@@ -12,6 +12,7 @@
 | EV-0004 | Phase dependency graph is executable and deadlock-free | mechanical validation | `python scripts/check_phase_graph.py` | **exit 0. 10/10 PASS.** Graph **parsed from authoritative documents**, not hard-coded: 41 phases from the Master Specification · 41 prerequisite rows from `IMPLEMENTATION_DEPENDENCY_MATRIX.md` · 1 DENY from the Master Specification · 8 human gates from `AUTHORITY_MAP.yaml`. 92 edges over 3 graph-edge classes; human gates checked separately. No forward prerequisite · no directed cycle · all phases reachable · DENY satisfiable (22B before 23) · Release reachable · Installer integrates Recovery Supervisor · no duplicate release authority | ARK-REQ-0135, 0136, 0182 |
 | EV-0004N | **Drift negative control** for EV-0004 | mechanical validation | `python scripts/check_phase_graph_negative.py` | **exit 0 (control behaved correctly).** The HG1-05 defect is injected into an **in-memory copy** of the authoritative matrix and the same parser + validator re-run: **3 checks FAIL as required**, reporting the cycle `25 → 26 → 22B → 23 → 24 → 25`. Repository matrix verified unmodified afterwards. Proves the validator rejects a defective authoritative input rather than passing vacuously | — |
 | EV-0005 | Phase 0A/0B deliverable reconciliation, counts derived from canonical lists | mechanical validation | `python scripts/check_phase0_deliverables.py` | **exit 0.** Phase 0A **16/16**, Phase 0B **11/11**. Bullet counts parsed from the Build Protocol; every bullet resolved by file existence **and** content probe | ARK-REQ-0224, 0225 |
+| **EV-0006** | **HUMAN GATE 1 acceptance decision** | **human decision record** | independent inspection of the actual Phase 0A/0B artifacts and independent execution of the validation scripts by the human acceptance authority | **ACCEPTED.** Candidate `007ebf6e9275fa99d932022004440b1b869701d4`. Phase 0A and 0B accepted as one package. Recorded as `HGR-001` in `HUMAN_GATE_RECORDS.md` | ARK-REQ-0183, 0201, 0226 |
 
 Both commands were executed in this phase and their output recorded. No result in this index is estimated, recalled or inferred.
 
@@ -32,7 +33,7 @@ Both commands were executed in this phase and their output recorded. No result i
 | Golden Repair benchmark run | NOT_APPLICABLE | requires an accepted Golden Product |
 | Mutation / property / chaos | NOT_APPLICABLE | nothing to mutate or perturb |
 | L2 / L3 execution evidence | NOT_APPLICABLE | no packaged artifact exists |
-| HUMAN GATE 1 record | **AWAITING** | must be granted by the human acceptance authority |
+| HUMAN GATE 1 record | **PASS — GRANTED** | see EV-0006 |
 
 ## Coverage statement
 

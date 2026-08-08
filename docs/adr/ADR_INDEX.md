@@ -1,20 +1,23 @@
 # ADR INDEX — ARKALI GENESIS v2
 
-**Status:** PHASE 0 CANDIDATE — AWAITING HUMAN GATE 1
+**Status:** ACCEPTED under HUMAN GATE 1 (record `HGR-001`)
+**Accepted candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 
-ADRs are immutable once accepted. A superseded ADR is retained and marked, never deleted or edited in place.
+All nine Phase 0 ADRs were transitioned PROPOSED → ACCEPTED by the human acceptance authority as part of the Phase 0A + 0B acceptance package.
+
+**ADRs are immutable once accepted.** From this point the decisions below may not be edited in place. A change requires a new ADR that supersedes the earlier one, which is retained and marked `SUPERSEDED_BY`. ADR-0001, ADR-0005 and ADR-0008 govern Protected Core content and therefore additionally require HUMAN GATE 2 to supersede.
 
 | ADR | Title | Status | Resolves |
 |---|---|---|---|
-| ADR-0001 | Canonical authority map and machine-readable enforcement | PROPOSED | ARK-REQ-0018, 0019, 0052, 0351 |
-| ADR-0002 | Isolation Backend abstraction — properties, not technologies | PROPOSED | ARK-REQ-0017, 0113, 0118–0123 |
-| ADR-0003 | Capability Graph split: schema Phase 3, activation Phase 9B | PROPOSED | ARK-REQ-0046, 0047, 0048, 0049 |
-| ADR-0004 | Canonical workflow graph sole authority; hash-bound derived caches | PROPOSED | ARK-REQ-0063, 0064, 0065, 0332 |
-| ADR-0005 | Protected Core membership and modification path | PROPOSED | ARK-REQ-0108–0112, 0236 |
-| ADR-0006 | SQLite+WAL local-first with PostgreSQL-ready abstractions | PROPOSED | ARK-REQ-0011, 0012 |
-| ADR-0007 | Durable runtime without a mandatory Temporal dependency | PROPOSED | ARK-REQ-0059, 0061 |
-| ADR-0008 | Numeric architecture budgets and GATE 8 exception path | PROPOSED | ARK-REQ-0030, 0031, 0032 |
-| ADR-0009 | Promotion and rollback as separate lifecycle authorities | PROPOSED | ARK-REQ-0023, 0155, 0156 |
+| ADR-0001 | Canonical authority map and machine-readable enforcement | ACCEPTED | ARK-REQ-0018, 0019, 0052, 0351 |
+| ADR-0002 | Isolation Backend abstraction — properties, not technologies | ACCEPTED | ARK-REQ-0017, 0113, 0118–0123 |
+| ADR-0003 | Capability Graph split: schema Phase 3, activation Phase 9B | ACCEPTED | ARK-REQ-0046, 0047, 0048, 0049 |
+| ADR-0004 | Canonical workflow graph sole authority; hash-bound derived caches | ACCEPTED | ARK-REQ-0063, 0064, 0065, 0332 |
+| ADR-0005 | Protected Core membership and modification path | ACCEPTED | ARK-REQ-0108–0112, 0236 |
+| ADR-0006 | SQLite+WAL local-first with PostgreSQL-ready abstractions | ACCEPTED | ARK-REQ-0011, 0012 |
+| ADR-0007 | Durable runtime without a mandatory Temporal dependency | ACCEPTED | ARK-REQ-0059, 0061 |
+| ADR-0008 | Numeric architecture budgets and GATE 8 exception path | ACCEPTED | ARK-REQ-0030, 0031, 0032 |
+| ADR-0009 | Promotion and rollback as separate lifecycle authorities | ACCEPTED | ARK-REQ-0023, 0155, 0156 |
 
 ---
 

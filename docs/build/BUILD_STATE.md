@@ -1,8 +1,10 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** PHASE 0 CANDIDATE — AWAITING HUMAN GATE 1
+**Current state:** **PHASE 0 ACCEPTED — PHASE 1 UNLOCKED, NOT STARTED**
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
-**Last updated by:** Phase 0 candidate generation
+**Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
+**HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
+**Last updated by:** HUMAN GATE 1 acceptance recording
 
 ---
 
@@ -10,11 +12,11 @@
 
 | Phase | Title | Status |
 |---|---|---|
-| 0A | Canonical Architecture | **COMPLETE (candidate)** |
-| 0B | Governance & Executable Contracts | **COMPLETE (candidate)** |
-| 0 | Acceptance package (0A + 0B) | **AWAITING HUMAN GATE 1** |
-| 1 | Repository Bootstrap | NOT_STARTED — locked until GATE 1 |
-| 2 … 37 | all subsequent phases | NOT_STARTED — locked |
+| 0A | Canonical Architecture | **ACCEPTED** |
+| 0B | Governance & Executable Contracts | **ACCEPTED** |
+| 0 | Acceptance package (0A + 0B) | **ACCEPTED — HUMAN GATE 1 granted** |
+| 1 | Repository Bootstrap | **UNLOCKED — NOT_STARTED** |
+| 2 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order, no further gate until GATE 2 (Phase 23) |
 
 ## What exists
 
@@ -50,10 +52,22 @@
 | Any test suite executed | NOT_APPLICABLE | Phase 0 produces no implementation |
 | Provider configured | NOT_CONFIGURED | no provider required or used in Phase 0 |
 | Isolation backends probed | NOT_TESTED | probe runs at Phase 4 |
-| Human Gate 1 | **AWAITING** | must not be self-accepted |
+| Human Gate 1 | **ACCEPTED** | granted by the human acceptance authority after independent inspection and independent execution of the validators; record `HGR-001` |
 
 ## Next exact action
 
-Submit the Phase 0A + 0B package as **one acceptance package** to the human acceptance authority for HUMAN GATE 1. Do not begin Phase 1. Do not self-accept.
+**Begin Phase 1 — Repository Bootstrap.** Phase 1 is unlocked and not started; no Phase 1 work has been performed.
 
-On GATE 1 acceptance: begin Phase 1 (Repository Bootstrap), then Phase 2 (Foundation + Contracts + Phase Gate Checker), at which point the architecture gates and the Checker become executable and Phase 0's `NOT_TESTED` items become testable.
+Phase 1 creates the repository skeleton only. Phase 2 (Foundation + Contracts + Phase Gate Checker) follows, at which point the eight architecture gates and the deterministic Phase Gate Checker become executable and Phase 0's `NOT_TESTED` items become testable for the first time.
+
+From here, normal phases are accepted by machine verdict without human approval. The next human gate is **GATE 2** at Phase 23 (Stable Core promotion), unless a phase reaches GATE 4, 5, 6 or 8 earlier.
+
+## Carried forward past acceptance
+
+Acceptance of Phase 0 closed no finding other than the gate itself:
+
+- 0 of 303 MANDATORY requirements are verified. Phase 0 established the denominator; it verified no capability.
+- The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
+- Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
+- 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.
+- 14 recorded defects remain in `KNOWN_FAILURES.md` as permanent evidence.

@@ -37,4 +37,5 @@ Decisions taken during Phase 0 that are not large enough for an ADR, or that rec
 | Workflow derived caches | human authority | Permitted when deterministically derived, hash-bound and invalidated |
 | ROLLBACK_STABLE constraints | human authority | Recovery-Supervisor-only, verified immutable target, atomic pointer switch preferred, no transformation |
 | Autonomy model | human authority | Machine acceptance for normal phases; stop only at the 8 gates or a failed machine gate |
+| **HUMAN GATE 1 ACCEPTED** | human authority | Phase 0A + 0B accepted as one package on candidate `007ebf6`; 9 ADRs PROPOSED → ACCEPTED; Phase 1 unlocked. Recorded as `HGR-001`. Autonomous progression through normal phases now applies until GATE 2 (Phase 23) or an earlier gate condition |
 | Isolation Backend abstraction | human authority | Properties, not technologies; unsatisfiable ⇒ UNSUPPORTED/DENY; never silently downgrade |

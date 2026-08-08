@@ -12,9 +12,11 @@ Three HIGH defects were found by independent review at HUMAN GATE 1 and are now 
 
 | ID | Blocker | Type | Owner | Blocks |
 |---|---|---|---|---|
-| EXT-001 | HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted | HUMAN GATE | human acceptance authority | Phase 1 and all subsequent phases |
+| ~~EXT-001~~ | ~~HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted~~ | HUMAN GATE | human acceptance authority | **CLOSED** — granted on candidate `007ebf6`, record `HGR-001` |
 
-Phase 1 is locked. This is the designed state, not a defect.
+**No external blockers open.** Phase 1 is unlocked and not started.
+
+Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an earlier trigger of GATE 4 (security boundary change), GATE 5 (applicability waiver), GATE 6 (migration APPLY to real/stable data) or GATE 8 (architecture budget exception).
 
 ## Deferred items (not blockers, tracked so they are not lost)
 

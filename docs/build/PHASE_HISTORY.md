@@ -7,7 +7,11 @@
 | 3 | Canonical architecture repair (pre-phase) | COMPLETE | `079c925` | 9 BLOCKER + 16 HIGH findings repaired in the canonical set |
 | 4 | **PHASE 0A — Canonical Architecture** | **CANDIDATE** | pending | architecture package produced; no implementation |
 | 5 | **PHASE 0B — Governance & Executable Contracts** | **CANDIDATE** | pending | register, authority map, checker spec, ADRs |
-| 6 | PHASE 0 acceptance package | **AWAITING HUMAN GATE 1** | — | not self-accepted |
+| 6 | PHASE 0 acceptance package (candidate rev 1) | REJECTED by review | `85f3c1c` | HG1-01…HG1-04 |
+| 7 | PHASE 0 acceptance package (candidate rev 2) | REJECTED by review | `5c6a28d` | HG1-05…HG1-09 |
+| 8 | PHASE 0 acceptance package (candidate rev 3) | REJECTED by review | `63ab9a8` | HG1-10…HG1-12 |
+| 9 | **PHASE 0 acceptance package (candidate rev 4)** | **ACCEPTED — HUMAN GATE 1** | `007ebf6` | record `HGR-001`; Phase 0A + 0B accepted as one package; 9 ADRs PROPOSED → ACCEPTED; Phase 1 unlocked |
+| 10 | PHASE 1 — Repository Bootstrap | NOT_STARTED | — | unlocked, not begun |
 
 ## Phase 0 report
 
@@ -51,4 +55,6 @@ No application test suite was executed: NOT_APPLICABLE — Phase 0 produces no i
 
 **Next exact action.** Submit Phase 0A+0B as one package for HUMAN GATE 1. Do not begin Phase 1.
 
-**Status.** PASS (internal audit) — **AWAITING HUMAN GATE 1**. Not accepted.
+**Status.** **ACCEPTED.** HUMAN GATE 1 granted by the human acceptance authority on candidate `007ebf6e9275fa99d932022004440b1b869701d4`, following independent inspection of the actual artifacts and independent execution of the validation scripts. Recorded as `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`.
+
+Phase 0 required four candidate revisions. Fourteen defects were recorded, ten of them found by independent review rather than self-audit — the record of that is retained in full and is not superseded by acceptance.
