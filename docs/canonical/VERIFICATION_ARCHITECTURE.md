@@ -98,4 +98,8 @@ Both must equal 100% for Production Ready. `NOT_TESTED`, `NOT_CONFIGURED`, `UNSU
 
 ## 2.4 Phase 0 coverage position
 
-0 of 301 MANDATORY requirements are verified. Phase 0 establishes the denominator and the graph shape; it verifies no capability and claims no coverage.
+**0 verified MANDATORY requirements at Phase 0. The exact denominator is read from the Canonical Requirement Register — it is never duplicated or hard-coded here.**
+
+Phase 0 establishes the denominator and the graph shape; it verifies no capability and claims no coverage.
+
+*Snapshot at this candidate (informational only, not a second denominator):* the register holds 313 entries — 303 MANDATORY, 8 CONDITIONAL, 2 OPTIONAL. If this snapshot ever disagrees with `REQUIREMENT_REGISTER.md`, **the register wins and this snapshot is the defect.**

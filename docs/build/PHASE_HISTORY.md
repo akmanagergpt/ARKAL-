@@ -43,6 +43,8 @@ No application test suite was executed: NOT_APPLICABLE — Phase 0 produces no i
 
 **Evidence created.** `EVIDENCE_INDEX.md` with two mechanical validation records.
 
+**Second correction (HUMAN GATE 1, review 2).** Five further defects were found by independent review of the corrected package and are closed: F-0009 (phase-order deadlock 22B↔26 masked by a false-negative cycle check), F-0010 (impossible forward prerequisite C-03 + Phase 0B deliverable miscount 12 vs 11), F-0011 (stale denominators presented as current PASS basis in three artifacts). Two deterministic validators were added — `scripts/check_phase_graph.py` (9/9 PASS, with a negative control that reproduces the deadlock cycle) and `scripts/check_phase0_deliverables.py` (0A 16/16, 0B 11/11, counts parsed from the canonical lists).
+
 **Limitations.** Phase 0 is documentation only. The architecture is unproven until code exists. Seven self-introduced defects are recorded in `KNOWN_FAILURES.md`: four caught by internal self-audit (F-0001…F-0004) and **three caught only by independent review** (F-0005 false closure of ARK-REQ-0090/0091, F-0006 five missing Phase 0A deliverables, F-0007 ARK-REQ-0012 misclassification). That the internal audit passed while three canonical traceability defects remained is itself the most significant limitation of this phase.
 
 **Blockers.** None internal. External: HUMAN GATE 1.

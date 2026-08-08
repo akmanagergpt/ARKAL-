@@ -22,6 +22,7 @@
 - **Phase 0A architecture package (8):** `ARCHITECTURE.md`, `SECURITY_ARCHITECTURE.md`, `STATE_MACHINES.md`, `EXECUTION_AND_CAPABILITY.md`, `CONTRACT_INVENTORY.md` (36 families), `VERIFICATION_ARCHITECTURE.md` (test architecture + evidence graph strategy), `IMPLEMENTATION_DEPENDENCY_MATRIX.md`, `CONTRADICTION_ANALYSIS.md`.
 - **Phase 0B governance package (5):** `REQUIREMENT_REGISTER.md` (313 entries), `AUTHORITY_MAP.yaml` (machine-readable, parses), `GOLDEN_REPAIR_CORPUS_DEFINITION.md`, `PHASE_GATE_CHECKER.md`, `ADR_INDEX.md` (9 ADRs, all PROPOSED).
 - Build state artifacts (this file and siblings), `EVIDENCE_INDEX.md`.
+- **Validation tooling (2):** `scripts/check_phase_graph.py`, `scripts/check_phase0_deliverables.py`. These are Phase 0 validators, not application source code — they analyse documents and import no ARKALI module.
 
 ## What does not exist
 
@@ -39,8 +40,9 @@
 |---|---|---|
 | Architecture package produced | PASS | documents exist and are internally consistent |
 | Requirement register produced | PASS | 313 entries, 0 duplicates, mechanically counted |
-| Phase 0A deliverables vs Build Protocol list | PASS | 16/16 present, item by item |
-| Phase 0B deliverables vs Build Protocol list | PASS | 11/11 present, item by item |
+| Phase 0A deliverables vs Build Protocol list | PASS | 16/16, count derived from the canonical list, each content-probed (EV-0005) |
+| Phase 0B deliverables vs Build Protocol list | PASS | 11/11, count derived from the canonical list, each content-probed (EV-0005) |
+| Phase dependency graph executable | PASS | 9/9, all four edge classes, negative control fails as required (EV-0004, EV-0004N) |
 | Golden Repair corpus instantiated | NOT_APPLICABLE | no accepted Golden Product exists; ARK-REQ-0187/0188 open at Phase 30 |
 | Authority map machine-readable | PASS | parses; 0 duplicate concern authorities |
 | Architecture gates executed | NOT_TESTED | no code exists to analyse; gates run from Phase 2 |

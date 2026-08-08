@@ -8,7 +8,10 @@
 |---|---|---|---|---|---|
 | EV-0001 | `AUTHORITY_MAP.yaml` is machine-readable and internally consistent | mechanical validation | `python -c` YAML safe_load + invariant assertions | **exit 0.** 31 contexts · 39 concerns · 14 operation classes · 8 architecture gates · duplicate concern authorities = 0 · all `max_*` budgets numeric = True · contexts with unknown layer = [] · `stable_mutation.direct_mutation_permitted_by` = [] · protected_core members = 7 | ARK-REQ-0018, 0030, 0108, 0109 |
 | EV-0002 | `REQUIREMENT_REGISTER.md` structural integrity | mechanical validation | `python -c` regex extraction + counting | **exit 0.** 313 entries · 313 unique · duplicate IDs = 0 · MANDATORY 303 / CONDITIONAL 8 / OPTIONAL 2 · CONDITIONAL entries missing an applicability rule = 0 · orphan applicability rules = 0 | ARK-REQ-0033, 0034, 0035, 0039 |
-| EV-0003 | Phase 0A/0B deliverable reconciliation against the Build Protocol lists | mechanical validation | file-existence check per canonical list item | **exit 0.** Phase 0A 16/16 present · Phase 0B 11/11 present | ARK-REQ-0224, 0225 |
+| EV-0003 | Phase 0A/0B deliverable reconciliation (superseded by EV-0005) | mechanical validation | file-existence check per canonical list item | **exit 0**, but count was hand-mapped and produced a false PASS (F-0008) and a miscount (F-0010). Superseded | ARK-REQ-0224, 0225 |
+| EV-0004 | Phase dependency graph is executable and deadlock-free | mechanical validation | `python scripts/check_phase_graph.py` | **exit 0. 9/9 PASS.** 41 nodes, 88 edges across explicit prerequisites + canonical phase-order + DENY. No forward prerequisite · no directed cycle · all phases reachable · 22B before 23 · 26 reachable · 29 integrates Recovery Supervisor · no duplicate release authority | ARK-REQ-0135, 0136, 0182 |
+| EV-0004N | **Negative control** for EV-0004 | mechanical validation | same validator with 22B prerequisites reverted to the defective `5, 20, 26` | **exit 1. 3 checks FAIL as required**, reporting the cycle `22B → 23 → 24 → 25 → 26 → 22B`. Proves the validator detects the deadlock rather than passing vacuously | — |
+| EV-0005 | Phase 0A/0B deliverable reconciliation, counts derived from canonical lists | mechanical validation | `python scripts/check_phase0_deliverables.py` | **exit 0.** Phase 0A **16/16**, Phase 0B **11/11**. Bullet counts parsed from the Build Protocol; every bullet resolved by file existence **and** content probe | ARK-REQ-0224, 0225 |
 
 Both commands were executed in this phase and their output recorded. No result in this index is estimated, recalled or inferred.
 
@@ -33,4 +36,4 @@ Both commands were executed in this phase and their output recorded. No result i
 
 ## Coverage statement
 
-Mandatory requirement coverage is **0 / 303 verified** at Phase 0, by design. Phase 0 establishes the denominator; it verifies no capability. Any coverage percentage reported before Phase 2 would be meaningless, and none is claimed.
+Mandatory requirement coverage is **0 verified** at Phase 0, by design. The denominator is read from the Canonical Requirement Register (snapshot at this candidate: 303 MANDATORY); it is not maintained independently here. Phase 0 establishes the denominator; it verifies no capability. Any coverage percentage reported before Phase 2 would be meaningless, and none is claimed.

@@ -11,9 +11,9 @@
 | # | Check | Result | Basis |
 |---|---|---|---|
 | 1 | Every major canonical concern has exactly one authority | **PASS** | A1 — 39 concerns, 0 with multiple owners |
-| 2 | Every normative requirement maps to an ARK-REQ ID | **PASS (with scope note)** | 311 entries covering every section of MS/BP/VDC; see note below |
-| 3 | Every MANDATORY requirement has an owner and evidence definition | **PASS** | A2, A3 — 311/311 |
-| 4 | Every CONDITIONAL requirement has an objective applicability rule | **PASS** | A4, A5 — 9/9, and no orphan rules |
+| 2 | Every normative requirement maps to an ARK-REQ ID | **PASS (with scope note)** | 313 entries covering every section of MS/BP/VDC; see note below |
+| 3 | Every MANDATORY requirement has an owner and evidence definition | **PASS** | A2, A3 — 313/313 |
+| 4 | Every CONDITIONAL requirement has an objective applicability rule | **PASS** | A4, A5 — 8/8, and no orphan rules |
 | 5 | No implementing actor can self-author applicability | **PASS** | ARK-REQ-0040, 0217, 0306; MS §Applicability; BP mandatory rule |
 | 6 | No direct Stable mutation path exists | **PASS** | A6 — `direct_mutation_permitted_by: []`; A16 — `WRITE_STABLE_FILE` fixed DENY |
 | 7 | ROLLBACK_STABLE is Recovery-Supervisor-only and immutable-revision based | **PASS** | A7–A10 |
@@ -36,7 +36,7 @@
 
 | # | Check | Result |
 |---|---|---|
-| 20 | No duplicate ARK-REQ IDs | **PASS** — 311 entries, 311 unique |
+| 20 | No duplicate ARK-REQ IDs | **PASS** — 313 entries, 313 unique |
 | 21 | No duplicate state-machine authority | **PASS** (A24) |
 | 22 | No duplicate lifecycle authority | **PASS** — 14 lifecycles, single owner each |
 | 23 | Provider fields single-owned, copying and caching prohibited | **PASS** (A25) |
@@ -76,6 +76,21 @@ Prior MEDIUM/LOW findings carried from the canonical repair are listed in `OPEN_
 | Unbounded loops | 0 |
 | Security boundary ambiguities | 0 |
 
+### Current-state denominator (single source)
+
+All current-state assertions in this document use the Canonical Requirement Register as their only denominator:
+
+| Metric | Current value |
+|---|---|
+| Register entries | **313** |
+| MANDATORY | **303** |
+| CONDITIONAL | **8** |
+| OPTIONAL | **2** |
+| Phase 0A deliverables | **16/16** (count derived from the canonical Build Protocol list) |
+| Phase 0B deliverables | **11/11** (count derived from the canonical Build Protocol list) |
+
+Any figure elsewhere in this file that differs from the table above is **historical failed evidence** and is labelled as such. No stale value is used as a current PASS basis.
+
 ---
 
 # HUMAN GATE 1 CORRECTION RE-AUDIT
@@ -95,8 +110,8 @@ Four HIGH defects were found after the first internal audit passed — three by 
 | # | Check | Result |
 |---|---|---|
 | 1 | No Phase 0 requirement marked CLOSED without required evidence | **PASS** |
-| 2 | Every Phase 0A deliverable exists | **PASS** — 16/16, content-probed |
-| 3 | Every Phase 0B deliverable exists | **PASS** — 12/12, content-probed |
+| 2 | Every Phase 0A deliverable exists | **PASS** — 16/16, count derived from the canonical list, content-probed (EV-0005) |
+| 3 | Every Phase 0B deliverable exists | **PASS** — 11/11, count derived from the canonical list, content-probed (EV-0005) |
 | 4 | Classifications do not narrow unconditional requirements | **PASS** |
 | 5 | CONDITIONAL rules cannot be scope-reduction exploits | **PASS** — 8/8 with objective rules, 0 orphan rules |
 | 6 | BUILD_STATE / OPEN_BLOCKERS / PHASE_HISTORY / PHASE_0_AUDIT / REGISTER agree | **PASS** |

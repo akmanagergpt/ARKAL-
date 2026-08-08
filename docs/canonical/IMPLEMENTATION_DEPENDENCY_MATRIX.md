@@ -33,11 +33,11 @@ Legend — `GATE n` = human gate required to exit · `DENY` = policy-enforced pr
 | 20 | Database Migration Safety + Full Backup/Recovery | 5, 6 | migration safety chain | **GATE 6** on APPLY |
 | 21 | Plugins + Integrations + Research | 4, 9 | C-30 | GATE 4 if boundary changes |
 | 22 | Local AI + Model Laboratory | 4, 9 | local adapters | — |
-| **22B** | **Recovery Supervisor + Core Rollback Verification** | **5, 20, 26** | C-32; verified rollback | — |
+| **22B** | **Recovery Supervisor + Core Rollback Verification** | **5, 6, 13, 20** | **minimal stable-revision pointer primitive** (owned by `lifecycle.release`); C-32; verified rollback | — |
 | 23 | Self-Evolution | **22B (DENY until verified)**, 13, 16 | C-33 | **GATE 2** |
 | 24 | Generated Product Evolution SDK | 16, 13 | C-36 | GATE 3 where approval-gated |
 | 25 | Operations + Hardware Intelligence | 7, 9, 11 | C-34 | — |
-| 26 | Release / Supply Chain / Deployment | 6, 13 | C-31 | — |
+| 26 | Release / Supply Chain / Deployment | 6, 13, 22B | C-31 (full release, SBOM, supply chain, deployment) | — |
 | 27 | Command Center Consolidation + Skill Modes | 5…25 slices | C-35 consolidation | — |
 | 28 | Tauri Desktop | 27 | desktop shell | — |
 | 29 | Installer + Recovery Supervisor Integration | 26, 28, 22B | ARKALI_Setup.exe | — |
@@ -53,9 +53,17 @@ Legend — `GATE n` = human gate required to exit · `DENY` = policy-enforced pr
 2. **22B before 23.** Self-Evolution is `DENY` at the PDP until Recovery Supervisor rollback verification passes. A Recovery Supervisor that exists but is unverified does not satisfy it.
 3. **Minimal backup/restore in 5, not 20.** State begins accumulating at Phase 5; a proven restore path must exist from the same phase. Phase 20 adds migration safety and full recovery — a distinct concern, distinctly titled, so no duplicate lifecycle authority arises.
 4. **Frontend slices from Phase 5.** Every capability with a production-visible state ships its own UI increment. Phase 27 consolidates; it is not first integration.
-5. **26 before 22B.** Rollback targets an immutable revision under Release Authority, so revision identity must exist first.
+5. **22B does NOT require full Phase 26.** Rollback needs only a *minimal* set of primitives, not the release/supply-chain/deployment system:
+   - immutable, content-addressed revision identity — Phase 6 (`evidence.artifact`);
+   - a record that a revision was accepted, i.e. "previously verified" — Phase 13 (`acceptance.engine`);
+   - restorable snapshot + restore proof — Phase 5, hardened at Phase 20 (`lifecycle.recovery`);
+   - an **atomic stable-revision pointer** — delivered *within* Phase 22B and owned by `lifecycle.release`.
+
+   The pointer primitive is delivered by Phase 22B but its **authority remains `lifecycle.release`**. No second release authority is created: Phase 26 extends the same owner with SBOM, signing, supply chain and deployment. `stable_promotion` has exactly one owner in `AUTHORITY_MAP.yaml` and this does not change it.
 6. **30 before 31.** Mutation and chaos verification need a real generated product to perturb.
 
 ## Cycle check
 
-The prerequisite relation was checked for cycles: **none found**. The graph is a DAG rooted at 0A with a single human-gate cut between 0B and 1.
+Validated by `scripts/check_phase_graph.py` over **three** edge classes — explicit prerequisites, mandatory canonical phase-order edges, and the 22B→23 DENY precondition. Result recorded in `docs/acceptance/EVIDENCE_INDEX.md` (EV-0004).
+
+An earlier revision of this matrix declared `22B ← 26` and reported "no cycles" because the check considered only explicit prerequisite edges. With canonical phase-order edges included that produced a genuine deadlock: 22B needs 26, 26 is reachable only past 23, and 23 is DENY until 22B. **A cycle check that omits the canonical ordering edges is a false negative**; the validator now includes them by construction.

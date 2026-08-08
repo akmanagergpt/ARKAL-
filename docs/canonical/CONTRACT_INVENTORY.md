@@ -12,6 +12,7 @@
 4. Compatibility class is declared per contract and enforced by contract tests from Phase 2.
 5. Contracts owned by a Protected Core context are themselves Protected Core; changing them requires HUMAN GATE 2.
 6. `docs/contracts/` holds the authoritative schema files from Phase 2. Paths below are **planned locations**, not existing files.
+7. **Definition phase ≠ implementation phase.** A contract's *definition* (schema shape, versioning rule, error surface) may land earlier than the *runtime implementation* that satisfies it. Where the two differ the phase column shows `def N / impl M`. A contract may be a prerequisite of a phase only by its **definition** phase; requiring a contract whose definition lands later than the consuming phase is a forward prerequisite and is invalid.
 
 Category key: `INT` internal service interface · `HTTP` external HTTP API · `DB` persistence schema · `EVT` event/message · `ART` artifact format · `POL` policy decision · `EVD` evidence record · `GRAPH` graph document · `MANIFEST` third-party manifest.
 
@@ -25,7 +26,7 @@ Compatibility key: `STRICT` no breaking change without MAJOR + migration · `ADD
 |---|---|---|---|---|---|---|---|---|---|---|
 | C-01 | Error taxonomy | `kernel.contracts` | kernel | all contexts | INT | `docs/contracts/errors.md` + `kernel/contracts/errors.py` | semver | STRICT | `acceptance.engine` — contract tests | 2 |
 | C-02 | Correlation/causation envelope | `kernel.observability` | all emitters | `surfaces.operations`, `evidence.audit` | EVT | `docs/contracts/telemetry_envelope.md` | semver | ADDITIVE | `kernel.observability` — integration | 2 |
-| C-03 | Persistence base schema + migration contract | `kernel.persistence` | kernel | all persisting contexts | DB | `backend/alembic/` + `docs/contracts/persistence.md` | migration-numbered | STRICT | `lifecycle.recovery` — migration + restore evidence | 5 |
+| C-03 | Persistence base schema + migration contract | `kernel.persistence` | kernel | all persisting contexts | DB | `backend/alembic/` + `docs/contracts/persistence.md` | migration-numbered | STRICT | `lifecycle.recovery` — migration + restore evidence | **def 2 / impl 5** |
 | C-04 | Requirement register record (`ARK-REQ`) | `control.specification` | Phase 0B / human | `acceptance.engine`, all phase reports | INT | `docs/contracts/requirement_record.md` | semver | STRICT | `acceptance.engine` — coverage computation | 2 |
 | C-05 | Canonical authority map document | `control.architecture` | Phase 0B / human | architecture gates, `control.policy` | GRAPH | `docs/canonical/AUTHORITY_MAP.yaml` (exists) | schema_version | STRICT | `control.architecture` — 8 architecture gates | 2 |
 | C-06 | Architecture budget record | `control.architecture` | Phase 0B / human | architecture gates | INT | within `AUTHORITY_MAP.yaml` | schema_version | STRICT | `control.architecture` — budget gate | 2 |
@@ -66,6 +67,10 @@ Compatibility key: `STRICT` no breaking change without MAJOR + migration · `ADD
 
 C-05, C-06, C-07, C-08, C-09, C-10, C-15, C-16, C-17, C-18, C-31, C-32 are owned by Protected Core contexts. Changing any of them runs the Stable Core candidate lifecycle and requires HUMAN GATE 2.
 
-## Contracts required before Phase 2 implementation begins
+## Contract **definitions** required by Phase 2
 
-C-01, C-03, C-04, C-05, C-06, C-17, C-18 — the foundation set. Phase 2 cannot deliver the Phase Gate Checker without C-17 and C-18.
+C-01 (error taxonomy), C-03 (persistence schema + migration contract — **definition only**), C-04 (requirement record), C-05 (authority map — already exists), C-06 (architecture budgets — already exists), C-17 (phase report), C-18 (phase gate verdict).
+
+All seven have **definition phase ≤ 2**, so the set is executable. C-03 is the only one whose runtime implementation lands later: Phase 2 defines the persistence schema and migration contract; Phase 5 implements the runtime that satisfies it. Phase 2 cannot deliver the Phase Gate Checker without C-17 and C-18, since checks C1 and C2 read those shapes.
+
+An earlier revision of this section listed C-03 as required "before Phase 2" while its phase column read `5` — a contract required by a phase earlier than the phase that produced it. That was an impossible forward prerequisite (HG1-06), corrected by separating definition from implementation under governing rule 7.
