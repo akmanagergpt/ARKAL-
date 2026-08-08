@@ -16,15 +16,16 @@ Build ARKALI GENESIS v2 as a completely new greenfield repository.
 Do not use the historical ARKALI source tree as the architectural foundation.
 Do not start mass code generation.
 
-FIRST execute PHASE 0 — Architecture Freeze.
+FIRST execute PHASE 0 — Architecture Freeze, delivered as Phase 0A and Phase 0B,
+which together form one acceptance package under HUMAN GATE 1.
 
-Read all three documents completely and create the repository-local canonical architecture/build-state artifacts required by the Build Protocol.
+Read all three documents completely and create the repository-local canonical
+architecture/build-state artifacts required by the Build Protocol.
 
-At minimum produce:
+PHASE 0A — Canonical Architecture, at minimum:
 - final repository architecture,
 - four-plane architecture map,
 - bounded-context dependency map,
-- canonical authority map,
 - formal state-machine inventory,
 - capability graph schema,
 - contract inventory,
@@ -32,23 +33,53 @@ At minimum produce:
 - persistence model,
 - durable execution model,
 - worker/resource scheduler model,
-- security trust boundaries,
-- policy model,
 - observability model,
 - verification/test architecture,
 - implementation dependency matrix,
-- initial ADRs,
+- initial ADRs.
+
+PHASE 0B — Governance & Executable Contracts, at minimum:
+- canonical requirement register,
+- machine-readable canonical authority map (ADR-0001 + AUTHORITY_MAP.yaml),
+- canonical architecture budgets,
+- protected-core membership declaration,
+- security trust boundaries and isolation property matrix,
+- Isolation Backend registry design,
+- policy model including the Computer-Use operation-class resolution matrix,
+- canonical Windows clean-test baseline definition,
+- Golden Repair defect corpus definition,
+- Phase Gate Checker specification,
 - BUILD_STATE,
 - PHASE 0 REPORT.
 
-Validate PHASE 0 against all three authoritative documents.
+Submit PHASE 0 to the human acceptance authority for validation against all three
+authoritative documents. Do not self-accept PHASE 0.
 
-If PHASE 0 is PASS, continue autonomously to subsequent canonical phases.
-Do not ask for routine permission between normal engineering phases.
+If PHASE 0 is accepted by the human acceptance authority, continue autonomously
+through subsequent canonical phases. Do not ask for routine permission between
+normal engineering phases or between steps within a phase.
 
-Write actual files and run actual tests whenever filesystem/execution access is available.
+Stop only at a canonical HUMAN GATE, or when a machine acceptance gate FAILS.
+
+Canonical HUMAN GATES:
+1. PHASE 0 canonical architecture acceptance
+2. ARKALI Stable Core promotion
+3. generated-product promotion where explicitly approval-gated
+4. weakening or change of a security boundary, sandbox tier or protected-core policy
+5. exceptional applicability waiver
+6. APPLY of a migration to real or stable data
+7. final Production Release
+8. exception to a canonical architecture budget
+
+Canonical approval requirements always override autonomous continuation. This
+instruction can never reduce, waive, defer or reinterpret an approval gate stated
+in the canonical documents, and never converts a FAIL into progression.
+
+Write actual files and run actual tests whenever filesystem/execution access is
+available.
 
 Do not claim success for work that was not implemented or not tested.
+Never fabricate or simulate an external-provider result.
 
 Use honest states:
 PASS
@@ -59,10 +90,11 @@ NOT_CONFIGURED
 UNSUPPORTED
 NOT_APPLICABLE.
 
-Stop only for a genuine architectural contradiction, unavoidable external blocker, required credential/license, or a high-risk operation that explicitly requires user approval.
-
 The objective is not a prototype or mock dashboard.
 
-The objective is a production-grade Engineering Control Fabric whose software factory is verified by generating and running real applications, surviving failure injection, passing independent acceptance, completing four pre-delivery hardening rounds, and satisfying the canonical Verification and Delivery Contract.
+The objective is a production-grade Engineering Control Fabric whose software
+factory is verified by generating and running real applications, surviving failure
+injection, passing independent acceptance, completing four pre-delivery hardening
+rounds, and satisfying the canonical Verification and Delivery Contract.
 
-Begin PHASE 0 now.
+Begin PHASE 0A now.
