@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `6d6296def50dfab2cfdf7d6afb18294b8267c964` |
+| Current HEAD | `765bb077facbbaecdf5ee75b03ebeb8a6c4133b8` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -105,13 +105,13 @@ repository, the repository wins.
 | Phase 1 | **MACHINE-ACCEPTED** |
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
-| Phase 4 | **MACHINE-ACCEPTED at `1ea79f3` — DEFECTIVE.** F-0024 open: ARK-REQ-0111 reported as discharged without an implementation. Remediation and re-submission required |
-| Phase 5 | **UNLOCKED — NOT_STARTED. BLOCKED by F-0024** ← remediate F-0024 first |
+| Phase 4 | **MACHINE-ACCEPTED** — re-accepted after the ERR-004 remediation; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
+| Phase 5 | **UNLOCKED — NOT_STARTED** ← current work |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **64** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 32 Phase 4). ARK-REQ-0111 withdrawn pending F-0024 |
-| BLOCKER / HIGH | **0 / 1** — F-0024 open. Every phase gate returns `PHASE_BLOCKED` |
+| Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4), reconciled by check C6 against `phase_4_traceability.json` |
+| BLOCKER / HIGH | **0 / 0** |
 | MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every Phase 3 finding is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over 41 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
@@ -150,7 +150,9 @@ repository, the repository wins.
 | 22 | `5fa4d90` | handoff manifest refreshed after the errata (§12 rule) |
 | 23 | `1ea79f3` | **PHASE 4 MACHINE-ACCEPTED** — PDP/PEP, isolation, Protected Core, secrets, Local-Only. Later found **DEFECTIVE** (F-0024) |
 | 24 | `191958d` | handoff manifest refreshed after Phase 4 acceptance (§12 rule) |
-| 25 | `6d6296d` | **F-0024 reopened** — ARK-REQ-0111 discharged without an implementation; Phase 5 blocked ← HEAD at generation |
+| 25 | `6d6296d` | **F-0024 reopened** — ARK-REQ-0111 discharged without an implementation; Phase 5 blocked |
+| 26 | `0bf585c` | handoff manifest refreshed after F-0024 (§12 rule) |
+| 27 | `765bb07` | **ERR-004 remediation** — ARK-REQ-0111 implemented, finding parser fixed, **Phase 4 re-accepted** ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -202,7 +204,8 @@ No unavailable toolchain may be reported as PASS.
 | 0 BLOCKER, 0 HIGH | `OPEN_BLOCKERS.md` |
 | 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
 | Every Phase 3 finding (F-0018 … F-0021) is **closed**; F-0018 by ERR-002 and F-0020 by ERR-003 | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
-| Every Phase 4 finding (F-0022, F-0023) is **closed** within the phase | `KNOWN_FAILURES.md` |
+| Every Phase 4 finding (F-0022 … F-0025) is **closed**; F-0024 and F-0025 by the ERR-004 remediation | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
+| **A machine re-score of an already-accepted phase** is not settled by the canonical set. The position taken, and its basis, are recorded and may be overturned | **ERR-004** in `HUMAN_GATE_RECORDS.md` |
 | **TRUST-2/3/4 are UNSUPPORTED on this host** — a real probe result, not a defect. Re-probe on any new host | `phase_4_report.json` · EV-0033 |
 | **No execution surface exists**, so policy bypass resistance is CONTRACT-level only | EV-0032 |
 | Isolation backend probe deferral **DEF-003 is closed** | `OPEN_BLOCKERS.md` |
@@ -253,26 +256,23 @@ subject to the PDP, `kernel.persistence` is not Protected Core but
 
 ## 9. Next exact action
 
-**Remediate F-0024, then re-submit Phase 4. Do not begin Phase 5.**
+**Begin Phase 5 — Persistence + Project Registry + Minimal Backup/Restore.**
 
-`ARK-REQ-0111` (stronger verification profile for Protected Core changes) is a
-Phase 4 MANDATORY requirement owned by `acceptance.engine`. It was reported as
-discharged in the Phase 4 report without any implementation, and Phase Gate
-Checker C2 passed on that assertion. Either:
+Do not begin any later phase. Do not activate the Capability Graph — that is
+Phase 9B. Do not implement the Recovery Supervisor or Stable Core promotion.
 
-* implement and verify it — the acceptance engine must apply a stronger
-  verification profile (security review, adversarial review, full regression)
-  when a change touches Protected Core — and re-submit Phase 4; or
-* obtain a governance erratum from the acceptance authority reclassifying it.
+**Two acceptance rules now bind every phase report you write.** They exist
+because Phase 4's first revision discharged a requirement it had not
+implemented, and they are not optional:
 
-An implementing actor may not re-score its own accepted phase
-(`failed_gate_may_be_rescored_by_implementing_actor: false`).
-
-Also open: **F-0025** (MEDIUM) — `_parse_open_findings` drops any finding row
-containing the substring `CLOSED`, so a finding can be hidden by its own
-wording. Fix belongs with the F-0024 remediation.
-
-Phase 5's contract is derived in §8 and remains correct; it is simply blocked.
+* **C6** — a requirement may appear in `ark_req_ids_closed` only if
+  `docs/acceptance/phase_5_traceability.json` claims it SATISFIED with a named
+  implementation and a named evidence source. Any other state, a missing claim,
+  or an unbacked claim fails the gate.
+* **PROTECTED_CORE** — if the phase touches a protected-core path, the report
+  must carry three real executions whose summaries name *security review*,
+  *adversarial review* and *full regression*. There is no flag that substitutes
+  for them.
 
 ## 10. New-session bootstrap protocol
 
@@ -296,8 +296,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `6d6296def50dfab2cfdf7d6afb18294b8267c964` |
-| Generated after | **A new HIGH finding that changes continuation strategy** — F-0024, the Phase 4 acceptance defect. Cumulative verified corrected 65 → 64; NEXT EXACT ACTION changed from "begin Phase 5" to "remediate F-0024 and re-submit Phase 4". Multiple §12 triggers |
+| Generated at HEAD | `765bb077facbbaecdf5ee75b03ebeb8a6c4133b8` |
+| Generated after | **The ERR-004 remediation and Phase 4 re-acceptance.** F-0024 and F-0025 closed, `ARK-REQ-0111` genuinely satisfied, cumulative verified restored 64 → 65, NEXT EXACT ACTION back to "begin Phase 5". Multiple §12 triggers |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -345,7 +345,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 6d6296def50dfab2cfdf7d6afb18294b8267c964
+head: 765bb077facbbaecdf5ee75b03ebeb8a6c4133b8
 branch: main
 working_tree_clean: true
 
@@ -358,8 +358,8 @@ verified_by_phase:
   "1": 5
   "2": 23
   "3": 4
-  "4": 32
-cumulative_verified: 64
+  "4": 33
+cumulative_verified: 65
 
 accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4"]
 unlocked_phase: "5"
@@ -368,7 +368,7 @@ next_exact_action_phase: "5"
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
 adr_proposed: 0
-open_blocker_high: ["F-0024"]
+open_blocker_high: []
 
 authoritative_sources:
   - docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
