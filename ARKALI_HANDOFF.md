@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7` |
+| Current HEAD | `e323c67160b0cb9b121cba65eb276a0bbf63a12a` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -67,7 +67,7 @@ docs/acceptance/HUMAN_GATE_RECORDS.md    human decisions + ERR-001 erratum
 docs/build/BUILD_STATE.md                current phase status
 docs/build/PHASE_HISTORY.md              phase outcomes and commits
 docs/build/OPEN_BLOCKERS.md              open findings and deferrals
-docs/build/KNOWN_FAILURES.md             16 recorded defects, historical values
+docs/build/KNOWN_FAILURES.md             recorded defects, historical values
 docs/build/DECISION_LOG.md               decisions + human rulings
 docs/acceptance/EVIDENCE_INDEX.md        EV-0001 .. EV-0022
 ```
@@ -81,7 +81,18 @@ scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
 backend/                                    pytest suite (88 tests)
+backend/tests/governance/test_handoff_drift.py  handoff negative controls
 ```
+
+**Tracked root documentation — holds no governed value, never an authority:**
+
+```
+ARKALI_NEW_SESSION_PROMPT.txt        new-session bootstrap prompt
+ARKALI_YENI_OTURUM_DEVAM_NOTU.md     session-continuation note (Turkish)
+```
+
+Neither file may be read as authority. Where either disagrees with the
+repository, the repository wins.
 
 ## 3. Current verified state
 
@@ -116,7 +127,10 @@ backend/                                    pytest suite (88 tests)
 | 9 | `0ad45a7` | Phase 1 candidate — NOT ACCEPTED (F-0015) |
 | 10 | `1ae0835` | **ERR-001 erratum + Phase 1 MACHINE-ACCEPTED** |
 | 11 | `76edd26` | **Phase 2 MACHINE-ACCEPTED** |
-| 12 | `fc239ff` | cross-session handoff protocol; fixes F-0016 ← HEAD |
+| 12 | `fc239ff` | cross-session handoff protocol; fixes F-0016 |
+| 13 | `a08af56` | handoff manifest refreshed to committed HEAD (§12 rule) |
+| 14 | `74a9ccf` | **F-0017** — vacuous handoff negative control repaired |
+| 15 | `e323c67` | session-continuation note tracked as documentation ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -168,7 +182,7 @@ No unavailable toolchain may be reported as PASS.
 | Contract schema files under `docs/contracts/` deferred (DEF-008) | `OPEN_BLOCKERS.md` |
 | Clean-test baseline VM image deferred to Phase 36 (DEF-005) | `OPEN_BLOCKERS.md` |
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
-| 15 recorded defects retained as permanent evidence | `KNOWN_FAILURES.md` |
+| Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
 ## 8. Current phase contract — Phase 3
 
@@ -221,8 +235,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7` |
-| Generated after | Phase 2 machine acceptance; refreshed at handoff-protocol commit per the §12 rule |
+| Generated at HEAD | `e323c67160b0cb9b121cba65eb276a0bbf63a12a` |
+| Generated after | tracking of the session-continuation note, which resolved the working-tree drift; refreshed per the §12 rule. No phase, gate, ADR or requirement state changed |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -270,7 +284,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7
+head: e323c67160b0cb9b121cba65eb276a0bbf63a12a
 branch: main
 working_tree_clean: true
 
