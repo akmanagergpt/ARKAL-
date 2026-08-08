@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `e323c67160b0cb9b121cba65eb276a0bbf63a12a` |
+| Current HEAD | `85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -130,7 +130,9 @@ repository, the repository wins.
 | 12 | `fc239ff` | cross-session handoff protocol; fixes F-0016 |
 | 13 | `a08af56` | handoff manifest refreshed to committed HEAD (§12 rule) |
 | 14 | `74a9ccf` | **F-0017** — vacuous handoff negative control repaired |
-| 15 | `e323c67` | session-continuation note tracked as documentation ← HEAD at generation |
+| 15 | `e323c67` | session-continuation note tracked as documentation |
+| 16 | `fc8c98d` | handoff manifest refreshed after note tracking (§12 rule) |
+| 17 | `85cbcda` | pre-Phase-3 governance hygiene: GH-001/002/003 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -235,8 +237,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `e323c67160b0cb9b121cba65eb276a0bbf63a12a` |
-| Generated after | tracking of the session-continuation note, which resolved the working-tree drift; refreshed per the §12 rule. No phase, gate, ADR or requirement state changed |
+| Generated at HEAD | `85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f` |
+| Generated after | pre-Phase-3 governance hygiene (GH-001 defect-count dereference, GH-002 Phase 2 commit identity, GH-003 advisory-note state removal). Governed artifacts changed, so the §12 refresh was mechanically required, not discretionary. No phase, gate, ADR or requirement state changed |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -284,7 +286,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: e323c67160b0cb9b121cba65eb276a0bbf63a12a
+head: 85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f
 branch: main
 working_tree_clean: true
 
