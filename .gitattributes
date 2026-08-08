@@ -1,0 +1,116 @@
+# ============================================================================
+# ARKALI GENESIS v2 — deterministic line-ending and diff policy
+#
+# Goal: byte-for-byte stable files on every platform and every checkout.
+# Canonical documents must hash identically on Windows, macOS and Linux.
+#
+# Policy: LF everywhere, in the repository AND in the working tree.
+# Exceptions are limited to formats that genuinely require CRLF, and to
+# binary formats that must never be transformed or line-diffed.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# Default: detect text, normalise to LF in the repo, check out as LF.
+# This overrides any developer's local core.autocrlf setting.
+# ----------------------------------------------------------------------------
+* text=auto eol=lf
+
+
+# ----------------------------------------------------------------------------
+# Windows-native scripts — these require CRLF to execute reliably
+# ----------------------------------------------------------------------------
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+
+# ----------------------------------------------------------------------------
+# Binary formats — never transform, never line-diff
+# ----------------------------------------------------------------------------
+
+# Images
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.bmp  binary
+*.avif binary
+
+# Documents
+*.pdf  binary
+
+# Archives
+*.zip  binary
+*.7z   binary
+*.gz   binary
+*.tgz  binary
+*.bz2  binary
+*.xz   binary
+*.rar  binary
+
+# Executables and native libraries
+*.exe  binary
+*.dll  binary
+*.so   binary
+*.dylib binary
+*.msi  binary
+*.pdb  binary
+
+# Fonts
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+
+# Media
+*.mp4 binary
+*.webm binary
+*.mp3 binary
+*.wav binary
+
+# Databases and compiled artefacts
+*.db      binary
+*.sqlite  binary
+*.sqlite3 binary
+*.pyc     binary
+*.pyd     binary
+*.wasm    binary
+
+
+# ----------------------------------------------------------------------------
+# Explicit text declarations for canonical and source content
+#
+# Redundant against `* text=auto eol=lf` above, but stated deliberately so the
+# policy for canonical documents is unambiguous and survives future edits to
+# the default rule.
+# ----------------------------------------------------------------------------
+*.md   text eol=lf
+*.txt  text eol=lf
+*.py   text eol=lf
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.rs   text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.sql  text eol=lf
+*.sh   text eol=lf
+*.cfg  text eol=lf
+*.ini  text eol=lf
+
+# Lock files: text, LF, but keep diffs collapsed in review tooling
+package-lock.json  text eol=lf linguist-generated=true
+pnpm-lock.yaml     text eol=lf linguist-generated=true
+yarn.lock          text eol=lf linguist-generated=true
+poetry.lock        text eol=lf linguist-generated=true
+uv.lock            text eol=lf linguist-generated=true
+Cargo.lock         text eol=lf linguist-generated=true
