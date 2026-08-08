@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `1ea79f3978fab6cb11452eb30fe70b469c3ae111` |
+| Current HEAD | `6d6296def50dfab2cfdf7d6afb18294b8267c964` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -148,7 +148,9 @@ repository, the repository wins.
 | 20 | `bd38bb6` | handoff manifest refreshed after Phase 3 acceptance (§12 rule) |
 | 21 | `39d1c34` | **ERR-002 + ERR-003** — Phase 3 human rulings applied; 3 budget violations repaired |
 | 22 | `5fa4d90` | handoff manifest refreshed after the errata (§12 rule) |
-| 23 | `1ea79f3` | **PHASE 4 MACHINE-ACCEPTED** — PDP/PEP, isolation, Protected Core, secrets, Local-Only ← HEAD at generation |
+| 23 | `1ea79f3` | **PHASE 4 MACHINE-ACCEPTED** — PDP/PEP, isolation, Protected Core, secrets, Local-Only. Later found **DEFECTIVE** (F-0024) |
+| 24 | `191958d` | handoff manifest refreshed after Phase 4 acceptance (§12 rule) |
+| 25 | `6d6296d` | **F-0024 reopened** — ARK-REQ-0111 discharged without an implementation; Phase 5 blocked ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -294,8 +296,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `1ea79f3978fab6cb11452eb30fe70b469c3ae111` |
-| Generated after | **Phase 4 machine acceptance** (verdict `PHASE_ACCEPTED_BY_MACHINE`). Phase 4 → MACHINE-ACCEPTED, Phase 5 → UNLOCKED, cumulative verified 32 → 65, DEF-003 closed, NEXT EXACT ACTION changed. Multiple §12 triggers |
+| Generated at HEAD | `6d6296def50dfab2cfdf7d6afb18294b8267c964` |
+| Generated after | **A new HIGH finding that changes continuation strategy** — F-0024, the Phase 4 acceptance defect. Cumulative verified corrected 65 → 64; NEXT EXACT ACTION changed from "begin Phase 5" to "remediate F-0024 and re-submit Phase 4". Multiple §12 triggers |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -343,7 +345,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 1ea79f3978fab6cb11452eb30fe70b469c3ae111
+head: 6d6296def50dfab2cfdf7d6afb18294b8267c964
 branch: main
 working_tree_clean: true
 
