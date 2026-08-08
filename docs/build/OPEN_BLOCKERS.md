@@ -4,7 +4,12 @@
 
 ## Internal blockers
 
-**None open.** Internal BLOCKER = 0, internal HIGH = 0. F-0015 (the one Phase 1 HIGH) was closed by governance erratum ERR-001.
+| ID | Finding | Severity | Owner | Blocks |
+|---|---|---|---|---|
+| F-0024 | **A MANDATORY requirement was reported as satisfied without an implementation.** `ARK-REQ-0111` (stronger verification profile for Protected Core changes) is assigned to **Phase 4** by the register's Phase column and owned by `acceptance.engine`. No implementation exists anywhere in `backend/arkali/`. The Phase 4 report nevertheless listed it among the requirements it discharged, which is exactly what Phase Gate Checker C2 consumes, so C2 passed on an assertion that was never earned | **HIGH** | acceptance authority | **Phase 5 and every later phase.** Phase 4 acceptance requires remediation and re-submission |
+| F-0025 | **The open-findings parser can drop a finding based on wording.** `GovernanceState._parse_open_findings` skips any table row whose text contains the substring `CLOSED` anywhere. A row describing a defect in terms of requirement closure is therefore silently treated as already resolved. This was discovered when F-0024 above failed to register purely because it quoted a field name. A governance parser that hides a finding fails **open** | MEDIUM | acceptance.engine | Reliability of the BLOCKER/HIGH stop mechanism |
+
+Internal BLOCKER = 0, internal HIGH = **1**. F-0015 (the one Phase 1 HIGH) was resolved by governance erratum ERR-001.
 
 Three HIGH defects were found by independent review at HUMAN GATE 1 and are now closed: F-0005 (false closure of ARK-REQ-0090/0091), F-0006 (five Phase 0A deliverables absent), F-0007 (ARK-REQ-0012 misclassification). See `KNOWN_FAILURES.md`.
 

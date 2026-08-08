@@ -105,13 +105,13 @@ repository, the repository wins.
 | Phase 1 | **MACHINE-ACCEPTED** |
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
-| Phase 4 | **MACHINE-ACCEPTED** |
-| Phase 5 | **UNLOCKED — NOT_STARTED** ← current work |
+| Phase 4 | **MACHINE-ACCEPTED at `1ea79f3` — DEFECTIVE.** F-0024 open: ARK-REQ-0111 reported as discharged without an implementation. Remediation and re-submission required |
+| Phase 5 | **UNLOCKED — NOT_STARTED. BLOCKED by F-0024** ← remediate F-0024 first |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4) |
-| BLOCKER / HIGH | **0 / 0** |
+| Cumulative verified | **64** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 32 Phase 4). ARK-REQ-0111 withdrawn pending F-0024 |
+| BLOCKER / HIGH | **0 / 1** — F-0024 open. Every phase gate returns `PHASE_BLOCKED` |
 | MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every Phase 3 finding is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over 41 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
@@ -251,10 +251,26 @@ subject to the PDP, `kernel.persistence` is not Protected Core but
 
 ## 9. Next exact action
 
-**Begin Phase 5 — Persistence + Project Registry + Minimal Backup/Restore.**
+**Remediate F-0024, then re-submit Phase 4. Do not begin Phase 5.**
 
-Do not begin any later phase. Do not activate the Capability Graph — that is
-Phase 9B. Do not implement the Recovery Supervisor or Stable Core promotion.
+`ARK-REQ-0111` (stronger verification profile for Protected Core changes) is a
+Phase 4 MANDATORY requirement owned by `acceptance.engine`. It was reported as
+discharged in the Phase 4 report without any implementation, and Phase Gate
+Checker C2 passed on that assertion. Either:
+
+* implement and verify it — the acceptance engine must apply a stronger
+  verification profile (security review, adversarial review, full regression)
+  when a change touches Protected Core — and re-submit Phase 4; or
+* obtain a governance erratum from the acceptance authority reclassifying it.
+
+An implementing actor may not re-score its own accepted phase
+(`failed_gate_may_be_rescored_by_implementing_actor: false`).
+
+Also open: **F-0025** (MEDIUM) — `_parse_open_findings` drops any finding row
+containing the substring `CLOSED`, so a finding can be hidden by its own
+wording. Fix belongs with the F-0024 remediation.
+
+Phase 5's contract is derived in §8 and remains correct; it is simply blocked.
 
 ## 10. New-session bootstrap protocol
 
@@ -340,8 +356,8 @@ verified_by_phase:
   "1": 5
   "2": 23
   "3": 4
-  "4": 33
-cumulative_verified: 65
+  "4": 32
+cumulative_verified: 64
 
 accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4"]
 unlocked_phase: "5"
@@ -350,7 +366,7 @@ next_exact_action_phase: "5"
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
 adr_proposed: 0
-open_blocker_high: []
+open_blocker_high: ["F-0024"]
 
 authoritative_sources:
   - docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md

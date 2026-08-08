@@ -14,9 +14,31 @@
 | 10 | PHASE 1 — Repository Bootstrap (candidate rev 1) | NOT ACCEPTED | `0ad45a7` | F-0015 HIGH open; preserved unamended as the record of the defect |
 | 11 | ERR-001 governance erratum + PHASE 1 repair | MACHINE-ACCEPTED | `1ae0835` | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. Phase 2 unlocked |
 | 12 | **PHASE 2 — Foundation + Contracts + Executable Phase Gates** | **MACHINE-ACCEPTED** | `76edd26` | Verdict `PHASE_ACCEPTED_BY_MACHINE` from the real checker. 66 tests, 8 architecture gates (16 real edges), 19 negative/drift controls, mypy strict clean. 23/23 Phase 2 ARK-REQs PASS. Prior-phase reconciliation clean. **Phase 3 unlocked** |
-| 15 | **PHASE 4 — Security + Governance + Isolation Backends** | **MACHINE-ACCEPTED** | pending | Verdict `PHASE_ACCEPTED_BY_MACHINE`. C-07/08/09/10. One PDP, PEP contract, 14 operation classes, 5 TRUST tiers, 7 isolation properties, 7 backends really probed, Protected Core boundary, Secret Vault boundary, Local-Only. 242 new tests (785 total), 8 gates over 41 edges, mypy strict clean. 33/33 Phase 4 ARK-REQs accounted for. DEF-003 closed. F-0022 opened and closed. **Phase 5 unlocked** |
+| 16 | **Pre-Phase-5 acceptance integrity check** | **DEFECT FOUND — F-0024 HIGH** | pending | ARK-REQ-0111 was reported as discharged by Phase 4 without any implementation. C2 passed on the assertion. Phase 5 blocked; Phase 4 requires remediation and re-submission. Phase 4's verdict at `1ea79f3` preserved unamended |
+| 15 | **PHASE 4 — Security + Governance + Isolation Backends** | **MACHINE-ACCEPTED — later found DEFECTIVE (F-0024)** | pending | Verdict `PHASE_ACCEPTED_BY_MACHINE`. C-07/08/09/10. One PDP, PEP contract, 14 operation classes, 5 TRUST tiers, 7 isolation properties, 7 backends really probed, Protected Core boundary, Secret Vault boundary, Local-Only. 242 new tests (785 total), 8 gates over 41 edges, mypy strict clean. 33/33 Phase 4 ARK-REQs accounted for. DEF-003 closed. F-0022 opened and closed. **Phase 5 unlocked** |
 | 14 | **ERR-002 + ERR-003 — pre-Phase-4 human rulings** | GOVERNANCE REPAIR | pending | Both Phase 3 human-ruling items closed. ERR-002: Plugin `REMOVED` is terminal. ERR-003: architecture-budget measurement contract ratified; re-measurement exposed 3 real complexity violations including one in accepted Phase 2 code, all repaired by decomposition with no behavioural change and no GATE 8 request. All 9 numeric budgets now evaluated. 578 tests pass. Phase 3 remains MACHINE-ACCEPTED; Phase 4 remains UNLOCKED |
 | 13 | **PHASE 3 — Formal State Machines + Capability Graph Schema** | **MACHINE-ACCEPTED** | `4321611` | Verdict `PHASE_ACCEPTED_BY_MACHINE`. 12 state machines across 10 owning contexts, C-13 schema, 444 new tests (532 total), 294 rejection-asserting controls, 8 gates over 32 real edges, mypy strict clean. 4/4 Phase 3 ARK-REQs PASS. Findings F-0018/F-0019/F-0020 opened at MEDIUM. **Phase 4 unlocked** |
+
+## Pre-Phase-5 acceptance integrity check — F-0024
+
+Instructed to derive the requirement Phase 4 recorded as DEFERRED from the register and its canonical source rather than from the phase report, and to determine whether the deferral was canonical (case A) or a MANDATORY requirement counted as satisfied without being met (case B).
+
+**Result: case B.** The determination rests on four facts, none of which comes from the Phase 4 report:
+
+1. `REQUIREMENT_REGISTER.md` assigns `ARK-REQ-0111` to Phase **4**, owner `acceptance.engine`, evidence `sec, integ`. The register is the sole denominator (governing rule 4); nothing in it defers the requirement.
+2. `MS §Protected Core` states the obligation concretely — security review, adversarial review and full regression — and defers nothing.
+3. The owner exists and is implemented: `acceptance.engine` has shipped since Phase 2. The requirement was implementable.
+4. `backend/arkali/` contains **no** verification-profile mechanism. The work was not done.
+
+The Phase 4 report's own justification — "DEFERRED … which depends on the candidate lifecycle" — contradicts the register's Phase column. That justification was authored by the implementing actor and had no canonical basis.
+
+**How it passed.** C2 asks whether every mandatory requirement id appears in the report's discharged list. `ARK-REQ-0111` appeared, so C2 passed. C2 cannot ask whether the work happened; that is what the requirement's evidence keys are for, and no evidence record was produced for `sec` or `integ` against this id. The traceability map written in the same commit recorded the truth (`DEFERRED`) and its control asserted only that the deferred set had one member — never that a deferred requirement must be absent from the discharged list. The honest record and the false claim shipped together and no check compared them.
+
+**Action taken.** F-0024 opened at HIGH in `OPEN_BLOCKERS.md`. Progression is now mechanically stopped: `run_phase_gate.py 4 5` returns `PHASE_BLOCKED`, failing condition `FINDINGS`. Phase 5 was **not** begun. Phase 4's machine verdict at `1ea79f3` is preserved unamended — re-scoring an accepted phase is the acceptance authority's decision, not the implementing actor's.
+
+**Second defect found while recording the first.** F-0025: `_parse_open_findings` skips any row containing the substring `CLOSED`, so F-0024 initially failed to register because its text quoted a field name ending in `_closed`. A governance parser that hides a finding fails open. Worked around by rewording; the fix belongs with the F-0024 remediation because `acceptance.engine` is Protected Core.
+
+**Cumulative count corrected.** The published figure of 65 verified requirements includes ARK-REQ-0111 and is overstated by one. The defensible figure is 64 pending remediation.
 
 ## Phase 4 report
 
