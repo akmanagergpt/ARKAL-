@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `39d1c34fb982233b9bde7f551c1fceb281cb53e3` |
+| Current HEAD | `1ea79f3978fab6cb11452eb30fe70b469c3ae111` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,7 +80,8 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (589 tests)
+backend/                                    pytest suite (785 tests)
+backend/tests/security/                     PDP, PEP, isolation, secrets, drift
 backend/tests/governance/test_handoff_drift.py  handoff negative controls
 backend/tests/state_machines/               12 machines + canonical reconciliation
 backend/tests/capability/                   C-13 schema + pre-activation behaviour
@@ -104,17 +105,21 @@ repository, the repository wins.
 | Phase 1 | **MACHINE-ACCEPTED** |
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
-| Phase 4 | **UNLOCKED — NOT_STARTED** ← current work |
+| Phase 4 | **MACHINE-ACCEPTED** |
+| Phase 5 | **UNLOCKED — NOT_STARTED** ← current work |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **32** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3) |
+| Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4) |
 | BLOCKER / HIGH | **0 / 0** |
 | MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every Phase 3 finding is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates non-failing over 33 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
+| Architecture violations | **0** (8 gates PASS over 41 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
+| Security | one PDP · 14 operation classes · 5 TRUST tiers · 7 properties · 7 backends probed · Protected Core, Secret Vault and Local-Only boundaries enforced |
+| Host isolation | TRUST-0/1 satisfiable. **TRUST-2/3/4 UNSUPPORTED** on this host (`NET_EGRESS_CONTROL`, `KERNEL_ISOLATION` unavailable). Re-probe; never assume |
+| Execution surfaces | **none exist.** Policy bypass resistance is verified at CONTRACT level only |
 | Working tree | clean at HEAD |
 
 ## 4. Accepted commit history
@@ -141,7 +146,9 @@ repository, the repository wins.
 | 18 | `c69d1dd` | handoff manifest refreshed after hygiene (§12 rule) |
 | 19 | `4321611` | **PHASE 3 MACHINE-ACCEPTED** — 12 state machines, C-13 schema |
 | 20 | `bd38bb6` | handoff manifest refreshed after Phase 3 acceptance (§12 rule) |
-| 21 | `39d1c34` | **ERR-002 + ERR-003** — Phase 3 human rulings applied; 3 budget violations repaired ← HEAD at generation |
+| 21 | `39d1c34` | **ERR-002 + ERR-003** — Phase 3 human rulings applied; 3 budget violations repaired |
+| 22 | `5fa4d90` | handoff manifest refreshed after the errata (§12 rule) |
+| 23 | `1ea79f3` | **PHASE 4 MACHINE-ACCEPTED** — PDP/PEP, isolation, Protected Core, secrets, Local-Only ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -164,6 +171,8 @@ Referenced, not duplicated. Read the cited artifact before relying on any of the
 | **`engineering.import` logical identity retained; physical package is `engineering/project_import`** | **ERR-001** in `HUMAN_GATE_RECORDS.md` |
 | **Plugin `REMOVED` is terminal; reintroduction starts a new lifecycle instance** | **ERR-002** in `HUMAN_GATE_RECORDS.md` |
 | **Every numeric architecture budget has one ratified measurement formula; the gate reads it as data** | **ERR-003** in `HUMAN_GATE_RECORDS.md`; `AUTHORITY_MAP.yaml` `architecture_budget_measurement` |
+| **The PDP receives isolation posture as an injected fact, never by importing `control.isolation`** — both are layer rank 1 and `allow_same_layer: false` | `DECISION_LOG.md`; `SECURITY_ARCHITECTURE.md` §1 |
+| **`ROLLBACK_STABLE` is DENY for every actor** until a verified Recovery Supervisor exists (Phase 22B) | `DECISION_LOG.md`; `pdp.py::_rollback_rule` |
 
 ## 6. Current environment
 
@@ -191,6 +200,10 @@ No unavailable toolchain may be reported as PASS.
 | 0 BLOCKER, 0 HIGH | `OPEN_BLOCKERS.md` |
 | 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
 | Every Phase 3 finding (F-0018 … F-0021) is **closed**; F-0018 by ERR-002 and F-0020 by ERR-003 | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
+| Every Phase 4 finding (F-0022, F-0023) is **closed** within the phase | `KNOWN_FAILURES.md` |
+| **TRUST-2/3/4 are UNSUPPORTED on this host** — a real probe result, not a defect. Re-probe on any new host | `phase_4_report.json` · EV-0033 |
+| **No execution surface exists**, so policy bypass resistance is CONTRACT-level only | EV-0032 |
+| Isolation backend probe deferral **DEF-003 is closed** | `OPEN_BLOCKERS.md` |
 | Register exhaustiveness is by construction, not mechanical extraction (M-P0-1) | `PHASE_0_AUDIT.md` |
 | Golden Repair corpus instantiation deferred to Phase 30 (DEF-004) | `OPEN_BLOCKERS.md` |
 | Contract schema files under `docs/contracts/` deferred (DEF-008) | `OPEN_BLOCKERS.md` |
@@ -198,40 +211,50 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 4
+## 8. Current phase contract — Phase 5
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value | Source |
 |---|---|---|
-| Name | **Security + Governance + Isolation Backends** | Master Spec §Canonical Implementation Phases |
-| Prerequisites | Phases **2** and **3** (both MACHINE-ACCEPTED) | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
-| ARK-REQ IDs | **33** MANDATORY — 0017, 0071, 0096–0107, 0110–0114, 0118–0123, 0171–0175, 0202, 0236, 0241 | `REQUIREMENT_REGISTER.md` (Phase column) |
-| Contract IDs | **C-07, C-08, C-09, C-10** | `CONTRACT_INVENTORY.md` |
-| Owners | `control.policy` (21), `control.isolation` (10), `acceptance.engine` (1), `control.architecture` (1) | register Owner column |
-| Human gate | none for the phase itself; **GATE 4** governs any later weakening of a security boundary, sandbox tier or protected-core policy | matrix Gate column · `AUTHORITY_MAP.yaml` |
+| Name | **Persistence + Project Registry + Minimal Backup/Restore** | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
+| Prerequisites | Phases **2** and **4** (both MACHINE-ACCEPTED) | matrix Prerequisites column |
+| ARK-REQ IDs | **7** MANDATORY — 0009, 0011, 0012, 0153, 0178, 0229, 0335 | `REQUIREMENT_REGISTER.md` (Phase column) |
+| Contract IDs | **C-03** (implementation; defined at Phase 2), **C-12** project/revision record | `CONTRACT_INVENTORY.md` |
+| Owners | `kernel.persistence` (2), `lifecycle.recovery` (2), `surfaces.command` (2), `control.architecture` (1) | register Owner column |
+| State machines | **T5** Provider Health, **T11** Hardening Round — already implemented at Phase 3; Phase 5 gives them persistence | matrix |
+| Human gate | none | matrix Gate column |
 
-**In scope.** The PDP/PEP decision path; the fourteen canonical operation classes with their fixed resolutions; `unmapped_action_resolution: DENY`; Protected Core enforcement (ADR-0005); TRUST-0..4 tier requirements expressed as *properties*; Isolation Backend declarations and composition; the backend availability probe (DEF-003).
+**In scope.** SQLite+WAL behind engine-neutral repositories with PostgreSQL-ready
+abstractions (ADR-0006, ARK-REQ-0011/0012) — **no raw SQL outside
+`kernel.persistence`**, enforced by architecture test. The Project/Revision
+registry (C-12). Minimal backup/restore under `lifecycle.recovery`, where a
+backup is not verified until proven by an actual restore (§9 of
+`STATE_MACHINES.md`). The first frontend slice under `surfaces.command`.
 
-**Forbidden scope.** Capability Graph activation (Phase 9B). Provider runtime (Phase 9). Any persistence engine (Phase 5). Sandbox *execution* enforcement belongs to `execution.sandbox`, whose implementation is a later phase — Phase 4 owns the isolation **authority**, not the enforcement point.
+**Forbidden scope.** Capability Graph activation (Phase 9B). Provider runtime
+(Phase 9). Stable Core promotion (Phase 23, GATE 2). The Recovery *Supervisor*
+is Phase 22B — Phase 5 delivers minimal backup/restore, not `ROLLBACK_STABLE`,
+which the PDP denies for every actor.
 
-**Evidence required.** Dominated by `sec` and `prop`, with `chaos` for 0121 and `human` for 0099/0106/0110/0202. `human` evidence cannot be self-produced: it requires a recorded decision.
+**Carry forward from Phase 4.** All persistence work is now governed: writes are
+subject to the PDP, `kernel.persistence` is not Protected Core but
+`lifecycle.recovery` is, and `WRITE_STABLE_FILE` is DENY for every actor.
 
 **Machine acceptance.** Produce a phase report satisfying C-17, then run
-`python scripts/run_phase_gate.py 4 5`. Acceptance requires verdict
+`python scripts/run_phase_gate.py 5 6`. Acceptance requires verdict
 `PHASE_ACCEPTED_BY_MACHINE`: C1–C5 PASS, 8 architecture gates non-failing,
 0 open BLOCKER/HIGH, prerequisites accepted.
 
-**Read before starting.** `SECURITY_ARCHITECTURE.md`, ADR-0002, ADR-0005, and
-`AUTHORITY_MAP.yaml` `isolation` + `operation_classes`. The tier→property and
-backend→property tables are governed data; parse them, never copy them.
+**Read before starting.** ADR-0006, `ARCHITECTURE.md` §10 (persistence),
+`STATE_MACHINES.md` §9, and `CONTRACT_INVENTORY.md` rows C-03 and C-12.
 
 ## 9. Next exact action
 
-**Begin Phase 4 — Security + Governance + Isolation Backends.**
+**Begin Phase 5 — Persistence + Project Registry + Minimal Backup/Restore.**
 
 Do not begin any later phase. Do not activate the Capability Graph — that is
-Phase 9B. Do not implement `execution.sandbox` enforcement.
+Phase 9B. Do not implement the Recovery Supervisor or Stable Core promotion.
 
 ## 10. New-session bootstrap protocol
 
@@ -255,8 +278,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `39d1c34fb982233b9bde7f551c1fceb281cb53e3` |
-| Generated after | **Accepted governance errata ERR-002 and ERR-003**, which closed the two Phase 3 human-ruling items. Six governed artifacts changed, so the §12 refresh was mechanically required. No phase, gate, ADR or requirement state changed: Phase 3 remains MACHINE-ACCEPTED and Phase 4 remains UNLOCKED |
+| Generated at HEAD | `1ea79f3978fab6cb11452eb30fe70b469c3ae111` |
+| Generated after | **Phase 4 machine acceptance** (verdict `PHASE_ACCEPTED_BY_MACHINE`). Phase 4 → MACHINE-ACCEPTED, Phase 5 → UNLOCKED, cumulative verified 32 → 65, DEF-003 closed, NEXT EXACT ACTION changed. Multiple §12 triggers |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -304,7 +327,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 39d1c34fb982233b9bde7f551c1fceb281cb53e3
+head: 1ea79f3978fab6cb11452eb30fe70b469c3ae111
 branch: main
 working_tree_clean: true
 
@@ -317,11 +340,12 @@ verified_by_phase:
   "1": 5
   "2": 23
   "3": 4
-cumulative_verified: 32
+  "4": 33
+cumulative_verified: 65
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3"]
-unlocked_phase: "4"
-next_exact_action_phase: "4"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4"]
+unlocked_phase: "5"
+next_exact_action_phase: "5"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
