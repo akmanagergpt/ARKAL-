@@ -14,7 +14,28 @@
 | 10 | PHASE 1 — Repository Bootstrap (candidate rev 1) | NOT ACCEPTED | `0ad45a7` | F-0015 HIGH open; preserved unamended as the record of the defect |
 | 11 | ERR-001 governance erratum + PHASE 1 repair | MACHINE-ACCEPTED | `1ae0835` | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. Phase 2 unlocked |
 | 12 | **PHASE 2 — Foundation + Contracts + Executable Phase Gates** | **MACHINE-ACCEPTED** | `76edd26` | Verdict `PHASE_ACCEPTED_BY_MACHINE` from the real checker. 66 tests, 8 architecture gates (16 real edges), 19 negative/drift controls, mypy strict clean. 23/23 Phase 2 ARK-REQs PASS. Prior-phase reconciliation clean. **Phase 3 unlocked** |
-| 13 | **PHASE 3 — Formal State Machines + Capability Graph Schema** | **MACHINE-ACCEPTED** | pending | Verdict `PHASE_ACCEPTED_BY_MACHINE`. 12 state machines across 10 owning contexts, C-13 schema, 444 new tests (532 total), 294 rejection-asserting controls, 8 gates over 32 real edges, mypy strict clean. 4/4 Phase 3 ARK-REQs PASS. Findings F-0018/F-0019/F-0020 opened at MEDIUM. **Phase 4 unlocked** |
+| 14 | **ERR-002 + ERR-003 — pre-Phase-4 human rulings** | GOVERNANCE REPAIR | pending | Both Phase 3 human-ruling items closed. ERR-002: Plugin `REMOVED` is terminal. ERR-003: architecture-budget measurement contract ratified; re-measurement exposed 3 real complexity violations including one in accepted Phase 2 code, all repaired by decomposition with no behavioural change and no GATE 8 request. All 9 numeric budgets now evaluated. 578 tests pass. Phase 3 remains MACHINE-ACCEPTED; Phase 4 remains UNLOCKED |
+| 13 | **PHASE 3 — Formal State Machines + Capability Graph Schema** | **MACHINE-ACCEPTED** | `4321611` | Verdict `PHASE_ACCEPTED_BY_MACHINE`. 12 state machines across 10 owning contexts, C-13 schema, 444 new tests (532 total), 294 rejection-asserting controls, 8 gates over 32 real edges, mypy strict clean. 4/4 Phase 3 ARK-REQs PASS. Findings F-0018/F-0019/F-0020 opened at MEDIUM. **Phase 4 unlocked** |
+
+## Pre-Phase-4 governance repair (ERR-002, ERR-003)
+
+Applied after Phase 3 acceptance, on human ruling. Phase 3 was **not** reopened, redesigned or re-accepted, and `docs/acceptance/phase_3_report.json` is left unamended as the historical record of what was true at acceptance — including its then-accurate statement that F-0020 was unresolved. This section supersedes that statement; the report is evidence, not current state.
+
+**ERR-002 — Plugin `REMOVED` is terminal.** `STATE_MACHINES.md` §6 now reads `any pre-REMOVED→QUARANTINED` with `Forbidden: REMOVED→any`, reusing §7's existing `any pre-X` idiom. 24 permanent controls assert both directions: the six legal quarantine paths survived, and no path out of `REMOVED` exists — including by direct attribute mutation. Reintroduction starts a new lifecycle instance.
+
+**ERR-003 — budget measurement contract.** Ratified as data in `AUTHORITY_MAP.yaml` v1.0.0. The gate reads it; no validator holds a private formula. All **nine** declared numeric budgets are now evaluated, so `AWAITING_CANONICAL_FORMULA` is empty.
+
+**What re-measurement cost.** Three functions exceeded the zero-threshold complexity budget under the newly ratified formula:
+
+| Function | Measured | Budget | Outcome |
+|---|---|---|---|
+| `acceptance/checker.py:evaluate` | 17 | 12 | decomposed into `_run_checks`, `_blocking_human_gate`, `_is_blocked`, `_blocking_reason`, `_decide` |
+| `gates/structure_gates.py:_per_module` | 18 | 12 | decomposed into `_module_size`, `_module_coupling`, `_function_shape` |
+| `state_machine_spec.py:_pairs` | 13 | 12 | decomposed into `_split_chain`, `_link` |
+
+One of these sat in **accepted Phase 2 code**. It was not grandfathered and no HUMAN GATE 8 exception was requested, because decomposition was straightforward — the ruling's stated condition for a Gate 8 request was not met. No behaviour changed: the full suite and every negative control pass unchanged, and the Phase Gate Checker still returns `PHASE_ACCEPTED_BY_MACHINE` for Phase 3. Max complexity is now 12 of 12; max orchestration depth 3 of 4 via `acceptance.engine → control.architecture → kernel.contracts`.
+
+That an accepted phase carried an unapproved budget violation for the whole of Phase 3 is the point worth keeping: the budget was declared with a number and no way to measure it, so nothing could have caught it. A threshold without a formula is not a control.
 
 ## Phase 3 report
 

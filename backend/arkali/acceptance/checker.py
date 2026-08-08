@@ -187,14 +187,8 @@ class PhaseGateChecker:
 
     # -- orchestration --------------------------------------------------------
 
-    def evaluate(
-        self, report: PhaseReport, requested_next_phase: str | None = None
-    ) -> GateVerdict:
-        """Run every check and produce a deterministic verdict."""
-        if report.phase_id not in self.state.phases:
-            raise GovernanceStateError(
-                f"phase {report.phase_id!r} has no governance status row"
-            )
+    def _run_checks(self, report: PhaseReport) -> list[CheckResult]:
+        """Every check, in canonical order, with the gate details appended."""
         gate_result, gate_details = self.check_architecture_gates()
         checks = [
             self.check_report_completeness(report),
@@ -207,27 +201,66 @@ class PhaseGateChecker:
             self.check_human_gate(report.phase_id),
         ]
         checks.extend(gate_details)
-        findings = tuple(f for c in checks for f in c.findings)
+        return checks
 
-        human = next(
+    @staticmethod
+    def _blocking_human_gate(checks: list[CheckResult]) -> CheckResult | None:
+        return next(
             (c for c in checks if c.check_id == "HUMAN_GATE"
              and c.state is HonestState.BLOCKED),
             None,
         )
-        failing = [c for c in checks if c.state is HonestState.FAIL]
+
+    @staticmethod
+    def _is_blocked(
+        checks: list[CheckResult], findings: tuple[Finding, ...]
+    ) -> bool:
+        failing = any(c.state is HonestState.FAIL for c in checks)
+        stopping = any(f.severity in ACCEPTANCE_STOPPING for f in findings)
+        return failing or stopping
+
+    @staticmethod
+    def _blocking_reason(
+        checks: list[CheckResult], findings: tuple[Finding, ...]
+    ) -> str:
+        failing = [c.check_id for c in checks if c.state is HonestState.FAIL]
+        if failing:
+            return f"failing checks: {failing}"
         stopping = [f for f in findings if f.severity in ACCEPTANCE_STOPPING]
+        return f"stopping findings: {len(stopping)}"
 
-        if failing or stopping:
-            verdict, permitted = Verdict.PHASE_BLOCKED, False
-            reason = (f"failing checks: {[c.check_id for c in failing]}"
-                      if failing else f"stopping findings: {len(stopping)}")
-        elif human is not None:
-            verdict, permitted = Verdict.AWAITING_HUMAN_GATE, False
-            reason = human.summary
-        else:
-            verdict, permitted = Verdict.PHASE_ACCEPTED_BY_MACHINE, True
-            reason = ""
+    def _decide(
+        self, checks: list[CheckResult], findings: tuple[Finding, ...]
+    ) -> tuple[Verdict, bool, str, CheckResult | None]:
+        """Verdict, progression, reason and the blocking gate, if any.
 
+        Order is load-bearing: a failing check blocks even when a human gate is
+        also outstanding, so a blocked phase is never reported as merely
+        awaiting a signature.
+        """
+        human = self._blocking_human_gate(checks)
+        if self._is_blocked(checks, findings):
+            return (
+                Verdict.PHASE_BLOCKED,
+                False,
+                self._blocking_reason(checks, findings),
+                human,
+            )
+        if human is not None:
+            return Verdict.AWAITING_HUMAN_GATE, False, human.summary, human
+        return Verdict.PHASE_ACCEPTED_BY_MACHINE, True, "", human
+
+    def evaluate(
+        self, report: PhaseReport, requested_next_phase: str | None = None
+    ) -> GateVerdict:
+        """Run every check and produce a deterministic verdict."""
+        if report.phase_id not in self.state.phases:
+            raise GovernanceStateError(
+                f"phase {report.phase_id!r} has no governance status row"
+            )
+        checks = self._run_checks(report)
+        findings = tuple(f for c in checks for f in c.findings)
+        verdict, permitted, reason, human = self._decide(checks, findings)
         return GateVerdict(
             phase_id=report.phase_id,
             requested_next_phase=requested_next_phase,

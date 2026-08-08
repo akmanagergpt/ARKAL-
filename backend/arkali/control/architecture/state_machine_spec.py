@@ -103,11 +103,11 @@ def _expand(token: str, states: tuple[str, ...]) -> tuple[list[str], bool]:
     return [text], False
 
 
-def _pairs(segment: str, states: tuple[str, ...]) -> list[tuple[str, str]]:
-    """Expand one `A→B↔C` chain into concrete ordered pairs."""
+def _split_chain(
+    segment: str, states: tuple[str, ...]
+) -> tuple[list[tuple[list[str], bool]], list[str]]:
+    """Split `A→B↔C` into resolved node groups and the operators between them."""
     parts = [p for p in _ARROW.split(segment) if p.strip()]
-    if len(parts) < 3:
-        return []
     nodes: list[tuple[list[str], bool]] = []
     operators: list[str] = []
     for index, part in enumerate(parts):
@@ -115,18 +115,36 @@ def _pairs(segment: str, states: tuple[str, ...]) -> list[tuple[str, str]]:
             nodes.append(_expand(part, states))
         else:
             operators.append(part.strip())
+    return nodes, operators
+
+
+def _link(
+    left: tuple[list[str], bool], right: tuple[list[str], bool], operator: str
+) -> list[tuple[str, str]]:
+    """Ordered pairs for one `left OP right` step of a chain."""
+    left_states, left_wild = left
+    right_states, right_wild = right
+    wildcard = left_wild or right_wild
+    found: list[tuple[str, str]] = []
+    for src in left_states:
+        for dst in right_states:
+            if wildcard and src == dst:
+                continue
+            found.append((src, dst))
+            if operator == "↔":
+                found.append((dst, src))
+    return found
+
+
+def _pairs(segment: str, states: tuple[str, ...]) -> list[tuple[str, str]]:
+    """Expand one `A→B↔C` chain into concrete ordered pairs."""
+    parts = [p for p in _ARROW.split(segment) if p.strip()]
+    if len(parts) < 3:
+        return []
+    nodes, operators = _split_chain(segment, states)
     found: list[tuple[str, str]] = []
     for position, operator in enumerate(operators):
-        left, left_wild = nodes[position]
-        right, right_wild = nodes[position + 1]
-        wildcard = left_wild or right_wild
-        for src in left:
-            for dst in right:
-                if wildcard and src == dst:
-                    continue
-                found.append((src, dst))
-                if operator == "↔":
-                    found.append((dst, src))
+        found.extend(_link(nodes[position], nodes[position + 1], operator))
     return found
 
 

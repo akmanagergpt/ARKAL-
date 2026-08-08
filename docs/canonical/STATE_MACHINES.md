@@ -34,8 +34,9 @@ Invariant: this is the **only** store of provider health. `control.capability` h
 
 ### 6. Plugin Lifecycle — authority `engineering.plugin`
 States: `DISCOVERED`, `MANIFEST_VALIDATED`, `PERMISSIONS_DECLARED`, `APPROVED`, `ENABLED`, `DISABLED`, `QUARANTINED`, `REMOVED`
-Transitions: DISCOVERED→MANIFEST_VALIDATED→PERMISSIONS_DECLARED→APPROVED→ENABLED↔DISABLED; any→QUARANTINED→{DISABLED,REMOVED}
-Invariant: permissions are declared using the 14 canonical operation classes; an unmappable permission blocks at `PERMISSIONS_DECLARED`.
+Transitions: DISCOVERED→MANIFEST_VALIDATED→PERMISSIONS_DECLARED→APPROVED→ENABLED↔DISABLED; any pre-REMOVED→QUARANTINED→{DISABLED,REMOVED}
+Forbidden: REMOVED→any
+Invariants: permissions are declared using the 14 canonical operation classes; an unmappable permission blocks at `PERMISSIONS_DECLARED`. **`REMOVED` is terminal (ERR-002)** — a removed plugin revision cannot be quarantined again, reactivated or reinstalled by mutating the same lifecycle instance. Reintroducing the same plugin or package starts a **new** lifecycle instance with its own provenance and audit identity.
 
 ### 7. Release — authority `lifecycle.release`
 States: `DRAFT`, `BUILT`, `VERIFIED`, `SIGNED_READY`, `RELEASED`, `WITHDRAWN`

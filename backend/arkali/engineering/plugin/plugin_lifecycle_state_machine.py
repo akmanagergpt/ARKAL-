@@ -14,10 +14,17 @@ guard receives the permitted classes from its context, so `AUTHORITY_MAP.yaml`
 remains the sole store of the fourteen operation classes. Hard-coding them would
 be the shadow-model defect F-0013 recorded against the phase-graph validator.
 
-`REMOVED → QUARANTINED` is present because §6 states `any→QUARANTINED` literally,
-which leaves this machine with no terminal state. That reading is recorded as
-finding F-0018 for human ruling and is implemented exactly as written rather
-than silently narrowed.
+`REMOVED` is TERMINAL by human ruling **ERR-002**, which closed finding F-0018.
+§6 previously read `any→QUARANTINED`; taken literally that made
+`REMOVED → QUARANTINED` legal and left the machine with no terminal state. The
+ruling narrowed `any` to the non-removed states and §6 now reads
+`any pre-REMOVED→QUARANTINED` with an explicit `Forbidden: REMOVED→any`.
+
+A removed plugin revision cannot be quarantined again, reactivated, or
+reinstalled by mutating the same lifecycle instance. Reintroducing the same
+plugin or package starts a **new** instance with its own provenance and audit
+identity — `StateMachine.start` on a fresh instance, never a transition out of
+`REMOVED`.
 """
 
 from __future__ import annotations
@@ -59,12 +66,19 @@ DEFINITION = StateMachineDefinition(
         ("APPROVED", "QUARANTINED"),
         ("ENABLED", "QUARANTINED"),
         ("DISABLED", "QUARANTINED"),
-        ("REMOVED", "QUARANTINED"),
         ("QUARANTINED", "DISABLED"),
         ("QUARANTINED", "REMOVED"),
     ),
-    forbidden=(),
-    terminal=(),
+    forbidden=(
+        ("REMOVED", "DISCOVERED"),
+        ("REMOVED", "MANIFEST_VALIDATED"),
+        ("REMOVED", "PERMISSIONS_DECLARED"),
+        ("REMOVED", "APPROVED"),
+        ("REMOVED", "ENABLED"),
+        ("REMOVED", "DISABLED"),
+        ("REMOVED", "QUARANTINED"),
+    ),
+    terminal=("REMOVED",),
 )
 
 

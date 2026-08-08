@@ -54,6 +54,55 @@ Acceptance of Phase 0 does not close the following, which remain open and tracke
 
 ---
 
+## ERR-003 — GOVERNANCE ERRATUM (post-Phase 3): architecture-budget measurement contract
+
+| Field | Value |
+|---|---|
+| **Type** | Human-authorized governance erratum — **not** an ordinary implementing-agent edit |
+| **Raised by** | Phase 3 (finding **F-0020**) |
+| **Decision** | **AUTHORIZED** by the human acceptance authority |
+| **Scope** | Measurement definition only. No budget **value** changes |
+| **Applies to** | `docs/canonical/AUTHORITY_MAP.yaml` → new `architecture_budget_measurement` section |
+| **Ruling** | A numeric budget that participates in acceptance MUST have exactly one deterministic measurement definition. `max_cyclomatic_complexity_per_function` and `max_orchestration_depth` may not remain unenforced numbers |
+| **Rationale** | An unmeasurable budget is unenforceable, and a formula authored by the implementing actor would let it decide whether its own code complies — the prohibition ADR-0008 already applies to budget exceptions |
+
+**Cyclomatic complexity.** Standard McCabe, `M = decision_points + 1`, computed per Python function or method from the AST. The incrementing node types, their amounts, the boolean-operator rule and the explicit exclusions are enumerated in the contract. Nested functions are measured independently. Value unchanged at **12**.
+
+**Orchestration depth.** The longest directed chain over the **bounded-context** graph, with edges derived from real resolved Python imports. This follows `ARCHITECTURE.md` §8, which defines the budget as "call chain across contexts"; ordinary depth inside a single context is therefore not orchestration depth. A cycle FAILs independently of depth, and unresolvable context ownership FAILs closed. Value unchanged at **4**.
+
+### What this erratum does NOT change
+
+No budget value, no requirement, no ADR, no contract, no phase state. It does not create a second architecture-budget authority: the measurement contract lives inside `AUTHORITY_MAP.yaml` alongside the values it measures, both owned by `control.architecture`.
+
+### Consequence, recorded rather than avoided
+
+Re-measuring the repository under the ratified formula exposed **three real violations** of a zero-threshold budget, one of them in accepted Phase 2 code (`acceptance/checker.py:evaluate`, measured 17 against 12). None was grandfathered and no HUMAN GATE 8 exception was requested. All three were repaired by decomposition with no behavioural change; the full suite and every negative control pass unchanged. Orchestration depth measured **3** against a budget of 4.
+
+---
+
+## ERR-002 — GOVERNANCE ERRATUM (post-Phase 3): Plugin `REMOVED` is terminal
+
+| Field | Value |
+|---|---|
+| **Type** | Human-authorized governance erratum — **not** an ordinary implementing-agent edit |
+| **Raised by** | Phase 3 canonical-inventory parsing (finding **F-0018**) |
+| **Decision** | **AUTHORIZED** by the human acceptance authority |
+| **Scope** | Narrow clarification of one transition expression |
+| **Applies to** | `docs/canonical/STATE_MACHINES.md` §6 Plugin Lifecycle |
+| **Old value** | `Transitions: … ; any→QUARANTINED→{DISABLED,REMOVED}` |
+| **New value** | `Transitions: … ; any pre-REMOVED→QUARANTINED→{DISABLED,REMOVED}` plus `Forbidden: REMOVED→any` |
+| **Ruling** | `REMOVED` is **TERMINAL**. `any` means any non-terminal, non-removed lifecycle state for this transition |
+
+Read literally, `any` included `REMOVED`, making `REMOVED→QUARANTINED` legal and leaving the machine with **no terminal state** — a removed plugin could be quarantined, then re-enabled. Once a plugin revision reaches `REMOVED` it cannot leave, cannot be quarantined again, cannot be reactivated, and cannot be reinstalled by mutating the same lifecycle instance. Reintroducing the same plugin or package starts a **new** lifecycle instance with its own provenance and audit identity.
+
+`any pre-REMOVED` is not new vocabulary: §7 Release already uses `any pre-RELEASED`, so the clarification reuses an idiom the canonical set had already accepted under HUMAN GATE 1.
+
+### What this erratum does NOT change
+
+No state is added or removed. The six non-terminal→`QUARANTINED` transitions, both quarantine exits, and the whole `DISCOVERED → … → ENABLED↔DISABLED` chain are unchanged, and are asserted unchanged by permanent tests so the narrowing cannot have over-reached. Authority (`engineering.plugin`), lifecycle authority, TRUST classification, Protected Core membership and requirement meaning are untouched. Phase 0 was not reopened; Phase 3 remains MACHINE-ACCEPTED.
+
+---
+
 ## ERR-001 — GOVERNANCE ERRATUM (post-HUMAN GATE 1)
 
 | Field | Value |

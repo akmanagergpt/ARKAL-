@@ -57,6 +57,9 @@ class AuthorityMap(BaseModel):
     concerns: tuple[ConcernOwnership, ...]
     sibling_edges: tuple[SiblingEdge, ...]
     architecture_budgets: dict[str, Any]
+    #: Measurement formulas for the budgets above (ERR-003). Data, not code:
+    #: the gate reads it and no validator holds a private copy.
+    architecture_budget_measurement: dict[str, Any]
     architecture_gates: tuple[dict[str, Any], ...]
     human_gates: dict[str, str]
     lifecycle_authorities: dict[str, str]
@@ -119,6 +122,9 @@ class AuthorityMap(BaseModel):
             concerns=concerns,
             sibling_edges=edges,
             architecture_budgets=raw["architecture_budgets"],
+            architecture_budget_measurement=raw.get(
+                "architecture_budget_measurement", {}
+            ),
             architecture_gates=tuple(raw["architecture_gates"]),
             human_gates=raw["human_gates"],
             lifecycle_authorities=raw.get("lifecycle_authorities", {}),

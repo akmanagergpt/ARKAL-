@@ -36,7 +36,7 @@ Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an
 
 These were reported at the canonical repair and remain open by design; none blocks Phase 0.
 
-MEDIUM (opened at Phase 3): F-0018 canonical §6 transition reading leaves Plugin Lifecycle with no terminal state, awaiting human ruling · F-0019 architecture budget gate scope, partially closed, 7 of 9 budgets now evaluated · F-0020 two numeric budgets declared without a canonical measurement formula, deliberately unenforced pending a ruling. F-0021 (expiring negative controls) was opened and closed within Phase 3.
+Opened at Phase 3, **all now closed**: F-0018 closed by erratum ERR-002 (Plugin `REMOVED` is terminal) · F-0019 closed — all 9 numeric budgets are now evaluated by the gate · F-0020 closed by erratum ERR-003 (ratified budget measurement contract; three exposed violations repaired by decomposition) · F-0021 opened and closed within Phase 3 (expiring negative controls). No Phase 3 finding remains open.
 
 MEDIUM: installer code-signing vs SmartScreen on a clean baseline · "Temporal-grade" unmeasurable except behaviorally · mutation-testing budget at system scale · fine-tuning acceptance path · air-gapped signing key management · Git branching/remote model unspecified · knowledge-lifecycle transition rules undefined · Phase 0 deliverable breadth · workflow derived-cache invalidation complexity · Import/Rescue phase-level budget.
 

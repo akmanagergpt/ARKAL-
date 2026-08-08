@@ -5,7 +5,7 @@
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
 **Last updated by:** Phase 3 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
-**Governance erratum:** ERR-001 (closes F-0015) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
+**Governance errata:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
 
@@ -110,5 +110,6 @@ Acceptance of Phase 0 closed no finding other than the gate itself:
 - The Capability Graph exists as schema only. ARK-REQ-0046, 0047 and 0048 remain open at Phase 9B and are **not** claimed by Phase 3.
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
 - Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
-- 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.
+- 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`. Every Phase 3 finding (F-0018 … F-0021) is now **closed**; two by human erratum.
+- All **nine** declared numeric architecture budgets are evaluated by the gate under ratified measurement contract 1.0.0 (ERR-003). Max measured complexity **12** of 12; max orchestration depth **3** of 4.
 - Every recorded defect remains in `KNOWN_FAILURES.md` as permanent evidence. That file is the authoritative defect ledger; its composition is deliberately **not** mirrored here, because a transcribed count re-rots the moment a defect is added (F-0002, F-0011). Read the ledger. F-0015 is CLOSED by ERR-001 but retained in full.

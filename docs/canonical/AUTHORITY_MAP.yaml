@@ -56,6 +56,79 @@ architecture_budgets:
   exception_may_be_authored_by_implementing_actor: false
 
 # ---------------------------------------------------------------------------
+# Architecture budget MEASUREMENT contract (ERR-003, closes F-0020).
+#
+# A budget that participates in acceptance must have exactly one deterministic
+# measurement definition. Numbers without a formula were unenforceable, and any
+# formula chosen by an implementing actor would decide whether its own code
+# complies - which ADR-0008 forbids for the exception, and therefore equally for
+# the rule that decides an exception is needed.
+#
+# This is data, not code. The gate reads it; no validator holds a private copy.
+# Changing a value here changes the verdict without editing any validator.
+# `contract_version` is recorded in every measurement result so a change to the
+# formula is auditable and cannot be mistaken for a change in the code measured.
+#
+# Owner: control.architecture. This is NOT a second budget authority - it is the
+# measurement half of the existing `architecture_budgets` declaration above.
+# ---------------------------------------------------------------------------
+architecture_budget_measurement:
+  contract_version: "1.0.0"
+  ratified_by: "human ruling, erratum ERR-003"
+
+  cyclomatic_complexity:
+    # Standard McCabe: M = decision_points + 1, per function or method,
+    # computed from the Python AST. Nested functions are measured
+    # independently and do not contribute to their enclosing function.
+    method: mccabe_decision_points
+    subject: python_function_or_method
+    base: 1
+    nested_functions_measured_independently: true
+    # Each AST node type below contributes the stated amount when it occurs in
+    # the function body. `elif` is an ast.If in the orelse branch and is counted
+    # by the If rule; a plain `else` adds nothing, since it is the fall-through
+    # of a decision already counted.
+    increment_per_node:
+      If: 1
+      IfExp: 1
+      For: 1
+      AsyncFor: 1
+      While: 1
+      ExceptHandler: 1
+      Assert: 1
+      comprehension: 1
+      comprehension_if: 1
+      match_case: 1
+    # `a and b and c` has two decision points, not three: values - 1.
+    increment_per_boolean_value_beyond_first:
+      BoolOp: 1
+    not_counted:
+      - With
+      - AsyncWith
+      - Try
+      - Return
+      - Raise
+      - Lambda
+      - FunctionDef
+      - AsyncFunctionDef
+      - ClassDef
+
+  orchestration_depth:
+    # ARCHITECTURE.md section 8 defines this budget as "call chain across
+    # contexts". The subject is therefore the bounded context, not the module:
+    # ordinary depth inside one context is not orchestration depth. Edges are
+    # derived from real Python imports resolved to owning contexts, never from
+    # a hand-maintained component list.
+    method: longest_directed_chain_over_context_graph
+    subject: bounded_context
+    edge_evidence: resolved_python_imports
+    canonical_definition_source: "ARCHITECTURE.md section 8"
+    depth_counts: contexts_in_chain
+    on_cycle: FAIL
+    on_unresolvable_context_ownership: FAIL
+    self_edges_ignored: true
+
+# ---------------------------------------------------------------------------
 # Human gates
 # ---------------------------------------------------------------------------
 human_gates:
