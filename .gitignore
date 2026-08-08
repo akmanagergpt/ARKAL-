@@ -82,6 +82,9 @@ pyvenv.cfg
 
 # Packaging / build artifacts
 build/
+# --- canonical build-state documents are NOT build artifacts and MUST stay tracked ---
+!docs/build/
+!docs/build/**
 dist/
 sdist/
 wheels/

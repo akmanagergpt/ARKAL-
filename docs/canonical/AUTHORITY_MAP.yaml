@@ -1,0 +1,293 @@
+# ARKALI GENESIS v2 — CANONICAL AUTHORITY MAP
+# Status: PHASE 0 CANDIDATE — AWAITING HUMAN GATE 1
+# Machine-readable input for the architecture verification gates defined in
+# ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md (Architecture verification).
+# Derived from canonical set at 079c925996034017855fb9d1f1fa532077d7e86d
+
+schema_version: 1
+canonical_source_commit: "079c925996034017855fb9d1f1fa532077d7e86d"
+status: "PHASE_0_CANDIDATE_AWAITING_HUMAN_GATE_1"
+
+# ---------------------------------------------------------------------------
+# Layer model. A context may depend only on strictly lower layers.
+# ---------------------------------------------------------------------------
+layers:
+  - {rank: 0, name: kernel}
+  - {rank: 1, name: control}
+  - {rank: 2, name: evidence}
+  - {rank: 3, name: execution}
+  - {rank: 4, name: engineering}
+  - {rank: 5, name: lifecycle}
+  - {rank: 6, name: surfaces}
+
+dependency_rules:
+  allow_lower_layer: true
+  allow_same_layer: false          # except allowed_sibling_edges below
+  allow_higher_layer: false        # no exception
+  allow_cycles: false
+  evidence_write_from_any_layer: true
+  evidence_read_for_verdict_only_by: acceptance.engine
+  policy_callable_from_any_layer: true
+
+allowed_sibling_edges:
+  - {from: execution.sandbox, to: execution.durable, reason: "job lifecycle binding"}
+  - {from: execution.workflow, to: execution.durable, reason: "workflow steps are durable jobs"}
+  - {from: engineering.factory, to: engineering.candidate, reason: "factory assembles candidates"}
+  - {from: engineering.factory, to: engineering.agent, reason: "factory dispatches agent tasks"}
+  - {from: engineering.repair, to: engineering.candidate, reason: "repairs produce candidates"}
+  - {from: lifecycle.evolution, to: lifecycle.release, reason: "promotion handoff"}
+  - {from: lifecycle.recovery, to: lifecycle.release, reason: "reads stable revision pointer"}
+
+# ---------------------------------------------------------------------------
+# Architecture budgets. Numeric. Exception = HUMAN GATE 8 + ADR.
+# ---------------------------------------------------------------------------
+architecture_budgets:
+  max_module_logical_lines: 400
+  max_public_symbols_per_module: 20
+  max_fan_in_per_module: 15
+  max_fan_out_per_module: 12
+  max_public_surface_per_context: 40
+  max_orchestration_depth: 4
+  max_cyclomatic_complexity_per_function: 12
+  max_parameters_per_public_function: 6
+  max_contexts_touched_by_module: 3
+  exception_gate: HUMAN_GATE_8
+  exception_requires_adr: true
+  exception_may_be_authored_by_implementing_actor: false
+
+# ---------------------------------------------------------------------------
+# Human gates
+# ---------------------------------------------------------------------------
+human_gates:
+  HUMAN_GATE_1: "PHASE 0 canonical architecture acceptance (0A + 0B as one package)"
+  HUMAN_GATE_2: "ARKALI Stable Core promotion"
+  HUMAN_GATE_3: "Generated-product promotion where approval-gated"
+  HUMAN_GATE_4: "Weakening or change of a security boundary, sandbox tier or protected-core policy"
+  HUMAN_GATE_5: "Exceptional applicability waiver"
+  HUMAN_GATE_6: "APPLY of a migration to real or stable data"
+  HUMAN_GATE_7: "Final Production Release"
+  HUMAN_GATE_8: "Exception to a canonical architecture budget"
+
+machine_autonomy:
+  normal_phase_acceptance: machine
+  normal_phase_requires_human_approval: false
+  failed_machine_gate_blocks_progression: true
+  failed_gate_may_be_rescored_by_implementing_actor: false
+
+# ---------------------------------------------------------------------------
+# Concerns -> exactly one canonical owning component.
+# Any duplicate `owner` for one `concern` is a gate violation.
+# ---------------------------------------------------------------------------
+concerns:
+  - {concern: requirement_identity_and_classification, owner: control.specification}
+  - {concern: architecture_rules_and_budgets,          owner: control.architecture}
+  - {concern: protected_core_membership,               owner: control.architecture, enforced_by: control.policy}
+  - {concern: policy_decision,                         owner: control.policy}
+  - {concern: secret_storage_and_brokering,            owner: control.policy}
+  - {concern: isolation_backend_availability,          owner: control.isolation}
+  - {concern: provider_identity,                       owner: control.registry.provider}
+  - {concern: model_identity,                          owner: control.registry.provider}
+  - {concern: provider_configuration,                  owner: control.registry.provider}
+  - {concern: provider_health,                         owner: control.registry.provider}
+  - {concern: provider_availability,                   owner: control.registry.provider}
+  - {concern: provider_cost_metadata,                  owner: control.registry.provider}
+  - {concern: provider_fallback_configuration,         owner: control.registry.provider}
+  - {concern: project_and_revision_identity,           owner: control.registry.project}
+  - {concern: capability_availability_answer,          owner: control.capability}
+  - {concern: artifact_identity_and_provenance,        owner: evidence.artifact}
+  - {concern: audit_chain_and_evidence_integrity,      owner: evidence.audit}
+  - {concern: acceptance_verdict,                      owner: acceptance.engine}
+  - {concern: phase_gating_before_phase_13,            owner: acceptance.engine}
+  - {concern: durable_job_state,                       owner: execution.durable}
+  - {concern: canonical_workflow_graph,                owner: execution.workflow}
+  - {concern: resource_allocation,                     owner: execution.scheduler}
+  - {concern: sandbox_execution,                       owner: execution.sandbox}
+  - {concern: agent_task_bounding_and_context,         owner: engineering.agent}
+  - {concern: code_graphs_and_digital_twin,            owner: engineering.codeintel}
+  - {concern: candidate_workspace_content,             owner: engineering.candidate}
+  - {concern: repair_budget_and_convergence,           owner: engineering.repair}
+  - {concern: software_factory_pipeline,               owner: engineering.factory}
+  - {concern: knowledge_validity_state,                owner: engineering.knowledge}
+  - {concern: imported_project_lifecycle,              owner: engineering.import}
+  - {concern: plugin_lifecycle,                        owner: engineering.plugin}
+  - {concern: local_model_adapters,                    owner: engineering.localai}
+  - {concern: stable_promotion,                        owner: lifecycle.release}
+  - {concern: stable_rollback,                         owner: lifecycle.recovery}
+  - {concern: backup_and_restore,                      owner: lifecycle.recovery}
+  - {concern: evolution_campaign_state,                owner: lifecycle.evolution}
+  - {concern: telemetry_presentation,                  owner: surfaces.operations}
+  - {concern: computer_use_execution,                  owner: surfaces.operations}
+  - {concern: command_center_presentation,             owner: surfaces.command}
+
+# ---------------------------------------------------------------------------
+# Bounded contexts
+# ---------------------------------------------------------------------------
+contexts:
+  kernel.persistence:    {layer: kernel,      protected_core: false, module_root: backend/arkali/kernel/persistence}
+  kernel.observability:  {layer: kernel,      protected_core: false, module_root: backend/arkali/kernel/observability}
+  kernel.contracts:      {layer: kernel,      protected_core: false, module_root: backend/arkali/kernel/contracts}
+
+  control.specification: {layer: control,     protected_core: false, module_root: backend/arkali/control/specification}
+  control.architecture:  {layer: control,     protected_core: true,  module_root: backend/arkali/control/architecture}
+  control.policy:        {layer: control,     protected_core: true,  module_root: backend/arkali/control/policy}
+  control.isolation:     {layer: control,     protected_core: true,  module_root: backend/arkali/control/isolation}
+  control.registry.provider: {layer: control, protected_core: false, module_root: backend/arkali/control/registry/provider}
+  control.registry.project:  {layer: control, protected_core: false, module_root: backend/arkali/control/registry/project}
+  control.capability:    {layer: control,     protected_core: false, module_root: backend/arkali/control/capability}
+
+  evidence.artifact:     {layer: evidence,    protected_core: false, module_root: backend/arkali/evidence/artifact}
+  evidence.audit:        {layer: evidence,    protected_core: true,  module_root: backend/arkali/evidence/audit}
+  acceptance.engine:     {layer: evidence,    protected_core: true,  module_root: backend/arkali/acceptance}
+
+  execution.durable:     {layer: execution,   protected_core: false, module_root: backend/arkali/execution/durable}
+  execution.workflow:    {layer: execution,   protected_core: false, module_root: backend/arkali/execution/workflow}
+  execution.scheduler:   {layer: execution,   protected_core: false, module_root: backend/arkali/execution/scheduler}
+  execution.sandbox:     {layer: execution,   protected_core: false, module_root: backend/arkali/execution/sandbox}
+
+  engineering.agent:     {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/agent}
+  engineering.codeintel: {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/codeintel}
+  engineering.candidate: {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/candidate}
+  engineering.repair:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/repair}
+  engineering.factory:   {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/factory}
+  engineering.knowledge: {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/knowledge}
+  engineering.import:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/import}
+  engineering.plugin:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/plugin}
+  engineering.localai:   {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/localai}
+
+  lifecycle.release:     {layer: lifecycle,   protected_core: true,  module_root: backend/arkali/lifecycle/release}
+  lifecycle.recovery:    {layer: lifecycle,   protected_core: true,  module_root: backend/arkali/lifecycle/recovery}
+  lifecycle.evolution:   {layer: lifecycle,   protected_core: false, module_root: backend/arkali/lifecycle/evolution}
+
+  surfaces.operations:   {layer: surfaces,    protected_core: false, module_root: backend/arkali/surfaces/operations}
+  surfaces.command:      {layer: surfaces,    protected_core: false, module_root: backend/arkali/surfaces/command}
+
+# ---------------------------------------------------------------------------
+# Lifecycle and state-machine authorities (duplicate authority = gate violation)
+# ---------------------------------------------------------------------------
+lifecycle_authorities:
+  project:              control.registry.project
+  candidate:            engineering.candidate
+  candidate_promotion:  lifecycle.release
+  stable_rollback:      lifecycle.recovery
+  job:                  execution.durable
+  workflow_execution:   execution.workflow
+  provider_health:      control.registry.provider
+  plugin:               engineering.plugin
+  release:              lifecycle.release
+  core_upgrade:         lifecycle.evolution
+  backup_restore:       lifecycle.recovery
+  evolution_campaign:   lifecycle.evolution
+  hardening_round:      acceptance.engine
+  import_project:       engineering.import
+
+state_machine_authorities:
+  Project:             control.registry.project
+  Candidate:           engineering.candidate
+  Job:                 execution.durable
+  WorkflowExecution:   execution.workflow
+  ProviderHealth:      control.registry.provider
+  PluginLifecycle:     engineering.plugin
+  Release:             lifecycle.release
+  CoreUpgrade:         lifecycle.evolution
+  BackupRestore:       lifecycle.recovery
+  EvolutionCampaign:   lifecycle.evolution
+  HardeningRound:      acceptance.engine
+  ImportProject:       engineering.import
+
+# ---------------------------------------------------------------------------
+# Provider/model authority references. Copying any of these fields elsewhere
+# is a shadow-registry violation.
+# ---------------------------------------------------------------------------
+provider_authority:
+  owner: control.registry.provider
+  fields_owned: [identity, model_identity, configuration, health, availability, cost_metadata, fallback]
+  reference_only_consumers:
+    - control.capability
+    - execution.scheduler
+    - engineering.agent
+    - engineering.localai
+    - surfaces.operations
+  copying_permitted: false
+  caching_permitted: false
+
+# ---------------------------------------------------------------------------
+# Isolation / security ownership
+# ---------------------------------------------------------------------------
+isolation:
+  owner: control.isolation
+  enforcement_point: execution.sandbox
+  properties: [FS_CONFINEMENT, NET_EGRESS_CONTROL, PROCESS_CONTAINMENT,
+               CREDENTIAL_ISOLATION, RESOURCE_LIMITS, KERNEL_ISOLATION, DISPOSABILITY]
+  tier_requirements:
+    TRUST-0: []
+    TRUST-1: [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS]
+    TRUST-2: [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS, NET_EGRESS_CONTROL, CREDENTIAL_ISOLATION]
+    TRUST-3: [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS, NET_EGRESS_CONTROL, CREDENTIAL_ISOLATION, KERNEL_ISOLATION]
+    TRUST-4: [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS, NET_EGRESS_CONTROL, CREDENTIAL_ISOLATION, KERNEL_ISOLATION, DISPOSABILITY]
+  backends:
+    job_object:        [PROCESS_CONTAINMENT, RESOURCE_LIMITS]
+    restricted_token:  [FS_CONFINEMENT]
+    workspace_acl:     [FS_CONFINEMENT]
+    wfp_egress:        [NET_EGRESS_CONTROL]
+    vault_detach:      [CREDENTIAL_ISOLATION]
+    windows_sandbox:   [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS, NET_EGRESS_CONTROL, CREDENTIAL_ISOLATION, KERNEL_ISOLATION, DISPOSABILITY]
+    hyperv_container:  [FS_CONFINEMENT, PROCESS_CONTAINMENT, RESOURCE_LIMITS, NET_EGRESS_CONTROL, CREDENTIAL_ISOLATION, KERNEL_ISOLATION]
+  composition_permitted: true
+  on_unsatisfiable: DENY
+  capability_state_when_unsatisfiable: UNSUPPORTED
+  silent_downgrade_permitted: false
+  registry_is_protected_core: true
+  backend_change_gate: HUMAN_GATE_4
+
+# ---------------------------------------------------------------------------
+# Computer-Use operation classes (also the plugin permission vocabulary)
+# ---------------------------------------------------------------------------
+operation_classes:
+  READ_FILE:                   {default: AUTO,      fixed: null}
+  WRITE_WORKSPACE_FILE:        {default: AUTO,      fixed: null}
+  WRITE_STABLE_FILE:           {default: DENY,      fixed: DENY}
+  ROLLBACK_STABLE:             {default: DENY,      fixed: RECOVERY_SUPERVISOR_ONLY}
+  RUN_PROCESS:                 {default: AUTO,      fixed: null}
+  TERMINATE_PROCESS:           {default: AUTO,      fixed: OWN_PROCESS_ONLY}
+  BROWSER_LOCAL:               {default: AUTO,      fixed: LOOPBACK_ONLY}
+  BROWSER_EXTERNAL:            {default: ASK_USER,  fixed: DENY_IN_LOCAL_ONLY}
+  NETWORK_EXTERNAL:            {default: ASK_USER,  fixed: DENY_IN_LOCAL_ONLY}
+  INSTALL_DEPENDENCY:          {default: AUTO,      fixed: LOCKFILE_BOUND}
+  INSTALL_SYSTEM_SOFTWARE:     {default: ASK_USER,  fixed: NEVER_AUTO}
+  CHANGE_SYSTEM_CONFIGURATION: {default: ASK_USER,  fixed: NEVER_AUTO}
+  ACCESS_SECRET:               {default: DENY,      fixed: NEVER_AUTO_OUTSIDE_PREAUTHORIZED_SCOPE}
+  APPLY_MIGRATION:             {default: ASK_USER,  fixed: HUMAN_GATE_6_ON_REAL_OR_STABLE_DATA}
+unmapped_action_resolution: DENY
+
+# ---------------------------------------------------------------------------
+# Stable mutation policy
+# ---------------------------------------------------------------------------
+stable_mutation:
+  direct_mutation_permitted_by: []          # empty by design
+  prohibited_actors: [ai_agent, deterministic_transformer, workflow, plugin,
+                      computer_use_worker, human_operated_engineering_tool]
+  required_path: [stable, candidate, verification, acceptance, promotion]
+  sole_exception:
+    operation: ROLLBACK_STABLE
+    invoker: lifecycle.recovery
+    target_must_be: previously_verified_immutable_revision
+    mechanism_preference: atomic_revision_pointer_switch
+    novel_content_permitted: false
+    transformation_during_restore_permitted: false
+    evidence_required: true
+    direct_ai_invocation_permitted: false
+  effective_from: "first revision designated Stable by lifecycle.release"
+
+# ---------------------------------------------------------------------------
+# Architecture verification gates (all must evaluate 0)
+# ---------------------------------------------------------------------------
+architecture_gates:
+  - {id: duplicate_canonical_authority,   threshold: 0, negative_control_fixture_required: true}
+  - {id: shadow_registry,                 threshold: 0, negative_control_fixture_required: true}
+  - {id: duplicate_state_machine_authority, threshold: 0, negative_control_fixture_required: true}
+  - {id: duplicate_lifecycle_authority,   threshold: 0, negative_control_fixture_required: true}
+  - {id: forbidden_dependency_direction,  threshold: 0, negative_control_fixture_required: true}
+  - {id: forbidden_cycles,                threshold: 0, negative_control_fixture_required: true}
+  - {id: protected_core_boundary_violation, threshold: 0, negative_control_fixture_required: true}
+  - {id: architecture_budget_violation,   threshold: 0, exception_gate: HUMAN_GATE_8, negative_control_fixture_required: true}
+identifier_only_checker_is_sufficient: false
