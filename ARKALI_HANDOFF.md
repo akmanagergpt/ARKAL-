@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f` |
+| Current HEAD | `432161158faf091beb8c1f5d8688028ad45feeaa` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,8 +80,10 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (88 tests)
+backend/                                    pytest suite (532 tests)
 backend/tests/governance/test_handoff_drift.py  handoff negative controls
+backend/tests/state_machines/               12 machines + canonical reconciliation
+backend/tests/capability/                   C-13 schema + pre-activation behaviour
 ```
 
 **Tracked root documentation — holds no governed value, never an authority:**
@@ -101,15 +103,18 @@ repository, the repository wins.
 | Phase 0A / 0B | **ACCEPTED** (one package, Human Gate 1) |
 | Phase 1 | **MACHINE-ACCEPTED** |
 | Phase 2 | **MACHINE-ACCEPTED** |
-| Phase 3 | **UNLOCKED — NOT_STARTED** ← current work |
+| Phase 3 | **MACHINE-ACCEPTED** |
+| Phase 4 | **UNLOCKED — NOT_STARTED** ← current work |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **28** MANDATORY (5 Phase 1 + 23 Phase 2) |
+| Cumulative verified | **32** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3) |
 | BLOCKER / HIGH | **0 / 0** |
-| MEDIUM / LOW | 14 / 9 (tracked, non-blocking) |
+| MEDIUM / LOW | 17 / 9 (tracked, non-blocking) |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over 16 real cross-context edges) |
+| Architecture violations | **0** (8 gates non-failing over 32 real cross-context edges) |
+| State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
+| Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
 | Working tree | clean at HEAD |
 
 ## 4. Accepted commit history
@@ -132,7 +137,9 @@ repository, the repository wins.
 | 14 | `74a9ccf` | **F-0017** — vacuous handoff negative control repaired |
 | 15 | `e323c67` | session-continuation note tracked as documentation |
 | 16 | `fc8c98d` | handoff manifest refreshed after note tracking (§12 rule) |
-| 17 | `85cbcda` | pre-Phase-3 governance hygiene: GH-001/002/003 ← HEAD at generation |
+| 17 | `85cbcda` | pre-Phase-3 governance hygiene: GH-001/002/003 |
+| 18 | `c69d1dd` | handoff manifest refreshed after hygiene (§12 rule) |
+| 19 | `4321611` | **PHASE 3 MACHINE-ACCEPTED** — 12 state machines, C-13 schema ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -178,7 +185,9 @@ No unavailable toolchain may be reported as PASS.
 | Item | Reference |
 |---|---|
 | 0 BLOCKER, 0 HIGH | `OPEN_BLOCKERS.md` |
-| 14 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
+| 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
+| **F-0018** — `STATE_MACHINES.md` §6 `any→QUARANTINED` read literally leaves Plugin Lifecycle with no terminal state; awaiting a human ruling, implemented as written | `KNOWN_FAILURES.md` |
+| **F-0020** — `max_cyclomatic_complexity_per_function` and `max_orchestration_depth` are declared without a measurement formula and are deliberately unenforced | `KNOWN_FAILURES.md` |
 | Register exhaustiveness is by construction, not mechanical extraction (M-P0-1) | `PHASE_0_AUDIT.md` |
 | Golden Repair corpus instantiation deferred to Phase 30 (DEF-004) | `OPEN_BLOCKERS.md` |
 | Contract schema files under `docs/contracts/` deferred (DEF-008) | `OPEN_BLOCKERS.md` |
@@ -186,34 +195,40 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 3
+## 8. Current phase contract — Phase 4
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value | Source |
 |---|---|---|
-| Name | **Formal State Machines + Capability Graph Schema** | Master Spec §Canonical Implementation Phases |
-| Prerequisites | Phase **2** (MACHINE-ACCEPTED) | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
-| ARK-REQ IDs | **0043, 0044, 0045, 0049** — all MANDATORY | `REQUIREMENT_REGISTER.md` |
-| Contract IDs | **C-13** Capability node + query result (`3 (schema) / 9B`) | `CONTRACT_INVENTORY.md` |
-| Human gate | none (machine acceptance) | matrix Gate column |
+| Name | **Security + Governance + Isolation Backends** | Master Spec §Canonical Implementation Phases |
+| Prerequisites | Phases **2** and **3** (both MACHINE-ACCEPTED) | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
+| ARK-REQ IDs | **33** MANDATORY — 0017, 0071, 0096–0107, 0110–0114, 0118–0123, 0171–0175, 0202, 0236, 0241 | `REQUIREMENT_REGISTER.md` (Phase column) |
+| Contract IDs | **C-07, C-08, C-09, C-10** | `CONTRACT_INVENTORY.md` |
+| Owners | `control.policy` (21), `control.isolation` (10), `acceptance.engine` (1), `control.architecture` (1) | register Owner column |
+| Human gate | none for the phase itself; **GATE 4** governs any later weakening of a security boundary, sandbox tier or protected-core policy | matrix Gate column · `AUTHORITY_MAP.yaml` |
 
-**In scope.** The twelve canonical state machines (`STATE_MACHINES.md`) with states, transitions and *structurally impossible* invalid transitions (0043, 0044). The Capability Graph **schema** — node shape carrying references only (0045). Pre-activation query behaviour returning `NOT_CONFIGURED` (0049).
+**In scope.** The PDP/PEP decision path; the fourteen canonical operation classes with their fixed resolutions; `unmapped_action_resolution: DENY`; Protected Core enforcement (ADR-0005); TRUST-0..4 tier requirements expressed as *properties*; Isolation Backend declarations and composition; the backend availability probe (DEF-003).
 
-**Forbidden scope.** Capability Graph **activation** — that is Phase 9B (ADR-0003); population with real permissions, evidence requirements or provider health; any provider runtime; any persistence engine; anything owned by a later phase.
+**Forbidden scope.** Capability Graph activation (Phase 9B). Provider runtime (Phase 9). Any persistence engine (Phase 5). Sandbox *execution* enforcement belongs to `execution.sandbox`, whose implementation is a later phase — Phase 4 owns the isolation **authority**, not the enforcement point.
 
-**Evidence required.** `unit` and `prop` for 0043/0044 · `contract` for 0045 · `unit` for 0049.
+**Evidence required.** Dominated by `sec` and `prop`, with `chaos` for 0121 and `human` for 0099/0106/0110/0202. `human` evidence cannot be self-produced: it requires a recorded decision.
 
 **Machine acceptance.** Produce a phase report satisfying C-17, then run
-`python scripts/run_phase_gate.py 3 4`. Acceptance requires verdict
+`python scripts/run_phase_gate.py 4 5`. Acceptance requires verdict
 `PHASE_ACCEPTED_BY_MACHINE`: C1–C5 PASS, 8 architecture gates non-failing,
 0 open BLOCKER/HIGH, prerequisites accepted.
 
+**Read before starting.** `SECURITY_ARCHITECTURE.md`, ADR-0002, ADR-0005, and
+`AUTHORITY_MAP.yaml` `isolation` + `operation_classes`. The tier→property and
+backend→property tables are governed data; parse them, never copy them.
+
 ## 9. Next exact action
 
-**Begin Phase 3 — Formal State Machines + Capability Graph Schema.**
+**Begin Phase 4 — Security + Governance + Isolation Backends.**
 
-Do not begin any later phase. Do not activate the Capability Graph.
+Do not begin any later phase. Do not activate the Capability Graph — that is
+Phase 9B. Do not implement `execution.sandbox` enforcement.
 
 ## 10. New-session bootstrap protocol
 
@@ -237,8 +252,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f` |
-| Generated after | pre-Phase-3 governance hygiene (GH-001 defect-count dereference, GH-002 Phase 2 commit identity, GH-003 advisory-note state removal). Governed artifacts changed, so the §12 refresh was mechanically required, not discretionary. No phase, gate, ADR or requirement state changed |
+| Generated at HEAD | `432161158faf091beb8c1f5d8688028ad45feeaa` |
+| Generated after | **Phase 3 machine acceptance** (verdict `PHASE_ACCEPTED_BY_MACHINE`). Phase 3 → MACHINE-ACCEPTED, Phase 4 → UNLOCKED, cumulative verified 28 → 32, three MEDIUM findings opened (F-0018/0019/0020) and one opened-and-closed (F-0021), NEXT EXACT ACTION changed. Multiple §12 triggers |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -286,7 +301,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 85cbcda0bc4e1b26fab9d2059adbb81f8edbcd3f
+head: 432161158faf091beb8c1f5d8688028ad45feeaa
 branch: main
 working_tree_clean: true
 
@@ -298,11 +313,12 @@ requirements_optional: 2
 verified_by_phase:
   "1": 5
   "2": 23
-cumulative_verified: 28
+  "3": 4
+cumulative_verified: 32
 
-accepted_phases: ["0", "0A", "0B", "1", "2"]
-unlocked_phase: "3"
-next_exact_action_phase: "3"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3"]
+unlocked_phase: "4"
+next_exact_action_phase: "4"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
