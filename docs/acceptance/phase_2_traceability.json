@@ -1,0 +1,167 @@
+{
+  "phase_id": "2",
+  "note": "Traceability record retro-fitted when check C6 was introduced (F-0024 remediation). Derived from the accepted phase_2_report.json discharged list; it adds no claim the accepted report did not make.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0002",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0008",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0013",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0014",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0019",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0020",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0026",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0203",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0204",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0205",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0209",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0210",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0213",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0214",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0215",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0216",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0227",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0228",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0230",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0242",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0351",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0352",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    },
+    {
+      "req_id": "ARK-REQ-0353",
+      "state": "SATISFIED",
+      "implementation": "Phase 2 deliverables recorded in phase_2_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0015..EV-0020 (Phase 2 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 2 report; no claim is added that the report did not already make"
+    }
+  ]
+}

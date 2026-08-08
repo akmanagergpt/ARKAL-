@@ -1,0 +1,34 @@
+{
+  "phase_id": "3",
+  "note": "Traceability record retro-fitted when check C6 was introduced (F-0024 remediation). Derived from the accepted phase_3_report.json discharged list.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0043",
+      "state": "SATISFIED",
+      "implementation": "Phase 3 deliverables recorded in phase_3_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0023..EV-0027 (Phase 3 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 3 report; adds no claim the accepted report did not make"
+    },
+    {
+      "req_id": "ARK-REQ-0044",
+      "state": "SATISFIED",
+      "implementation": "Phase 3 deliverables recorded in phase_3_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0023..EV-0027 (Phase 3 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 3 report; adds no claim the accepted report did not make"
+    },
+    {
+      "req_id": "ARK-REQ-0045",
+      "state": "SATISFIED",
+      "implementation": "Phase 3 deliverables recorded in phase_3_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0023..EV-0027 (Phase 3 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 3 report; adds no claim the accepted report did not make"
+    },
+    {
+      "req_id": "ARK-REQ-0049",
+      "state": "SATISFIED",
+      "implementation": "Phase 3 deliverables recorded in phase_3_report.json files_created",
+      "evidence": "EVIDENCE_INDEX EV-0023..EV-0027 (Phase 3 accepted evidence)",
+      "note": "retro-fitted at the F-0024 remediation from the accepted Phase 3 report; adds no claim the accepted report did not make"
+    }
+  ]
+}

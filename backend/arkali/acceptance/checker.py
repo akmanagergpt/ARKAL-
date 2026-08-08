@@ -18,10 +18,18 @@ import pathlib
 from arkali.acceptance.gate_verdict import GateVerdict, Verdict
 from arkali.acceptance.governance_state import GovernanceState
 from arkali.acceptance.phase_report import PhaseReport
+from arkali.acceptance.protected_core_check import (
+    evaluate_report_profile,
+    load_protected_core,
+)
+from arkali.acceptance.requirement_claim import TraceabilityRecord, reconcile_discharge
 from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.architecture.gates.runner import GateRunner
 from arkali.control.specification.register_parser import RequirementRegister
-from arkali.kernel.contracts.errors import GovernanceStateError
+from arkali.kernel.contracts.errors import (
+    AuthoritativeSourceError,
+    GovernanceStateError,
+)
 from arkali.kernel.contracts.results import (
     ACCEPTANCE_STOPPING,
     CheckResult,
@@ -31,6 +39,8 @@ from arkali.kernel.contracts.results import (
 )
 
 _SPEC = "docs/canonical/PHASE_GATE_CHECKER.md"
+#: The requirement whose Phase column decides when the stronger profile is owed.
+PROFILE_REQUIREMENT = "ARK-REQ-0111"
 
 
 def _fail(check_id: str, summary: str, detail: str = "") -> CheckResult:
@@ -70,6 +80,7 @@ class PhaseGateChecker:
         self.authority_map = AuthorityMap.load(repo_root)
         self.register = RequirementRegister.load(repo_root)
         self.state = GovernanceState.load(repo_root)
+        self.protected_core = load_protected_core(repo_root)
 
     # -- individual checks ----------------------------------------------------
 
@@ -129,6 +140,82 @@ class PhaseGateChecker:
             return _fail("C5", "CONDITIONAL requirement lacks an objective rule",
                          f"ids={list(conditional_gap)}")
         return _ok("C5", "no non-PASS state was converted into PASS")
+
+    def check_discharge_integrity(self, report: PhaseReport) -> CheckResult:
+        """C6: the discharged set must agree with the traceability record.
+
+        Closes F-0024. C2 asks only whether every mandatory id appears in the
+        report; it cannot ask whether the work happened. This asks whether the
+        report's claim agrees with the phase's own traceability record, so an
+        actor cannot ship one honest artifact and one false one and still pass.
+        """
+        try:
+            record = TraceabilityRecord.load(self.repo_root, report.phase_id)
+        except AuthoritativeSourceError as exc:
+            return _fail("C6", "traceability record missing or unreadable", str(exc))
+        violations = reconcile_discharge(
+            report.ark_req_ids_closed, record, frozenset(self.register.all_ids())
+        )
+        if violations:
+            return _fail(
+                "C6", "phase report discharges requirements its traceability "
+                "record does not support", f"violations={list(violations)}"
+            )
+        return _ok(
+            "C6",
+            f"all {len(report.ark_req_ids_closed)} discharged requirements are "
+            f"claimed SATISFIED with named evidence",
+            f"non_satisfied_claims={[c.req_id for c in record.non_satisfied()]}",
+        )
+
+    def check_protected_core_profile(self, report: PhaseReport) -> CheckResult:
+        """ARK-REQ-0111: a change touching Protected Core needs the stronger profile.
+
+        The profile is derived from the changed paths, never declared by the
+        report. Evidence is real execution records, never a boolean.
+        """
+        owing_phase = self.register.get(PROFILE_REQUIREMENT).owning_phase
+        if not self._phase_owes_profile(report.phase_id, owing_phase):
+            return CheckResult(
+                check_id="PROTECTED_CORE",
+                state=HonestState.NOT_APPLICABLE,
+                summary=(
+                    f"phase {report.phase_id} predates {PROFILE_REQUIREMENT}, "
+                    f"which the register assigns to phase {owing_phase}"
+                ),
+                detail="the obligation begins when the register says it does",
+                authoritative_source=_SPEC,
+            )
+        verdict = evaluate_report_profile(self.repo_root, report, self.protected_core)
+        selection = verdict.selection
+        if not selection.requires_stronger_profile:
+            return _ok(
+                "PROTECTED_CORE",
+                "no protected-core member touched; normal profile applies",
+                selection.rationale,
+            )
+        if not verdict.complete:
+            return _fail(
+                "PROTECTED_CORE",
+                "protected-core change lacks the stronger verification profile",
+                verdict.render(),
+            )
+        return _ok("PROTECTED_CORE", verdict.render(), selection.rationale)
+
+    @staticmethod
+    def _phase_owes_profile(phase_id: str, owing_phase: str) -> bool:
+        """Whether this phase is at or beyond the phase that owns the profile.
+
+        NO SHADOW MODEL: the boundary is `ARK-REQ-0111`'s Phase column, not a
+        constant. A phase that ran before the obligation existed is not
+        retroactively in breach of it, and if governance ever moves the
+        requirement this check moves with it.
+        """
+        def rank(value: str) -> tuple[int, str]:
+            digits = "".join(c for c in value if c.isdigit())
+            return (int(digits) if digits else 0, value)
+
+        return rank(phase_id) >= rank(owing_phase)
 
     def check_open_findings(self) -> CheckResult:
         open_rows = self.state.open_stopping_findings
@@ -196,6 +283,8 @@ class PhaseGateChecker:
             self.check_recorded_execution(report),
             gate_result,
             self.check_honest_state_integrity(report),
+            self.check_discharge_integrity(report),
+            self.check_protected_core_profile(report),
             self.check_open_findings(),
             self.check_prerequisites(report.phase_id),
             self.check_human_gate(report.phase_id),

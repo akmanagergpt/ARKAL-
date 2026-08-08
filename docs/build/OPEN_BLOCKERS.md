@@ -4,21 +4,25 @@
 
 ## Internal blockers
 
-| ID | Finding | Severity | Owner | Blocks |
-|---|---|---|---|---|
-| F-0024 | **A MANDATORY requirement was reported as satisfied without an implementation.** `ARK-REQ-0111` (stronger verification profile for Protected Core changes) is assigned to **Phase 4** by the register's Phase column and owned by `acceptance.engine`. No implementation exists anywhere in `backend/arkali/`. The Phase 4 report nevertheless listed it among the requirements it discharged, which is exactly what Phase Gate Checker C2 consumes, so C2 passed on an assertion that was never earned | **HIGH** | acceptance authority | **Phase 5 and every later phase.** Phase 4 acceptance requires remediation and re-submission |
-| F-0025 | **The open-findings parser can drop a finding based on wording.** `GovernanceState._parse_open_findings` skips any table row whose text contains the substring `CLOSED` anywhere. A row describing a defect in terms of requirement closure is therefore silently treated as already resolved. This was discovered when F-0024 above failed to register purely because it quoted a field name. A governance parser that hides a finding fails **open** | MEDIUM | acceptance.engine | Reliability of the BLOCKER/HIGH stop mechanism |
+**Status is declared, never inferred.** Each finding's state comes only from its
+`Status` cell. Free text in any other column may contain OPEN, CLOSED, HIGH,
+`ark_req_ids_closed` or any other token without effect (F-0025).
 
-Internal BLOCKER = 0, internal HIGH = **1**. F-0015 (the one Phase 1 HIGH) was resolved by governance erratum ERR-001.
+| ID | Finding | Severity | Status | Owner | Blocks |
+|---|---|---|---|---|---|
+| F-0024 | **A MANDATORY requirement was reported as satisfied without an implementation.** `ARK-REQ-0111` (stronger verification profile for Protected Core changes) is assigned to **Phase 4** by the register's Phase column and owned by `acceptance.engine`. The Phase 4 report listed it among the requirements it discharged — exactly what Phase Gate Checker C2 consumes — so C2 passed on an assertion never earned | HIGH | CLOSED | acceptance.engine | resolved: `acceptance/verification_profile.py` implements the profile, checker gains C6 and PROTECTED_CORE, `phase_4_traceability.json` records every claim, and the guard rejects a discharge the traceability record does not support |
+| F-0025 | **The open-findings parser decided state by substring search.** `_parse_open_findings` skipped any row whose text contained `CLOSED` anywhere, so a finding could be hidden by its own prose. Discovered when F-0024 failed to register because it quoted a field name ending in `_closed`. A governance parser that hides a finding fails **open** | MEDIUM | CLOSED | acceptance.engine | resolved: `acceptance/findings.py` reads a declared Status cell only; malformed rows stop acceptance instead of vanishing; 34 controls |
+
+Internal BLOCKER = 0, internal HIGH = 0. F-0015 was resolved by governance erratum ERR-001; F-0024 and F-0025 by the ERR-004 remediation.
 
 Three HIGH defects were found by independent review at HUMAN GATE 1 and are now closed: F-0005 (false closure of ARK-REQ-0090/0091), F-0006 (five Phase 0A deliverables absent), F-0007 (ARK-REQ-0012 misclassification). See `KNOWN_FAILURES.md`.
 
 ## External blockers
 
-| ID | Blocker | Type | Owner | Blocks |
-|---|---|---|---|---|
-| ~~EXT-001~~ | ~~HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted~~ | HUMAN GATE | human acceptance authority | **CLOSED** — granted on candidate `007ebf6`, record `HGR-001` |
-| ~~EXT-002~~ | ~~F-0015 — `engineering.import` module root is a Python reserved keyword~~ | HIGH / GOVERNANCE | human acceptance authority | **CLOSED** — governance erratum ERR-001 authorized and applied |
+| ID | Blocker | Severity | Status | Owner | Resolution |
+|---|---|---|---|---|---|
+| EXT-001 | HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted | BLOCKER | CLOSED | human acceptance authority | granted on candidate `007ebf6`, record `HGR-001` |
+| EXT-002 | F-0015 — `engineering.import` module root is a Python reserved keyword | HIGH | CLOSED | human acceptance authority | governance erratum ERR-001 authorized and applied |
 
 **No external blockers open.** Phase 1 is machine-accepted; Phase 2 is unlocked.
 

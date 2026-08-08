@@ -23,7 +23,10 @@ def build_report(**overrides: object) -> PhaseReport:
         "phase_id": "2",
         "objective": "Foundation, contracts and executable phase gates",
         "ark_req_ids_closed": tuple(mandatory),
-        "files_created": ("backend/arkali/acceptance/checker.py",),
+        # A representative Phase 2 file outside Protected Core, so the happy
+        # path exercises the NORMAL profile. The stronger profile has its own
+        # controls in test_protected_core_profile.py.
+        "files_created": ("backend/arkali/control/specification/register_parser.py",),
         "files_modified": (),
         "public_contracts": ("C-01", "C-17", "C-18"),
         "migrations": (),

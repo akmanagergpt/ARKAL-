@@ -54,6 +54,32 @@ Acceptance of Phase 0 does not close the following, which remain open and tracke
 
 ---
 
+## ERR-004 — HUMAN RULING (post-Phase 4): F-0024 confirmed, remediation ordered
+
+| Field | Value |
+|---|---|
+| **Type** | Human ruling on a reported acceptance defect |
+| **Raised by** | Pre-Phase-5 acceptance integrity check (finding **F-0024**) |
+| **Decision** | **F-0024 CONFIRMED.** `ARK-REQ-0111` remains MANDATORY in Phase 4 |
+| **Explicitly refused** | reclassification · deferral · weakening of its evidence requirements |
+| **Ordered** | implement and verify it; repair **F-0025** in the same remediation because the affected parser is part of the acceptance path; do not begin Phase 5 |
+
+**Why this is recorded as a ruling and not an erratum.** Nothing canonical was amended. The register already assigned `ARK-REQ-0111` to Phase 4; the defect was that an implementing actor reported it discharged without doing the work. The ruling confirms the register rather than changing it.
+
+### Re-scoring an already-accepted phase
+
+The remediation raised a governance question the canonical set does not address directly: may the acceptance mechanism issue a fresh verdict for a phase that was already machine-accepted? The position taken, and the basis for it:
+
+* `AUTHORITY_MAP.yaml` `machine_autonomy.normal_phase_acceptance: machine`, and the dependency matrix records **no human gate** against Phase 4.
+* `VERIFICATION_ARCHITECTURE.md` §1.4 names the **Phase Gate Checker** as the authority for a phase gate. The prohibition — "no implementing actor may issue, re-score or override any of these" — binds the implementing actor, which did not issue this verdict. The checker did, from evidence.
+* `failed_gate_may_be_rescored_by_implementing_actor: false` is likewise a constraint on the actor, not on the mechanism.
+* §2.2 rule 1 explicitly contemplates supersession: "Evidence is never edited or deleted. A superseded result is retained with a `supersedes` edge." The defective revision is retained as `phase_4_report_rev1_defective.json` and the original verdict stands in history at `1ea79f3`.
+* Precedent: Phase 1 was re-submitted and machine-accepted after erratum ERR-001, at `1ae0835`.
+
+The distinction between re-scoring a *rejected* phase (Phase 1) and a *previously accepted* one (Phase 4) is not addressed by the canonical set. This position may be overturned by the acceptance authority; if it is, the superseding record is withdrawn and Phase 4 returns to the defective state, since nothing was overwritten.
+
+---
+
 ## ERR-003 — GOVERNANCE ERRATUM (post-Phase 3): architecture-budget measurement contract
 
 | Field | Value |

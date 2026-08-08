@@ -1,8 +1,8 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 4 ACCEPTANCE DEFECTIVE (F-0024 open, HIGH). PHASE 5 BLOCKED, NOT STARTED.**
+**Current state:** **PHASE 4 RE-ACCEPTED after the ERR-004 remediation. PHASE 5 UNLOCKED, NOT STARTED.**
 
-Progression is mechanically stopped: `python scripts/run_phase_gate.py 4 5` returns `PHASE_BLOCKED`, failing condition `FINDINGS`. The Phase 4 verdict at `1ea79f3` is preserved unamended as the record of the defect. Re-scoring it is the acceptance authority's decision, not the implementing actor's (`failed_gate_may_be_rescored_by_implementing_actor: false`).
+F-0024 and F-0025 are closed. `ARK-REQ-0111` is genuinely implemented and was applied to its own remediation candidate. Phase 4 was re-submitted to the real Phase Gate Checker and returned `PHASE_ACCEPTED_BY_MACHINE` with the two new checks — **C6** discharge integrity and **PROTECTED_CORE** — both passing. The defective revision is preserved unmodified as `docs/acceptance/phase_4_report_rev1_defective.json`, and the original verdict at `1ea79f3` stands in history as the record of the defect.
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
@@ -21,8 +21,8 @@ Progression is mechanically stopped: `python scripts/run_phase_gate.py 4 5` retu
 | 1 | Repository Bootstrap | **MACHINE-ACCEPTED** (validator 12/12, suite 7/7) |
 | 2 | Foundation + Contracts + Phase Gate Checker | **MACHINE-ACCEPTED** (66 tests, 8 gates, mypy clean) |
 | 3 | Formal State Machines + Capability Graph Schema | **MACHINE-ACCEPTED** (12 machines, C-13 schema, 444 new tests) |
-| 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED at `1ea79f3` — DEFECTIVE. F-0024 open: ARK-REQ-0111 was reported as discharged without an implementation. Remediation and re-submission required** |
-| 5 | Persistence + Project Registry + Minimal Backup/Restore | **UNLOCKED — NOT_STARTED. BLOCKED by F-0024; not begun** |
+| 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED** (re-accepted after the ERR-004 remediation; the defective first revision is retained as evidence) |
+| 5 | Persistence + Project Registry + Minimal Backup/Restore | **UNLOCKED — NOT_STARTED** |
 | 6 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
@@ -86,9 +86,11 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Remediate F-0024 before any Phase 5 work.** `ARK-REQ-0111` must either be genuinely implemented and verified by `acceptance.engine`, or reclassified by the acceptance authority through a governance erratum. Until then Phase 4 must be re-submitted to the Phase Gate Checker and Phase 5 remains blocked.
+**Begin Phase 5 — Persistence + Project Registry + Minimal Backup/Restore.** Phase 5 is unlocked and not started.
 
-The published cumulative count of **65** verified requirements includes ARK-REQ-0111 and is therefore overstated by one; the defensible figure is **64** pending remediation.
+*(superseded guidance retained for continuity)*
+
+**Remediate F-0024 before any Phase 5 work.** Done: `ARK-REQ-0111` implemented and verified, F-0024 and F-0025 closed, Phase 4 re-accepted. Cumulative verified is **65** again, now genuinely.
 
 *(superseded guidance retained for continuity)*
 
@@ -116,7 +118,9 @@ From here, normal phases are accepted by machine verdict without human approval.
 
 Acceptance of Phase 0 closed no finding other than the gate itself:
 
-- **64 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3, **32** from Phase 4). The Phase 4 report claimed 33; ARK-REQ-0111 is withdrawn from that count pending F-0024 remediation. The eight gates now evaluate 41 real cross-context edges.
+- **65 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3, 33 from Phase 4). All 33 Phase 4 entries were re-derived from the register after F-0024 and each is recorded in `phase_4_traceability.json` with a named implementation and a named control; check C6 refuses any discharge that record does not support.
+- **A false discharge can no longer pass.** C6 reconciles the phase report against the phase's traceability record; a requirement in any non-SATISFIED state may not appear in the discharged set.
+- **Protected Core changes now carry a stronger profile** from Phase 4 onward (`ARK-REQ-0111`): security review, adversarial review and full regression, each backed by a real execution record. The eight gates now evaluate 41 real cross-context edges.
 - **Security is enforced, not described.** One PDP, deterministic and pure; every decision audited including AUTO; unmappable action DENY; `WRITE_STABLE_FILE` DENY for every actor at every tier; Protected Core direct mutation refused. All governed vocabularies are parsed from the authority map — no security module holds a private copy.
 - **Host isolation is partial and honestly reported.** TRUST-0/1 satisfiable; TRUST-2/3/4 **UNSUPPORTED** on this host because `NET_EGRESS_CONTROL` (WFP needs elevation) and `KERNEL_ISOLATION` (Windows Sandbox and Hyper-V not enabled) are genuinely unavailable. No Windows feature was enabled to improve the result.
 - **No execution surface exists.** Bypass resistance is verified at contract level only; API, UI, agent, workflow, plugin and computer-use are NOT_YET_IMPLEMENTED and are not claimed.

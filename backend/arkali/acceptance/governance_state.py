@@ -15,8 +15,8 @@ import re
 
 from pydantic import BaseModel, ConfigDict
 
+from arkali.acceptance.findings import stopping_findings
 from arkali.kernel.contracts.errors import AuthoritativeSourceError
-from arkali.kernel.contracts.results import Severity
 
 BUILD_STATE = "docs/build/BUILD_STATE.md"
 HUMAN_GATES = "docs/acceptance/HUMAN_GATE_RECORDS.md"
@@ -143,34 +143,18 @@ class GovernanceState:
                 accepted.add(f"HUMAN_GATE_{header.group('gate')}")
         return frozenset(accepted)
 
-    #: Markdown table header/separator cells that are never finding ids.
-    _NON_ROW_IDS = frozenset({"ID", "FINDING", "BLOCKER", ""})
-
     @staticmethod
     def _parse_open_findings(text: str) -> tuple[str, ...]:
-        """Open BLOCKER/HIGH rows. Struck-through (~~) or CLOSED rows are excluded.
+        """Findings that stop acceptance, read from declared Status cells.
 
-        Header and separator rows are skipped explicitly: a header cell reading
-        "Blocker" would otherwise be counted as an open finding.
+        Defect F-0025: the predecessor decided closure by searching the whole
+        row for the substring `CLOSED`, so a finding could be hidden by its own
+        prose. State now comes only from the Status column, and a row that
+        cannot be read is returned as stopping rather than skipped.
+
+        Delegates to `arkali.acceptance.findings`, which owns the structure.
         """
-        open_rows: list[str] = []
-        for line in text.splitlines():
-            if not line.startswith("|") or "~~" in line:
-                continue
-            upper = line.upper()
-            if "CLOSED" in upper:
-                continue
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
-            if not cells:
-                continue
-            identifier = cells[0].replace("*", "").strip()
-            if identifier.upper() in GovernanceState._NON_ROW_IDS:
-                continue
-            if set(identifier) <= {"-", ":"}:
-                continue
-            if any(sev.value in upper for sev in (Severity.BLOCKER, Severity.HIGH)):
-                open_rows.append(identifier)
-        return tuple(sorted(set(open_rows)))
+        return stopping_findings(text)
 
     def phase(self, phase_id: str) -> PhaseStatus:
         status = self.phases.get(phase_id)

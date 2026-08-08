@@ -40,28 +40,15 @@
     "backend/tests/security/test_protected_core_and_secrets.py",
     "backend/tests/security/test_requirement_traceability.py",
     "backend/tests/structural/test_stable_mutation_check.py",
-    "backend/arkali/acceptance/findings.py",
-    "backend/arkali/acceptance/requirement_claim.py",
-    "backend/arkali/acceptance/verification_profile.py",
-    "backend/arkali/acceptance/protected_core_check.py",
-    "backend/tests/governance/test_finding_parser.py",
-    "backend/tests/governance/test_false_discharge.py",
-    "backend/tests/governance/test_protected_core_profile.py",
-    "docs/acceptance/phase_4_report.json",
-    "docs/acceptance/phase_4_traceability.json",
-    "docs/acceptance/phase_2_traceability.json"
+    "docs/acceptance/phase_4_report.json"
   ],
   "files_modified": [
-    "scripts/check_repository_structure.py",
-    "backend/arkali/acceptance/checker.py",
-    "backend/arkali/acceptance/governance_state.py",
-    "backend/tests/governance/test_authoritative_parsing.py",
-    "backend/tests/governance/test_phase_gate_checker.py"
+    "scripts/check_repository_structure.py"
   ],
-  "limitations": "HOST ISOLATION IS PARTIAL AND REPORTED AS SUCH. Real read-only probes: job_object PASS, restricted_token PASS, workspace_acl PASS, vault_detach (DPAPI) PASS, wfp_egress NOT_CONFIGURED (present but this process is not elevated), windows_sandbox NOT_CONFIGURED (feature not enabled), hyperv_container NOT_CONFIGURED (platform not enabled). Consequently TRUST-0 and TRUST-1 are satisfiable on this host; TRUST-2, TRUST-3 and TRUST-4 are UNSUPPORTED with execution DENY. No Windows feature was installed or enabled to improve this result. NO RUNTIME ENFORCEMENT IS CLAIMED: probes establish that a primitive is obtainable, not that a workload was confined; confinement evidence belongs to execution.sandbox in a later phase. NO EXECUTION SURFACE EXISTS (API, UI, agent, workflow, plugin, computer-use), so bypass resistance is verified at contract level only. ARK-REQ-0111 is now IMPLEMENTED AND VERIFIED, not deferred: the stronger Protected Core verification profile is executable in acceptance.engine, derives its categories from MS section Protected Core, derives membership from AUTHORITY_MAP, cannot be downgraded by the actor making the change, and was applied to this remediation itself (bootstrap self-application). All 33 Phase 4 MANDATORY requirements are re-derived from the register and recorded in phase_4_traceability.json; check C6 refuses any discharge the traceability record does not support. Python 3.13 NOT_CONFIGURED (3.12.10 present); Rust/Cargo UNSUPPORTED; TypeScript/Vite, ruff, poetry/uv NOT_CONFIGURED.",
+  "limitations": "HOST ISOLATION IS PARTIAL AND REPORTED AS SUCH. Real read-only probes: job_object PASS, restricted_token PASS, workspace_acl PASS, vault_detach (DPAPI) PASS, wfp_egress NOT_CONFIGURED (present but this process is not elevated), windows_sandbox NOT_CONFIGURED (feature not enabled), hyperv_container NOT_CONFIGURED (platform not enabled). Consequently TRUST-0 and TRUST-1 are satisfiable on this host; TRUST-2, TRUST-3 and TRUST-4 are UNSUPPORTED with execution DENY. No Windows feature was installed or enabled to improve this result. NO RUNTIME ENFORCEMENT IS CLAIMED: probes establish that a primitive is obtainable, not that a workload was confined; confinement evidence belongs to execution.sandbox in a later phase. NO EXECUTION SURFACE EXISTS (API, UI, agent, workflow, plugin, computer-use), so bypass resistance is verified at contract level only. ARK-REQ-0111 (stronger verification profile for Protected Core changes) is DEFERRED: Phase 4 delivers the boundary and the gate requirement, not the verification profile, which depends on the candidate lifecycle. Python 3.13 NOT_CONFIGURED (3.12.10 present); Rust/Cargo UNSUPPORTED; TypeScript/Vite, ruff, poetry/uv NOT_CONFIGURED.",
   "migrations": [],
   "next_exact_action": "Begin Phase 5 - Persistence Foundation (per IMPLEMENTATION_DEPENDENCY_MATRIX.md)",
-  "objective": "Deterministic security and governance foundation: Policy Authority, the single PDP, PEP enforcement contract, the fourteen operation classes, TRUST tier and Isolation Backend property model with real host probes, Protected Core boundary, Secret Vault boundary and Local-Only policy. REVISION 2 - supersedes phase_4_report_rev1_defective.json, which discharged ARK-REQ-0111 without an implementation (F-0024). The defective revision is retained unmodified as evidence.",
+  "objective": "Deterministic security and governance foundation: Policy Authority, the single PDP, PEP enforcement contract, the fourteen operation classes, TRUST tier and Isolation Backend property model with real host probes, Protected Core boundary, Secret Vault boundary and Local-Only policy",
   "phase_id": "4",
   "public_contracts": [
     "C-07 policy decision request/response",
@@ -77,22 +64,15 @@
       "command": "python -m pytest -q",
       "exit_code": 0,
       "failed": 0,
-      "passed": 852,
-      "summary": "full regression: every applicable test tier (T1-T4, T6, T9) executed; 852 passed, 11 skipped"
+      "passed": 774,
+      "summary": "774 passed, 11 skipped in 15.93s (785 collected; 242 added by Phase 4)"
     },
     {
       "command": "python -m pytest tests/security -q",
       "exit_code": 0,
       "failed": 0,
       "passed": 184,
-      "summary": "security review: T9 security tier - PDP, PEP, Local-Only, isolation, Protected Core, secrets, drift; 184 passed"
-    },
-    {
-      "command": "python -m pytest tests/governance/test_finding_parser.py tests/governance/test_false_discharge.py tests/governance/test_protected_core_profile.py tests/governance/test_handoff_drift.py tests/structural/test_stable_mutation_check.py tests/governance/test_architecture_gates.py -q",
-      "exit_code": 0,
-      "failed": 0,
-      "passed": 137,
-      "summary": "adversarial review: negative controls against the acceptance mechanisms themselves - finding parser, false discharge, profile evasion, handoff drift, stable-mutation detection, architecture gates; 137 passed"
+      "summary": "184 passed - PDP, PEP, Local-Only, isolation, Protected Core, secrets, drift, traceability"
     },
     {
       "command": "python -m mypy arkali --ignore-missing-imports",

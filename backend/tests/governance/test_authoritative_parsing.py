@@ -112,20 +112,35 @@ class TestGovernanceStateParsing:
         with pytest.raises(AuthoritativeSourceError):
             state.phase("99")
 
+    # These three moved to the structured contract when ERR-004 replaced
+    # substring matching with declared Status cells (F-0025). The new rule is
+    # strictly stricter than the old one - a row that cannot be read now stops
+    # acceptance instead of being skipped - so none of this relaxes the stop
+    # mechanism. Exhaustive controls live in test_finding_parser.py.
+
+    _HEADER = "| ID | Finding | Severity | Status | Owner |\n|---|---|---|---|---|\n"
+
     def test_table_header_is_not_read_as_a_finding(self) -> None:
         """Regression: a header cell reading 'Blocker' was counted as a finding."""
-        parsed = GovernanceState._parse_open_findings(
-            "| ID | Blocker | Type | Owner | Blocks |\n|---|---|---|---|---|\n"
-        )
-        assert parsed == ()
+        assert GovernanceState._parse_open_findings(self._HEADER) == ()
 
     def test_open_high_row_is_detected(self) -> None:
         parsed = GovernanceState._parse_open_findings(
-            "| EXT-9 | something broken | HIGH | owner | blocks |\n"
+            self._HEADER + "| EXT-9 | something broken | HIGH | OPEN | owner |\n"
         )
         assert parsed == ("EXT-9",)
 
-    def test_closed_and_struck_rows_are_excluded(self) -> None:
+    def test_closed_rows_are_excluded(self) -> None:
         assert GovernanceState._parse_open_findings(
-            "| ~~EXT-1~~ | old | HIGH | o | CLOSED |\n"
+            self._HEADER + "| EXT-1 | old | HIGH | CLOSED | o |\n"
         ) == ()
+
+    def test_a_row_with_no_declared_status_now_stops_rather_than_vanishing(
+        self,
+    ) -> None:
+        """The F-0025 fix: unreadable is louder than open, never quieter."""
+        parsed = GovernanceState._parse_open_findings(
+            "| ID | Finding | Severity | Owner |\n|---|---|---|---|\n"
+            "| EXT-8 | no status column | HIGH | o |\n"
+        )
+        assert parsed == ("EXT-8",)
