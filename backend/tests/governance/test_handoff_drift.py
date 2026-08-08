@@ -135,17 +135,30 @@ class TestNegativeControls:
         assert "all authoritative sources exist" in drift_names(validator, mutated)
 
     def test_8_false_clean_tree_claim_is_detected(
-        self, validator, handoff_text: str, tmp_path: pathlib.Path
+        self, validator, handoff_text: str
     ) -> None:
-        """A clean claim must be rejected when the tree is dirty."""
-        dirty = tmp_path / "scratch.txt"
-        dirty.write_text("temporary", encoding="utf-8")
+        """A clean claim must be rejected when the tree is genuinely dirty.
+
+        The probe file must NOT be gitignored, or the tree stays clean and this
+        control passes for the wrong reason. An earlier version used a `.tmp`
+        suffix, which `.gitignore` excludes; it only appeared to work because
+        unrelated uncommitted files happened to be present at the time.
+        """
+        probe = REPO / "_handoff_dirty_probe_do_not_commit.md"
+        assert subprocess.run(
+            ["git", "check-ignore", "-q", "--", probe.name],
+            cwd=REPO, capture_output=True,
+        ).returncode != 0, "probe file is gitignored; the control would be vacuous"
         try:
-            (REPO / "_handoff_dirty_probe.tmp").write_text("x", encoding="utf-8")
+            probe.write_text("dirty-tree probe", encoding="utf-8")
+            dirty = subprocess.run(
+                ["git", "status", "--porcelain", "-uall"],
+                cwd=REPO, capture_output=True, text=True,
+            ).stdout
+            assert probe.name in dirty, "probe did not dirty the working tree"
             mutated = mutate_claim(handoff_text, "working_tree_clean", "true")
             assert "working-tree clean claim" in drift_names(validator, mutated)
         finally:
-            probe = REPO / "_handoff_dirty_probe.tmp"
             if probe.exists():
                 probe.unlink()
 
