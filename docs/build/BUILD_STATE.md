@@ -104,4 +104,4 @@ Acceptance of Phase 0 closed no finding other than the gate itself:
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
 - Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
 - 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.
-- **15** recorded defects remain in `KNOWN_FAILURES.md` as permanent evidence. F-0015 is CLOSED by ERR-001 but retained in full.
+- Every recorded defect remains in `KNOWN_FAILURES.md` as permanent evidence. That file is the authoritative defect ledger; its composition is deliberately **not** mirrored here, because a transcribed count re-rots the moment a defect is added (F-0002, F-0011). Read the ledger. F-0015 is CLOSED by ERR-001 but retained in full.

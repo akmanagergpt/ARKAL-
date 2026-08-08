@@ -91,20 +91,34 @@ Tutarsızlık varsa: HANDOFF_DRIFT.
 
 "Open the current ARKALI repository. Read ARKALI_HANDOFF.md first. Verify it against Git, BUILD_STATE, HUMAN_GATE_RECORDS, REQUIREMENT_REGISTER and AUTHORITY_MAP. Run scripts/check_handoff.py. If drift exists, stop with HANDOFF_DRIFT. If consistent, continue only from NEXT EXACT ACTION. Do not restart architecture from scratch and do not rely on previous chat memory."
 
-## Şu anki referans durumu
+## Repository durumu bu notta TUTULMAZ
 
-Bu not oluşturulduğunda:
-- Phase 0A: ACCEPTED
-- Phase 0B: ACCEPTED
-- Human Gate 1: ACCEPTED
-- Phase 1: MACHINE-ACCEPTED
-- Phase 2: MACHINE-ACCEPTED
-- Phase 3: UNLOCKED / NOT_STARTED
-- Handoff version: ARKALI-HANDOFF-V1
-- Current reference HEAD: 74a9ccfef5e0befdefd8aad52fbf5e3898650c0c
-- Next exact action: Phase 3 — Formal State Machines + Capability Graph Schema
+Bu not advisory bir insan notudur; repository otoritesi değildir ve bilinçli
+olarak hiçbir repository-state değeri taşımaz.
 
-Bu bölüm zamanla eskiyebilir. Yeni oturumda her zaman gerçek repository ve ARKALI_HANDOFF.md üzerinden yeniden doğrula.
+**Güncel HEAD her zaman `ARKALI_HANDOFF.md` dosyasından okunur ve Git ile
+doğrulanır. Bu advisory notta kayıtlı bir HEAD değerine güvenme.** Böyle bir
+değer burada bilerek tutulmamaktadır.
+
+Aynı kural şu değerler için de geçerlidir — hepsinin sahibi authoritative
+handoff ve governance artifact'leridir, bu not değil:
+
+| Değer | Otorite |
+|---|---|
+| HEAD, branch, working-tree durumu | `ARKALI_HANDOFF.md` + Git |
+| Faz durumları (accepted / unlocked / NOT_STARTED) | `docs/build/BUILD_STATE.md` |
+| Human Gate durumu | `docs/acceptance/HUMAN_GATE_RECORDS.md` |
+| Requirement sayıları | `docs/canonical/REQUIREMENT_REGISTER.md` |
+| ADR durumları | `docs/adr/ADR_INDEX.md` |
+| BLOCKER / HIGH | `docs/build/OPEN_BLOCKERS.md` |
+| Kayıtlı defect ledger'ı | `docs/build/KNOWN_FAILURES.md` |
+| NEXT EXACT ACTION | `ARKALI_HANDOFF.md` §9 + `BUILD_STATE.md` |
+
+Bu tablo yalnızca **nereye bakılacağını** söyler; hiçbir değeri kopyalamaz.
+Bir değeri buraya yazmak, onu eskimeye mahkûm etmek demektir.
+
+Doğrulama: `python scripts/check_handoff.py` (exit 0 zorunlu). Tutarsızlık
+varsa HANDOFF_DRIFT ile dur.
 
 ## En önemli kural
 
