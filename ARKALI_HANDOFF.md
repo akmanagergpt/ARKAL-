@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `432161158faf091beb8c1f5d8688028ad45feeaa` |
+| Current HEAD | `39d1c34fb982233b9bde7f551c1fceb281cb53e3` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,7 +80,7 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (532 tests)
+backend/                                    pytest suite (589 tests)
 backend/tests/governance/test_handoff_drift.py  handoff negative controls
 backend/tests/state_machines/               12 machines + canonical reconciliation
 backend/tests/capability/                   C-13 schema + pre-activation behaviour
@@ -110,9 +110,9 @@ repository, the repository wins.
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
 | Cumulative verified | **32** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3) |
 | BLOCKER / HIGH | **0 / 0** |
-| MEDIUM / LOW | 17 / 9 (tracked, non-blocking) |
+| MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every Phase 3 finding is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates non-failing over 32 real cross-context edges) |
+| Architecture violations | **0** (8 gates non-failing over 33 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
 | Working tree | clean at HEAD |
@@ -139,7 +139,9 @@ repository, the repository wins.
 | 16 | `fc8c98d` | handoff manifest refreshed after note tracking (§12 rule) |
 | 17 | `85cbcda` | pre-Phase-3 governance hygiene: GH-001/002/003 |
 | 18 | `c69d1dd` | handoff manifest refreshed after hygiene (§12 rule) |
-| 19 | `4321611` | **PHASE 3 MACHINE-ACCEPTED** — 12 state machines, C-13 schema ← HEAD at generation |
+| 19 | `4321611` | **PHASE 3 MACHINE-ACCEPTED** — 12 state machines, C-13 schema |
+| 20 | `bd38bb6` | handoff manifest refreshed after Phase 3 acceptance (§12 rule) |
+| 21 | `39d1c34` | **ERR-002 + ERR-003** — Phase 3 human rulings applied; 3 budget violations repaired ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -160,6 +162,8 @@ Referenced, not duplicated. Read the cited artifact before relying on any of the
 | Protected Core membership and modification path | ADR-0005, Master Spec §Protected Core |
 | Direct-AI benchmark states; `NOT_CONFIGURED`/`EXTERNAL_UNAVAILABLE` do not block release | Verification Contract §Direct-AI benchmark |
 | **`engineering.import` logical identity retained; physical package is `engineering/project_import`** | **ERR-001** in `HUMAN_GATE_RECORDS.md` |
+| **Plugin `REMOVED` is terminal; reintroduction starts a new lifecycle instance** | **ERR-002** in `HUMAN_GATE_RECORDS.md` |
+| **Every numeric architecture budget has one ratified measurement formula; the gate reads it as data** | **ERR-003** in `HUMAN_GATE_RECORDS.md`; `AUTHORITY_MAP.yaml` `architecture_budget_measurement` |
 
 ## 6. Current environment
 
@@ -186,8 +190,7 @@ No unavailable toolchain may be reported as PASS.
 |---|---|
 | 0 BLOCKER, 0 HIGH | `OPEN_BLOCKERS.md` |
 | 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
-| **F-0018** — `STATE_MACHINES.md` §6 `any→QUARANTINED` read literally leaves Plugin Lifecycle with no terminal state; awaiting a human ruling, implemented as written | `KNOWN_FAILURES.md` |
-| **F-0020** — `max_cyclomatic_complexity_per_function` and `max_orchestration_depth` are declared without a measurement formula and are deliberately unenforced | `KNOWN_FAILURES.md` |
+| Every Phase 3 finding (F-0018 … F-0021) is **closed**; F-0018 by ERR-002 and F-0020 by ERR-003 | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
 | Register exhaustiveness is by construction, not mechanical extraction (M-P0-1) | `PHASE_0_AUDIT.md` |
 | Golden Repair corpus instantiation deferred to Phase 30 (DEF-004) | `OPEN_BLOCKERS.md` |
 | Contract schema files under `docs/contracts/` deferred (DEF-008) | `OPEN_BLOCKERS.md` |
@@ -252,8 +255,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `432161158faf091beb8c1f5d8688028ad45feeaa` |
-| Generated after | **Phase 3 machine acceptance** (verdict `PHASE_ACCEPTED_BY_MACHINE`). Phase 3 → MACHINE-ACCEPTED, Phase 4 → UNLOCKED, cumulative verified 28 → 32, three MEDIUM findings opened (F-0018/0019/0020) and one opened-and-closed (F-0021), NEXT EXACT ACTION changed. Multiple §12 triggers |
+| Generated at HEAD | `39d1c34fb982233b9bde7f551c1fceb281cb53e3` |
+| Generated after | **Accepted governance errata ERR-002 and ERR-003**, which closed the two Phase 3 human-ruling items. Six governed artifacts changed, so the §12 refresh was mechanically required. No phase, gate, ADR or requirement state changed: Phase 3 remains MACHINE-ACCEPTED and Phase 4 remains UNLOCKED |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -301,7 +304,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 432161158faf091beb8c1f5d8688028ad45feeaa
+head: 39d1c34fb982233b9bde7f551c1fceb281cb53e3
 branch: main
 working_tree_clean: true
 
