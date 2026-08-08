@@ -10,6 +10,7 @@ asserts that a specific corruption is detected by name.
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import re
 import subprocess
@@ -51,6 +52,33 @@ def drift_names(validator, text: str) -> list[str]:
     return validator.validate(REPO, text).drift
 
 
+def truth(validator) -> dict:
+    """Live derived truth. Mutations are built from this, never hard-coded.
+
+    Defect F-0021: several controls asserted that a *literal* value was wrong -
+    `accepted_phases: ["0","0A","0B","1","2","3"]`, `unlocked_phase: "9"`,
+    `accepted_human_gates: [... ,"HUMAN_GATE_2"]`. Each of those becomes true as
+    the build progresses, at which point the control stops testing detection and
+    starts failing for a reason unrelated to the validator. A negative control
+    whose expected-wrong value can become right has an expiry date. Deriving the
+    mutation from current truth removes it.
+    """
+    return validator.derive_truth(REPO)
+
+
+def a_phase_that_is_not_accepted(validator) -> str:
+    """A phase id guaranteed absent from the accepted set, derived at run time."""
+    current = truth(validator)
+    unlocked = current["unlocked_phase"]
+    if unlocked and unlocked not in current["accepted_phases"]:
+        return unlocked
+    candidates = [str(n) for n in range(37, 0, -1)]
+    for candidate in candidates:
+        if candidate not in current["accepted_phases"]:
+            return candidate
+    raise AssertionError("every phase is accepted; control cannot be constructed")
+
+
 class TestHandoffAgreesWithRepository:
     def test_live_handoff_has_no_governance_drift(
         self, validator, handoff_text: str
@@ -86,43 +114,56 @@ class TestNegativeControls:
     def test_3_stale_requirement_count_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "requirements_total", "311")
+        wrong = truth(validator)["requirements_total"] - 2
+        mutated = mutate_claim(handoff_text, "requirements_total", str(wrong))
         assert "requirements total" in drift_names(validator, mutated)
 
     def test_3b_stale_mandatory_count_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "requirements_mandatory", "300")
+        wrong = truth(validator)["requirements_mandatory"] - 3
+        mutated = mutate_claim(handoff_text, "requirements_mandatory", str(wrong))
         assert "requirements MANDATORY" in drift_names(validator, mutated)
 
     def test_4_wrong_cumulative_verified_count_is_detected(
         self, validator, handoff_text: str
     ) -> None:
         """cumulative_verified must equal the sum of verified_by_phase."""
-        mutated = mutate_claim(handoff_text, "cumulative_verified", "99")
+        claims = validator.parse_claims(handoff_text)
+        wrong = sum(int(v) for v in (claims.get("verified_by_phase") or {}).values()) + 1
+        mutated = mutate_claim(handoff_text, "cumulative_verified", str(wrong))
         assert "cumulative verified requirements" in drift_names(validator, mutated)
 
     def test_5_false_human_gate_acceptance_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(
-            handoff_text, "accepted_human_gates",
-            '["HUMAN_GATE_1", "HUMAN_GATE_2"]',
+        """Claims one more gate than is recorded, whichever gates those are."""
+        accepted = list(truth(validator)["accepted_human_gates"])
+        unaccepted = next(
+            f"HUMAN_GATE_{n}" for n in range(1, 9)
+            if f"HUMAN_GATE_{n}" not in accepted
         )
+        claimed = json.dumps(sorted([*accepted, unaccepted]))
+        mutated = mutate_claim(handoff_text, "accepted_human_gates", claimed)
         assert "accepted human gates" in drift_names(validator, mutated)
 
     def test_6_wrong_unlocked_phase_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "unlocked_phase", '"9"')
+        actual = truth(validator)["unlocked_phase"]
+        wrong = next(str(n) for n in range(37, 0, -1) if str(n) != actual)
+        mutated = mutate_claim(handoff_text, "unlocked_phase", f'"{wrong}"')
         assert "unlocked phase" in drift_names(validator, mutated)
 
     def test_6b_wrong_accepted_phase_set_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(
-            handoff_text, "accepted_phases", '["0", "0A", "0B", "1", "2", "3"]'
+        """Adds a phase that is provably not accepted right now."""
+        current = truth(validator)
+        claimed = json.dumps(
+            sorted([*current["accepted_phases"], a_phase_that_is_not_accepted(validator)])
         )
+        mutated = mutate_claim(handoff_text, "accepted_phases", claimed)
         assert "accepted phases" in drift_names(validator, mutated)
 
     def test_7_missing_authoritative_source_is_detected(
@@ -165,7 +206,9 @@ class TestNegativeControls:
     def test_9_next_action_pointing_at_wrong_phase_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "next_exact_action_phase", '"23"')
+        actual = truth(validator)["unlocked_phase"]
+        wrong = next(str(n) for n in range(37, 0, -1) if str(n) != actual)
+        mutated = mutate_claim(handoff_text, "next_exact_action_phase", f'"{wrong}"')
         assert "NEXT EXACT ACTION targets the unlocked phase" in drift_names(
             validator, mutated
         )
@@ -173,14 +216,52 @@ class TestNegativeControls:
     def test_10_stale_adr_status_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "adr_proposed", "9")
+        wrong = truth(validator)["adr_proposed"] + 9
+        mutated = mutate_claim(handoff_text, "adr_proposed", str(wrong))
         assert "ADR proposed count" in drift_names(validator, mutated)
 
     def test_10b_stale_adr_accepted_count_is_detected(
         self, validator, handoff_text: str
     ) -> None:
-        mutated = mutate_claim(handoff_text, "adr_accepted", "0")
+        wrong = truth(validator)["adr_accepted"] + 1
+        mutated = mutate_claim(handoff_text, "adr_accepted", str(wrong))
         assert "ADR accepted count" in drift_names(validator, mutated)
+
+
+class TestControlsDoNotDecay:
+    """Permanent guard for defect class F-0021.
+
+    A negative control must assert that a *derived-wrong* value is detected, not
+    that a *literal* value is wrong. Literals expire: `unlocked_phase: "9"` is
+    wrong today and correct at Phase 9, and on that day the control stops
+    proving detection and starts reporting a failure that has nothing to do with
+    the validator.
+
+    These checks re-derive each mutation and assert it still differs from truth.
+    """
+
+    def test_phase_mutations_still_differ_from_truth(self, validator) -> None:
+        current = truth(validator)
+        assert a_phase_that_is_not_accepted(validator) not in current["accepted_phases"]
+
+    def test_unlocked_phase_mutation_still_differs_from_truth(self, validator) -> None:
+        actual = truth(validator)["unlocked_phase"]
+        wrong = next(str(n) for n in range(37, 0, -1) if str(n) != actual)
+        assert wrong != actual
+
+    def test_human_gate_mutation_still_differs_from_truth(self, validator) -> None:
+        accepted = list(truth(validator)["accepted_human_gates"])
+        unaccepted = next(
+            f"HUMAN_GATE_{n}" for n in range(1, 9)
+            if f"HUMAN_GATE_{n}" not in accepted
+        )
+        assert unaccepted not in accepted
+
+    def test_count_mutations_still_differ_from_truth(self, validator) -> None:
+        current = truth(validator)
+        assert current["requirements_total"] - 2 != current["requirements_total"]
+        assert current["adr_accepted"] + 1 != current["adr_accepted"]
+        assert current["adr_proposed"] + 9 != current["adr_proposed"]
 
 
 class TestFailClosed:

@@ -81,3 +81,11 @@ class HumanGateRequired(PhaseProgressionDenied):
     """A human gate is required and no acceptance record exists."""
 
     code = "ARK-ERR-0009"
+
+
+# Phase 3 extends this taxonomy in sibling modules rather than here, because
+# `max_public_symbols_per_module` is 20 and the combined taxonomy exceeds it.
+# Decomposition is the intended response to a budget (ADR-0008); a GATE 8
+# exception is not, and would in any case have to be authored by someone other
+# than the implementing actor. See `state_machine_errors` and
+# `capability_errors`, both owned by kernel.contracts.

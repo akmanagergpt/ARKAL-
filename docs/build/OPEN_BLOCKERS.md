@@ -36,6 +36,8 @@ Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an
 
 These were reported at the canonical repair and remain open by design; none blocks Phase 0.
 
+MEDIUM (opened at Phase 3): F-0018 canonical §6 transition reading leaves Plugin Lifecycle with no terminal state, awaiting human ruling · F-0019 architecture budget gate scope, partially closed, 7 of 9 budgets now evaluated · F-0020 two numeric budgets declared without a canonical measurement formula, deliberately unenforced pending a ruling. F-0021 (expiring negative controls) was opened and closed within Phase 3.
+
 MEDIUM: installer code-signing vs SmartScreen on a clean baseline · "Temporal-grade" unmeasurable except behaviorally · mutation-testing budget at system scale · fine-tuning acceptance path · air-gapped signing key management · Git branching/remote model unspecified · knowledge-lifecycle transition rules undefined · Phase 0 deliverable breadth · workflow derived-cache invalidation complexity · Import/Rescue phase-level budget.
 
 LOW: `ARKALI_RELEASE_QUALITY_REPORT.md` contents · `ADR_INDEX` format conventions · PostgreSQL path unverified · "Transaction/Transactions" plural mismatch in the canonical set · `docs/canonical` vs `docs/contracts` scope overlap · MCP adapters unverified · skill-mode verification implied via Phase 27 rather than an explicit VDC clause.

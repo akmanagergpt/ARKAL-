@@ -1,10 +1,10 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 2 MACHINE-ACCEPTED. PHASE 3 UNLOCKED, NOT STARTED.**
+**Current state:** **PHASE 3 MACHINE-ACCEPTED. PHASE 4 UNLOCKED, NOT STARTED.**
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 2 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
+**Last updated by:** Phase 3 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
 **Governance erratum:** ERR-001 (closes F-0015) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -18,8 +18,9 @@
 | 0 | Acceptance package (0A + 0B) | **ACCEPTED — HUMAN GATE 1 granted** |
 | 1 | Repository Bootstrap | **MACHINE-ACCEPTED** (validator 12/12, suite 7/7) |
 | 2 | Foundation + Contracts + Phase Gate Checker | **MACHINE-ACCEPTED** (66 tests, 8 gates, mypy clean) |
-| 3 | Formal State Machines + Capability Graph Schema | **UNLOCKED — NOT_STARTED** |
-| 4 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
+| 3 | Formal State Machines + Capability Graph Schema | **MACHINE-ACCEPTED** (12 machines, C-13 schema, 444 new tests) |
+| 4 | Security + Governance + Isolation Backends | **UNLOCKED — NOT_STARTED** |
+| 5 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
 
@@ -82,9 +83,13 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Begin Phase 3 — Formal State Machines + Capability Graph Schema.** Phase 3 is unlocked and not started.
+**Begin Phase 4 — Security + Governance + Isolation Backends.** Phase 4 is unlocked and not started.
 
-Phase 3 delivers the twelve canonical state machines and the Capability Graph schema (C-13). Per ADR-0003 the graph is schema-only until Phase 9B; every capability query must return `NOT_CONFIGURED` before activation.
+Phase 4 delivers C-07, C-08, C-09 and C-10; the PDP/PEP; Protected Core enforcement; and the isolation backend availability probe (DEF-003). Its prerequisites are Phases 2 and 3, both machine-accepted.
+
+*(superseded guidance retained for continuity)*
+
+**Begin Phase 3 — Formal State Machines + Capability Graph Schema.** Phase 3 delivered the twelve canonical state machines and the Capability Graph schema (C-13). Per ADR-0003 the graph is schema-only until Phase 9B; every capability query returns `NOT_CONFIGURED` before activation.
 
 *(superseded guidance retained for continuity)*
 
@@ -100,7 +105,9 @@ From here, normal phases are accepted by machine verdict without human approval.
 
 Acceptance of Phase 0 closed no finding other than the gate itself:
 
-- **28 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2). The architecture is no longer only a declaration: the eight gates now evaluate 16 real cross-context edges.
+- **32 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3). The architecture is no longer only a declaration: the eight gates now evaluate 32 real cross-context edges.
+- The twelve canonical state machines are executable and reconciled against `STATE_MACHINES.md` on every run, so the inventory can no longer drift from the code that implements it.
+- The Capability Graph exists as schema only. ARK-REQ-0046, 0047 and 0048 remain open at Phase 9B and are **not** claimed by Phase 3.
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
 - Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
 - 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.

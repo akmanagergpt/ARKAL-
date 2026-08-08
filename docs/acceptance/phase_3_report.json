@@ -1,0 +1,129 @@
+{
+  "architecture_checks": "8 canonical gates executed by GateRunner; all non-failing. The architecture_budget_violation gate was extended this phase from 3 to 7 of the 9 declared numeric budgets after finding F-0019; the 2 remaining are recorded as awaiting a canonical measurement formula (F-0020) and are deliberately not evaluated against a formula invented by the implementing actor.",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0043",
+    "ARK-REQ-0044",
+    "ARK-REQ-0045",
+    "ARK-REQ-0049"
+  ],
+  "blockers": "none",
+  "duplicate_shadow_check": "PASS. The twelve executable machine definitions are reconciled against docs/canonical/STATE_MACHINES.md by a parser that holds no machine data of its own (101 reconciliation assertions). The capability activation phase is derived from ARK-REQ-0048's Phase column, never written in code. The plugin permission vocabulary and the provider-owned field list are injected from AUTHORITY_MAP.yaml rather than copied. duplicate_canonical_authority, duplicate_state_machine_authority, duplicate_lifecycle_authority and shadow_registry gates all PASS.",
+  "evidence_created": [
+    "EV-0023",
+    "EV-0024",
+    "EV-0025",
+    "EV-0026",
+    "EV-0027"
+  ],
+  "fake_success_scan": "clean. No TODO/stub/mock/placeholder markers in Phase 3 source (structure validator check 10 PASS). No forward-phase runtime construct (check 12 PASS). Capability resolution is not implemented and does not pretend to be: every pre-activation query returns NOT_CONFIGURED and every activation attempt raises PrematureActivation. mypy strict clean over 74 source files.",
+  "files_created": [
+    "backend/arkali/acceptance/hardening_round_state_machine.py",
+    "backend/arkali/control/architecture/state_machine_spec.py",
+    "backend/arkali/control/capability/capability_graph.py",
+    "backend/arkali/control/capability/capability_node.py",
+    "backend/arkali/control/registry/project/project_state_machine.py",
+    "backend/arkali/control/registry/provider/provider_health_state_machine.py",
+    "backend/arkali/engineering/candidate/candidate_state_machine.py",
+    "backend/arkali/engineering/plugin/plugin_lifecycle_state_machine.py",
+    "backend/arkali/engineering/project_import/import_project_state_machine.py",
+    "backend/arkali/execution/durable/job_state_machine.py",
+    "backend/arkali/execution/workflow/workflow_execution_state_machine.py",
+    "backend/arkali/kernel/contracts/capability_errors.py",
+    "backend/arkali/kernel/contracts/state_machine.py",
+    "backend/arkali/kernel/contracts/state_machine_errors.py",
+    "backend/arkali/lifecycle/evolution/core_upgrade_state_machine.py",
+    "backend/arkali/lifecycle/evolution/evolution_campaign_state_machine.py",
+    "backend/arkali/lifecycle/recovery/backup_restore_state_machine.py",
+    "backend/arkali/lifecycle/release/release_state_machine.py",
+    "backend/tests/capability/__init__.py",
+    "backend/tests/capability/test_capability_preactivation.py",
+    "backend/tests/capability/test_capability_schema.py",
+    "backend/tests/governance/test_budget_enforcement_coverage.py",
+    "backend/tests/state_machines/__init__.py",
+    "backend/tests/state_machines/registry.py",
+    "backend/tests/state_machines/test_canonical_reconciliation.py",
+    "backend/tests/state_machines/test_machine_behaviour.py",
+    "backend/tests/state_machines/test_state_machine_kernel.py",
+    "docs/acceptance/phase_3_report.json"
+  ],
+  "files_modified": [
+    "backend/arkali/control/architecture/gates/structure_gates.py",
+    "backend/arkali/kernel/contracts/errors.py"
+  ],
+  "limitations": "Python 3.13 NOT_CONFIGURED (3.12.10 present, re-detected this phase); Rust/Cargo/rustc UNSUPPORTED; TypeScript/Vite, ruff, poetry/uv NOT_CONFIGURED. None converted to PASS. The Capability Graph is schema-only: no resolution, no population, no provider runtime, no persistence. ARK-REQ-0046, 0047 and 0048 remain open at Phase 9B and are NOT claimed here. max_cyclomatic_complexity_per_function and max_orchestration_depth remain unevaluated pending a canonical measurement formula (F-0020); under one candidate formula backend/arkali/acceptance/checker.py:evaluate measures 16 against a budget of 12, which is reported rather than resolved because choosing the formula is a governance act.",
+  "migrations": [],
+  "next_exact_action": "Begin Phase 4 - Security + Governance + Isolation Backends (C-07, C-08, C-09, C-10; PDP/PEP; Protected Core enforcement; isolation backend probe)",
+  "objective": "Formal state machines for the twelve canonical entities with structurally impossible invalid transitions, and the C-13 Capability Graph schema with pre-activation NOT_CONFIGURED resolution",
+  "phase_id": "3",
+  "public_contracts": [
+    "C-13 (schema only; activation is Phase 9B per ADR-0003)"
+  ],
+  "security_findings": "none. No executable surface, no network, no clock, no randomness, no secret handling. No secret-bearing tracked file (structure validator check 9 PASS). No Stable mutation path introduced (check 11 PASS); the Core Upgrade machine restricts PROMOTED to ROLLED_BACK to the lifecycle.recovery invoker per ADR-0009.",
+  "state_machine_capability_changes": "Twelve state machines implemented, one per entity declared in AUTHORITY_MAP.yaml state_machine_authorities, each owned by the context the map names and physically located in that context's module root. Illegal transitions are structurally impossible: there is no public setter for machine state, __setattr__ refuses external writes, and the only path between states validates first. Capability Graph schema (C-13) delivered with twelve fields matching the canonical block; activation is refused.",
+  "status": "PASS",
+  "tests_executed": [
+    {
+      "command": "python -m pytest -q",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 518,
+      "summary": "518 passed, 14 skipped in 10.10s (532 collected; 444 added by Phase 3)"
+    },
+    {
+      "command": "python -m pytest tests/state_machines tests/capability -q",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 423,
+      "summary": "423 passed, 14 skipped - state machine and capability behaviour"
+    },
+    {
+      "command": "python -m mypy arkali --ignore-missing-imports",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "Success: no issues found in 74 source files"
+    },
+    {
+      "command": "python scripts/check_repository_structure.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "SUMMARY: 12 pass, 0 fail, 12 total"
+    },
+    {
+      "command": "python scripts/check_repository_structure_negative.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "NEGATIVE CONTROL: PASS - keyword check rejects defective input and accepts corrected input"
+    },
+    {
+      "command": "python scripts/check_phase_graph.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "[AUTHORITATIVE] RESULT: PASS (10/10) - graph executable, deadlock-free"
+    },
+    {
+      "command": "python scripts/check_phase_graph_negative.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "NEGATIVE CONTROL: PASS - validator rejected the defective authoritative input"
+    },
+    {
+      "command": "python scripts/check_phase0_deliverables.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "RESULT: PASS - 0A 16/16, 0B 11/11"
+    },
+    {
+      "command": "python scripts/check_handoff.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "RESULT: PASS - handoff agrees with repository truth"
+    }
+  ]
+}
