@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `76edd26adc6a8ba13a37a92fcef714c9287df0da` |
+| Current HEAD | `fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -67,9 +67,9 @@ docs/acceptance/HUMAN_GATE_RECORDS.md    human decisions + ERR-001 erratum
 docs/build/BUILD_STATE.md                current phase status
 docs/build/PHASE_HISTORY.md              phase outcomes and commits
 docs/build/OPEN_BLOCKERS.md              open findings and deferrals
-docs/build/KNOWN_FAILURES.md             15 recorded defects, historical values
+docs/build/KNOWN_FAILURES.md             16 recorded defects, historical values
 docs/build/DECISION_LOG.md               decisions + human rulings
-docs/acceptance/EVIDENCE_INDEX.md        EV-0001 .. EV-0020
+docs/acceptance/EVIDENCE_INDEX.md        EV-0001 .. EV-0022
 ```
 
 **Executable governance (run these, do not trust prose):**
@@ -80,7 +80,7 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (66 tests)
+backend/                                    pytest suite (88 tests)
 ```
 
 ## 3. Current verified state
@@ -115,7 +115,8 @@ backend/                                    pytest suite (66 tests)
 | 8 | `3378054` | **HUMAN GATE 1 ACCEPTED** — ADRs PROPOSED→ACCEPTED, Phase 1 unlocked |
 | 9 | `0ad45a7` | Phase 1 candidate — NOT ACCEPTED (F-0015) |
 | 10 | `1ae0835` | **ERR-001 erratum + Phase 1 MACHINE-ACCEPTED** |
-| 11 | `76edd26` | **Phase 2 MACHINE-ACCEPTED** ← HEAD |
+| 11 | `76edd26` | **Phase 2 MACHINE-ACCEPTED** |
+| 12 | `fc239ff` | cross-session handoff protocol; fixes F-0016 ← HEAD |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -220,8 +221,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `76edd26adc6a8ba13a37a92fcef714c9287df0da` |
-| Generated after | Phase 2 machine acceptance |
+| Generated at HEAD | `fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7` |
+| Generated after | Phase 2 machine acceptance; refreshed at handoff-protocol commit per the §12 rule |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -269,7 +270,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 76edd26adc6a8ba13a37a92fcef714c9287df0da
+head: fc239ffb4a73ec3152c7f9652a5f36587f9b3ba7
 branch: main
 working_tree_clean: true
 
