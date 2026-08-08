@@ -59,6 +59,27 @@
 | Isolation backends probed | NOT_TESTED | probe runs at Phase 4 |
 | Human Gate 1 | **ACCEPTED** | granted by the human acceptance authority after independent inspection and independent execution of the validators; record `HGR-001` |
 
+## Cross-session handoff (mandatory maintenance)
+
+`ARKALI_HANDOFF.md` at the repository root is the cross-session bootstrap index.
+It is **not an authority** and can never override the canonical set, the
+requirement register, the authority map, the accepted ADRs, the human-gate
+records, this file, `PHASE_HISTORY.md` or accepted Git history. On disagreement
+the repository wins and continuation stops with `HANDOFF_DRIFT`.
+
+**It MUST be regenerated from authoritative repository state after:**
+
+- every machine-accepted phase;
+- every Human Gate decision;
+- every accepted governance erratum;
+- Stable Core promotion;
+- any rollback;
+- any new BLOCKER or HIGH that changes continuation strategy;
+- any change to NEXT EXACT ACTION.
+
+Refresh means re-derive from the repository, never hand-edit to match a
+recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
+
 ## Next exact action
 
 **Begin Phase 3 — Formal State Machines + Capability Graph Schema.** Phase 3 is unlocked and not started.

@@ -1,0 +1,58 @@
+ARKALI GENESIS v2 — NEW SESSION BOOTSTRAP
+
+You are continuing an in-progress engineering project. You are not starting one.
+
+THE REPOSITORY IS THE ONLY AUTHORITY.
+Conversation history, including any summary you are given, is advisory only.
+
+DO THIS FIRST, IN ORDER:
+
+1. Read ARKALI_HANDOFF.md at the repository root.
+   It is an INDEX, not an authority. Do not trust it — verify it.
+
+2. Verify it against the repository:
+     git rev-parse HEAD
+     git rev-parse --abbrev-ref HEAD
+     git status --porcelain -uall
+     read docs/build/BUILD_STATE.md
+     read docs/acceptance/HUMAN_GATE_RECORDS.md
+
+3. Run the drift validator:
+     python scripts/check_handoff.py
+
+   Exit 0  -> the handoff agrees with the repository; continue.
+   Non-zero -> HANDOFF_DRIFT. STOP. Report the drift. Do not continue,
+               do not "fix" it by editing authoritative files, and do not
+               proceed on the handoff's version of the truth.
+
+4. Read only the authoritative sources relevant to NEXT EXACT ACTION
+   (ARKALI_HANDOFF.md section 9). Do not read or rewrite everything.
+
+5. Continue from NEXT EXACT ACTION. Nothing else.
+
+RULES THAT DO NOT BEND:
+
+- Never rebuild the architecture from scratch. Phase 0 is accepted and closed
+  under Human Gate 1; the ADRs are accepted and immutable.
+- Never modify the four canonical source documents in docs/ without an explicit
+  human ruling recorded in docs/acceptance/HUMAN_GATE_RECORDS.md.
+- Never claim prior work, a test result, or a phase acceptance without
+  repository evidence. If it is not in the repository, it did not happen.
+- Never weaken, skip, xfail or delete a test or gate to obtain acceptance.
+- Never convert an unavailable toolchain into PASS. Use the honest states:
+  PASS FAIL BLOCKED NOT_TESTED NOT_CONFIGURED UNSUPPORTED NOT_APPLICABLE.
+- Never self-accept a Human Gate. Only a recorded human decision counts.
+- Do not begin a phase that BUILD_STATE.md does not show as unlocked.
+
+WHEN A PHASE IS COMPLETE:
+
+  python scripts/run_phase_gate.py <phase> <next_phase>
+
+Acceptance requires verdict PHASE_ACCEPTED_BY_MACHINE. If the verdict is
+PHASE_BLOCKED or AWAITING_HUMAN_GATE, the phase is not accepted — report that
+outcome truthfully rather than adjusting the report to pass.
+
+Then refresh ARKALI_HANDOFF.md by re-deriving it from repository state.
+
+This file contains no credentials, no secrets and no personal data, and none
+may be added to it.

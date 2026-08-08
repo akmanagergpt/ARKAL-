@@ -20,7 +20,7 @@ Checks (Phase 1 scope only):
   9  no secret-bearing file is tracked
  10  no fake implementation markers
  11  no Stable mutation path introduced
- 12  no Phase 2+ capability implemented
+ 12  no forward-phase runtime construct (web app / ORM engine)
 
 Exit 0 = all PASS. Exit 1 = at least one FAIL.
 """
@@ -62,9 +62,19 @@ def record(state: str, name: str, detail: str = "") -> None:
 
 
 def tracked_files() -> list[str]:
-    out = subprocess.run(["git", "ls-files"], cwd=ROOT,
-                         capture_output=True, text=True, check=True)
-    return [p for p in out.stdout.splitlines() if p]
+    """Tracked files PLUS untracked working-tree files.
+
+    Defect F-0016: an earlier version listed only `git ls-files`, so files added
+    by the phase under validation were invisible until they were committed --
+    the scans below then passed vacuously over work they were meant to inspect.
+    Scope now follows the working tree, not the index.
+    """
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT,
+                             capture_output=True, text=True, check=True)
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT,
+        capture_output=True, text=True, check=True)
+    return sorted({p for p in (tracked.stdout + untracked.stdout).splitlines() if p})
 
 
 def main() -> int:
@@ -266,7 +276,11 @@ def main() -> int:
     record("PASS" if not stable else "FAIL",
            "11 no Stable mutation path introduced", str(stable))
 
-    # 12 no Phase 2+ capability
+    # 12 no forward-phase RUNTIME construct
+    #   Phase-scoped predecessor ("no Phase 2+ capability") retired: Phase 2
+    #   legitimately implements Pydantic contract models per the canonical stack.
+    #   What remains forbidden is genuinely later-phase runtime: a web app or an
+    #   ORM engine, which belong to Phase 5 and beyond.
     forbidden = []
     for f in tracked_files():
         if not f.endswith(".py") or f.startswith(("scripts/", "backend/tests/")):
@@ -276,11 +290,12 @@ def main() -> int:
             continue
         body = open(fp, encoding="utf-8").read()
         for pat in [r"FastAPI\(", r"APIRouter\(", r"@app\.", r"create_engine\(",
-                    r"declarative_base\(", r"BaseModel\)"]:
+                    r"declarative_base\(", r"sessionmaker\("]:
             if re.search(pat, body):
                 forbidden.append(f"{f}: {pat}")
     record("PASS" if not forbidden else "FAIL",
-           "12 no Phase 2+ capability implemented", str(forbidden))
+           "12 no forward-phase runtime construct (web app / ORM engine)",
+           str(forbidden))
 
     print()
     fails = [r for r in results if r[0] == "FAIL"]

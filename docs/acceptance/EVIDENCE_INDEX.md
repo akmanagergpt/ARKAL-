@@ -31,6 +31,9 @@ Every command above was executed and its exit code recorded. No result in this i
 | **EV-0019** | **Prior-phase reconciliation (0A, 0B, 1)** | mechanical validation | executable checker against recorded state | **clean.** Prerequisites PASS, HUMAN_GATE_1 recorded, register 313/303/8/2, 0 authority conflicts, 0 open BLOCKER/HIGH. No defect found in any accepted prior phase; no history rewritten | — |
 | **EV-0020** | **mypy strict** | real tooling | `python -m mypy arkali --ignore-missing-imports` | **exit 0.** 56 source files, no issues. Caught a dead comparison in C3 that was fixed rather than silenced | ARK-REQ-0026 |
 
+| **EV-0021** | **Handoff drift validation** | mechanical validation | `python scripts/check_handoff.py` | **exit 0 at committed state.** Every claim in `ARKALI_HANDOFF.md` compared against truth derived from Git and the accepted governance artifacts: HEAD, branch, working tree, 313/303/8/2, accepted phases, unlocked phase, human gates, ADR counts, open findings, cumulative verified, source existence, NEXT EXACT ACTION | ARK-REQ-0220, 0223, 0243 |
+| **EV-0022** | **Handoff negative controls** | mechanical validation | `pytest tests/governance/test_handoff_drift.py` | **exit 0. 22 passed.** All ten required defect classes proven detectable: stale HEAD, wrong branch, stale requirement count, wrong cumulative verified, false human-gate acceptance, wrong unlocked/accepted phase, missing authoritative source, false clean-tree claim, NEXT EXACT ACTION pointing at a locked phase, stale ADR status. Plus fail-closed on missing/malformed claim block and proof that validation mutates no accepted state | ARK-REQ-0026, 0216 |
+
 ## Evidence deliberately absent
 
 | Evidence class | State | Reason |
