@@ -19,8 +19,8 @@
 ## What exists
 
 - Canonical document set (4 files), unmodified by Phase 0.
-- Phase 0A architecture package: `ARCHITECTURE.md`, `SECURITY_ARCHITECTURE.md`, `STATE_MACHINES.md`, `EXECUTION_AND_CAPABILITY.md`.
-- Phase 0B governance package: `REQUIREMENT_REGISTER.md` (311 entries), `AUTHORITY_MAP.yaml` (machine-readable, parses), `PHASE_GATE_CHECKER.md`, `ADR_INDEX.md` (9 ADRs, all PROPOSED).
+- **Phase 0A architecture package (8):** `ARCHITECTURE.md`, `SECURITY_ARCHITECTURE.md`, `STATE_MACHINES.md`, `EXECUTION_AND_CAPABILITY.md`, `CONTRACT_INVENTORY.md` (36 families), `VERIFICATION_ARCHITECTURE.md` (test architecture + evidence graph strategy), `IMPLEMENTATION_DEPENDENCY_MATRIX.md`, `CONTRADICTION_ANALYSIS.md`.
+- **Phase 0B governance package (5):** `REQUIREMENT_REGISTER.md` (313 entries), `AUTHORITY_MAP.yaml` (machine-readable, parses), `GOLDEN_REPAIR_CORPUS_DEFINITION.md`, `PHASE_GATE_CHECKER.md`, `ADR_INDEX.md` (9 ADRs, all PROPOSED).
 - Build state artifacts (this file and siblings), `EVIDENCE_INDEX.md`.
 
 ## What does not exist
@@ -30,14 +30,18 @@
 - No migrations, no database, no runtime state.
 - No test suite — nothing is implemented to test.
 - No Phase Gate Checker implementation (Phase 2).
-- No golden defect corpus content (definition only; corpus authored when a Golden Product exists).
+- No contract **schema files** — the 36 families are inventoried (Phase 0A); schemas are Phase 2 (DEF-008).
+- No **instantiated** Golden Repair corpus. The definition is delivered (Phase 0B, ARK-REQ-0090/0091); instantiation is ARK-REQ-0187/0188 at Phase 30 and is **NOT_APPLICABLE** until an accepted Golden Product exists — it is not a closed requirement.
 
 ## Honest state of Phase 0 verification
 
 | Item | State | Reason |
 |---|---|---|
 | Architecture package produced | PASS | documents exist and are internally consistent |
-| Requirement register produced | PASS | 311 entries, 0 duplicates, mechanically counted |
+| Requirement register produced | PASS | 313 entries, 0 duplicates, mechanically counted |
+| Phase 0A deliverables vs Build Protocol list | PASS | 16/16 present, item by item |
+| Phase 0B deliverables vs Build Protocol list | PASS | 11/11 present, item by item |
+| Golden Repair corpus instantiated | NOT_APPLICABLE | no accepted Golden Product exists; ARK-REQ-0187/0188 open at Phase 30 |
 | Authority map machine-readable | PASS | parses; 0 duplicate concern authorities |
 | Architecture gates executed | NOT_TESTED | no code exists to analyse; gates run from Phase 2 |
 | Phase Gate Checker executed | NOT_TESTED | implemented in Phase 2 |

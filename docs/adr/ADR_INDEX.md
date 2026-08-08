@@ -45,8 +45,8 @@ ADRs are immutable once accepted. A superseded ADR is retained and marked, never
 
 ## ADR-0006 — SQLite+WAL with PostgreSQL-ready abstractions
 **Context.** Local-first is a product requirement; PostgreSQL readiness is stated but never verified.
-**Decision.** SQLite+WAL is the shipping engine. Repository interfaces avoid engine-specific SQL so a PostgreSQL adapter remains possible. PostgreSQL support is registered CONDITIONAL (ARK-REQ-0012) and is not claimed as verified.
-**Consequences.** No raw SQL outside `kernel.persistence`. PostgreSQL remains an unexercised path and is reported honestly as such.
+**Decision.** SQLite+WAL is the shipping engine. Repository interfaces are engine-neutral so a PostgreSQL adapter remains possible. The **abstraction property is MANDATORY** (ARK-REQ-0012) and is verified by architecture test — no engine-specific SQL outside `kernel.persistence`. Verified *operation* on PostgreSQL is not a canonical requirement and is therefore not registered.
+**Consequences.** No raw SQL outside `kernel.persistence`. The abstraction is enforced from Phase 5. PostgreSQL as a runtime target remains unexercised and is reported honestly as such, without weakening the abstraction requirement.
 
 ## ADR-0007 — Durable runtime without Temporal
 **Context.** Temporal-grade durability is required; a mandatory Temporal dependency is not acceptable for a local-first desktop product.

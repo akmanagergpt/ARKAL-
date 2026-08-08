@@ -13,11 +13,15 @@
 
 **Phase ID / objective.** Phase 0A+0B — produce the canonical architecture and governance contracts required before any implementation, resolving architectural ownership so no concern has two authorities.
 
-**ARK-REQ IDs closed.** ARK-REQ-0033, 0034, 0035, 0036, 0039 (register mechanism); ARK-REQ-0018, 0030, 0108, 0109 (authority map, budgets, protected core declaration); ARK-REQ-0090, 0091 (Golden Repair corpus definition); ARK-REQ-0182, 0183 (phase model, single acceptance package); ARK-REQ-0221, 0222, 0224, 0225 (repository state and Phase 0 deliverables). All remaining 296 entries are open and owned by later phases.
+**ARK-REQ IDs closed (18).** Register mechanism: 0033, 0034, 0035, 0036, 0039. Authority map / budgets / protected core: 0018, 0030, 0108, 0109. Golden Repair corpus **definition**: 0090, 0091. Phase model and single acceptance package: 0182, 0183. Repository state and Phase 0 deliverables: 0221, 0222, 0224, 0225. Contract inventory: 0230 (definition-level only — schemas are Phase 2).
 
-**Files created.** 12 (listed in `EVIDENCE_INDEX.md`). **Files modified.** 0 canonical documents.
+**ARK-REQ IDs explicitly NOT closed, with state.** ARK-REQ-0187 and ARK-REQ-0188 (instantiated, content-hashed corpus) = **NOT_APPLICABLE at Phase 0B** — no accepted Golden Product exists as an injection target until Phase 30. All remaining 295 entries are open and owned by later phases.
 
-**Public contracts.** None — Phase 0 defines no runtime contracts. Contract inventory is scheduled for Phase 2.
+**Correction record.** An earlier draft of this report claimed ARK-REQ-0090 and 0091 closed while `BUILD_STATE`, `OPEN_BLOCKERS` and `PHASE_0_AUDIT` recorded the corpus as unpopulated and deferred. That was a false closure of a mandatory requirement and an internal contradiction between Phase 0 artifacts. It is corrected here: the canonical Phase 0B obligation is the corpus *definition* (Build Protocol §Phase 0B), now delivered as `docs/canonical/GOLDEN_REPAIR_CORPUS_DEFINITION.md`; the instantiation obligation is separately registered as 0187/0188 against Phase 30. Logged as F-0005.
+
+**Files created.** 20 Phase 0 artifacts (listed in `EVIDENCE_INDEX.md`). **Canonical source documents modified.** 0.
+
+**Public contracts.** None implemented. 36 canonical contract families are **inventoried** in `docs/canonical/CONTRACT_INVENTORY.md` with owner, producer, consumers, category, planned schema location, versioning rule, compatibility class, evidence responsibility and implementation phase. Schema files are Phase 2 work; the inventory is Phase 0A work and is delivered.
 
 **Migrations.** None.
 
@@ -25,7 +29,7 @@
 
 **Tests actually executed.** Two mechanical validations, both run and recorded:
 - `AUTHORITY_MAP.yaml` YAML parse + invariant check — exit 0. 31 contexts, 39 concerns, 14 operation classes, 8 gates, 0 duplicate concern authorities, all budgets numeric, `stable_mutation.direct_mutation_permitted_by == []`.
-- `REQUIREMENT_REGISTER.md` structural count — exit 0. 311 entries, 311 unique, 0 duplicate IDs, 300 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL, 0 CONDITIONAL entries missing an applicability rule.
+- `REQUIREMENT_REGISTER.md` structural count — exit 0. 313 entries, 313 unique, 0 duplicate IDs, 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL, 0 CONDITIONAL entries missing an applicability rule, 0 orphan applicability rules.
 
 No application test suite was executed: NOT_APPLICABLE — Phase 0 produces no implementation.
 
@@ -39,7 +43,7 @@ No application test suite was executed: NOT_APPLICABLE — Phase 0 produces no i
 
 **Evidence created.** `EVIDENCE_INDEX.md` with two mechanical validation records.
 
-**Limitations.** Phase 0 is documentation only. The architecture is unproven until code exists. Two self-introduced defects were caught during self-audit and corrected before commit (a fullwidth `＃` breaking YAML parsing; unverified coverage counts in the register's Appendix B) — both are recorded in `KNOWN_FAILURES.md`.
+**Limitations.** Phase 0 is documentation only. The architecture is unproven until code exists. Seven self-introduced defects are recorded in `KNOWN_FAILURES.md`: four caught by internal self-audit (F-0001…F-0004) and **three caught only by independent review** (F-0005 false closure of ARK-REQ-0090/0091, F-0006 five missing Phase 0A deliverables, F-0007 ARK-REQ-0012 misclassification). That the internal audit passed while three canonical traceability defects remained is itself the most significant limitation of this phase.
 
 **Blockers.** None internal. External: HUMAN GATE 1.
 

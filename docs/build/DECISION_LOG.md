@@ -15,6 +15,11 @@ Decisions taken during Phase 0 that are not large enough for an ADR, or that rec
 | D-009 | Golden Repair corpus **defined** but not populated | Corpus instances require an accepted Golden Product to inject into | Phase 0B |
 | D-010 | Phase 0 commits as a candidate, explicitly not accepted | Canonical set forbids self-acceptance; commit records work, GATE 1 records acceptance | Phase 0B |
 | D-011 | PyYAML used only to validate the authority map parses | Read-only validation of a Phase 0 artifact; no runtime dependency added, no lockfile, no install performed | Phase 0B |
+| D-012 | Golden Repair: **definition** at Phase 0B, **instantiation** at Phase 30 | Derived from canonical text, not chosen: BP §Phase 0B says "corpus **definition**" and every sibling item in that list is a definition/specification/declaration/design; MS defines the corpus as "**injected** defects" executed "against a Golden Product revision that has already passed acceptance". Injection requires a target that does not exist before Phase 30 | HG1-02 correction |
+| D-013 | Instantiation registered as new ARK-REQ-0187/0188 rather than by amending 0090/0091 | MS §Canonical Requirement Register makes IDs immutable and forbids reuse/renumbering. The reserved gap 0187–0199 in the MS block exists for exactly this | HG1-02 correction |
+| D-014 | ARK-REQ-0012 reclassified CONDITIONAL → MANDATORY | MS §Frozen technology direction states "PostgreSQL-ready abstractions" unconditionally. The prior rule made the abstraction inapplicable in the default SQLite deployment — narrowing an unconditional requirement, the exact scope-reduction exploit the register exists to prevent | HG1-03 correction |
+| D-015 | Verified *operation* on PostgreSQL is not registered as a requirement | No canonical statement requires it. Registering an unrequired obligation would be as wrong as omitting a required one | HG1-03 correction |
+| D-016 | Contract inventory delivered at Phase 0A, not deferred to Phase 2 | BP §Phase 0A lists "contract inventory" explicitly. Phase 2 implements schemas; the inventory is architecture | HG1-01 correction |
 
 ## Human rulings incorporated (recorded, not decided here)
 

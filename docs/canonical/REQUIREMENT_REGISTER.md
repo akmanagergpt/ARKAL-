@@ -34,7 +34,7 @@ Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integ
 | ARK-REQ-0009 | Frontend stack: React, TypeScript, Vite, Tailwind | MS §Frozen tech | MANDATORY | 5 | surfaces.command | arch |
 | ARK-REQ-0010 | Desktop: Tauri 2.x | MS §Frozen tech | MANDATORY | 28 | surfaces.command | arch, run |
 | ARK-REQ-0011 | Persistence: SQLite+WAL local-first | MS §Frozen tech | MANDATORY | 5 | kernel.persistence | arch, persist |
-| ARK-REQ-0012 | PostgreSQL-ready abstractions | MS §Frozen tech | CONDITIONAL | 5 | kernel.persistence | arch |
+| ARK-REQ-0012 | PostgreSQL-ready abstractions (engine-neutral repository interfaces; no engine-specific SQL outside `kernel.persistence`) | MS §Frozen tech | MANDATORY | 5 | kernel.persistence | arch |
 | ARK-REQ-0013 | Test stack incl. contract/architecture/property/mutation/chaos + Playwright | MS §Frozen tech | MANDATORY | 2 | acceptance.engine | unit, arch |
 | ARK-REQ-0014 | Observability OpenTelemetry-compatible | MS §Frozen tech | MANDATORY | 2 | kernel.observability | integ |
 | ARK-REQ-0015 | Git-linked revisions, content hashes, SBOM/signing-ready design | MS §Frozen tech | MANDATORY | 26 | evidence.artifact | prov |
@@ -112,8 +112,8 @@ Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integ
 | ARK-REQ-0087 | Repair fingerprints recorded; repeated failed strategy escalates | MS §Root-Cause | MANDATORY | 14 | engineering.repair | integ, prop |
 | ARK-REQ-0088 | Six repair budget dimensions enforced | MS §Root-Cause | MANDATORY | 14 | engineering.repair | prop, integ |
 | ARK-REQ-0089 | Golden Repair executes against an accepted Golden Product revision | MS §Golden Repair | MANDATORY | 30 | engineering.repair | run |
-| ARK-REQ-0090 | Versioned content-hashed defect corpus covering eight classes | MS §Golden Repair | MANDATORY | 0B | engineering.repair | doc, prov |
-| ARK-REQ-0091 | Corpus includes at least one deliberately unrepairable defect | MS §Golden Repair | MANDATORY | 0B | engineering.repair | doc |
+| ARK-REQ-0090 | Corpus **definition**: schema, eight defect classes, versioning and content-hashing rules, injection contract | MS §Golden Repair + BP §Phase 0B | MANDATORY | 0B | engineering.repair | doc |
+| ARK-REQ-0091 | Corpus definition requires at least one deliberately unrepairable entry | MS §Golden Repair + BP §Phase 0B | MANDATORY | 0B | engineering.repair | doc |
 | ARK-REQ-0092 | Budgets declared before each Golden Repair run | MS §Golden Repair | MANDATORY | 30 | engineering.repair | prov |
 | ARK-REQ-0093 | Golden Repair PASS requires all six listed conditions | MS §Golden Repair | MANDATORY | 30 | acceptance.engine | run, prov |
 | ARK-REQ-0094 | Unrepairable defect reaches terminal ESCALATED within budget | MS §Golden Repair | MANDATORY | 30 | engineering.repair | prop, run |
@@ -224,6 +224,8 @@ Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integ
 | ARK-REQ-0184 | IMPLEMENTED ≠ VERIFIED | MS §Final Success | MANDATORY | 13 | acceptance.engine | doc |
 | ARK-REQ-0185 | Program-generation VERIFIED requires all eight applicable proofs | MS §Final Success | MANDATORY | 30 | acceptance.engine | run, persist, prov |
 | ARK-REQ-0186 | Applicability of the eight proofs determined by register | MS §Final Success | MANDATORY | 13 | acceptance.engine | arch |
+| ARK-REQ-0187 | Corpus **instantiated**: concrete defects injected into an accepted Golden Product revision, versioned and content-hashed | MS §Golden Repair | MANDATORY | 30 | engineering.repair | prov, run |
+| ARK-REQ-0188 | Instantiated corpus contains at least one entry unrepairable within the declared budget | MS §Golden Repair | MANDATORY | 30 | engineering.repair | prov, run |
 
 ---
 
@@ -377,7 +379,6 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 
 | ID | Applicability rule (APPLICABLE when true) |
 |---|---|
-| ARK-REQ-0012 | `deployment.database_engine == "postgresql"` in any declared target profile |
 | ARK-REQ-0060 | `job_type.supports_pause == true` in the job-type contract registry |
 | ARK-REQ-0084 | `component.kind in {parser, security_boundary, ai_output_deserializer}` — outside this set, applicable only when the component is declared `fuzz_target: true` in its contract |
 | ARK-REQ-0129 | `isolation.probe.local_ai_runtime_available == true` AND `hardware.probe.accelerator_present == true` |
@@ -395,16 +396,29 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 
 | Metric | Value |
 |---|---|
-| Total registered requirements | **311 entries** (highest ID allocated: ARK-REQ-0380) |
-| MANDATORY | 300 |
-| CONDITIONAL | 9 |
+| Total registered requirements | **313 entries** (highest ID allocated: ARK-REQ-0380) |
+| MANDATORY | 303 |
+| CONDITIONAL | 8 |
 | OPTIONAL | 2 |
 | Duplicate IDs | 0 |
-| Entries with owner assigned | 311 (100%) |
-| Entries with evidence definition | 311 (100%) |
-| CONDITIONAL entries with objective rule in Appendix A | 9 (100%) |
-| Requirements pending Phase 1+ implementation | 311 (100%) — Phase 0 produces no implementation |
+| Entries with owner assigned | 313 (100%) |
+| Entries with evidence definition | 313 (100%) |
+| CONDITIONAL entries with objective rule in Appendix A | 8 (100%) |
+| Orphan applicability rules (rule with no CONDITIONAL entry) | 0 |
+| Requirements verified | 0 — Phase 0 produces no implementation and claims no coverage |
 
 Counts above were mechanically verified against this file, not asserted.
+
+## Appendix C — corrections applied before HUMAN GATE 1
+
+This register has never been accepted. The entries below were corrected in the Phase 0 candidate following independent review; no accepted requirement was mutated and no ID was reused or renumbered.
+
+| Entry | Change | Reason |
+|---|---|---|
+| ARK-REQ-0012 | CONDITIONAL → **MANDATORY**; applicability rule removed from Appendix A | "PostgreSQL-ready abstractions" is an unconditional architectural property in MS §Frozen technology direction. Gating it on `deployment.database_engine == "postgresql"` narrowed an unconditional canonical requirement. Verified operation on PostgreSQL is not a canonical requirement and is not registered |
+| ARK-REQ-0090 | Restated: corpus **definition** at Phase 0B (was: populated corpus at Phase 0B) | BP §Phase 0B assigns "Golden Repair defect corpus **definition**"; MS binds injected defects to an accepted Golden Product |
+| ARK-REQ-0091 | Restated: definition must require an unrepairable entry | same basis |
+| ARK-REQ-0187 | **New** — instantiated, versioned, content-hashed corpus at Phase 30 | the instantiation half of the MS §Golden Repair statement, previously unregistered |
+| ARK-REQ-0188 | **New** — instantiated corpus contains an unrepairable entry | same basis |
 
 ID allocation is intentionally sparse (gaps at 0187–0199, 0244–0299) so future requirements can be added within their source block without renumbering. Gaps are not missing requirements.

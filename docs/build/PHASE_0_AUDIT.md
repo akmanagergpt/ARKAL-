@@ -76,6 +76,41 @@ Prior MEDIUM/LOW findings carried from the canonical repair are listed in `OPEN_
 | Unbounded loops | 0 |
 | Security boundary ambiguities | 0 |
 
+---
+
+# HUMAN GATE 1 CORRECTION RE-AUDIT
+
+Four HIGH defects were found after the first internal audit passed — three by independent review, one by this correction repeating the defect it was fixing. All are closed.
+
+| Finding | Defect | Closure | Verified by |
+|---|---|---|---|
+| HG1-01 / F-0006 | Contract inventory absent (deferred to Phase 2 as DEF-007) | `CONTRACT_INVENTORY.md` — 36 families, 0 with multiple owners | content probe |
+| HG1-02 / F-0005 | ARK-REQ-0090/0091 claimed CLOSED while other artifacts recorded the corpus unpopulated | Canonical basis re-read; definition delivered; instantiation split to new ARK-REQ-0187/0188 at Phase 30, recorded NOT_APPLICABLE at 0B | check 1, check 6 |
+| HG1-03 / F-0007 | ARK-REQ-0012 CONDITIONAL narrowed an unconditional canonical requirement | Reclassified MANDATORY; rule removed; ADR-0006 corrected | check 4 |
+| HG1-04 / F-0006 | Verification architecture, evidence graph strategy, dependency matrix, contradiction analysis only incidental | Four dedicated artifacts created | content probe |
+| — / F-0008 | The 0B matrix falsely PASSed "clean-test baseline definition" by asserting a path without checking | `CLEAN_TEST_BASELINE.md` created; matrix rebuilt to resolve every claim by file existence **and** content probe | check 3 |
+
+## Re-audit results (12 mandated checks, all executed)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | No Phase 0 requirement marked CLOSED without required evidence | **PASS** |
+| 2 | Every Phase 0A deliverable exists | **PASS** — 16/16, content-probed |
+| 3 | Every Phase 0B deliverable exists | **PASS** — 12/12, content-probed |
+| 4 | Classifications do not narrow unconditional requirements | **PASS** |
+| 5 | CONDITIONAL rules cannot be scope-reduction exploits | **PASS** — 8/8 with objective rules, 0 orphan rules |
+| 6 | BUILD_STATE / OPEN_BLOCKERS / PHASE_HISTORY / PHASE_0_AUDIT / REGISTER agree | **PASS** |
+| 7 | BLOCKER = 0 | **PASS** |
+| 8 | HIGH = 0 | **PASS** |
+| 9 | Authority conflicts = 0 | **PASS** — 39 concerns, one owner each |
+| 10 | Phase 1 remains locked | **PASS** |
+| 11 | ADRs remain PROPOSED | **PASS** — 9 PROPOSED, 0 ACCEPTED |
+| 12 | No application source code | **PASS** |
+
+## Standing lesson
+
+The first internal audit reported 29/29 PASS while four HIGH defects were present, because every check compared the generated artifacts against **each other** rather than against the canonical deliverable lists and requirement text. Self-consistency is not conformance. This is the concrete, observed justification for the canonical rule that the implementing actor is not the acceptance authority — and it is why HUMAN GATE 1 exists.
+
 ## Verdict
 
-Internal audit: **PASS**. This is an internal machine/self audit only. It is **not** acceptance. Phase 0 is submitted as a candidate package to the human acceptance authority for HUMAN GATE 1 and must not be treated as accepted on the strength of this document.
+Internal audit after correction: **PASS**. This is an internal machine/self audit only. It is **not** acceptance. Phase 0 is submitted as a candidate package to the human acceptance authority for HUMAN GATE 1 and must not be treated as accepted on the strength of this document.
