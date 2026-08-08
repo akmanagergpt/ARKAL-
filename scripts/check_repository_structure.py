@@ -53,6 +53,37 @@ FAKE_MARKERS = [r"\bTODO\b", r"\bFIXME\b", r"\bstub\b", r"\bdummy\b",
 SECRET_PATTERNS = [r"AKIA[0-9A-Z]{16}", r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
                    r"(?i)\b(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]{12,}"]
 
+#: Check 11: constructs capable of mutating a file. Module level so the negative
+#: control imports the deployed rule rather than a copy of it (F-0013).
+STABLE_WRITE_PATTERN = re.compile(
+    r"open\([^)]*['\"][wax]|\.write_text\(|\.write_bytes\(|\.write\(|"
+    r"shutil\.(copy|move|rmtree)|os\.(replace|remove|rename|unlink)|"
+    r"subprocess\."
+)
+
+
+def stable_mutation_classes(amap: dict) -> list[str]:
+    """Operation classes whose fixed rule forbids ordinary mutation.
+
+    Derived from AUTHORITY_MAP.yaml, never listed here.
+    """
+    return sorted(
+        name for name, meta in amap["operation_classes"].items()
+        if meta.get("fixed") in ("DENY", "RECOVERY_SUPERVISOR_ONLY")
+    )
+
+
+def is_stable_mutation_path(body: str, classes: list[str]) -> bool:
+    """True when a file both names a stable-mutation class and can write.
+
+    Naming a class in a deny rule is not a mutation path; performing a write
+    while naming one is. Both halves are required.
+    """
+    if not classes:
+        return False
+    named = re.compile("|".join(re.escape(c) for c in classes))
+    return bool(named.search(body) and STABLE_WRITE_PATTERN.search(body))
+
 results: list[tuple[str, str, str]] = []   # (state, name, detail)
 
 
@@ -265,16 +296,39 @@ def main() -> int:
            "10 no fake-implementation markers in Phase 1 source", str(fake))
 
     # 11 stable mutation path
+    #
+    #   Defect F-0022. The predecessor flagged any module that *mentioned*
+    #   WRITE_STABLE_FILE or ROLLBACK_STABLE. That was correct while no code
+    #   existed, and became wrong at Phase 4, whose job is to implement the
+    #   policy that DENIES those operations - naming a class in a deny rule is
+    #   the opposite of introducing a mutation path. Fifth instance of a
+    #   phase-scoped check outliving its phase (cf. F-0008, F-0013, F-0016,
+    #   F-0019).
+    #
+    #   The durable rule: a Stable mutation path is code that references a
+    #   stable-mutation operation class AND is capable of performing a write.
+    #   The class names are derived from AUTHORITY_MAP.yaml rather than listed
+    #   here, so the check follows the canonical set instead of a private copy.
+    #   The test tier is excluded, consistent with check 12: tests do not ship
+    #   and cannot be a production mutation path.
+    stable_classes = stable_mutation_classes(amap)
     stable = []
+    if not stable_classes:
+        stable.append(
+            "authority map declares no stable-mutation operation class; the "
+            "check cannot run and must not report PASS"
+        )
     for f in tracked_files():
-        if not f.endswith(".py") or f.startswith("scripts/"):
+        if not f.endswith(".py") or f.startswith(("scripts/", "backend/tests/")):
             continue
         fp = os.path.join(ROOT, f)
-        if os.path.isfile(fp) and re.search(r"WRITE_STABLE_FILE|ROLLBACK_STABLE",
-                                            open(fp, encoding="utf-8").read()):
+        if not os.path.isfile(fp):
+            continue
+        if is_stable_mutation_path(open(fp, encoding="utf-8").read(), stable_classes):
             stable.append(f)
     record("PASS" if not stable else "FAIL",
-           "11 no Stable mutation path introduced", str(stable))
+           f"11 no Stable mutation path introduced "
+           f"(classes derived: {stable_classes})", str(stable))
 
     # 12 no forward-phase RUNTIME construct
     #   Phase-scoped predecessor ("no Phase 2+ capability") retired: Phase 2

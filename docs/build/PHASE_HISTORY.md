@@ -14,8 +14,49 @@
 | 10 | PHASE 1 — Repository Bootstrap (candidate rev 1) | NOT ACCEPTED | `0ad45a7` | F-0015 HIGH open; preserved unamended as the record of the defect |
 | 11 | ERR-001 governance erratum + PHASE 1 repair | MACHINE-ACCEPTED | `1ae0835` | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. Phase 2 unlocked |
 | 12 | **PHASE 2 — Foundation + Contracts + Executable Phase Gates** | **MACHINE-ACCEPTED** | `76edd26` | Verdict `PHASE_ACCEPTED_BY_MACHINE` from the real checker. 66 tests, 8 architecture gates (16 real edges), 19 negative/drift controls, mypy strict clean. 23/23 Phase 2 ARK-REQs PASS. Prior-phase reconciliation clean. **Phase 3 unlocked** |
+| 15 | **PHASE 4 — Security + Governance + Isolation Backends** | **MACHINE-ACCEPTED** | pending | Verdict `PHASE_ACCEPTED_BY_MACHINE`. C-07/08/09/10. One PDP, PEP contract, 14 operation classes, 5 TRUST tiers, 7 isolation properties, 7 backends really probed, Protected Core boundary, Secret Vault boundary, Local-Only. 242 new tests (785 total), 8 gates over 41 edges, mypy strict clean. 33/33 Phase 4 ARK-REQs accounted for. DEF-003 closed. F-0022 opened and closed. **Phase 5 unlocked** |
 | 14 | **ERR-002 + ERR-003 — pre-Phase-4 human rulings** | GOVERNANCE REPAIR | pending | Both Phase 3 human-ruling items closed. ERR-002: Plugin `REMOVED` is terminal. ERR-003: architecture-budget measurement contract ratified; re-measurement exposed 3 real complexity violations including one in accepted Phase 2 code, all repaired by decomposition with no behavioural change and no GATE 8 request. All 9 numeric budgets now evaluated. 578 tests pass. Phase 3 remains MACHINE-ACCEPTED; Phase 4 remains UNLOCKED |
 | 13 | **PHASE 3 — Formal State Machines + Capability Graph Schema** | **MACHINE-ACCEPTED** | `4321611` | Verdict `PHASE_ACCEPTED_BY_MACHINE`. 12 state machines across 10 owning contexts, C-13 schema, 444 new tests (532 total), 294 rejection-asserting controls, 8 gates over 32 real edges, mypy strict clean. 4/4 Phase 3 ARK-REQs PASS. Findings F-0018/F-0019/F-0020 opened at MEDIUM. **Phase 4 unlocked** |
+
+## Phase 4 report
+
+**Phase ID / objective.** Phase 4 — the deterministic security and governance foundation: Policy Authority, the single PDP, the PEP enforcement contract, the fourteen operation classes, the TRUST tier and Isolation Backend property model with real host probes, the Protected Core boundary, the Secret Vault boundary and Local-Only policy.
+
+**ARK-REQ IDs accounted for (33).** All Phase 4 MANDATORY entries, derived from the register's Phase column. Claim levels are explicit and machine-asserted in `test_requirement_traceability.py`: **CONTRACT** for 30, **PROBED** for 2 (0102, 0123), **DEFERRED** for 1 (0111). Nothing claims REAL EXECUTION, because no execution surface exists.
+
+**Contracts.** C-07 policy decision request/response · C-08 operation class · C-09 secret reference · C-10 isolation property/backend descriptor. Derived from `CONTRACT_INVENTORY.md`, which agreed with the handoff's hint.
+
+**One architectural constraint had to be resolved.** `SECURITY_ARCHITECTURE.md` §1 shows the PDP reading `control.isolation`. Both contexts are layer rank 1 and the authority map sets `allow_same_layer: false` with no sibling edge between them, so a direct import would be an architecture violation. The isolation posture is therefore resolved by `control.isolation` and **injected** as a fact on the request. The PDP stays pure; the layering rule is respected rather than quietly broken. Recorded in `DECISION_LOG.md`.
+
+**Real host probes, truthfully reported.** Read-only, non-destructive; nothing was installed, elevated or enabled.
+
+| Backend | State | Evidence |
+|---|---|---|
+| `job_object` | **PASS** | `kernel32!CreateJobObjectW` present |
+| `restricted_token` | **PASS** | `advapi32!CreateRestrictedToken` present |
+| `workspace_acl` | **PASS** | volume is NTFS |
+| `vault_detach` | **PASS** | `crypt32!CryptProtectData` (DPAPI) present |
+| `wfp_egress` | NOT_CONFIGURED | `fwpuclnt.dll` present, process not elevated |
+| `windows_sandbox` | NOT_CONFIGURED | optional feature not enabled |
+| `hyperv_container` | NOT_CONFIGURED | Hyper-V platform not enabled |
+
+Consequently TRUST-0 and TRUST-1 are satisfiable here; **TRUST-2, TRUST-3 and TRUST-4 are UNSUPPORTED with execution DENY**, missing `NET_EGRESS_CONTROL` and `KERNEL_ISOLATION`. That is the canonical outcome, not a failure: a tier is never silently downgraded, and ARKALI stays operational for what remains satisfiable.
+
+**What Phase 4 does not claim.** A probe proves a primitive is *obtainable*, not that a workload was confined — confinement evidence belongs to `execution.sandbox` in a later phase. No execution surface exists, so bypass resistance is verified at contract level only and `test_pep_and_bypass.py` asserts the absence of those surfaces so the claim cannot quietly become false.
+
+**Two of the phase's own defects were caught by its own tests.** `ROLLBACK_STABLE` briefly resolved to ASK_USER for the canonical invoker; it is now DENY at every tier for every actor, because the Recovery Supervisor is Phase 22B and its canonical preconditions cannot be checked. `ACCESS_SECRET` was over-restricted to ASK_USER inside a pre-authorized scope where the canonical matrix grants AUTO at TRUST-0/1 — stricter than canonical is still a misreading of canonical.
+
+**The budget gate caught two real violations during the phase.** `kernel.contracts` public surface reached 45>40 and `kernel.contracts.errors` fan-in reached 16>15. Both were repaired by decomposition, not waived: the security taxonomy moved to the contexts that raise it, and four copies of authority-map loading collapsed into one reader.
+
+**Tests actually executed.** 774 passed, 11 skipped (785 collected; 242 added by Phase 4). 184 security tests. mypy strict clean over 88 source files. Structure validator 12/12 and negative control PASS. Phase graph 10/10 and negative control PASS. Phase 0 deliverables 16/16 and 11/11. Handoff validator PASS.
+
+**Evidence created.** EV-0031 … EV-0036.
+
+**Blockers.** None.
+
+**Next exact action.** Begin Phase 5 — Persistence Foundation.
+
+**Status.** **MACHINE-ACCEPTED.** Verdict `PHASE_ACCEPTED_BY_MACHINE` from `scripts/run_phase_gate.py 4 5`, exit 0.
 
 ## Pre-Phase-4 governance repair (ERR-002, ERR-003)
 

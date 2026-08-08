@@ -25,7 +25,7 @@ Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an
 |---|---|---|---|
 | DEF-001 | Architecture gate implementation + negative-control fixtures | Phase 2 | requires source code to analyse |
 | DEF-002 | Phase Gate Checker implementation | Phase 2 | specification only in Phase 0 |
-| DEF-003 | Isolation backend availability probe | Phase 4 | requires runtime |
+| ~~DEF-003~~ | ~~Isolation backend availability probe~~ | — | **CLOSED at Phase 4.** Seven declared backends probed read-only on the real host; four PASS, three NOT_CONFIGURED. No feature installed or enabled |
 | DEF-004 | Golden Repair corpus **instantiation** (ARK-REQ-0187, 0188) | Phase 30 | Definition delivered at Phase 0B per BP §Phase 0B. Instantiation requires an accepted Golden Product as injection target — state is NOT_APPLICABLE at Phase 0B, not deferred-and-closed |
 | DEF-005 | Canonical Windows clean-test baseline **image** | Phase 36 | definition exists; VM snapshot is an acceptance-environment asset |
 | DEF-006 | `ARKALI_RELEASE_QUALITY_REPORT.md` content contract | Phase 26 | LOW; undefined in the canonical set, carried forward honestly |
@@ -35,6 +35,8 @@ Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an
 ## Residual MEDIUM/LOW findings carried from the canonical repair
 
 These were reported at the canonical repair and remain open by design; none blocks Phase 0.
+
+Opened at Phase 4, **all closed within the phase**: F-0022 (structure check 11 flagged a mention as a mutation path) · F-0023 (LOW — secret-shaped test fixtures tripped the secret scanner).
 
 Opened at Phase 3, **all now closed**: F-0018 closed by erratum ERR-002 (Plugin `REMOVED` is terminal) · F-0019 closed — all 9 numeric budgets are now evaluated by the gate · F-0020 closed by erratum ERR-003 (ratified budget measurement contract; three exposed violations repaired by decomposition) · F-0021 opened and closed within Phase 3 (expiring negative controls). No Phase 3 finding remains open.
 

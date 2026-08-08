@@ -1,10 +1,10 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 3 MACHINE-ACCEPTED. PHASE 4 UNLOCKED, NOT STARTED.**
+**Current state:** **PHASE 4 MACHINE-ACCEPTED. PHASE 5 UNLOCKED, NOT STARTED.**
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 3 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
+**Last updated by:** Phase 4 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
 **Governance errata:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -19,8 +19,9 @@
 | 1 | Repository Bootstrap | **MACHINE-ACCEPTED** (validator 12/12, suite 7/7) |
 | 2 | Foundation + Contracts + Phase Gate Checker | **MACHINE-ACCEPTED** (66 tests, 8 gates, mypy clean) |
 | 3 | Formal State Machines + Capability Graph Schema | **MACHINE-ACCEPTED** (12 machines, C-13 schema, 444 new tests) |
-| 4 | Security + Governance + Isolation Backends | **UNLOCKED — NOT_STARTED** |
-| 5 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
+| 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED** (PDP/PEP, 14 operation classes, TRUST tiers, isolation probes, Protected Core, Secret Vault, Local-Only) |
+| 5 | Persistence Foundation | **UNLOCKED — NOT_STARTED** |
+| 6 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
 
@@ -83,9 +84,11 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Begin Phase 4 — Security + Governance + Isolation Backends.** Phase 4 is unlocked and not started.
+**Begin Phase 5 — Persistence Foundation.** Phase 5 is unlocked and not started.
 
-Phase 4 delivers C-07, C-08, C-09 and C-10; the PDP/PEP; Protected Core enforcement; and the isolation backend availability probe (DEF-003). Its prerequisites are Phases 2 and 3, both machine-accepted.
+*(superseded guidance retained for continuity)*
+
+**Begin Phase 4 — Security + Governance + Isolation Backends.** Phase 4 delivered C-07, C-08, C-09 and C-10; the single PDP and the PEP enforcement contract; Protected Core boundary enforcement; the Secret Vault boundary; Local-Only policy; and the isolation backend availability probe, closing **DEF-003**.
 
 *(superseded guidance retained for continuity)*
 
@@ -105,7 +108,10 @@ From here, normal phases are accepted by machine verdict without human approval.
 
 Acceptance of Phase 0 closed no finding other than the gate itself:
 
-- **32 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3). The architecture is no longer only a declaration: the eight gates now evaluate 32 real cross-context edges.
+- **65 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3, 33 from Phase 4). The eight gates now evaluate 41 real cross-context edges.
+- **Security is enforced, not described.** One PDP, deterministic and pure; every decision audited including AUTO; unmappable action DENY; `WRITE_STABLE_FILE` DENY for every actor at every tier; Protected Core direct mutation refused. All governed vocabularies are parsed from the authority map — no security module holds a private copy.
+- **Host isolation is partial and honestly reported.** TRUST-0/1 satisfiable; TRUST-2/3/4 **UNSUPPORTED** on this host because `NET_EGRESS_CONTROL` (WFP needs elevation) and `KERNEL_ISOLATION` (Windows Sandbox and Hyper-V not enabled) are genuinely unavailable. No Windows feature was enabled to improve the result.
+- **No execution surface exists.** Bypass resistance is verified at contract level only; API, UI, agent, workflow, plugin and computer-use are NOT_YET_IMPLEMENTED and are not claimed.
 - The twelve canonical state machines are executable and reconciled against `STATE_MACHINES.md` on every run, so the inventory can no longer drift from the code that implements it.
 - The Capability Graph exists as schema only. ARK-REQ-0046, 0047 and 0048 remain open at Phase 9B and are **not** claimed by Phase 3.
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
