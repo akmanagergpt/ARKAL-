@@ -4,7 +4,7 @@
 
 ## Internal blockers
 
-**None open.** Internal BLOCKER = 0, internal HIGH = 0 (see `docs/build/PHASE_0_AUDIT.md`).
+**Internal BLOCKER = 0. Internal HIGH = 1 — F-0015**, raised in Phase 1 and tracked as EXT-002 because its resolution needs a governance ruling (see `docs/build/PHASE_1_REPORT.md` §7).
 
 Three HIGH defects were found by independent review at HUMAN GATE 1 and are now closed: F-0005 (false closure of ARK-REQ-0090/0091), F-0006 (five Phase 0A deliverables absent), F-0007 (ARK-REQ-0012 misclassification). See `KNOWN_FAILURES.md`.
 
@@ -13,8 +13,9 @@ Three HIGH defects were found by independent review at HUMAN GATE 1 and are now 
 | ID | Blocker | Type | Owner | Blocks |
 |---|---|---|---|---|
 | ~~EXT-001~~ | ~~HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted~~ | HUMAN GATE | human acceptance authority | **CLOSED** — granted on candidate `007ebf6`, record `HGR-001` |
+| **EXT-002** | **F-0015** — `engineering.import` module root is a Python reserved keyword; amending `AUTHORITY_MAP.yaml` may require HUMAN GATE 2 (Protected Core). Governance ruling required | **HIGH / GOVERNANCE** | human acceptance authority | **Phase 1 acceptance and Phase 2 unlock** |
 
-**No external blockers open.** Phase 1 is unlocked and not started.
+**One external blocker open (EXT-002).** Phase 1 is a non-accepted candidate; Phase 2 is locked.
 
 Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an earlier trigger of GATE 4 (security boundary change), GATE 5 (applicability waiver), GATE 6 (migration APPLY to real/stable data) or GATE 8 (architecture budget exception).
 
