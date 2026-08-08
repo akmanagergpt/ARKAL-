@@ -15,7 +15,8 @@ Checks (Phase 1 scope only):
   5  no cross-context implementation modules exist yet
   6  no forbidden dependency direction among Phase 1 files
   7  architecture budgets respected by Phase 1 files
-  8  no Python-keyword segment in any module root
+  8  every module_root segment is a legal Python identifier (generic,
+     driven by keyword.iskeyword/issoftkeyword + str.isidentifier)
   9  no secret-bearing file is tracked
  10  no fake implementation markers
  11  no Stable mutation path introduced
@@ -26,6 +27,7 @@ Exit 0 = all PASS. Exit 1 = at least one FAIL.
 from __future__ import annotations
 
 import ast
+import keyword
 import os
 import re
 import subprocess
@@ -34,11 +36,15 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUTH = os.path.join(ROOT, "docs/canonical/AUTHORITY_MAP.yaml")
 
-KEYWORDS = {"import", "class", "def", "return", "from", "global", "lambda",
-            "pass", "raise", "try", "with", "yield", "assert", "async",
-            "await", "break", "continue", "del", "elif", "else", "except",
-            "finally", "for", "if", "in", "is", "none", "nonlocal", "not",
-            "or", "and", "while"}
+def _is_illegal_module_segment(seg: str) -> bool:
+    """Authoritative, generic test - not a hand-maintained word list.
+
+    Uses Python's own keyword table (keyword.iskeyword / issoftkeyword) plus
+    str.isidentifier, so the check stays correct across Python versions and
+    covers every keyword, not only the one that happened to be found (F-0015).
+    """
+    return (keyword.iskeyword(seg) or keyword.issoftkeyword(seg)
+            or not seg.isidentifier())
 
 FAKE_MARKERS = [r"\bTODO\b", r"\bFIXME\b", r"\bstub\b", r"\bdummy\b",
                 r"\bfake\b", r"NotImplementedError", r"\bplaceholder\b",
@@ -184,11 +190,20 @@ def main() -> int:
     record("PASS" if not over else "FAIL",
            f"7  architecture budget: module <= {maxlines} logical lines", str(over))
 
-    # 8 python keyword segments
-    kw = [f"{n} -> {m['module_root']}" for n, m in contexts.items()
-          if any(s.lower() in KEYWORDS for s in m["module_root"].split("/"))]
+    # 8 illegal python module path segments (generic, keyword-table driven)
+    kw = []
+    for n, m in contexts.items():
+        segs = m["module_root"].split("/")
+        try:
+            pkg_segs = segs[segs.index("arkali"):]
+        except ValueError:
+            pkg_segs = segs
+        bad = [s for s in pkg_segs if _is_illegal_module_segment(s)]
+        if bad:
+            kw.append(f"{n} -> {m['module_root']} (illegal: {bad})")
     record("PASS" if not kw else "FAIL",
-           "8  no Python-keyword segment in any module root", str(kw))
+           "8  every module_root segment is a legal Python identifier "
+           "(keyword.iskeyword/issoftkeyword/isidentifier)", str(kw))
 
     # 9 secrets
     hits = []

@@ -11,7 +11,8 @@
 | 7 | PHASE 0 acceptance package (candidate rev 2) | REJECTED by review | `5c6a28d` | HG1-05…HG1-09 |
 | 8 | PHASE 0 acceptance package (candidate rev 3) | REJECTED by review | `63ab9a8` | HG1-10…HG1-12 |
 | 9 | **PHASE 0 acceptance package (candidate rev 4)** | **ACCEPTED — HUMAN GATE 1** | `007ebf6` | record `HGR-001`; Phase 0A + 0B accepted as one package; 9 ADRs PROPOSED → ACCEPTED; Phase 1 unlocked |
-| 10 | **PHASE 1 — Repository Bootstrap** | **CANDIDATE — NOT ACCEPTED** | pending | 15 validations run: 11 PASS, 1 FAIL, 2 NOT_CONFIGURED, 1 UNSUPPORTED. 5/5 Phase 1 ARK-REQs PASS. F-0015 HIGH open. Phase 2 NOT unlocked |
+| 10 | PHASE 1 — Repository Bootstrap (candidate rev 1) | NOT ACCEPTED | `0ad45a7` | F-0015 HIGH open; preserved unamended as the record of the defect |
+| 11 | **ERR-001 governance erratum + PHASE 1 repair** | **MACHINE-ACCEPTED** | pending | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. **Phase 2 unlocked** |
 
 ## Phase 0 report
 

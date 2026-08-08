@@ -12,6 +12,7 @@ that test discovery works.
 from __future__ import annotations
 
 import importlib
+import keyword
 import pathlib
 import pkgutil
 
@@ -21,11 +22,10 @@ import yaml
 REPO = pathlib.Path(__file__).resolve().parents[3]
 AUTHORITY_MAP = REPO / "docs" / "canonical" / "AUTHORITY_MAP.yaml"
 
-PY_KEYWORD_SEGMENTS = {"import", "class", "def", "return", "from", "global",
-                       "lambda", "pass", "raise", "try", "with", "yield",
-                       "assert", "async", "await", "break", "continue", "del",
-                       "elif", "else", "except", "finally", "for", "if", "in",
-                       "is", "none", "nonlocal", "not", "or", "and", "while"}
+def _is_illegal_module_segment(segment: str) -> bool:
+    """Generic legality test driven by Python's own keyword table."""
+    return (keyword.iskeyword(segment) or keyword.issoftkeyword(segment)
+            or not segment.isidentifier())
 
 
 @pytest.fixture(scope="module")
@@ -85,22 +85,28 @@ def test_context_packages_declare_their_layer(authority_map: dict) -> None:
 
 
 @pytest.mark.structural
-def test_no_context_module_root_uses_a_python_keyword(authority_map: dict) -> None:
-    """A path segment that is a Python keyword cannot be reached by `import`.
+def test_every_module_root_segment_is_a_legal_python_identifier(
+    authority_map: dict,
+) -> None:
+    """Every package path segment must be usable in an `import` statement.
 
-    Recorded as Phase 1 finding F-0015. This test is expected to FAIL until the
-    accepted AUTHORITY_MAP is amended through the governance path; it is not
-    skipped, xfailed or weakened, because doing so would hide a real defect.
+    Closes Phase 1 finding F-0015 (governance erratum ERR-001). The check is
+    generic: it uses Python's own keyword table rather than a hand-maintained
+    word list, so it rejects any keyword, soft keyword or non-identifier.
     """
-    offenders = [
-        f"{name} -> {meta['module_root']}"
-        for name, meta in authority_map["contexts"].items()
-        if any(seg.lower() in PY_KEYWORD_SEGMENTS
-               for seg in meta["module_root"].split("/"))
-    ]
+    offenders = []
+    for name, meta in authority_map["contexts"].items():
+        segments = meta["module_root"].split("/")
+        try:
+            package_segments = segments[segments.index("arkali"):]
+        except ValueError:
+            package_segments = segments
+        bad = [s for s in package_segments if _is_illegal_module_segment(s)]
+        if bad:
+            offenders.append(f"{name} -> {meta['module_root']} (illegal: {bad})")
     assert not offenders, (
-        "module roots containing a Python reserved keyword cannot be imported "
-        f"with an import statement: {offenders}"
+        "module_root segments must be legal Python identifiers usable in an "
+        f"import statement: {offenders}"
     )
 
 

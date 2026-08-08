@@ -1,10 +1,11 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 1 CANDIDATE — NOT ACCEPTED (1 HIGH open). PHASE 2 LOCKED.**
+**Current state:** **PHASE 1 MACHINE-ACCEPTED. PHASE 2 UNLOCKED, NOT STARTED.**
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 1 candidate (repository bootstrap)
+**Last updated by:** ERR-001 governance erratum + Phase 1 machine acceptance
+**Governance erratum:** ERR-001 (closes F-0015) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
 
@@ -15,9 +16,9 @@
 | 0A | Canonical Architecture | **ACCEPTED** |
 | 0B | Governance & Executable Contracts | **ACCEPTED** |
 | 0 | Acceptance package (0A + 0B) | **ACCEPTED — HUMAN GATE 1 granted** |
-| 1 | Repository Bootstrap | **CANDIDATE — NOT ACCEPTED** (F-0015 HIGH open) |
-| 2 | Foundation + Contracts + Phase Gate Checker | **LOCKED** — Phase 1 not accepted |
-| 3 … 37 | all subsequent phases | NOT_STARTED — locked |
+| 1 | Repository Bootstrap | **MACHINE-ACCEPTED** (validator 12/12, suite 7/7) |
+| 2 | Foundation + Contracts + Phase Gate Checker | **UNLOCKED — NOT_STARTED** |
+| 3 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
 
@@ -58,13 +59,13 @@
 
 ## Next exact action
 
-**Obtain the governance ruling on finding F-0015** (`engineering.import` module root uses a Python reserved keyword). See `docs/build/PHASE_1_REPORT.md` §7 for options (a)/(b)/(c) and the recommendation. On ruling: apply the amendment, re-run `scripts/check_repository_structure.py` and the backend suite, and re-submit Phase 1 for machine acceptance.
+**Begin Phase 2 — Foundation + Contracts + Phase Gate Checker.** Phase 2 is unlocked and not started.
 
-Phase 2 is LOCKED until Phase 1 is accepted.
+Phase 2 delivers contract definitions C-01, C-03 (definition), C-04, C-17, C-18; the eight architecture gates with their negative-control fixtures; and the deterministic Phase Gate Checker. At that point Phase 0's `NOT_TESTED` items become testable for the first time, and the vacuous dependency-direction check gains real imports to reject.
 
-*(superseded guidance retained below for continuity)*
+*(superseded guidance retained for continuity)*
 
-Phase 1 creates the repository skeleton only. Phase 2 (Foundation + Contracts + Phase Gate Checker) follows, at which point the eight architecture gates and the deterministic Phase Gate Checker become executable and Phase 0's `NOT_TESTED` items become testable for the first time.
+Phase 2 (Foundation + Contracts + Phase Gate Checker) follows, at which point the eight architecture gates and the deterministic Phase Gate Checker become executable and Phase 0's `NOT_TESTED` items become testable for the first time.
 
 From here, normal phases are accepted by machine verdict without human approval. The next human gate is **GATE 2** at Phase 23 (Stable Core promotion), unless a phase reaches GATE 4, 5, 6 or 8 earlier.
 
@@ -72,8 +73,8 @@ From here, normal phases are accepted by machine verdict without human approval.
 
 Acceptance of Phase 0 closed no finding other than the gate itself:
 
-- **5 of 303 MANDATORY requirements are verified** (the five Phase 1 entries). Phase 0 established the denominator and verified no capability.
+- **5 of 303 MANDATORY requirements are verified** (the five Phase 1 governance entries). No capability is implemented; the architecture remains a declaration until the Phase 2 gates run against real code.
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
 - Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
 - 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.
-- **15** recorded defects remain in `KNOWN_FAILURES.md` as permanent evidence (F-0015 added in Phase 1).
+- **15** recorded defects remain in `KNOWN_FAILURES.md` as permanent evidence. F-0015 is CLOSED by ERR-001 but retained in full.

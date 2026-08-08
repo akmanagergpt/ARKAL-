@@ -54,6 +54,40 @@ Acceptance of Phase 0 does not close the following, which remain open and tracke
 
 ---
 
+## ERR-001 — GOVERNANCE ERRATUM (post-HUMAN GATE 1)
+
+| Field | Value |
+|---|---|
+| **Type** | Human-authorized governance erratum — **not** an ordinary implementing-agent edit |
+| **Raised by** | Phase 1 structural validation (finding **F-0015**) |
+| **Decision** | **AUTHORIZED** by the human acceptance authority |
+| **Scope** | Physical realizability only |
+| **Applies to** | `docs/canonical/AUTHORITY_MAP.yaml` → `engineering.import.module_root` |
+| **Old value** | `backend/arkali/engineering/import` |
+| **New value** | `backend/arkali/engineering/project_import` |
+| **Rationale** | `import` is a Python reserved keyword. A bounded context reachable only through `importlib` would be permanent language-level friction and technical debt |
+
+### What this erratum does NOT change
+
+The logical bounded-context identity **`engineering.import` is unchanged**, as are: canonical authority ownership (`imported_project_lifecycle → engineering.import`), bounded-context semantics, lifecycle authority (`import_project`), state-machine authority (`ImportProject`), TRUST classification, Protected Core membership (`false`), dependency direction, product scope, and requirement meaning (ARK-REQ-0115, 0161 and all Phase 19 entries are untouched).
+
+Phase 0 was **not** reopened or redesigned. Stable Core promotion semantics were **not** invoked: no implemented or promoted Stable Core exists yet, so HUMAN GATE 2 is not engaged.
+
+### Verification
+
+| Evidence | Result |
+|---|---|
+| Ordinary `import` statement now works | `from arkali.engineering.project_import import __context__` → OK; `__context__` still reports `engineering.import` |
+| No compatibility alias left behind | filesystem scan for any directory named `import` → none |
+| Generic keyword check installed | `keyword.iskeyword` / `issoftkeyword` / `str.isidentifier` — not a hand-maintained word list |
+| Negative control (EV-0012) | defective mapping REJECTED, corrected mapping ACCEPTED, 9/9 keywords and non-identifiers rejected, 0 false positives, canonical map unmodified |
+
+### Effect
+
+F-0015 **CLOSED**. EXT-002 **CLOSED**. Phase 1 re-validated and machine-accepted; Phase 2 unlocked. Prior candidate `0ad45a7447d63a6b418d987ab64a34a2e7de015a` preserved unamended as the record of the defect.
+
+---
+
 ## Outstanding gates
 
 | Gate | Purpose | Status |

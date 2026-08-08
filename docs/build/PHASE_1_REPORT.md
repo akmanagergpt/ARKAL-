@@ -1,7 +1,8 @@
 # PHASE 1 REPORT — REPOSITORY BOOTSTRAP
 
-**Status:** **PHASE 1 CANDIDATE — NOT ACCEPTED. 1 HIGH finding open.**
-**Phase 2:** **NOT UNLOCKED**
+**Status:** **PHASE 1 MACHINE-ACCEPTED** (after governance erratum ERR-001)
+**Phase 2:** **UNLOCKED**
+**Candidate rev 1:** `0ad45a7447d63a6b418d987ab64a34a2e7de015a` — preserved unamended, records the defect
 **Governance HEAD at start:** `3378054cdedf167377435177091c2ceb9b7d697f`
 **Authoritative inputs:** `ARCHITECTURE.md`, `AUTHORITY_MAP.yaml`, `REQUIREMENT_REGISTER.md`, `CONTRACT_INVENTORY.md`, `IMPLEMENTATION_DEPENDENCY_MATRIX.md`, ADR-0001…0009 (all ACCEPTED)
 
@@ -83,9 +84,9 @@ The register assigns **5** requirements to Phase 1. Later-phase requirements are
 | 3 | Duplicate/shadow structural scan | **PASS** — 0 duplicate `module_root` |
 | 4 | Forbidden dependency-direction scan | **PASS (vacuous)** — 0 cross-context imports exist yet; honestly reported as having nothing to reject |
 | 5 | Architecture-budget scan | **PASS** — largest Phase 1 module well under 400 logical lines |
-| 6 | Python package/import validation | **PASS** — 31/31 contexts import (see finding F-0015 for the one requiring `importlib`) |
+| 6 | Python package/import validation | **PASS** — 31/31 contexts import; all reachable by ordinary `import` statement after ERR-001 |
 | 7 | Backend test discovery | **PASS** — 7 tests collected |
-| 8 | Backend test execution | **FAIL** — 6 passed, **1 failed** (F-0015) |
+| 8 | Backend test execution | **PASS** — 7 collected, **7 passed** (was 6/1 before ERR-001) |
 | 9 | Frontend manifest/config validation | **PASS** — manifest, lockfile and tsconfig parse; lock name matches manifest |
 | 10 | TypeScript/Vite bootstrap validation | **NOT_CONFIGURED** — dependencies not installed |
 | 11 | Rust/Tauri workspace validation | **UNSUPPORTED** — no Rust toolchain on this machine |
@@ -98,7 +99,15 @@ Phase 0 regression: all three Phase 0 validators still pass. Canonical and gover
 
 ## 7. Findings
 
-### F-0015 — HIGH — `engineering.import` module root uses a Python reserved keyword
+### F-0015 — HIGH — **CLOSED by governance erratum ERR-001**
+
+**Resolution.** The human acceptance authority confirmed the finding and authorized a governance erratum correcting **physical realizability only**: `engineering.import.module_root` changed from `backend/arkali/engineering/import` to `backend/arkali/engineering/project_import`. The logical bounded-context identity `engineering.import` is unchanged, as are authority ownership, bounded-context semantics, lifecycle authority, TRUST classification, Protected Core membership, dependency direction, product scope and requirement meaning. Phase 0 was not reopened; Stable Core promotion semantics were not invoked because no Stable Core exists.
+
+Verified: `from arkali.engineering.project_import import __context__` works and still reports `engineering.import`; no directory named `import` remains anywhere. The check was replaced with a generic one driven by `keyword.iskeyword`/`issoftkeyword`/`str.isidentifier` and given a negative control (EV-0012) proving it rejects the defective mapping, accepts the corrected one, rejects 9/9 other illegal segments, and produces no false positives.
+
+*Original finding, retained as evidence:*
+
+#### (as found) `engineering.import` module root uses a Python reserved keyword
 
 **Defect.** `AUTHORITY_MAP.yaml` declares `engineering.import → backend/arkali/engineering/import`. `import` is a Python keyword. The package exists and is discoverable, and `importlib.import_module("arkali.engineering.import")` works — but **no Python code can ever reach it with an `import` statement**; that is a `SyntaxError`. Verified empirically before reporting.
 
@@ -127,8 +136,23 @@ Per the accepted governance model, Phase 1 acceptance is machine acceptance and 
 | C4 architecture-gate evidence | NOT_TESTED — the 8 gates are Phase 2; not claimed as PASS |
 | C5 honest-state integrity | PASS — no non-PASS state converted to PASS |
 
-**Determination: 1 HIGH finding is open, so Phase 1 is NOT ACCEPTED and Phase 2 is NOT unlocked.** The acceptance criteria were not weakened to obtain a pass, and the failing structural test was not skipped, xfailed or deleted.
+**Determination after ERR-001: BLOCKER 0, HIGH 0, Phase 1 mandatory requirements PASS, authority conflicts 0, architecture violations 0, fake implementations 0, secret findings 0. Phase 1 is MACHINE-ACCEPTED and Phase 2 is UNLOCKED.**
+
+The acceptance criteria were never weakened. At candidate rev 1 the failing structural test was left failing rather than skipped, xfailed or deleted; it now passes because the underlying defect was fixed by authorized ruling, not because the test was changed to accommodate it. The test was made *stricter* in the process — generic across Python's whole keyword table instead of one hand-listed word.
 
 ## 9. Next exact action
 
-Obtain the governance ruling on F-0015 (option a, b or c). On that ruling: apply the amendment, re-run `scripts/check_repository_structure.py` and the backend test suite, and re-submit Phase 1 for machine acceptance. Phase 2 remains locked until then.
+**Begin Phase 2 — Foundation + Contracts + Phase Gate Checker.**
+
+## 10. Post-erratum validation summary
+
+| Check | Result |
+|---|---|
+| `scripts/check_repository_structure.py` | **12/12 PASS**, exit 0 |
+| `scripts/check_repository_structure_negative.py` | **6/6 PASS**, exit 0 |
+| backend `pytest -q` | **7 passed**, exit 0 |
+| Python import validation | 31/31 contexts, ordinary import statements |
+| Phase 0 validators (3) | all still PASS — no regression |
+| Frontend manifest/lock/tsconfig | parse OK, 183 packages, names match |
+
+Environment limitations are unchanged and remain truthful: Python 3.13 **NOT_CONFIGURED** (3.12.10 present), Rust/Cargo **UNSUPPORTED**, TypeScript/Vite **NOT_CONFIGURED**, Python lockfile **NOT_CONFIGURED**, ruff **NOT_CONFIGURED**. None was converted to PASS. No Phase 1 MANDATORY requirement requires successful execution with those toolchains.

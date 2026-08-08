@@ -150,7 +150,7 @@ contexts:
   engineering.repair:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/repair}
   engineering.factory:   {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/factory}
   engineering.knowledge: {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/knowledge}
-  engineering.import:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/import}
+  engineering.import:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/project_import}  # ERR-001: physical path only; logical id unchanged
   engineering.plugin:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/plugin}
   engineering.localai:   {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/localai}
 

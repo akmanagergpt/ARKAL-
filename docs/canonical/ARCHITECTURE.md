@@ -27,7 +27,7 @@ ARKALI/
       acceptance/                L2: acceptance engine, evidence graph, gate checker
       execution/                 L3: durable runtime, scheduler, workers, workflow
       engineering/               L4: agents, codeintel, candidate, repair, factory,
-                                     knowledge, import, plugin, localai
+                                     knowledge, project_import, plugin, localai
       lifecycle/                 L5: release, recovery, evolution
       surfaces/                  L6: operations api, command center api
     alembic/                     migrations
@@ -49,7 +49,7 @@ Directory layers map 1:1 to the layer model in §4. A bounded context lives in e
 | **Control** | Specification Authority, Architecture/Contract Authority, Capability Graph, Project/Revision Registry, Provider/Model Registry, Policy Authority, Workflow Definitions, Resource Scheduler, Knowledge Authority, Release Authority | `control/`, `execution/workflow` (definitions store), `lifecycle/release` |
 | **Execution** | Durable Job Runtime, Workflow Executor, Agent Workers, Provider Workers, Build/Test Workers, Browser Workers, Sandbox Executors, Local AI Workers, Computer-Use Workers | `execution/`, `engineering/`, `surfaces/operations` |
 | **Evidence** | Artifact Provenance, Acceptance Evidence Graph, traces/metrics/logs, audit chain, benchmark history, failure/repair history, security findings, test evidence | `evidence/`, `acceptance/` |
-| **Product** | Working Copies, Candidate Products, Stable Products, Imported Projects, Generated Products, AI-Native Child Products, Product Evolution SDK, ARKALI Candidate Core | `engineering/candidate`, `engineering/import`, `lifecycle/` |
+| **Product** | Working Copies, Candidate Products, Stable Products, Imported Projects, Generated Products, AI-Native Child Products, Product Evolution SDK, ARKALI Candidate Core | `engineering/candidate`, `engineering/project_import`, `lifecycle/` |
 
 **Plane dependency rule.** Execution depends on Control. Control never depends on Execution. Every plane may write to Evidence. Only Acceptance reads Evidence for verdicts. Product depends on Control + Execution + Evidence and is depended upon by nothing.
 
