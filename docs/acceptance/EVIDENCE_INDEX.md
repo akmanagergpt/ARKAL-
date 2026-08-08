@@ -24,6 +24,13 @@
 
 Every command above was executed and its exit code recorded. No result in this index is estimated, recalled or inferred. EV-0007 and EV-0008 record real failures rather than suppressing them.
 
+| **EV-0015** | **Phase 2 backend test suite** | real test run | `python -m pytest -q` (backend/) | **exit 0. 66 passed.** Structural (7) + governance (59), including 19 negative/drift controls | ARK-REQ-0013, 0209 |
+| **EV-0016** | **Eight architecture gates executed** | mechanical validation | `GateRunner.run_all()` via the Phase Gate Checker | **8/8 PASS.** Declaration reconciled against implementation; dependency and cycle gates evaluate **16 real cross-context edges**, no longer vacuous | ARK-REQ-0351, 0352, 0353 |
+| **EV-0017** | **Phase Gate Checker verdict for Phase 2** | real execution | `python scripts/run_phase_gate.py 2 3` | **exit 0. `PHASE_ACCEPTED_BY_MACHINE`.** C1–C5 PASS, FINDINGS PASS, PREREQ PASS, HUMAN_GATE NOT_APPLICABLE | ARK-REQ-0203, 0204, 0227, 0228 |
+| **EV-0018** | **Checker determinism** | mechanical validation | two independent evaluations over identical state | **byte-identical JSON (4529 bytes).** No clock, no randomness, no network | ARK-REQ-0210 |
+| **EV-0019** | **Prior-phase reconciliation (0A, 0B, 1)** | mechanical validation | executable checker against recorded state | **clean.** Prerequisites PASS, HUMAN_GATE_1 recorded, register 313/303/8/2, 0 authority conflicts, 0 open BLOCKER/HIGH. No defect found in any accepted prior phase; no history rewritten | — |
+| **EV-0020** | **mypy strict** | real tooling | `python -m mypy arkali --ignore-missing-imports` | **exit 0.** 56 source files, no issues. Caught a dead comparison in C3 that was fixed rather than silenced | ARK-REQ-0026 |
+
 ## Evidence deliberately absent
 
 | Evidence class | State | Reason |
@@ -50,4 +57,4 @@ Every command above was executed and its exit code recorded. No result in this i
 
 ## Coverage statement
 
-Mandatory requirement coverage is **5 verified** after Phase 1 machine acceptance (ARK-REQ-0206, 0208, 0220, 0223, 0243). Phase 0 itself verified 0. The denominator is read from the Canonical Requirement Register (snapshot at this candidate: 303 MANDATORY); it is not maintained independently here. Phase 1 verified only its own five governance requirements; it implemented no capability. No capability coverage is claimed.
+Mandatory requirement coverage is **28 verified** after Phase 2 machine acceptance (5 from Phase 1, 23 from Phase 2). The denominator is read from the Canonical Requirement Register (snapshot at this candidate: 303 MANDATORY); it is not maintained independently here. Phase 1 verified only its own five governance requirements; it implemented no capability. No capability coverage is claimed.

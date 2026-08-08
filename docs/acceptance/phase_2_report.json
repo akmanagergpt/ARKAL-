@@ -1,0 +1,135 @@
+{
+  "architecture_checks": "8 canonical gates executed by GateRunner and reconciled against AUTHORITY_MAP.architecture_gates; declaration/implementation mismatch fails closed",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0002",
+    "ARK-REQ-0008",
+    "ARK-REQ-0013",
+    "ARK-REQ-0014",
+    "ARK-REQ-0019",
+    "ARK-REQ-0020",
+    "ARK-REQ-0026",
+    "ARK-REQ-0203",
+    "ARK-REQ-0204",
+    "ARK-REQ-0205",
+    "ARK-REQ-0209",
+    "ARK-REQ-0210",
+    "ARK-REQ-0213",
+    "ARK-REQ-0214",
+    "ARK-REQ-0215",
+    "ARK-REQ-0216",
+    "ARK-REQ-0227",
+    "ARK-REQ-0228",
+    "ARK-REQ-0230",
+    "ARK-REQ-0242",
+    "ARK-REQ-0351",
+    "ARK-REQ-0352",
+    "ARK-REQ-0353"
+  ],
+  "blockers": "none",
+  "duplicate_shadow_check": "duplicate_canonical_authority and shadow_registry gates PASS; no validator holds a private copy of governed data; drift controls prove parsing",
+  "evidence_created": [
+    "EV-0015",
+    "EV-0016",
+    "EV-0017",
+    "EV-0018",
+    "EV-0019"
+  ],
+  "fake_success_scan": "clean; no TODO/stub/mock markers in Phase 2 source; no Phase 3+ capability constructs; mypy strict clean",
+  "files_created": [
+    "backend/arkali/acceptance/checker.py",
+    "backend/arkali/acceptance/gate_verdict.py",
+    "backend/arkali/acceptance/governance_state.py",
+    "backend/arkali/acceptance/phase_report.py",
+    "backend/arkali/control/architecture/authority_map.py",
+    "backend/arkali/control/architecture/gates/__init__.py",
+    "backend/arkali/control/architecture/gates/authority_gates.py",
+    "backend/arkali/control/architecture/gates/base.py",
+    "backend/arkali/control/architecture/gates/runner.py",
+    "backend/arkali/control/architecture/gates/structure_gates.py",
+    "backend/arkali/control/specification/register_parser.py",
+    "backend/arkali/control/specification/requirement_record.py",
+    "backend/arkali/kernel/contracts/errors.py",
+    "backend/arkali/kernel/contracts/results.py",
+    "backend/arkali/kernel/observability/envelope.py",
+    "backend/arkali/kernel/persistence/schema_contract.py",
+    "backend/tests/governance/__init__.py",
+    "backend/tests/governance/test_architecture_gates.py",
+    "backend/tests/governance/test_authoritative_parsing.py",
+    "backend/tests/governance/test_phase_gate_checker.py",
+    "docs/acceptance/phase_2_report.json",
+    "scripts/run_phase_gate.py"
+  ],
+  "files_modified": [
+    "backend/tests/structural/test_repository_structure.py",
+    "scripts/check_repository_structure.py"
+  ],
+  "limitations": "Python 3.13 NOT_CONFIGURED (3.12.10 present); Rust/Cargo UNSUPPORTED; TypeScript/Vite, ruff and Python lockfile tooling NOT_CONFIGURED. None converted to PASS.",
+  "migrations": [],
+  "next_exact_action": "Begin Phase 3 - Formal State Machines + Capability Graph Schema",
+  "objective": "Foundation, canonical contract definitions, deterministic Phase Gate Checker and eight executable architecture gates",
+  "phase_id": "2",
+  "public_contracts": [
+    "C-01",
+    "C-02",
+    "C-03 (definition only)",
+    "C-04",
+    "C-05",
+    "C-06",
+    "C-17",
+    "C-18"
+  ],
+  "security_findings": "none; no executable surface, no network, no clock, no randomness, no secret handling",
+  "state_machine_capability_changes": "No state machine implemented. Verdict enum (C-18) and the honest-state taxonomy are contracts only.",
+  "status": "PASS",
+  "tests_executed": [
+    {
+      "command": "python -m pytest -q",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 66,
+      "summary": "66 passed in 2.45s"
+    },
+    {
+      "command": "python -m mypy arkali --ignore-missing-imports",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "Success: no issues found in 56 source files"
+    },
+    {
+      "command": "python scripts/check_repository_structure.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "SUMMARY: 12 pass, 0 fail, 12 total"
+    },
+    {
+      "command": "python scripts/check_repository_structure_negative.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "NEGATIVE CONTROL: PASS - keyword check rejects defective input, accepts corrected input, and is generic across"
+    },
+    {
+      "command": "python scripts/check_phase_graph.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "[AUTHORITATIVE] RESULT: PASS (10/10) - graph executable, deadlock-free"
+    },
+    {
+      "command": "python scripts/check_phase_graph_negative.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "Repository IMPLEMENTATION_DEPENDENCY_MATRIX.md verified unmodified."
+    },
+    {
+      "command": "python scripts/check_phase0_deliverables.py",
+      "exit_code": 0,
+      "failed": 0,
+      "passed": 0,
+      "summary": "Counts derived from the canonical Build Protocol lists, not entered by hand."
+    }
+  ]
+}

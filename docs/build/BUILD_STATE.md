@@ -1,10 +1,10 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 1 MACHINE-ACCEPTED. PHASE 2 UNLOCKED, NOT STARTED.**
+**Current state:** **PHASE 2 MACHINE-ACCEPTED. PHASE 3 UNLOCKED, NOT STARTED.**
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** ERR-001 governance erratum + Phase 1 machine acceptance
+**Last updated by:** Phase 2 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
 **Governance erratum:** ERR-001 (closes F-0015) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -17,8 +17,9 @@
 | 0B | Governance & Executable Contracts | **ACCEPTED** |
 | 0 | Acceptance package (0A + 0B) | **ACCEPTED — HUMAN GATE 1 granted** |
 | 1 | Repository Bootstrap | **MACHINE-ACCEPTED** (validator 12/12, suite 7/7) |
-| 2 | Foundation + Contracts + Phase Gate Checker | **UNLOCKED — NOT_STARTED** |
-| 3 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
+| 2 | Foundation + Contracts + Phase Gate Checker | **MACHINE-ACCEPTED** (66 tests, 8 gates, mypy clean) |
+| 3 | Formal State Machines + Capability Graph Schema | **UNLOCKED — NOT_STARTED** |
+| 4 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
 
@@ -26,7 +27,8 @@
 - **Phase 0A architecture package (8):** `ARCHITECTURE.md`, `SECURITY_ARCHITECTURE.md`, `STATE_MACHINES.md`, `EXECUTION_AND_CAPABILITY.md`, `CONTRACT_INVENTORY.md` (36 families), `VERIFICATION_ARCHITECTURE.md` (test architecture + evidence graph strategy), `IMPLEMENTATION_DEPENDENCY_MATRIX.md`, `CONTRADICTION_ANALYSIS.md`.
 - **Phase 0B governance package (5):** `REQUIREMENT_REGISTER.md` (313 entries), `AUTHORITY_MAP.yaml` (machine-readable, parses), `GOLDEN_REPAIR_CORPUS_DEFINITION.md`, `PHASE_GATE_CHECKER.md`, `ADR_INDEX.md` (9 ADRs, all **ACCEPTED** under HUMAN GATE 1, now immutable).
 - Build state artifacts (this file and siblings), `EVIDENCE_INDEX.md`, `HUMAN_GATE_RECORDS.md`.
-- **Validation tooling (4):** `scripts/check_phase_graph.py`, `check_phase_graph_negative.py`, `check_phase0_deliverables.py`, `check_repository_structure.py`. Validators, not application source code — they analyse documents and repository structure.
+- **Executable governance (Phase 2):** `backend/arkali/` now contains 15 implementation modules across 8 bounded contexts — error taxonomy, honest states, correlation envelope, persistence schema contract, requirement register parser, authority map parser, 8 architecture gates, phase report, gate verdict and the deterministic Phase Gate Checker. Entry point: `scripts/run_phase_gate.py`.
+- **Validation tooling (5):** `scripts/check_phase_graph.py`, `check_phase_graph_negative.py`, `check_phase0_deliverables.py`, `check_repository_structure.py`. Validators, not application source code — they analyse documents and repository structure.
 - **Phase 1 repository bootstrap (candidate, not accepted):** `backend/` (31 bounded-context packages + 9 layer groupings, `pyproject.toml`, `tests/`, `alembic/versions/`), `frontend/` (workspace config + real `package-lock.json`), `src-tauri/`, `golden/`, `release/` roots.
 
 ## What does not exist
@@ -59,7 +61,11 @@
 
 ## Next exact action
 
-**Begin Phase 2 — Foundation + Contracts + Phase Gate Checker.** Phase 2 is unlocked and not started.
+**Begin Phase 3 — Formal State Machines + Capability Graph Schema.** Phase 3 is unlocked and not started.
+
+Phase 3 delivers the twelve canonical state machines and the Capability Graph schema (C-13). Per ADR-0003 the graph is schema-only until Phase 9B; every capability query must return `NOT_CONFIGURED` before activation.
+
+*(superseded guidance retained for continuity)*
 
 Phase 2 delivers contract definitions C-01, C-03 (definition), C-04, C-17, C-18; the eight architecture gates with their negative-control fixtures; and the deterministic Phase Gate Checker. At that point Phase 0's `NOT_TESTED` items become testable for the first time, and the vacuous dependency-direction check gains real imports to reject.
 
@@ -73,7 +79,7 @@ From here, normal phases are accepted by machine verdict without human approval.
 
 Acceptance of Phase 0 closed no finding other than the gate itself:
 
-- **5 of 303 MANDATORY requirements are verified** (the five Phase 1 governance entries). No capability is implemented; the architecture remains a declaration until the Phase 2 gates run against real code.
+- **28 of 303 MANDATORY requirements are verified** (5 from Phase 1, 23 from Phase 2). The architecture is no longer only a declaration: the eight gates now evaluate 16 real cross-context edges.
 - The architecture remains a declaration until the Phase 2 gates run against real code (M-P0-2).
 - Register exhaustiveness is by construction, not mechanical extraction; Phase 2 reconciles it (M-P0-1).
 - 14 MEDIUM and 9 LOW findings remain open in `OPEN_BLOCKERS.md`.

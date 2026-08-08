@@ -111,15 +111,32 @@ def test_every_module_root_segment_is_a_legal_python_identifier(
 
 
 @pytest.mark.structural
-def test_no_context_package_contains_implementation_yet() -> None:
-    """Phase 1 creates structure only: context packages hold no modules."""
-    pkg_root = REPO / "backend" / "arkali"
-    offenders = [
-        str(p.relative_to(REPO)).replace("\\", "/")
-        for p in pkg_root.rglob("*.py")
-        if p.name != "__init__.py"
+def test_every_module_lives_inside_a_declared_bounded_context(
+    authority_map: dict,
+) -> None:
+    """No module may exist outside its declared context (ARCHITECTURE.md 1).
+
+    This supersedes the Phase 1 assertion that no implementation module existed
+    *yet*, which was explicitly phase-scoped and which Phase 2 satisfies by
+    building the governance foundation. The replacement is strictly stronger: it
+    holds for every future phase instead of only the empty one, and it rejects
+    orphan modules that the earlier test could never have detected.
+    """
+    roots = [
+        REPO / meta["module_root"]
+        for meta in authority_map["contexts"].values()
     ]
-    assert not offenders, f"Phase 1 must not implement modules: {offenders}"
+    grouping = {"arkali", "kernel", "control", "evidence", "execution",
+                "engineering", "lifecycle", "surfaces", "registry"}
+    offenders = []
+    for path in (REPO / "backend" / "arkali").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        if path.name == "__init__.py" and path.parent.name in grouping:
+            continue
+        if not any(root == path.parent or root in path.parents for root in roots):
+            offenders.append(str(path.relative_to(REPO)).replace("\\", "/"))
+    assert not offenders, f"modules outside any declared context: {offenders}"
 
 
 @pytest.mark.structural

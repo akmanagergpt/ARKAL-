@@ -12,7 +12,8 @@
 | 8 | PHASE 0 acceptance package (candidate rev 3) | REJECTED by review | `63ab9a8` | HG1-10…HG1-12 |
 | 9 | **PHASE 0 acceptance package (candidate rev 4)** | **ACCEPTED — HUMAN GATE 1** | `007ebf6` | record `HGR-001`; Phase 0A + 0B accepted as one package; 9 ADRs PROPOSED → ACCEPTED; Phase 1 unlocked |
 | 10 | PHASE 1 — Repository Bootstrap (candidate rev 1) | NOT ACCEPTED | `0ad45a7` | F-0015 HIGH open; preserved unamended as the record of the defect |
-| 11 | **ERR-001 governance erratum + PHASE 1 repair** | **MACHINE-ACCEPTED** | pending | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. **Phase 2 unlocked** |
+| 11 | ERR-001 governance erratum + PHASE 1 repair | MACHINE-ACCEPTED | `1ae0835` | validator 12/12, backend suite 7/7, negative control 6/6. 5/5 Phase 1 ARK-REQs PASS. BLOCKER 0, HIGH 0. Phase 2 unlocked |
+| 12 | **PHASE 2 — Foundation + Contracts + Executable Phase Gates** | **MACHINE-ACCEPTED** | pending | Verdict `PHASE_ACCEPTED_BY_MACHINE` from the real checker. 66 tests, 8 architecture gates (16 real edges), 19 negative/drift controls, mypy strict clean. 23/23 Phase 2 ARK-REQs PASS. Prior-phase reconciliation clean. **Phase 3 unlocked** |
 
 ## Phase 0 report
 

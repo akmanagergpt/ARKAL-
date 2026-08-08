@@ -120,14 +120,30 @@ def main() -> int:
     record("PASS" if not dupes else "FAIL",
            "4  no duplicate module_root (shadow scan)", str(dupes))
 
-    # 5 no implementation modules yet
-    impl = []
+    # 5 every module lives inside a declared bounded context
+    #   (supersedes the Phase 1 "no modules yet" rule, which was phase-scoped)
+    roots = [os.path.normpath(os.path.join(ROOT, m["module_root"]))
+             for m in contexts.values()]
+    grouping = {"arkali", "kernel", "control", "evidence", "execution",
+                "engineering", "lifecycle", "surfaces", "registry"}
+    impl, orphans = [], []
     for dirpath, _dirs, files in os.walk(os.path.join(ROOT, "backend", "arkali")):
+        if "__pycache__" in dirpath:
+            continue
         for f in files:
-            if f.endswith(".py") and f != "__init__.py":
-                impl.append(os.path.relpath(os.path.join(dirpath, f), ROOT))
-    record("PASS" if not impl else "FAIL",
-           "5  no context implementation modules exist yet", str(impl))
+            if not f.endswith(".py"):
+                continue
+            full = os.path.normpath(os.path.join(dirpath, f))
+            rel = os.path.relpath(full, ROOT).replace(os.sep, "/")
+            if f != "__init__.py":
+                impl.append(rel)
+            if f == "__init__.py" and os.path.basename(dirpath) in grouping:
+                continue
+            if not any(os.path.commonpath([full, r]) == r for r in roots):
+                orphans.append(rel)
+    record("PASS" if not orphans else "FAIL",
+           f"5  every module lives inside a declared bounded context "
+           f"({len(impl)} implementation modules)", str(orphans))
 
     # 6 dependency direction among Phase 1 python files
     violations = []
