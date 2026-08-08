@@ -1,0 +1,68 @@
+ARKALI GENESIS v2 — START COMMAND
+
+The three attached canonical documents are authoritative:
+
+1. ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
+   defines WHAT ARKALI GENESIS v2 must be.
+
+2. CLAUDE_ARKALI_GENESIS_V2_BUILD_PROTOCOL.md
+   defines HOW you must build it.
+
+3. ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md
+   defines WHAT must be proven before production delivery.
+
+Build ARKALI GENESIS v2 as a completely new greenfield repository.
+
+Do not use the historical ARKALI source tree as the architectural foundation.
+Do not start mass code generation.
+
+FIRST execute PHASE 0 — Architecture Freeze.
+
+Read all three documents completely and create the repository-local canonical architecture/build-state artifacts required by the Build Protocol.
+
+At minimum produce:
+- final repository architecture,
+- four-plane architecture map,
+- bounded-context dependency map,
+- canonical authority map,
+- formal state-machine inventory,
+- capability graph schema,
+- contract inventory,
+- artifact/provenance model,
+- persistence model,
+- durable execution model,
+- worker/resource scheduler model,
+- security trust boundaries,
+- policy model,
+- observability model,
+- verification/test architecture,
+- implementation dependency matrix,
+- initial ADRs,
+- BUILD_STATE,
+- PHASE 0 REPORT.
+
+Validate PHASE 0 against all three authoritative documents.
+
+If PHASE 0 is PASS, continue autonomously to subsequent canonical phases.
+Do not ask for routine permission between normal engineering phases.
+
+Write actual files and run actual tests whenever filesystem/execution access is available.
+
+Do not claim success for work that was not implemented or not tested.
+
+Use honest states:
+PASS
+FAIL
+BLOCKED
+NOT_TESTED
+NOT_CONFIGURED
+UNSUPPORTED
+NOT_APPLICABLE.
+
+Stop only for a genuine architectural contradiction, unavoidable external blocker, required credential/license, or a high-risk operation that explicitly requires user approval.
+
+The objective is not a prototype or mock dashboard.
+
+The objective is a production-grade Engineering Control Fabric whose software factory is verified by generating and running real applications, surviving failure injection, passing independent acceptance, completing four pre-delivery hardening rounds, and satisfying the canonical Verification and Delivery Contract.
+
+Begin PHASE 0 now.

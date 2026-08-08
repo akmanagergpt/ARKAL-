@@ -1,0 +1,268 @@
+# ============================================================================
+# ARKALI GENESIS v2 — root .gitignore
+#
+# Scope: Python / FastAPI backend, Node.js + React + TypeScript + Vite
+# frontend, Tauri (Rust) desktop shell, SQLite runtime databases.
+#
+# Deliberately NOT ignored (these are version controlled):
+#   - canonical documentation under docs/
+#   - database migrations
+#   - dependency lock files (poetry.lock, uv.lock, package-lock.json,
+#     pnpm-lock.yaml, yarn.lock, Cargo.lock)
+#   - all source code and tests
+#   - configuration templates (*.example, *.template, *.sample)
+#   - verification evidence intended for delivery
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# Secrets and local environment  (see negations at the end of this section)
+# ----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+
+secrets/
+.secrets/
+secrets.json
+secrets.yaml
+secrets.yml
+
+credentials.json
+credentials.yaml
+credentials.yml
+service-account*.json
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+id_rsa
+id_ed25519
+
+# Local private configuration overrides
+config.local.*
+*.local.json
+*.local.yaml
+*.local.yml
+*.local.toml
+settings.local.*
+local.settings.json
+
+# --- Template / example files are safe and MUST stay tracked ---
+!.env.example
+!.env.template
+!.env.sample
+!.env.*.example
+!.env.*.template
+!*.env.example
+!*.example
+!*.template
+!*.sample
+
+
+# ----------------------------------------------------------------------------
+# Python
+# ----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Local virtual environments
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+pyvenv.cfg
+
+# Packaging / build artifacts
+build/
+dist/
+sdist/
+wheels/
+*.egg-info/
+.eggs/
+*.egg
+MANIFEST
+pip-wheel-metadata/
+
+# Tooling caches
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+.pytest_cache/
+.tox/
+.nox/
+.ipynb_checkpoints/
+.python-version
+
+# Coverage / test output
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+junit*.xml
+.hypothesis/
+
+
+# ----------------------------------------------------------------------------
+# Node.js / React / TypeScript / Vite
+# ----------------------------------------------------------------------------
+node_modules/
+.npm/
+.yarn/cache/
+.yarn/install-state.gz
+.pnp.*
+.pnpm-store/
+
+# Build output
+.vite/
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+.parcel-cache/
+storybook-static/
+
+# TypeScript incremental build state (tsconfig.json itself stays tracked)
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Test / coverage output
+coverage/
+.nyc_output/
+playwright-report/
+blob-report/
+test-results/
+.vitest/
+
+# Lint caches
+.eslintcache
+.stylelintcache
+
+
+# ----------------------------------------------------------------------------
+# Tauri / Rust
+# ----------------------------------------------------------------------------
+target/
+**/target/
+debug/
+*.rs.bk
+*.pdb
+
+# Tauri generated bundles / schemas (Cargo.lock and tauri.conf.json stay tracked)
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+
+
+# ----------------------------------------------------------------------------
+# SQLite runtime databases
+#
+# Runtime database files are local state, never committed.
+# Migrations and schema definitions ARE committed and are not matched here.
+# ----------------------------------------------------------------------------
+*.db
+*.db3
+*.sqlite
+*.sqlite3
+
+# SQLite sidecar / journal files
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Common runtime data locations
+data/*.db
+data/*.sqlite3
+var/
+instance/
+
+# --- Fixtures and seed databases intended for version control ---
+!tests/**/fixtures/*.db
+!tests/**/fixtures/*.sqlite3
+
+
+# ----------------------------------------------------------------------------
+# Logs
+# ----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+
+# ----------------------------------------------------------------------------
+# Temporary files
+# ----------------------------------------------------------------------------
+tmp/
+temp/
+.tmp/
+.cache/
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+
+# Merge conflict leftovers
+*.rej
+
+
+# ----------------------------------------------------------------------------
+# IDE / editor
+# ----------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+
+.fleet/
+.zed/
+.history/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+
+# ----------------------------------------------------------------------------
+# OS-generated
+# ----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
