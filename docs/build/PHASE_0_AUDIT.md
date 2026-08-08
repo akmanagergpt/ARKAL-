@@ -70,7 +70,7 @@ Prior MEDIUM/LOW findings carried from the canonical repair are listed in `OPEN_
 | HIGH | 0 |
 | MEDIUM | 3 new + 10 carried |
 | LOW | 2 new + 7 carried |
-| Orphan requirements | 0 (all 311 have owner + evidence) |
+| Orphan requirements | 0 (all 313 have owner + evidence) |
 | Orphan acceptance gates | 1 — `ARKALI_RELEASE_QUALITY_REPORT.md` content contract (LOW, carried) |
 | Authority conflicts | 0 |
 | Unbounded loops | 0 |

@@ -9,7 +9,7 @@ Decisions taken during Phase 0 that are not large enough for an ADR, or that rec
 | D-003 | Layer rule: strictly-lower dependencies only, same-layer edges enumerated explicitly | An unenumerated same-layer edge is how cycles appear; making the 7 legitimate edges explicit makes the rest detectable | Phase 0A |
 | D-004 | Promotion and rollback split across two lifecycle authorities | Prevents a failed promotion from approving its own recovery | ADR-0009 |
 | D-005 | ID ranges allocated sparsely (MS 0001–0186, BP 0200–0243, VDC 0300–0380) | New requirements can be added inside their source block without renumbering; IDs are immutable | Phase 0B |
-| D-006 | 9 CONDITIONAL entries only; everything else MANDATORY or OPTIONAL | Conditional classification is the main scope-narrowing exploit; each of the 9 has an objective machine-evaluable rule | Phase 0B |
+| D-006 | Minimise CONDITIONAL classification; everything else MANDATORY or OPTIONAL. Current count: **8** | Conditional classification is the main scope-narrowing exploit; every CONDITIONAL entry carries an objective machine-evaluable rule. The count is authoritative in `REQUIREMENT_REGISTER.md`, not here | Phase 0B (count revised by D-014) |
 | D-007 | Architecture budgets set deliberately generous (400 logical lines, fan-out 12) | Purpose is catching a central orchestrator, not policing ordinary modules; tight budgets would generate GATE 8 noise | ADR-0008 |
 | D-008 | Phase Gate Checker specified but **not** implemented in Phase 0 | Canonical phase model places implementation in Phase 2; Phase 0 produces no code | Phase 0B |
 | D-009 | Golden Repair corpus **defined** but not populated | Corpus instances require an accepted Golden Product to inject into | Phase 0B |
@@ -24,7 +24,7 @@ Decisions taken during Phase 0 that are not large enough for an ADR, or that rec
 | D-018 | 22B prerequisites = 5, 6, 13, 20 (was 5, 20, 26) | 6 supplies immutable content-addressed revision identity; 13 supplies the "previously verified" record; 5/20 supply snapshot and restore proof. Full Phase 26 is not needed to verify rollback safety | HG1-05 correction |
 | D-019 | Dependency validation must enumerate all four edge classes and ship a negative control | The original check used explicit prerequisites only and reported "no cycles" while a real deadlock existed. An edge class omitted from a graph check is a false negative by construction | HG1-05 correction |
 | D-020 | Contract definition phase separated from implementation phase | C-03 was required by Phase 2 while implemented at Phase 5 — an impossible forward prerequisite. Phase 2 needs the schema/interface, not the runtime | HG1-06 correction |
-| D-021 | Deliverable counts parsed from the canonical Build Protocol lists, never hand-entered | The 12/12 vs 11/11 disagreement arose from splitting one canonical bullet into two rows. Deriving the count from the source removes the class of error | HG1-08 correction |
+| D-021 | Deliverable counts parsed from the canonical Build Protocol lists, never hand-entered | *(historical defect)* an earlier audit read `12/12` while other artifacts read `11/11`, because one canonical bullet had been split into two rows. Current derived counts are 0A 16/16, 0B 11/11 | HG1-08 correction |
 | D-022 | Derived numbers are computed at check time, not transcribed | Three artifacts held stale denominators after the register was corrected, including the audit asserting all artifacts agreed. Same root cause as F-0002 | HG1-07 / HG1-09 correction |
 
 ## Human rulings incorporated (recorded, not decided here)

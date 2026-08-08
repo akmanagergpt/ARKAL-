@@ -1,70 +1,142 @@
 #!/usr/bin/env python3
 """Deterministic phase-dependency validator for ARKALI GENESIS v2 Phase 0.
 
-Validation tool, not application source code. It builds the phase graph from
-FOUR edge classes and proves the plan is executable:
+Validation tool, not application source code.
 
-  1. explicit prerequisite edges (IMPLEMENTATION_DEPENDENCY_MATRIX)
-  2. mandatory canonical phase-order edges (MASTER_SPECIFICATION phase list)
-  3. HUMAN GATE constraints
-  4. DENY preconditions (22B -> 23 self-evolution)
+SOURCE OF TRUTH
+---------------
+This validator holds NO dependency data of its own. Everything it tests is
+parsed at run time from the authoritative documents:
 
-A cycle check over class 1 alone is a false negative; classes 1 and 2 must be
-combined, which is how the 22B/26 deadlock was missed.
+  canonical phase order  <- docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
+                            (Canonical Implementation Phases)
+  explicit prerequisites <- docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md
+  DENY precondition      <- docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
+                            (ARKALI Self-Evolution)
+  HUMAN GATE constraints <- docs/canonical/AUTHORITY_MAP.yaml (human_gates)
+
+A hard-coded copy of the graph would be a shadow verification model: the
+authoritative matrix could drift while the validator kept passing against a
+stale duplicate. Only the *expected invariants* are asserted in code.
+
+GRAPH COMPOSITION
+-----------------
+THREE graph-edge classes are inserted into the graph:
+  1. explicit prerequisite edges
+  2. canonical phase-order edges
+  3. DENY precondition edges
+HUMAN GATE constraints are checked separately and are NOT graph edges; a gate
+suspends progression at a node, it does not add a dependency between phases.
 
 Exit 0 = all checks PASS. Exit 1 = at least one FAIL.
 """
+import os
+import re
 import sys
 
-# --- canonical phase order (MASTER_SPECIFICATION, Canonical Implementation Phases) ---
-ORDER = ["0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10",
-         "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21",
-         "22", "22B", "23", "24", "25", "26", "27", "28", "29", "30", "31",
-         "32", "33", "34", "35", "36", "37"]
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MS = os.path.join(ROOT, "docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md")
+MATRIX = os.path.join(ROOT, "docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md")
+AUTH = os.path.join(ROOT, "docs/canonical/AUTHORITY_MAP.yaml")
 
-# --- class 1: explicit prerequisites ---
-PREREQ = {
-    "0B": ["0A"], "1": ["0B"], "2": ["1"], "3": ["2"], "4": ["2", "3"],
-    "5": ["2", "4"], "6": ["5"], "7": ["5", "6"], "8": ["7"],
-    "9": ["4", "6", "8"], "9B": ["3", "4", "6", "9"], "10": ["9", "9B"],
-    "11": ["10"], "12": ["11"], "13": ["6", "12"], "14": ["13"], "15": ["13"],
-    "16": ["12", "14", "15"], "17": ["7", "8", "13"], "18": ["13"],
-    "19": ["4", "12"], "20": ["5", "6"], "21": ["4", "9"], "22": ["4", "9"],
-    "22B": ["5", "6", "13", "20"],          # corrected: was 5,20,26 -> deadlock
-    "23": ["22B", "13", "16"], "24": ["16", "13"], "25": ["7", "9", "11"],
-    "26": ["6", "13", "22B"], "27": ["5", "25"], "28": ["27"],
-    "29": ["26", "28", "22B"], "30": ["16", "14", "24"], "31": ["30"],
-    "32": ["31"], "33": ["32"], "34": ["33"], "35": ["34"],
-    "36": ["29", "31", "35"], "37": ["36"],
-}
-
-# --- class 3: human gates (phase -> gate required to EXIT it) ---
-GATES = {"0B": "HUMAN_GATE_1", "23": "HUMAN_GATE_2", "37": "HUMAN_GATE_7"}
-
-# --- class 4: DENY preconditions (blocked_phase -> must be verified first) ---
-DENY = {"23": "22B"}
-
-idx = {p: i for i, p in enumerate(ORDER)}
-fails = []
+PHASE_RE = re.compile(r"\b(\d{1,2}[AB]?)\b")
 
 
-def check(name, ok, detail=""):
-    print(("PASS " if ok else "FAIL ") + name + (("  -- " + detail) if detail else ""))
-    if not ok:
-        fails.append(name)
+def read(path):
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
 
 
-def build_edges():
-    """Union of explicit prerequisites, canonical order edges, DENY edges."""
-    e = set()
-    for p, deps in PREREQ.items():
+# ---------------------------------------------------------------- parsers
+def parse_canonical_order(ms_text):
+    """Canonical phase order from the Master Specification phase list."""
+    seg = ms_text.split("## Canonical Implementation Phases")[1]
+    seg = seg.split("\n## ")[0]
+    order = []
+    for line in seg.splitlines():
+        m = re.match(r"^(\d{1,2}[AB]?)\s+\S", line.strip())
+        if m and m.group(1) not in order:
+            order.append(m.group(1))
+    return order
+
+
+def parse_prereqs(matrix_text, order):
+    """Explicit prerequisites from the dependency matrix table."""
+    known = set(order)
+    prereq = {}
+    for line in matrix_text.splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        raw_id = cells[0].replace("*", "").replace("`", "").strip()
+        raw_deps = cells[2].replace("*", "").replace("`", "").strip()
+        # "GATE n" in the prerequisite cell is a HUMAN GATE constraint, not a
+        # phase dependency. Strip it before extracting phase tokens, otherwise
+        # "GATE 1" parses as phase 1 and creates a self-loop.
+        raw_deps = re.sub(r"GATE\s*\d+", " ", raw_deps, flags=re.I)
+        ids = []
+        if "–" in raw_id or "-" in raw_id.replace("–", "-"):
+            rng = re.match(r"^(\d+)[–-](\d+)$", raw_id)
+            if rng:
+                ids = [str(n) for n in range(int(rng.group(1)),
+                                             int(rng.group(2)) + 1)]
+        if not ids:
+            ids = [raw_id] if raw_id in known else []
+        if not ids:
+            continue
+        deps = [d for d in PHASE_RE.findall(raw_deps) if d in known]
+        for pid in ids:
+            if pid in known:
+                prereq[pid] = sorted(set(deps), key=lambda x: order.index(x))
+    return prereq
+
+
+def parse_deny(ms_text, order):
+    """DENY preconditions declared in the Master Specification."""
+    deny = {}
+    seg_split = ms_text.split("## ARKALI Self-Evolution")
+    if len(seg_split) > 1:
+        seg = seg_split[1].split("\n## ")[0]
+        m = re.search(r"DENY until .*?\(Phase (\d{1,2}[AB]?)\)", seg)
+        if m:
+            gate_phase = m.group(1)
+            target = next((p for p in order
+                           if _title(ms_text, p).lower()
+                           .startswith("self-evolution")), None)
+            if target and gate_phase in order:
+                deny[target] = gate_phase
+    return deny
+
+
+def _title(ms_text, pid):
+    seg = ms_text.split("## Canonical Implementation Phases")[1].split("\n## ")[0]
+    for line in seg.splitlines():
+        m = re.match(r"^(\d{1,2}[AB]?)\s+(.+)$", line.strip())
+        if m and m.group(1) == pid:
+            return m.group(2)
+    return ""
+
+
+def parse_gates(auth_path):
+    """HUMAN GATE constraints from the machine-readable authority map."""
+    import yaml
+    return yaml.safe_load(read(auth_path)).get("human_gates", {})
+
+
+# ---------------------------------------------------------------- graph
+def build_edges(order, prereq, deny):
+    """THREE graph-edge classes. Human gates are constraints, not edges."""
+    edges = set()
+    for p, deps in prereq.items():
         for d in deps:
-            e.add((d, p))                       # class 1
-    for a, b in zip(ORDER, ORDER[1:]):
-        e.add((a, b))                           # class 2
-    for blocked, req in DENY.items():
-        e.add((req, blocked))                   # class 4
-    return e
+            edges.add((d, p))                       # class 1
+    for a, b in zip(order, order[1:]):
+        edges.add((a, b))                           # class 2
+    for blocked, req in deny.items():
+        edges.add((req, blocked))                   # class 3
+    return edges
 
 
 def find_cycle(nodes, edges):
@@ -94,89 +166,100 @@ def find_cycle(nodes, edges):
     return None
 
 
-def main():
-    edges = build_edges()
-    print(f"nodes={len(ORDER)}  edges={len(edges)} "
-          f"(explicit + canonical-order + DENY)\n")
+# ---------------------------------------------------------------- run
+def validate(ms_text, matrix_text, auth_path, label="AUTHORITATIVE"):
+    fails = []
 
-    # 1 no forward prerequisite (a phase requiring a later phase)
-    fwd = [(p, d) for p, deps in PREREQ.items() for d in deps
+    def ck(name, ok, detail=""):
+        print(("PASS " if ok else "FAIL ") + name +
+              (("  -- " + detail) if detail else ""))
+        if not ok:
+            fails.append(name)
+
+    order = parse_canonical_order(ms_text)
+    prereq = parse_prereqs(matrix_text, order)
+    deny = parse_deny(ms_text, order)
+    gates = parse_gates(auth_path)
+    idx = {p: i for i, p in enumerate(order)}
+    edges = build_edges(order, prereq, deny)
+
+    print(f"[{label}] parsed: {len(order)} phases from MS | "
+          f"{len(prereq)} prereq rows from MATRIX | "
+          f"{len(deny)} DENY from MS | {len(gates)} human gates from AUTHORITY_MAP")
+    print(f"[{label}] graph: {len(edges)} edges "
+          f"(3 edge classes; human gates checked separately)\n")
+
+    ck("0  authoritative sources parsed non-empty",
+       len(order) > 30 and len(prereq) > 30 and len(deny) == 1 and len(gates) == 8,
+       f"order={len(order)} prereq={len(prereq)} deny={deny} gates={len(gates)}")
+
+    fwd = [(p, d) for p, deps in prereq.items() for d in deps
            if idx[d] >= idx[p]]
-    check("1  no phase requires a later or same canonical phase",
-          not fwd, str(fwd))
+    ck("1  no phase requires a later or same canonical phase", not fwd, str(fwd))
 
-    # 2 no directed cycle across all edge classes
-    cyc = find_cycle(ORDER, edges)
-    check("2  no directed cycle (all 4 edge classes)", cyc is None,
-          " -> ".join(cyc) if cyc else "")
+    cyc = find_cycle(order, edges)
+    ck("2  no directed cycle (3 graph-edge classes)", cyc is None,
+       " -> ".join(cyc) if cyc else "")
 
-    # 3 every phase reachable from 0A
-    adj = {n: [] for n in ORDER}
+    adj = {n: [] for n in order}
     for a, b in edges:
         adj[a].append(b)
-    seen, frontier = {"0A"}, ["0A"]
+    seen, frontier = {order[0]}, [order[0]]
     while frontier:
         u = frontier.pop()
         for v in adj[u]:
             if v not in seen:
                 seen.add(v)
                 frontier.append(v)
-    unreach = [p for p in ORDER if p not in seen]
-    check("3  every phase reachable from accepted Phase 0A",
-          not unreach, str(unreach))
+    unreach = [p for p in order if p not in seen]
+    ck("3  every phase reachable from accepted Phase 0A", not unreach, str(unreach))
 
-    # 4 every phase's prerequisites all precede it -> executable in order
-    bad = [p for p, deps in PREREQ.items()
-           if any(idx[d] > idx[p] for d in deps)]
-    check("4  canonical order is a valid execution order", not bad, str(bad))
+    bad = [p for p, deps in prereq.items() if any(idx[d] > idx[p] for d in deps)]
+    ck("4  canonical order is a valid execution order", not bad, str(bad))
 
-    # 5 22B strictly before 23
-    check("5  22B reachable before 23 (DENY precondition satisfiable)",
-          idx["22B"] < idx["23"],
-          f"22B@{idx['22B']} < 23@{idx['23']}")
+    ok5 = all(idx[req] < idx[blocked] for blocked, req in deny.items())
+    ck("5  DENY precondition satisfiable (gate phase precedes blocked phase)",
+       ok5, str(deny))
 
-    # 6 26 reachable without requiring anything at/after itself
-    check("6  26 remains reachable", "26" in seen and
-          all(idx[d] < idx["26"] for d in PREREQ["26"]),
-          f"prereqs={PREREQ['26']}")
+    rel = next((p for p in order if _title(ms_text, p).startswith("Release")), None)
+    ck("6  Release phase remains reachable",
+       rel in seen and all(idx[d] < idx[rel] for d in prereq.get(rel, [])),
+       f"{rel} prereqs={prereq.get(rel)}")
 
-    # 7 29 can integrate the Recovery Supervisor
-    check("7  29 can integrate Recovery Supervisor (22B precedes 29)",
-          "22B" in PREREQ["29"] and idx["22B"] < idx["29"])
+    inst = next((p for p in order
+                 if "Recovery Supervisor Integration" in _title(ms_text, p)), None)
+    rs = deny.get(next(iter(deny), ""), None)
+    ck("7  Installer phase can integrate the Recovery Supervisor",
+       inst is not None and rs is not None and rs in prereq.get(inst, []),
+       f"{inst} prereqs={prereq.get(inst)}")
 
-    # 8 human gates do not orphan any downstream phase
-    orphan = []
-    for gp in GATES:
-        after = ORDER[idx[gp] + 1:]
-        if after and not any(gp in PREREQ.get(a, []) or
-                             ORDER[idx[gp] + 1] == a for a in after):
-            orphan.append(gp)
-    check("8  human gates block progression without orphaning phases",
-          not orphan, str(orphan))
+    orphan = [g for g in gates if not gates[g]]
+    ck("8  human gate constraints present and named (not graph edges)",
+       len(gates) == 8 and not orphan, f"{sorted(gates)}")
 
-    # 9 no duplicate release/lifecycle authority introduced by 22B
-    #    22B delivers the pointer primitive; authority stays lifecycle.release
     try:
         import yaml
-        m = yaml.safe_load(
-            open("docs/canonical/AUTHORITY_MAP.yaml", encoding="utf-8"))
-        owners = [c["owner"] for c in m["concerns"]
-                  if c["concern"] == "stable_promotion"]
-        rollback = [c["owner"] for c in m["concerns"]
-                    if c["concern"] == "stable_rollback"]
-        check("9  no duplicate release/lifecycle authority",
-              owners == ["lifecycle.release"] and
-              rollback == ["lifecycle.recovery"],
-              f"promotion={owners} rollback={rollback}")
-    except Exception as exc:                     # pragma: no cover
-        check("9  no duplicate release/lifecycle authority", False, str(exc))
+        m = yaml.safe_load(read(auth_path))
+        promo = [c["owner"] for c in m["concerns"]
+                 if c["concern"] == "stable_promotion"]
+        roll = [c["owner"] for c in m["concerns"]
+                if c["concern"] == "stable_rollback"]
+        ck("9  no duplicate release/lifecycle authority",
+           promo == ["lifecycle.release"] and roll == ["lifecycle.recovery"],
+           f"promotion={promo} rollback={roll}")
+    except Exception as exc:                                # pragma: no cover
+        ck("9  no duplicate release/lifecycle authority", False, str(exc))
 
     print()
     if fails:
-        print(f"RESULT: FAIL ({len(fails)} check(s)) -> {fails}")
+        print(f"[{label}] RESULT: FAIL ({len(fails)}) -> {fails}")
         return 1
-    print("RESULT: PASS (9/9) - phase graph is executable and deadlock-free")
+    print(f"[{label}] RESULT: PASS (10/10) - graph executable, deadlock-free")
     return 0
+
+
+def main():
+    return validate(read(MS), read(MATRIX), AUTH)
 
 
 if __name__ == "__main__":

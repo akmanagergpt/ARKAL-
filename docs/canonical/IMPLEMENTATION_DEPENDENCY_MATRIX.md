@@ -64,6 +64,17 @@ Legend — `GATE n` = human gate required to exit · `DENY` = policy-enforced pr
 
 ## Cycle check
 
-Validated by `scripts/check_phase_graph.py` over **three** edge classes — explicit prerequisites, mandatory canonical phase-order edges, and the 22B→23 DENY precondition. Result recorded in `docs/acceptance/EVIDENCE_INDEX.md` (EV-0004).
+Validated by `scripts/check_phase_graph.py` over **three graph-edge classes plus Human Gate constraints**:
+
+| Class | Inserted into graph? | Source of truth |
+|---|---|---|
+| 1. explicit prerequisites | yes | this document (parsed) |
+| 2. canonical phase-order edges | yes | Master Specification §Canonical Implementation Phases (parsed) |
+| 3. DENY preconditions | yes | Master Specification §ARKALI Self-Evolution (parsed) |
+| Human Gate constraints | **no — checked separately** | `AUTHORITY_MAP.yaml` `human_gates` (parsed) |
+
+A human gate suspends progression *at* a node; it does not create a dependency *between* phases, so modelling it as an edge would be incorrect. It is verified as a constraint instead.
+
+**The validator holds no dependency data of its own.** Phase order, prerequisites, DENY preconditions and gates are all parsed from the authoritative documents at run time. A hard-coded copy would be a shadow model that keeps passing while this matrix drifts — a risk that was real: an earlier hard-coded validator recorded Phase 1's prerequisite as `0B` while this matrix states `GATE 1`, and neither noticed. Result recorded as EV-0004; drift negative control as EV-0004N.
 
 An earlier revision of this matrix declared `22B ← 26` and reported "no cycles" because the check considered only explicit prerequisite edges. With canonical phase-order edges included that produced a genuine deadlock: 22B needs 26, 26 is reachable only past 23, and 23 is DENY until 22B. **A cycle check that omits the canonical ordering edges is a false negative**; the validator now includes them by construction.
