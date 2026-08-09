@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `c291ee44e90e77bad8ebae44b8296bd0e5b7c576` |
+| Current HEAD | `c91126912a193759fca38fcfc362936e1e9da2dc` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,7 +80,7 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (1232 passed, 13 skipped)
+backend/                                    pytest suite (1293 passed, 13 skipped)
 backend/tests/surfaces/                     Command Center API integration (T5)
 backend/tests/persistence/                  T11 persistence: real SQLite, WAL, durability, migrations
 backend/tests/structural/                   ARK-REQ-0012 confinement, ARK-REQ-0229 vertical-slice
@@ -91,7 +91,8 @@ backend/tests/governance/test_handoff_drift.py  handoff negative controls
 backend/tests/governance/test_dependency_rules.py  dependency-rule reconciliation (F-0028)
 backend/tests/state_machines/               12 machines + canonical reconciliation
 backend/tests/capability/                   C-13 schema + pre-activation behaviour
-backend/tests/evidence/                     C-14 artifact identity, provenance, boundaries
+backend/tests/evidence/                     C-14 artifact identity/provenance · C-15 chain,
+                                            integrity, supersession, boundaries
 frontend/tests/                             vitest component tier (23)
 frontend/tests/e2e/                         T10 Playwright journey (9), real Chromium
 scripts/run_command_center.py               binds the real app to a socket for T10
@@ -117,7 +118,7 @@ repository, the repository wins.
 | Phase 3 | **MACHINE-ACCEPTED** |
 | Phase 4 | **MACHINE-ACCEPTED** — superseding verdict, **RATIFIED** under GOV-001; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
 | Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
-| Phase 6 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Artifact / Evidence Plane. **Package 1 complete** (C-14: artifact descriptor, provenance, content addressing, immutability, migration `0003_artifact_provenance`). **Package 2 not started** (C-15 `evidence.audit`, Protected Core). No phase report, no traceability record, no gate run |
+| Phase 6 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Artifact / Evidence Plane. **Packages 1–2 complete**: C-14 artifact descriptor + provenance (`evidence.artifact`) and C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), migrations `0003` and `0004`. **Package 3 owed**: final integration, evidence, traceability, gate. No phase report, no traceability record, no gate run |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -126,7 +127,7 @@ repository, the repository wins.
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | every finding through **F-0032** is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over **69** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028) |
+| Architecture violations | **0** (8 gates PASS over **77** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
 | Security | one PDP · 14 operation classes · 5 TRUST tiers · 7 properties · 7 backends probed · Protected Core, Secret Vault and Local-Only boundaries enforced |
@@ -187,7 +188,9 @@ repository, the repository wins.
 | 47 | `3edc171` | **PHASE 5 MACHINE-ACCEPTED** — Package 5: real T10 browser journey, evidence records, traceability, phase report and the gate run. **Phase 6 unlocked.** F-0031 opened and closed |
 | 48 | `d9b8af4` | handoff manifest refreshed after Phase 5 acceptance (§12 rule) |
 | 49 | `346c074` | manifest pointed at the refresh commit (governed-clean ancestor rule) |
-| 50 | `c291ee4` | **PHASE 6 PACKAGE 1** — C-14 artifact descriptor + provenance under `evidence.artifact`. **Not a phase acceptance**; C-15 not implemented. F-0032 closed ← HEAD at generation |
+| 50 | `c291ee4` | **PHASE 6 PACKAGE 1** — C-14 artifact descriptor + provenance. F-0032 closed |
+| 51 | `efaaac7` | handoff manifest refreshed after Package 1 (§12 rule) |
+| 52 | `c911269` | **PHASE 6 PACKAGE 2** — C-15 append-only evidence integrity chain; the shared content-address primitive moved to `kernel.contracts`. **Not a phase acceptance** ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -268,67 +271,62 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Evidence Plane + Provenance + Artifact Store** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 6) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED**. Package 1 done, Package 2 owed |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED**. Packages 1–2 done, Package 3 owed |
 | Prerequisites | Phase **5** (MACHINE-ACCEPTED) |
 | ARK-REQ IDs | **3** MANDATORY — 0004, 0057, 0349; all owned by `evidence.artifact` |
-| Contract IDs | **C-14** (`evidence.artifact`) — delivered by Package 1 · **C-15** (`evidence.audit`, **Protected Core**) — Package 2, not started |
+| Contract IDs | **C-14** (`evidence.artifact`) and **C-15** (`evidence.audit`, **Protected Core**) — both delivered |
 | Human gate | none (matrix Gate column `—`) |
-| Verification profile | **PROTECTED_CORE will apply** once Package 2 touches `evidence.audit`; `select_profile` derives it from the changed paths. It has **not** been run or claimed |
+| Verification profile | **PROTECTED_CORE applies.** `select_profile` derives it from the changed paths — members `control.architecture` and `evidence.audit`. All three categories ran at exit 0 for Package 2 and must be re-run for the phase report |
 | Test tiers | no new tier begins at Phase 6. `prov` (provenance) is an *evidence kind* in the register, not a numbered tier |
 
-**Delivered by Package 1.** `docs/contracts/artifact.md`; `evidence.artifact` with
-content addressing, artifact/provenance/parent records, immutability by ORM
-refusal, a PEP-governed blob store, and `revision_link.py` resolving a C-12
-`provenance_ref` one-way. Migration `0003_artifact_provenance`. C-12 unchanged.
+**Delivered.** `docs/contracts/artifact.md` and `docs/contracts/audit_record.md`;
+`evidence.artifact` (content addressing, descriptor, provenance, parent edges,
+PEP-governed blob store, one-way C-12 linkage) and `evidence.audit` (append-only
+hash chain, recomputed verification, supersession, orphan refusal). Migrations
+`0003_artifact_provenance` and `0004_audit_record`.
 
-**Owed by Package 2.** `docs/contracts/audit_record.md` and `evidence.audit`: the
-append-only chain, sole write authority (`VERIFICATION_ARCHITECTURE.md` §2.2
-rule 7), and the `supersedes` edge rule 1 requires. Then the phase report,
-`phase_6_traceability.json` and `python scripts/run_phase_gate.py 6 7`.
+**The two evidence contexts share a mechanism, not an authority.** The
+content-address primitive lives in `kernel.contracts` so both rank-2 siblings can
+reach it legally; `allow_same_layer` stays false and no exemption was widened.
+Artifact linkage is the persisted foreign key, not a sibling import.
 
-**Nothing is discharged.** `ARK-REQ-0004`, `ARK-REQ-0057` and `ARK-REQ-0349` are
-implemented in part and proven at package level; cumulative verified stays at
-**72** until the gate returns a verdict.
+**Owed by Package 3.** Integration evidence, `phase_6_traceability.json` (C-15
+must be mapped explicitly to `ARK-REQ-0004` — it has no register row of its own),
+`phase_6_report.json`, and `python scripts/run_phase_gate.py 6 7`.
+
+**Nothing is discharged.** Cumulative verified stays at **72**.
 
 ## 9. Next exact action
 
-**Phase 6 Atomic Package 2 — C-15 Audit / Evidence Integrity Chain.** Do not
-re-derive the whole phase; the scope is settled and recorded in §8. Do not
-rebuild Package 1.
+**Phase 6 Atomic Package 3 — Final Integration + Evidence + Traceability +
+Phase Acceptance.** Do not re-derive the phase; §8 records the settled scope. Do
+not rebuild Packages 1–2.
 
-**What Package 2 must respect.**
+1. **Integration evidence** for the Evidence Plane as a whole (`ARK-REQ-0004`):
+   an artifact registered through C-14 and evidenced through C-15, end to end.
+2. **`docs/acceptance/phase_6_traceability.json`** — three claims. C-15 has no
+   register row of its own, so map it explicitly to `ARK-REQ-0004` or the audit
+   half discharges nothing. C6 refuses any SATISFIED claim without a named
+   implementation *and* a named evidence source.
+3. **`docs/acceptance/phase_6_report.json`** (C-17, 17 fields) carrying the three
+   Protected Core categories as real executions.
+4. **`python scripts/run_phase_gate.py 6 7`** — record acceptance only on a
+   genuine `PHASE_ACCEPTED_BY_MACHINE`, and only *after* the verdict, since
+   recording it makes any re-run a GOV-001 re-score.
 
-* `evidence.audit` is **Protected Core**, so the stronger verification profile
-  applies to the phase — security review, adversarial review and full
-  regression, each a real execution at exit 0. It has not been run.
-* `VERIFICATION_ARCHITECTURE.md` §2.2 rule 7: `evidence.audit` owns the chain and
-  **no other context may write or amend an evidence record**. A control already
-  asserts `evidence.artifact` builds no chain of its own; keep it that way.
-* Rule 1: evidence is **append-only**; a superseded result is retained under a
-  `supersedes` edge, never edited or deleted.
-* `artifact_provenance.evidence` already holds *references*, so joining the two
-  is reference resolution, not a schema change to C-14.
-* `evidence.artifact` and `evidence.audit` are siblings at layer rank 2. Edges
-  *into* `evidence.*` are permitted from any layer; edges out to rank ≥ 2 are
-  not — `evidence.artifact → acceptance.engine` is refused.
-* Evidence-graph computation, coverage and verdicts are **Phase 13** (C-16), not
-  this phase.
+**Controls added in Packages 1–2 that must not be weakened.** All mutation-tested:
+`test_artifact_authority.py` (one identity authority, no shadow chain, no second
+persistence authority, no Stable mutation path, contract/schema reconciliation,
+dependency direction) and `test_evidence_authority.py` (sole chain writer, no
+artifact-identity minting in `evidence.audit`, no same-layer sibling import, no
+amend/delete escape, no stored verification flag, every column in the digest).
+`test_live_repository_uses_no_exempt_edge` is the F-0028 vacuity guard — if a
+later package makes it fail, change the design, not the control.
 
-**Controls added in Package 1 that must not be weakened.** All mutation-tested:
-`backend/tests/structural/test_artifact_authority.py` (one identity authority, no
-shadow audit chain, no second persistence authority, no Stable mutation path,
-contract/schema reconciliation, dependency direction) and
-`backend/tests/evidence/` (content addressing, immutability, secret sink,
-linkage).
-
-**Then, and only then:** `phase_6_report.json`,
-`docs/acceptance/phase_6_traceability.json`, and
-`python scripts/run_phase_gate.py 6 7`. C6 discharges nothing that traceability
-does not claim SATISFIED with a named implementation and a named evidence source.
-
-Do not begin Phase 7. Do not activate the Capability Graph (Phase 9B). Do not
-implement the Recovery Supervisor, Stable Core promotion, release manifests or
-evidence-graph coverage.
+Do not begin Phase 7. Do not implement Phase 13 evidence-graph computation,
+coverage or verdicts (C-16), the Acceptance Engine, provider runtime, Capability
+Graph activation, durable jobs, the Recovery Supervisor, Stable Core promotion or
+release/SBOM.
 
 ## 10. New-session bootstrap protocol
 
@@ -352,8 +350,9 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `c291ee44e90e77bad8ebae44b8296bd0e5b7c576` |
-| Generated after | **Phase 6 Atomic Package 1 (C-14)** — the artifact descriptor and provenance foundation under `evidence.artifact`. `BUILD_STATE.md`, `KNOWN_FAILURES.md` and `OPEN_BLOCKERS.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. Identity is the content address and is derived from the bytes, never supplied; artifacts and provenance are immutable by ORM refusal; a tampered blob is detected and never repaired; blob writes are PEP-governed under `WRITE_WORKSPACE_FILE`. **C-12 was not touched** — a 71-character address fits its existing column, and the rank 1 → rank 2 import ban still holds. A real architecture budget was hit (kernel error fan-in 16 > 15) and answered by decomposition per ADR-0008, not by an exception. **F-0032 opened and closed**: three tests transcribed the migration-chain head and expired when the chain advanced — proven stale before being touched, then repaired by deriving the head. Ninth instance of that family. **C-15 is not implemented and the Protected Core profile has NOT been run or claimed.** No requirement is discharged; Phase 6 is IN PROGRESS, NOT ACCEPTED; Phase 7 LOCKED; Phase 5 remains MACHINE-ACCEPTED |
+| Generated at HEAD | `c91126912a193759fca38fcfc362936e1e9da2dc` |
+| Generated after | **Phase 6 Atomic Package 2 (C-15)** — the append-only audit / evidence integrity chain under `evidence.audit` (Protected Core). `BUILD_STATE.md` and `DECISION_LOG.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. The chain is a real hash chain whose digest covers its predecessor; `verify()` recomputes and there is no stored flag to trust. Update *and* delete are refused; supersession appends and preserves. **The package turned on an architectural repair**: the first shape imported `evidence.artifact` across the layer, which `test_live_repository_uses_no_exempt_edge` caught — the exemption it leaned on is about *writing* evidence, not reading a sibling. The exemption was left alone and the content-address mechanism moved to `kernel.contracts` (the Phase 3 shape: mechanism in the kernel, authority with the context), while artifact linkage became the persisted foreign key. 8 gates PASS over 77 edges with `allow_same_layer` still false. Classified **PROTECTED_CORE** by `select_profile` (members `control.architecture`, `evidence.audit`); security review, adversarial review and full regression all ran at exit 0. Five structural controls mutation-tested. **No requirement is discharged**; Phase 6 IN PROGRESS, NOT ACCEPTED; Phase 7 LOCKED |
+| Previously generated after | **Phase 6 Atomic Package 1 (C-14)** — the artifact descriptor and provenance foundation under `evidence.artifact`. `BUILD_STATE.md`, `KNOWN_FAILURES.md` and `OPEN_BLOCKERS.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. Identity is the content address and is derived from the bytes, never supplied; artifacts and provenance are immutable by ORM refusal; a tampered blob is detected and never repaired; blob writes are PEP-governed under `WRITE_WORKSPACE_FILE`. **C-12 was not touched** — a 71-character address fits its existing column, and the rank 1 → rank 2 import ban still holds. A real architecture budget was hit (kernel error fan-in 16 > 15) and answered by decomposition per ADR-0008, not by an exception. **F-0032 opened and closed**: three tests transcribed the migration-chain head and expired when the chain advanced — proven stale before being touched, then repaired by deriving the head. Ninth instance of that family. **C-15 is not implemented and the Protected Core profile has NOT been run or claimed.** No requirement is discharged; Phase 6 is IN PROGRESS, NOT ACCEPTED; Phase 7 LOCKED; Phase 5 remains MACHINE-ACCEPTED |
 | Previously generated after | **PHASE 5 MACHINE ACCEPTANCE** — Atomic Package 5: the real T10 browser journey, the evidence records, `phase_5_traceability.json`, `phase_5_report.json` and the gate run, which returned `PHASE_ACCEPTED_BY_MACHINE` with C1–C6 PASS and PROTECTED_CORE COMPLETE. **Both acceptance guards were proved able to fail** before the verdict was recorded: setting one traceability claim to DEFERRED yields `PHASE_BLOCKED` on C6, and removing the adversarial-review run yields `PHASE_BLOCKED` on PROTECTED_CORE. Phase 5 is accepted and Phase 6 is unlocked; cumulative verified rises 65 → **72**. **F-0031** was opened and closed: two re-scoring controls named Phase 5 as their example of an unaccepted phase and expired on its acceptance — proven mechanically to be a stale subject rather than a defect, since the same path still returns NOT_APPLICABLE for phase 6, and repaired by deriving the subject from `GovernanceState`. Eighth instance of the phase-scoped-check family. `EVIDENCE_INDEX.md`'s deliberately-absent table was also repaired: rows Phase 5 made false are moved to a superseded table rather than deleted. Phase 4 remains MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 4 (complete)** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. `BUILD_STATE.md` and `DECISION_LOG.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. React/TypeScript/Vite/Tailwind now actually run: `npm ci` from the tracked lockfile, the Vitest tier added through real npm tooling, typecheck clean, 23 component tests green, production build succeeds. One backend contract was added — `GET /api/lifecycle/project` publishes the machine's state *vocabulary* and deliberately not its transition relation — for a demonstrated defect, recorded in `DECISION_LOG.md` and tested in both directions. **`ARK-REQ-0009`, `ARK-REQ-0178` and `ARK-REQ-0229` are implemented and controlled but NOT discharged**, and their `e2e` obligation is **unmet**: **T10 = NOT_CONFIGURED**, no browser ran, and the jsdom tests are not a substitute. Every new control was mutation-tested; the first linkage check did not fail its mutation and was repaired before being believed. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 4 (partial)** — the Command Center API under `surfaces.command`, backend half only.  `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The package was stopped at a green, internally consistent checkpoint rather than rushed; **the frontend is not built and ARK-REQ-0009/0178/0229 are not satisfied**. A Phase 4 tripwire fired as designed when the first execution surface appeared and was replaced by the obligation it named — see `DECISION_LOG.md`; not a finding, because nothing was defective. **No requirement is discharged.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
@@ -409,7 +408,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: c291ee44e90e77bad8ebae44b8296bd0e5b7c576
+head: c91126912a193759fca38fcfc362936e1e9da2dc
 branch: main
 working_tree_clean: true
 
