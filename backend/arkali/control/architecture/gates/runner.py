@@ -26,7 +26,7 @@ from arkali.control.architecture.gates.structure_gates import (
     ForbiddenDependencyDirectionGate,
     ProtectedCoreBoundaryGate,
 )
-from arkali.kernel.contracts.errors import GovernanceStateError
+from arkali.control.architecture.refusal import refuse_governance_state
 from arkali.kernel.contracts.results import CheckResult, HonestState
 
 GATE_IMPLEMENTATIONS: tuple[type[ArchitectureGate], ...] = (
@@ -60,12 +60,12 @@ class GateRunner:
         missing = sorted(declared - implemented)
         extra = sorted(implemented - declared)
         if missing:
-            raise GovernanceStateError(
+            raise refuse_governance_state(
                 f"architecture gates declared but not implemented: {missing}",
                 source=self._ctx.authority_map.source_path,
             )
         if extra:
-            raise GovernanceStateError(
+            raise refuse_governance_state(
                 f"architecture gates implemented but not declared: {extra}",
                 source=self._ctx.authority_map.source_path,
             )

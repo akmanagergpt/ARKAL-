@@ -10,6 +10,7 @@ quietly become false when a surface does appear.
 
 from __future__ import annotations
 
+import ast
 import pathlib
 
 import pytest
@@ -165,9 +166,47 @@ class TestIsolationFailureBlocksExecution:
         assert record.decision is Decision.AUTO
 
 
-#: Execution surfaces the canonical set names, and which are still unbuilt.
-#: `surfaces.command` arrived at Phase 5 Package 4; the rest do not exist.
-UNBUILT_SURFACE_PARTS = ("sandbox", "scheduler", "durable", "workflow", "operations")
+#: Execution-plane package roots the canonical set names. Which of these are
+#: built is DERIVED below, never listed: `surfaces.command` arrived at Phase 5
+#: Package 4 and `execution.durable` at Phase 7 Package 1, and the next one will
+#: not need this line edited.
+EXECUTION_PACKAGE_PARTS = ("sandbox", "scheduler", "durable", "workflow", "operations")
+
+#: A package counts as built when it holds a module that is neither a package
+#: marker nor a state-machine declaration. A machine is a declaration of a
+#: relation; it performs no governed operation and needs no PEP.
+def _package_modules(root: pathlib.Path, part: str) -> list[pathlib.Path]:
+    return sorted(
+        p for p in root.rglob("*.py")
+        if p.name != "__init__.py"
+        and part in p.parts
+        and "state_machine" not in p.name
+    )
+
+
+#: The PEP's decision methods. "Under a real PEP" means one of these is CALLED
+#: ON A PEP - naming the class proves nothing, because a module can import a type
+#: and never ask it anything.
+#:
+#: Two mutation rounds shaped this. A name-only substring check could not be
+#: defeated by any single edit, which is what a check measuring the wrong thing
+#: looks like. Then matching the method name alone matched
+#: `self._machine.evaluate(...)`, because `evaluate` belongs to the state machine
+#: too - so the RECEIVER is checked as well.
+PEP_DECISION_CALLS = ("require_auto", "enforce", "evaluate")
+
+
+def _takes_a_policy_decision(path: pathlib.Path) -> bool:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            continue
+        if node.func.attr not in PEP_DECISION_CALLS:
+            continue
+        receiver = ast.unparse(node.func.value).lower()
+        if "pep" in receiver:
+            return True
+    return False
 
 
 class TestSurfaceCoverageIsHonest:
@@ -201,20 +240,84 @@ class TestSurfaceCoverageIsHonest:
             f"PolicyEnforcementPoint: {[p.name for p in modules]}"
         )
 
-    def test_surfaces_not_yet_built_are_still_absent(self) -> None:
-        """If this fails, a new surface appeared and needs its own PEP coverage."""
+    def test_every_built_execution_package_enforces_and_the_rest_are_absent(
+        self,
+    ) -> None:
+        """The obligation the predecessor pointed at, made executable.
+
+        `execution.durable` arrived at Phase 7 Package 1 and the absence
+        assertion fired exactly as designed, naming what to do about it. It is
+        replaced here rather than deleted, and the replacement is **stronger**:
+        the predecessor could only say "nothing exists", and would have gone
+        quiet forever the moment something did. This says "everything built
+        enforces, and what is not built is still absent" — which still fails for
+        an unenforced package, and keeps failing for every package added later.
+        """
         root = REPO / "backend" / "arkali"
-        found = sorted(
-            p.relative_to(REPO).as_posix()
-            for p in root.rglob("*.py")
-            if p.name != "__init__.py"
-            and any(part in p.parts for part in UNBUILT_SURFACE_PARTS)
-            and "state_machine" not in p.name
+        built: dict[str, list[pathlib.Path]] = {}
+        absent: list[str] = []
+        for part in EXECUTION_PACKAGE_PARTS:
+            found = _package_modules(root, part)
+            if found:
+                built[part] = found
+            else:
+                absent.append(part)
+
+        assert built, "no execution package is built; this control would be vacuous"
+        for part, paths in built.items():
+            enforcing = [p for p in paths if _takes_a_policy_decision(p)]
+            assert enforcing, (
+                f"execution package {part!r} exists but no module in it takes a "
+                "policy decision; it must be brought under a real PEP with "
+                f"runtime evidence: {[p.name for p in paths]}"
+            )
+
+        # What is still unbuilt stays honestly unbuilt: no phase may imply
+        # coverage of a package that does not exist.
+        for part in absent:
+            assert _package_modules(root, part) == [], part
+
+    def test_a_governed_package_without_a_decision_would_be_detected(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """NEGATIVE CONTROL: the sweep above is not vacuous.
+
+        A package whose modules take no policy decision must fail the same test,
+        proved on a fixture tree rather than by trusting the live one.
+        """
+        root = tmp_path / "arkali"
+        (root / "execution" / "durable").mkdir(parents=True)
+        (root / "execution" / "durable" / "job_store.py").write_text(
+            "def submit() -> None:\n    ...\n", encoding="utf-8"
         )
-        assert found == [], (
-            "an execution surface now exists and must be brought under a real "
-            f"PEP with runtime evidence: {found}"
+        found = _package_modules(root, "durable")
+        assert found, "the fixture produced no module"
+        assert [p for p in found if _takes_a_policy_decision(p)] == [], (
+            "the fixture module takes no decision, so the live assertion above "
+            "would fail for it"
         )
+
+    def test_naming_the_type_without_asking_it_anything_is_not_enforcement(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """NEGATIVE CONTROL: importing a PEP is not the same as consulting one."""
+        root = tmp_path / "arkali"
+        (root / "execution" / "durable").mkdir(parents=True)
+        (root / "execution" / "durable" / "job_store.py").write_text(
+            "from arkali.control.policy.pep import PolicyEnforcementPoint\n"
+            "class JobStore:\n"
+            "    def __init__(self, pep: PolicyEnforcementPoint) -> None:\n"
+            "        self._pep = pep\n",
+            encoding="utf-8",
+        )
+        found = _package_modules(root, "durable")
+        assert found
+        assert [p for p in found if _takes_a_policy_decision(p)] == []
+
+    def test_the_durable_runtime_really_does_take_a_decision(self) -> None:
+        """The live package satisfies the obligation, asserted directly."""
+        store = REPO / "backend/arkali/execution/durable/job_store.py"
+        assert _takes_a_policy_decision(store)
 
     def test_bypass_resistance_is_claimed_only_at_contract_level(self) -> None:
         """Documents the boundary of the Phase 4 claim, in executable form."""

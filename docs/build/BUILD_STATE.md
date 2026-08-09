@@ -1,6 +1,14 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 6 MACHINE-ACCEPTED. PHASE 7 UNLOCKED — NOT_STARTED.**
+**Current state:** **PHASE 6 MACHINE-ACCEPTED. PHASE 7 UNLOCKED — IN PROGRESS, NOT ACCEPTED.**
+
+**Phase 7 Package 1 (C-19 persistence foundation).** `execution.durable` now holds the durable job record, its idempotency identity and the checkpoint record, with migration `0005_durable_job`. Two identities, one store: `job_id` is the primary key and (`job_type`, `idempotency_key`) is a named unique constraint, so a repeated submission resolves to the existing job across an engine dispose/reopen and cannot create a second one. Checkpoint ordering *is* identity — the primary key is (`job_id`, `sequence`) — and checkpoints refuse both update and delete. The canonical `Job` machine delivered in Phase 3 remains the sole transition authority; the store writes no state literal and no transition table, asserted structurally. Every governed operation passes an injected PEP under `READ_FILE`/`WRITE_WORKSPACE_FILE`, and a real PDP loaded from a denying authority map proves a refusal prevents the write. The clock is injected, so no test sleeps.
+
+**The Phase 4 durable-surface tripwire fired as designed and was replaced, not weakened.** `test_surfaces_not_yet_built_are_still_absent` asserted no module existed under `execution/durable`; the first real module made it fail, naming its own obligation — "must be brought under a real PEP with runtime evidence". That obligation is now met, and the assertion is replaced by a stronger live control that derives which execution packages are built and requires each of them to consult a PEP, so it keeps failing for every unenforced package added later instead of going quiet. Same precedent as Phase 5 Package 4; not a finding, because nothing was defective.
+
+**The Package 1 change set is PROTECTED_CORE** by `select_profile` from its own paths — member `control.architecture`, because completing the `refusal.py` decomposition that the kernel error fan-in budget demanded touches `authority_map.py` and `gates/runner.py`. All three canonical categories were executed at exit 0: *security review* (188), *adversarial review* (479 plus both negative-control validators) and *full regression* (1404 passed, 13 skipped).
+
+**No Phase 7 requirement is discharged.** ARK-REQ-0003, 0027, 0059, 0060 and 0061 remain open; there is no Phase 7 report, no traceability record and no gate run. Cumulative verified stays at **75**. Packages 2–5 are owed.
 
 Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic packages and accepted on its **first** gate submission: verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, recorded in `docs/acceptance/phase_6_report.json` and `docs/acceptance/phase_6_traceability.json`. C1–C6 PASS; PROTECTED_CORE **COMPLETE**; RESCORING NOT_APPLICABLE (no prior acceptance record); FINDINGS, PREREQ and all eight architecture gates PASS; HUMAN_GATE NOT_APPLICABLE — the matrix Gate column for Phase 6 is empty, and `evidence.audit` being Protected Core does not invent one. **Re-running the gate for Phase 6 now returns `AWAITING_RESCORING_AUTHORITY`; that is GOV-001 working, not a regression.**
 
@@ -21,7 +29,7 @@ Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic package
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 6 Atomic Package 3 (final integration, evidence, traceability and machine acceptance)
+**Last updated by:** Phase 7 Atomic Package 1 (C-19 durable-job persistence foundation)
 **Governance errata and rulings:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) · **ERR-004** (confirms F-0024, orders remediation) · **GOV-001** (superseding re-acceptance rule; ratifies the Phase 4 re-acceptance) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -39,7 +47,7 @@ Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic package
 | 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED** (re-accepted after the ERR-004 remediation; the defective first revision is retained as evidence) |
 | 5 | Persistence + Project Registry + Minimal Backup/Restore | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`; C1–C6 PASS, PROTECTED_CORE COMPLETE. Five atomic packages; 7/7 requirements SATISFIED and discharged under C6. First real T10: 9 browser tests in Chromium against the production build, a live API and a real SQLite file) |
 | 6 | Artifact / Evidence Plane (C-14, C-15) | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE` on first submission; C1–C6 PASS, PROTECTED_CORE COMPLETE over members `acceptance.engine`, `control.architecture`, `evidence.audit`. Three atomic packages; 3/3 requirements SATISFIED and discharged under C6. Migrations `0003_artifact_provenance` and `0004_audit_record`) |
-| 7 | Durable Job + Workflow Core (C-19) | **UNLOCKED — NOT_STARTED** ← next work. Both prerequisites, Phases 5 and 6, are accepted; the matrix Gate column for Phase 7 is empty, so no human gate applies. *(This is the exact wording that F-0034 mis-read as accepting Phase 7 itself. It is written plainly again because the parser now reads the declared state and ignores prose — this row is the live proof.)* |
+| 7 | Durable Job + Workflow Core (C-19) | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Package 1 complete: the C-19 durable-job persistence foundation under `execution.durable`, migration `0005_durable_job`. Packages 2–5 owed. Both prerequisites, Phases 5 and 6, are accepted; the matrix Gate column for Phase 7 is empty, so no human gate applies. *(This cell's prose is the exact wording F-0034 mis-read as accepting the phase; it is written plainly because the parser now reads the declared state and ignores prose — this row is the live proof.)* |
 | 8 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
@@ -108,6 +116,12 @@ Refresh means re-derive from the repository, never hand-edit to match a
 recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
+
+**Phase 7 Atomic Package 2 — durability semantics.** Heartbeat/lease, bounded retries, timeout, cancel, dead-letter and idempotent execution, on the Package 1 foundation. These belong together: retries without a bound, or a cancel without a terminal path, is a partial state machine. Keep using the canonical `Job` machine, the injected PEP and the injected clock; do not add a scheduler.
+
+Still owed after that: **Package 3** pause/resume + crash recovery (they share `RESUMING`, so they ship together, and the job-type registry that `ARK-REQ-0060`'s applicability rule reads belongs here); **Package 4** the enqueue surface for `ARK-REQ-0027`, a backend route in `surfaces.command` only — API constructs are confined there by structure check 12 and no frontend is owed; **Package 5** integration and fault-injection evidence, traceability, report and the gate.
+
+*(superseded guidance retained for continuity)*
 
 **Begin Phase 7 — Durable Job + Workflow Core (C-19).** Phase 7 is unlocked and not started; the matrix records prerequisites 5 and 6, both accepted, and no human gate.
 

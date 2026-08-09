@@ -16,7 +16,7 @@ from typing import Any, Final, Self
 import yaml
 from pydantic import BaseModel, ConfigDict
 
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
+from arkali.control.architecture.refusal import refuse
 
 AUTHORITY_MAP_RELPATH = "docs/canonical/AUTHORITY_MAP.yaml"
 
@@ -85,17 +85,17 @@ class AuthorityMap(BaseModel):
     def load(cls, repo_root: pathlib.Path) -> Self:
         path = repo_root / AUTHORITY_MAP_RELPATH
         if not path.is_file():
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "authority map not found", source=str(path)
             )
         try:
             raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         except yaml.YAMLError as exc:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"authority map is not parseable YAML: {exc}", source=str(path)
             ) from exc
         if not isinstance(raw, dict):
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "authority map root is not a mapping", source=str(path)
             )
         return cls._from_raw(raw, path)
@@ -105,7 +105,7 @@ class AuthorityMap(BaseModel):
         for key in ("layers", "contexts", "concerns", "architecture_budgets",
                     "architecture_gates", "human_gates"):
             if key not in raw:
-                raise AuthoritativeSourceError(
+                raise refuse(
                     f"authority map missing required section {key!r}", source=str(path)
                 )
         try:
@@ -120,13 +120,13 @@ class AuthorityMap(BaseModel):
                 for e in raw.get("allowed_sibling_edges", [])
             )
         except (KeyError, TypeError, ValueError) as exc:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"authority map is malformed: {exc}", source=str(path)
             ) from exc
 
         unknown = sorted({c.layer for c in contexts.values()} - set(ranks))
         if unknown:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"contexts reference undeclared layers: {unknown}", source=str(path)
             )
         return cls(
@@ -153,7 +153,7 @@ class AuthorityMap(BaseModel):
     def rank_of(self, context_name: str) -> int:
         context = self.contexts.get(context_name)
         if context is None:
-            raise AuthoritativeSourceError(f"unknown context {context_name!r}")
+            raise refuse(f"unknown context {context_name!r}")
         return self.layer_ranks[context.layer]
 
     @staticmethod
@@ -195,7 +195,7 @@ class AuthorityMap(BaseModel):
                 continue
             resolved = self._contexts_for_subject(subject)
             if not resolved:
-                raise AuthoritativeSourceError(
+                raise refuse(
                     f"dependency rule {key!r} is enabled but its subject "
                     f"{subject!r} matches no context, namespace or layer",
                     source=self.source_path,
