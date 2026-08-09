@@ -527,11 +527,12 @@ verified_by_phase:
   "4": 33
   "5": 7
   "6": 3
-cumulative_verified: 75
+  "7": 5
+cumulative_verified: 80
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6"]
-unlocked_phase: "7"
-next_exact_action_phase: "7"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7"]
+unlocked_phase: "8"
+next_exact_action_phase: "8"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9

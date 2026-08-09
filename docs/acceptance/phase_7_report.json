@@ -1,0 +1,178 @@
+{
+ "phase_id": "7",
+ "objective": "Durable Job + Workflow Core (C-19), delivered as five atomic packages: the durable-job persistence foundation with two identities in one store and checkpoint ordering as identity; the durability semantics (execution attempts with ownership and heartbeat, row-derived retry accounting against a bound recorded on the job, an absolute per-attempt deadline, cancellation and dead-lettering); the job-type contract registry that makes ARK-REQ-0060's applicability rule mechanically evaluable, plus pause/resume and the crash-recovery sweep, both converging on the canonical RESUMING state because the Job relation gives it exactly two predecessors; the ARK-REQ-0027 enqueue surface under surfaces.command, where an HTTP request persists durable work and returns a reference without executing it; and this final integration, fault-injection evidence, traceability and acceptance submission. The canonical Job state machine delivered at Phase 3 remained the sole lifecycle authority throughout and nothing was added to it: RUNNING -> RECOVERABLE is not a declared edge, so crash recovery travels RUNNING -> FAILED -> RECOVERABLE -> RESUMING, which is the disposition Package 2 already owned. No scheduler, worker, workflow or provider functionality was implemented - C-21 is Phase 8 and C-20 is Phase 17.",
+ "ark_req_ids_closed": [
+  "ARK-REQ-0003",
+  "ARK-REQ-0027",
+  "ARK-REQ-0059",
+  "ARK-REQ-0060",
+  "ARK-REQ-0061"
+ ],
+ "files_created": [
+  "backend/alembic/versions/0005_durable_job.py",
+  "backend/alembic/versions/0006_durable_execution.py",
+  "backend/alembic/versions/0007_job_type_registry.py",
+  "backend/arkali/execution/durable/errors.py",
+  "backend/arkali/execution/durable/execution.py",
+  "backend/arkali/execution/durable/job_store.py",
+  "backend/arkali/execution/durable/job_type.py",
+  "backend/arkali/execution/durable/records.py",
+  "backend/arkali/execution/durable/recovery.py",
+  "backend/arkali/surfaces/command/job_error_mapping.py",
+  "backend/arkali/surfaces/command/jobs.py",
+  "backend/tests/execution/__init__.py",
+  "backend/tests/execution/durable_harness.py",
+  "backend/tests/execution/phase_7_harness.py",
+  "backend/tests/execution/test_durable_execution.py",
+  "backend/tests/execution/test_durable_execution_lifecycle.py",
+  "backend/tests/execution/test_durable_job_store.py",
+  "backend/tests/execution/test_durable_job_type.py",
+  "backend/tests/execution/test_durable_pause_resume.py",
+  "backend/tests/execution/test_durable_recovery.py",
+  "backend/tests/execution/test_durable_recovery_restart.py",
+  "backend/tests/execution/test_phase_7_applicability.py",
+  "backend/tests/execution/test_phase_7_fault_injection.py",
+  "backend/tests/execution/test_phase_7_journey.py",
+  "backend/tests/structural/durable_reader.py",
+  "backend/tests/structural/test_durable_authority.py",
+  "backend/tests/structural/test_durable_governed_operations.py",
+  "backend/tests/structural/test_durable_recovery_authority.py",
+  "backend/tests/structural/test_enqueue_surface_authority.py",
+  "backend/tests/surfaces/test_command_jobs_api.py",
+  "docs/acceptance/phase_7_report.json",
+  "docs/acceptance/phase_7_traceability.json",
+  "docs/contracts/job.md"
+ ],
+ "files_modified": [
+  "ARKALI_HANDOFF.md",
+  "backend/alembic/env.py",
+  "backend/arkali/control/architecture/authority_map.py",
+  "backend/arkali/control/architecture/gates/runner.py",
+  "backend/arkali/control/architecture/refusal.py",
+  "backend/arkali/execution/durable/job_state_machine.py",
+  "backend/arkali/surfaces/command/app.py",
+  "backend/arkali/surfaces/command/contracts.py",
+  "backend/arkali/surfaces/command/error_mapping.py",
+  "backend/tests/security/test_pep_and_bypass.py",
+  "backend/tests/structural/test_contract_drift.py",
+  "docs/acceptance/EVIDENCE_INDEX.md",
+  "docs/build/BUILD_STATE.md",
+  "docs/build/DECISION_LOG.md",
+  "docs/build/KNOWN_FAILURES.md",
+  "docs/build/OPEN_BLOCKERS.md",
+  "docs/build/PHASE_HISTORY.md"
+ ],
+ "public_contracts": [
+  "C-19 durable job record + checkpoint - docs/contracts/job.md. Records: durable_job (job_id PK, job_type, idempotency_key, lifecycle_state, payload JSON, max_attempts, attempt_timeout_seconds, heartbeat_timeout_seconds, created_at, updated_at; unique (job_type, idempotency_key) named uq_durable_job_idempotency), job_checkpoint (job_id PK/FK, sequence PK, payload JSON, recorded_at; update and delete both refused at the ORM), job_execution_attempt (job_id PK/FK, attempt PK, owner, started_at, heartbeat_at, deadline_at, ended_at, outcome, detail), durable_job_type (job_type PK, supports_pause, registered_at). Public authority: JobStore (get/require/find_submitted/checkpoints/next_checkpoint_sequence/submit/transition/checkpoint), JobExecution (attempts/attempt_count/current_attempt/retry_permitted/timed_out/begin_attempt/heartbeat/complete_attempt/fail_attempt/time_out/cancel), JobTypeRegistry (get/require/supports_pause/declared/declare), JobRecovery (pause/resume/heartbeat_stale/recover_lost_executions). lifecycle_state is a recorded value; the canonical Job machine is the only transition authority.",
+  "arkali.surfaces.command.jobs - the ARK-REQ-0027 enqueue surface. POST /api/jobs (EnqueueJobRequest -> 202 JobReferenceResponse) persists durable work through C-19 and returns; GET /api/jobs/{job_id} resolves a reference. The response carries job_id, job_type, idempotency_key, lifecycle_state and created_at and nothing executional. Both routes declare the backend-only audience; no frontend obligation exists because no Phase 7 requirement is owned by a surface context.",
+  "arkali.surfaces.command.contracts.TransportModel - the base that normalises every datetime crossing this boundary to UTC-aware, so one persisted instant has one wire representation whether or not the row is still in the session (F-0038)."
+ ],
+ "migrations": [
+  "0005_durable_job",
+  "0006_durable_execution",
+  "0007_job_type_registry"
+ ],
+ "state_machine_capability_changes": "NONE. The canonical Job machine delivered at Phase 3 was read before each package and found sufficient every time; no state, transition, forbidden pair or terminal state was added, removed or altered, and test_canonical_reconciliation.py still reconciles the implemented relation against STATE_MACHINES.md section 3. Three properties Phase 7 relies on are consequences of that unchanged relation rather than of code: RESUMING has exactly two predecessors (PAUSED and RECOVERABLE), so pause and crash recovery share one lifecycle meaning; RUNNING -> RECOVERABLE is NOT declared and evaluate refuses it, so recovery must travel through FAILED; and DEAD_LETTER has no outgoing transition, so a dead-lettered job cannot be revived by any sweep. No capability graph node was activated: capability resolution remains NOT_CONFIGURED and Phase 7 neither uses nor claims it.",
+ "tests_executed": [
+  {
+   "command": "python -m pytest backend -q",
+   "exit_code": 0,
+   "passed": 1614,
+   "failed": 0,
+   "summary": "full regression: every applicable backend tier (T1-T5, T9, T11 and the architecture/structural/governance controls) executed on real SQLite against the final Phase 7 tree; 1614 passed, 13 skipped, 0 failed. The 13 skips are declared NOT_CONFIGURED/not-applicable cases (no PostgreSQL driver on this host; machines declaring no forbidden pairs or no terminal state), never substituted results"
+  },
+  {
+   "command": "python -m pytest backend/tests/security -q",
+   "exit_code": 0,
+   "passed": 188,
+   "failed": 0,
+   "summary": "security review: the Phase 4 PEP/PDP and bypass-resistance corpus re-executed against the final Phase 7 tree. Every governed C-19 operation and every enqueue route passes a real PEP; a real PDP loaded from an authority map with WRITE_WORKSPACE_FILE fixed to DENY refuses submission, declaration, pause, resume and the recovery sweep, and each refusal is proven to leave no durable row. WRITE_STABLE_FILE and ROLLBACK_STABLE are named nowhere in execution.durable or surfaces.command and no Stable mutation path exists"
+  },
+  {
+   "command": "python -m pytest backend/tests/structural backend/tests/governance -q",
+   "exit_code": 0,
+   "passed": 538,
+   "failed": 0,
+   "summary": "adversarial review: the structural and governance corpus, including the 73 controls added by Phase 7 across test_durable_authority.py, test_durable_governed_operations.py, test_durable_recovery_authority.py and test_enqueue_surface_authority.py. These are the controls that would have to be wrong for the phase's claims to be false: shadow lifecycle authority, direct state mutation, engine construction, raw SQL, scheduler and provider leakage, inline work in an HTTP request, unbounded retry, in-memory attempt accounting, and reimplemented idempotency"
+  },
+  {
+   "command": "python -m mypy --ignore-missing-imports arkali",
+   "exit_code": 0,
+   "passed": 128,
+   "failed": 0,
+   "summary": "T1 static tier: mypy strict, success, no issues found in 128 source files"
+  },
+  {
+   "command": "python scripts/check_repository_structure.py",
+   "exit_code": 0,
+   "passed": 12,
+   "failed": 0,
+   "summary": "structure validator 12/12, including the 400 logical-line budget and check 12 (runtime constructs confined to their canonical authority) over 128 shipping modules"
+  },
+  {
+   "command": "python scripts/check_repository_structure_negative.py",
+   "exit_code": 0,
+   "passed": 1,
+   "failed": 0,
+   "summary": "structure negative control: the keyword check is generic, runtime-construct authority is derived from the canonical documents, untracked files are seen, rename/move survives, and unresolvable authority fails closed"
+  },
+  {
+   "command": "python scripts/check_phase_graph.py",
+   "exit_code": 0,
+   "passed": 10,
+   "failed": 0,
+   "summary": "phase graph 10/10 - executable and deadlock-free across all four edge classes"
+  },
+  {
+   "command": "python scripts/check_phase_graph_negative.py",
+   "exit_code": 0,
+   "passed": 1,
+   "failed": 0,
+   "summary": "phase graph negative control: IMPLEMENTATION_DEPENDENCY_MATRIX.md verified unmodified"
+  },
+  {
+   "command": "python scripts/check_phase0_deliverables.py",
+   "exit_code": 0,
+   "passed": 27,
+   "failed": 0,
+   "summary": "Phase 0 deliverables 16/16 and 11/11, counts derived from the canonical Build Protocol lists rather than entered by hand"
+  },
+  {
+   "command": "python -m pytest backend/tests/execution/test_phase_7_journey.py -q",
+   "exit_code": 0,
+   "passed": 5,
+   "failed": 0,
+   "summary": "final integration journey: one durable job enqueued through the real HTTP API, executed, heartbeated, checkpointed, paused, resumed, then carried across a full restart, recovered from an expired heartbeat and completed - six separate runtimes over one real SQLite file, with Phase 7 evidence recorded through the C-14/C-15 authorities and re-verified after reopen"
+  },
+  {
+   "command": "python -m pytest backend/tests/execution/test_phase_7_fault_injection.py -q",
+   "exit_code": 0,
+   "passed": 17,
+   "failed": 0,
+   "summary": "fault injection at the available tier: process loss with persisted RUNNING state, heartbeat expiry observed by a process that never saw the job start, a returning zombie owner, a failed transaction, a duplicate attempt refused by the primary key, retry exhaustion to DEAD_LETTER, timeout with a live heartbeat, deadline basis surviving restart, ten reopens, and sweep idempotency across restarts. T12 IS NOT CLAIMED; ARK-REQ-0327 IS NOT CLAIMED; Phase 31 IS NOT CLAIMED"
+  },
+  {
+   "command": "python -m pytest backend/tests/execution/test_phase_7_applicability.py -q",
+   "exit_code": 0,
+   "passed": 10,
+   "failed": 0,
+   "summary": "ARK-REQ-0060 applicability: the Appendix A rule text is parsed out of REQUIREMENT_REGISTER.md and the field it names asserted to be a real persisted column; the rule evaluates TRUE against real persisted data and survives restarts; an unpausable type is proven not to retire the requirement; both sides are enforced end to end; recovery is proven unaffected by pause capability"
+  }
+ ],
+ "architecture_checks": "All 8 architecture gates PASS over 91 real cross-context edges with allow_same_layer still false and no sibling edge added by this phase: architecture_budget_violation, duplicate_canonical_authority, duplicate_lifecycle_authority (14 lifecycles, one authority each), duplicate_state_machine_authority (12 machines, one authority each), forbidden_cycles, forbidden_dependency_direction, protected_core_boundary_violation (7 contexts declared and present), shadow_registry. All 9 numeric budgets evaluated under ratified measurement contract 1.0.0 with zero violations. Two budgets were hit during the phase and both were answered by decomposition under ADR-0008 rather than by a GATE 8 exception: kernel.contracts.errors fan-in reached 16 of 15 in Package 1 and was brought to 14 by completing the control.architecture refusal decomposition, and test_durable_recovery.py reached 440 of 400 logical lines in Package 3 and was split along a real seam. Package 4 measured max_contexts_touched_by_module BEFORE writing - app.py and error_mapping.py were each already at 3 - and decomposed the surface from the first line. max_orchestration_depth now measures 4 of 4 on the path surfaces.command -> execution.durable -> control.policy -> kernel.contracts; it is at its ceiling and not over it, and Package 5 deliberately added no production import edge, assembling all final evidence in the test tier. NO GATE 8 EXCEPTION HAS EVER BEEN REQUESTED.",
+ "duplicate_shadow_check": "No duplicate or shadow authority was created. The canonical Job machine is the sole lifecycle authority: no module in execution.durable restates a state literal or a transition pair, the lifecycle column is assigned in exactly one method (derived as the one that calls evaluate, not named), and RESUMING is requested by exactly one module with every use of the name proven to be a transition target. Idempotency has one authority - the persisted unique constraint - and neither the durable services nor the HTTP surface holds a cache, a seen-set or a second lookup. The job-type registry is the only place ARK-REQ-0060's applicability question is answered, and it is read from the persisted row rather than from a request, a caller or a lifecycle state. Persistence has one authority: no engine is constructed or even imported in execution.durable or in the jobs router, and no raw or dialect-specific SQL appears in either. Evidence has one authority pair: Phase 7 evidence is recorded through evidence.artifact and evidence.audit unchanged, and no second evidence mechanism was created. No scheduler, worker, dispatch, admission, capacity, priority or provider concept exists anywhere in the phase, asserted by controls that derive their identifier sets from the AST including both halves of an import alias.",
+ "security_findings": "No security finding. Every governed operation in execution.durable and surfaces.command passes an injected PEP that has no default, so a caller cannot obtain a service that writes without a policy decision. Only two operation classes are requested - READ_FILE and WRITE_WORKSPACE_FILE - imported from the context whose operations they govern rather than restated, and unmapped_action_resolution: DENY means no new class could be invented. WRITE_STABLE_FILE and ROLLBACK_STABLE appear nowhere in either context and structure check 11 asserts it. A real PDP loaded from an authority map with WRITE_WORKSPACE_FILE fixed to DENY was driven through every governed path - submit, declare, pause, resume, the recovery sweep and the HTTP enqueue route - and each refusal was proven to leave the durable state unchanged. F-0039 was found and closed during the phase: PolicyDenied was mapped to 403 but unreachable from any route because guard() runs before the try, so a real denial surfaced as HTTP 500. Nothing failed open - the PEP still refused and nothing was written - but the client could not distinguish a refusal from a server fault; the mapping is now reachable from anywhere a domain error can be raised. The enqueue surface leaks no traceback, path, URL or SQL in any refusal, asserted.",
+ "fake_success_scan": "Clean. Structure validator checks 9-12 PASS. No TODO/stub/mock/placeholder marker in Phase 7 source. No forward-phase runtime construct: execution.scheduler, execution.workflow and execution.sandbox contain no module and are imported by nothing in this phase, and controls fail on the scheduling and provider vocabulary. No fake provider exists and none was needed to demonstrate enqueue - the job payload is opaque at every layer that carries it. No capability is claimed from the existence of a class: capability resolution remains NOT_CONFIGURED. No timing measurement is used as proof of ARK-REQ-0027 - the claim rests on the job being in its canonical initial state with zero attempts and zero checkpoints after the response. The chaos evidence key is discharged at the available tier and the report says so in every place it appears: T12, ARK-REQ-0327 and Phase 31 are named as NOT CLAIMED, and a control derives from the register that ARK-REQ-0327 is not a Phase 7 requirement. mypy strict clean over 128 source files. Fifteen anti-vacuity cases were injected into the shipping source and all fifteen were rejected by the controls that claim to protect those properties; eight defective traceability variants were proven to fail check C6 before the gate was run.",
+ "evidence_created": [
+  "EV-0060",
+  "EV-0061",
+  "EV-0062",
+  "EV-0063",
+  "EV-0064",
+  "EV-0065"
+ ],
+ "limitations": "PostgreSQL remains UNEXERCISED. ADR-0006 registers the engine-neutral abstraction as MANDATORY and verified PostgreSQL operation as not a canonical requirement; no driver exists on this host, two tests report NOT_CONFIGURED rather than substituting, and no PostgreSQL claim is made. THE FORMAL T12 CHAOS CORPUS IS NOT DELIVERED AND NOT CLAIMED - it begins at Phase 31, and ARK-REQ-0327, the durable-restart chaos proof, belongs there and is untouched by this phase; what discharges the chaos evidence key here is real deterministic fault injection at the currently available tier, following the accepted Phase 4 ARK-REQ-0121 precedent. APPROVALS AND SIGNALS are named in MS Durable Runtime and are NOT implemented; they are not represented by an unused column and are not claimed by ARK-REQ-0059, whose feature list they are part of - this is the one element of that list Phase 7 leaves unbuilt, recorded here rather than in prose elsewhere. NO SCHEDULER EXISTS: nothing decides which worker runs a job, in what order, with what priority or on what resources, and a recovered job waits in RESUMING for someone to pick it up. That is C-21 at Phase 8 and its absence is asserted, not assumed. NO WORKFLOW GRAPH EXISTS (C-20, Phase 17). NO PROVIDER RUNTIME EXISTS; the job payload is never interpreted. NO FRONTEND increment was built for the enqueue surface and none is owed - no Phase 7 requirement is owned by a surfaces.* context and none carries e2e evidence - so the routes declare the backend-only audience and the browser client is proven not to call them. THE EVIDENCE GRAPH IS NOT BUILT: no coverage is computed and no verdict is derived from any evidence record, which is C-16 and the Acceptance Engine at Phase 13. max_orchestration_depth is at 4 of 4, so the next package adding a hop to surfaces.command -> execution.durable -> control.policy -> kernel.contracts must decompose. One acceptance-engine weakness is carried forward unchanged from Phase 6: check C6 requires a SATISFIED claim to name an implementation and an evidence source but has no per-contract granularity, so C-19 is traced through ARK-REQ-0003 rather than by contract id; strengthening the traceability contract is an Acceptance Engine change and belongs to Phase 13.",
+ "blockers": "None. Internal BLOCKER = 0 and internal HIGH = 0 at submission, and open_stopping_findings is empty. Four findings were opened and closed within Phase 7: F-0036 (a durability predicate named for the heartbeat that measured the deadline), F-0037 (a contract control that assumed every backend route was also a browser-slice route), F-0038 (one durable timestamp with two wire representations) and F-0039 (a policy denial that could not reach its mapped status). All four are MEDIUM and none failed open; F-0038 and F-0039 are pre-existing Phase 5 defects that Phase 7 exposed, and both were reproduced on the Phase 5 routes alone before being repaired. No external blocker is open and no human gate applies to this phase.",
+ "next_exact_action": "Derive Phase 8 scope from repository authority before any implementation: read REQUIREMENT_REGISTER.md for the requirements the Phase column assigns to 8, CONTRACT_INVENTORY.md for C-21, IMPLEMENTATION_DEPENDENCY_MATRIX.md for prerequisites and gates, and ARCHITECTURE.md section 3 for execution.scheduler's ownership. Do not carry forward any assumption from Phase 7 about what Phase 8 owes. Note that max_orchestration_depth is at 4 of 4 before Phase 8 begins.",
+ "status": "PASS"
+}

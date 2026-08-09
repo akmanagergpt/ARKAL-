@@ -8,7 +8,27 @@ All fields above are the `CONTRACT_INVENTORY.md` row for C-19, not a restatement
 Where this document and the code or the canonical set disagree, they win and this
 document is the defect.
 
-## 0. Scope of this revision — Phase 7 Atomic Package 3
+## 0. Scope of this revision — Phase 7 complete (Packages 1–5)
+
+**Package 4 added no field to this contract and no migration.** The
+`ARK-REQ-0027` enqueue surface lives in `surfaces.command` and *consumes* C-19:
+it calls `JobStore.submit` and projects the recorded row onto a transport shape.
+It writes no lifecycle state, issues no query and holds no second idempotency
+mechanism, so this contract's authority is unchanged by the existence of an HTTP
+consumer. **Package 5 added no field and no migration either** — it is
+verification, evidence and acceptance.
+
+The final Phase 7 schema is therefore exactly what Packages 1–3 produced:
+migrations `0005_durable_job`, `0006_durable_execution`, `0007_job_type_registry`,
+composing to the four records in §4. A control derives the record set from the
+mapped module and reconciles it against this document in **both** directions, so
+neither an undocumented field nor a documented-but-absent one can survive.
+
+**Still not implemented and not claimed:** approvals/signals, and everything §5
+disclaims. The formal T12 chaos corpus is **Phase 31** and `ARK-REQ-0327` is not
+claimed by any Phase 7 evidence.
+
+### Scope of the earlier revision — Phase 7 Atomic Package 3
 
 Package 1 defined the persistence foundation: the durable job record, its
 idempotency identity and the checkpoint record. Package 2 added the durability

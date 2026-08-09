@@ -38,7 +38,7 @@ Three HIGH defects were found by independent review at HUMAN GATE 1 and are now 
 | EXT-001 | HUMAN GATE 1 — Phase 0A+0B acceptance not yet granted | BLOCKER | CLOSED | human acceptance authority | granted on candidate `007ebf6`, record `HGR-001` |
 | EXT-002 | F-0015 — `engineering.import` module root is a Python reserved keyword | HIGH | CLOSED | human acceptance authority | governance erratum ERR-001 authorized and applied |
 
-**No external blockers open.** Phase 1 is machine-accepted; Phase 2 is unlocked.
+**No external blockers open.** Phase 7 is machine-accepted; Phase 8 is unlocked.
 
 Next gate condition: **HUMAN GATE 2** at Phase 23 (Stable Core promotion), or an earlier trigger of GATE 4 (security boundary change), GATE 5 (applicability waiver), GATE 6 (migration APPLY to real/stable data) or GATE 8 (architecture budget exception).
 
