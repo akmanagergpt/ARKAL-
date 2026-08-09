@@ -61,22 +61,99 @@ def repo_with_records(tmp_path: pathlib.Path, records_text: str) -> pathlib.Path
     return target
 
 
+def first_unaccepted_phase() -> str:
+    """A phase that genuinely carries no acceptance record, resolved at run time.
+
+    DEFECT F-0031. These controls named phase "5" as their example of an
+    unaccepted phase. That was true when they were written and expired the
+    moment Phase 5 was accepted, at which point both failed while the mechanism
+    they guard was working perfectly: the checker correctly returned BLOCKED for
+    a phase that now has a record. Eighth instance of the phase-scoped-check
+    family (F-0008, F-0013, F-0016, F-0019, F-0022, F-0027, F-0029).
+
+    The durable form is the one F-0027 established: select the subject by the
+    property under test, never by phase number. The property is "has no
+    acceptance record", so it is asked of `GovernanceState`, which reads
+    `BUILD_STATE.md`. Fails closed when every phase is accepted, because then
+    the control has no subject and must not pass on an empty premise.
+    """
+    state = GovernanceState.load(REPO)
+    for phase in state.phases.values():
+        if not phase.is_accepted:
+            return str(phase.phase_id)
+    raise AssertionError(
+        "every phase carries an acceptance record, so the first-acceptance path "
+        "has no subject; this control cannot run and must not pass vacuously"
+    )
+
+
+def accepted_phases_without_their_own_grant() -> list[str]:
+    """Accepted phases holding no authorization for their own evidence package.
+
+    Phases whose evidence package does not exist at all are skipped: they were
+    accepted before the report contract existed, so there is nothing to digest
+    and nothing an authorization could be bound to.
+    """
+    state = GovernanceState.load(REPO)
+    found: list[str] = []
+    for phase in state.phases.values():
+        if not phase.is_accepted:
+            continue
+        try:
+            digest = evidence_package_digest(REPO, phase.phase_id)
+        except AuthoritativeSourceError:
+            continue
+        if find_authorization(REPO, phase.phase_id, digest) is None:
+            found.append(str(phase.phase_id))
+    return found
+
+
 class TestControl1FirstAcceptanceNeedsNoAuthorization:
     def test_an_unaccepted_phase_takes_the_first_acceptance_path(self) -> None:
-        """Control 1. Phase 5 is unlocked and not accepted."""
+        """Control 1. A phase with no acceptance record needs no authorization."""
+        phase_id = first_unaccepted_phase()
         state = GovernanceState.load(REPO)
-        assert not state.phase("5").is_accepted
+        assert not state.phase(phase_id).is_accepted
         checker = PhaseGateChecker(REPO)
-        report = _report_for(checker, "5")
-        result = checker.check_rescoring_authority(report)
-        assert result.state is HonestState.NOT_APPLICABLE
-
-    def test_control_14_phase_5_is_not_treated_as_a_rescore(self) -> None:
-        """Control 14. Phase 4 being superseded must not contaminate Phase 5."""
-        checker = PhaseGateChecker(REPO)
-        result = checker.check_rescoring_authority(_report_for(checker, "5"))
+        result = checker.check_rescoring_authority(_report_for(checker, phase_id))
         assert result.state is HonestState.NOT_APPLICABLE
         assert "no prior acceptance record" in result.summary
+
+    def test_control_14_a_supersession_does_not_contaminate_another_phase(self) -> None:
+        """Control 14. Phase 4's supersession stays Phase 4's.
+
+        Originally phrased as "must not contaminate Phase 5". The concern was
+        never about phase 5 specifically: it is that a supersession recorded
+        against one phase must not taint a phase that has no record of its own.
+        """
+        checker = PhaseGateChecker(REPO)
+        result = checker.check_rescoring_authority(
+            _report_for(checker, first_unaccepted_phase())
+        )
+        assert result.state is HonestState.NOT_APPLICABLE
+        assert "no prior acceptance record" in result.summary
+
+    def test_an_accepted_phase_cannot_borrow_another_phases_authorization(self) -> None:
+        """The sharper half of Control 14, reachable now that Phase 5 is accepted.
+
+        Phase 4 carries RSA-001. Phase 5 is accepted and carries no
+        authorization of its own, so re-scoring it must be refused - and refused
+        because *it* has no grant, not permitted because another phase does.
+        """
+        subjects = accepted_phases_without_their_own_grant()
+        assert subjects, (
+            "every accepted phase carries its own authorization, so this control "
+            "had no subject; it must not report PASS on an empty premise"
+        )
+        checker = PhaseGateChecker(REPO)
+        for phase_id in subjects:
+            result = checker.check_rescoring_authority(_report_for(checker, phase_id))
+            assert result.state is HonestState.BLOCKED, (
+                f"phase {phase_id} is accepted and holds no re-scoring "
+                "authorization for its own evidence package, yet the checker did "
+                "not stop; a grant issued to another phase must never be reusable"
+            )
+            assert "already accepted" in result.summary
 
 
 def _report_for(checker: PhaseGateChecker, phase_id: str):

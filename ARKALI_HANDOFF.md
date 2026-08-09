@@ -69,7 +69,7 @@ docs/build/PHASE_HISTORY.md              phase outcomes and commits
 docs/build/OPEN_BLOCKERS.md              open findings and deferrals
 docs/build/KNOWN_FAILURES.md             recorded defects, historical values
 docs/build/DECISION_LOG.md               decisions + human rulings
-docs/acceptance/EVIDENCE_INDEX.md        EV-0001 .. EV-0022
+docs/acceptance/EVIDENCE_INDEX.md        EV-0001 .. EV-0050
 ```
 
 **Executable governance (run these, do not trust prose):**
@@ -80,15 +80,20 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (1080 passed, 13 skipped)
+backend/                                    pytest suite (1139 passed, 13 skipped)
 backend/tests/surfaces/                     Command Center API integration (T5)
 backend/tests/persistence/                  T11 persistence: real SQLite, WAL, durability, migrations
-backend/tests/structural/test_engine_confinement.py  ARK-REQ-0012 architecture control
+backend/tests/structural/                   ARK-REQ-0012 confinement, ARK-REQ-0229 vertical-slice
+                                            linkage, contract drift, frontend boundaries,
+                                            frontend stack, T10 harness integrity
 backend/tests/security/                     PDP, PEP, isolation, secrets, drift
 backend/tests/governance/test_handoff_drift.py  handoff negative controls
 backend/tests/governance/test_dependency_rules.py  dependency-rule reconciliation (F-0028)
 backend/tests/state_machines/               12 machines + canonical reconciliation
 backend/tests/capability/                   C-13 schema + pre-activation behaviour
+frontend/tests/                             vitest component tier (23)
+frontend/tests/e2e/                         T10 Playwright journey (9), real Chromium
+scripts/run_command_center.py               binds the real app to a socket for T10
 ```
 
 **Tracked root documentation — holds no governed value, never an authority:**
@@ -110,21 +115,22 @@ repository, the repository wins.
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
 | Phase 4 | **MACHINE-ACCEPTED** — superseding verdict, **RATIFIED** under GOV-001; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
-| Phase 5 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Packages 1–4 complete (`11ebf14`, `3c116f2`, `fb9000e`, `884db7e` + `6ab0692`) — persistence, Project/Revision Registry, minimal backup/restore, and the Command Center vertical slice: API **and** the React/TypeScript/Vite/Tailwind Project Registry page. Package 5 owes the T10 browser journey, the phase report, the traceability record and the gate run. No phase report, no traceability record, no gate run |
+| Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
+| Phase 6 | **UNLOCKED — NOT_STARTED** ← current work. Artifact / Evidence Plane (C-14, C-15). Unlocked by the Phase 5 gate run returning `progression: PERMITTED` |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4), reconciled by check C6 against `phase_4_traceability.json` |
+| Cumulative verified | **72** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + **7 Phase 5**), reconciled by check C6 against `phase_4_traceability.json` and `phase_5_traceability.json` |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | every finding through **F-0030** is closed |
+| Recorded findings | every finding through **F-0031** is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **64** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
 | Security | one PDP · 14 operation classes · 5 TRUST tiers · 7 properties · 7 backends probed · Protected Core, Secret Vault and Local-Only boundaries enforced |
 | Host isolation | TRUST-0/1 satisfiable. **TRUST-2/3/4 UNSUPPORTED** on this host (`NET_EGRESS_CONTROL`, `KERNEL_ISOLATION` unavailable). Re-probe; never assume |
-| Execution surfaces | **one exists: `surfaces.command`** (Command Center API — seven routes — plus its React frontend, Phase 5 Package 4). Every route enforces through the Phase 4 PEP and is audited. The other five canonical paths — sandbox, scheduler, durable, workflow, operations — are absent. End-to-end bypass resistance across all six (ARK-REQ-0325, 0347) is Phase 31 and is **not** claimed |
+| Execution surfaces | **one exists: `surfaces.command`** (Command Center API — seven routes — plus its React frontend, Phase 5). Every route enforces through the Phase 4 PEP and is audited, and a real browser journey drives it end to end. The other five canonical paths — sandbox, scheduler, durable, workflow, operations — are absent. End-to-end bypass resistance across all six (ARK-REQ-0325, 0347) is Phase 31 and is **not** claimed |
 | Working tree | clean at HEAD |
 
 ## 4. Accepted commit history
@@ -175,7 +181,9 @@ repository, the repository wins.
 | 42 | `2148610` | handoff manifest refreshed after Package 3 (§12 rule) |
 | 43 | `884db7e` | **PHASE 5 PACKAGE 4 (PARTIAL)** — Command Center API under `surfaces.command`. Frontend **not** built |
 | 44 | `1880449` | handoff manifest refreshed after the partial checkpoint (§12 rule) |
-| 45 | `6ab0692` | **PHASE 5 PACKAGE 4 COMPLETE** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. **Not a phase acceptance** ← HEAD at generation |
+| 45 | `6ab0692` | **PHASE 5 PACKAGE 4 COMPLETE** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. Not a phase acceptance |
+| 46 | `4ff5004` | handoff manifest refreshed after Package 4 (§12 rule) |
+| 47 | `PENDING` | **PHASE 5 MACHINE-ACCEPTED** — Package 5: real T10 browser journey, evidence records, traceability, phase report and the gate run. **Phase 6 unlocked.** F-0031 opened and closed ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -220,7 +228,7 @@ Re-detected at generation. **Re-detect rather than trusting these values.**
 | SQLAlchemy 2.0.51 · Alembic 1.18.5 · FastAPI 0.111.0 | present | PASS — the Phase 5 backend stack is executable |
 | SQLite library 3.49.1 (WAL-capable) | present | PASS |
 | hypothesis (T6 property tier) | absent | **NOT_CONFIGURED** |
-| Playwright (T10 browser/E2E) | absent; npm registry reachable | **NOT_CONFIGURED** — installable, not installed |
+| Playwright 1.62.1 + Chromium 151.0.7922.34 (T10 browser/E2E) | installed | **PASS** — 9 browser tests green against the production build and a live API. Firefox and WebKit are NOT installed; no cross-browser claim |
 
 No unavailable toolchain may be reported as PASS.
 
@@ -249,100 +257,65 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 5
+## 8. Current phase contract — Phase 6
 
-Derived from authoritative artifacts, not from memory.
+Derived from authoritative artifacts, not from memory. **Phase 5 is closed;** its contract is in
+`phase_5_report.json` and `PHASE_HISTORY.md`.
 
-| Field | Value | Source |
-|---|---|---|
-| Name | **Persistence + Project Registry + Minimal Backup/Restore** | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
-| Prerequisites | Phases **2** and **4** (both MACHINE-ACCEPTED) | matrix Prerequisites column |
-| ARK-REQ IDs | **7** MANDATORY — 0009, 0011, 0012, 0153, 0178, 0229, 0335 | `REQUIREMENT_REGISTER.md` (Phase column) |
-| Contract IDs | **C-03** (implementation; defined at Phase 2), **C-12** project/revision record | `CONTRACT_INVENTORY.md` |
-| Owners | `kernel.persistence` (2), `lifecycle.recovery` (2), `surfaces.command` (2), `control.architecture` (1) | register Owner column |
-| Test tiers first owed | **T5** integration on real persistence, **T11** persistence (restart, durability, backup→restore→verify); **T10** browser/E2E from Phase 5 onward | `VERIFICATION_ARCHITECTURE.md` §test tiers |
-| State machines | none new. **Project**, **BackupRestore** and the other ten were implemented at Phase 3 and are reconciled against `STATE_MACHINES.md` on every run; Phase 5 gives Project and BackupRestore persistence and a real executor | `STATE_MACHINES.md` §1, §9 |
-| Human gate | none | matrix Gate column |
+| Field | Value |
+|---|---|
+| Name | **Artifact / Evidence Plane** | `IMPLEMENTATION_DEPENDENCY_MATRIX.md` |
+| Status | **UNLOCKED — NOT_STARTED**. Unlocked by the Phase 5 gate run, which returned `progression: PERMITTED` |
+| Contract IDs | **C-14**, **C-15** — read `CONTRACT_INVENTORY.md` before starting |
+| Read first | `CONTRACT_INVENTORY.md` rows C-14/C-15 · `VERIFICATION_ARCHITECTURE.md` Part 2 (evidence graph strategy) · ADR-0006 |
 
-**In scope.** SQLite+WAL behind engine-neutral repositories with PostgreSQL-ready
-abstractions (ADR-0006, ARK-REQ-0011/0012) — **no raw SQL outside
-`kernel.persistence`**, enforced by architecture test. The Project/Revision
-registry (C-12). Minimal backup/restore under `lifecycle.recovery`, where a
-backup is not verified until proven by an actual restore (§9 of
-`STATE_MACHINES.md`). The first frontend slice under `surfaces.command`.
-
-**Forbidden scope.** Capability Graph activation (Phase 9B). Provider runtime
-(Phase 9). Stable Core promotion (Phase 23, GATE 2). The Recovery *Supervisor*
-is Phase 22B — Phase 5 delivers minimal backup/restore, not `ROLLBACK_STABLE`,
-which the PDP denies for every actor.
-
-**Carry forward from Phase 4.** All persistence work is now governed: writes are
-subject to the PDP, `kernel.persistence` is not Protected Core but
-`lifecycle.recovery` is, and `WRITE_STABLE_FILE` is DENY for every actor.
+**Why it matters downstream.** Phase 6 supplies the content-addressed revision identity that Phase 5
+deliberately left as a nullable `provenance_ref`, and it is a prerequisite of Phase 22B (Recovery
+Supervisor). Re-derive its requirement set from `REQUIREMENT_REGISTER.md`'s Phase column rather than
+trusting any summary, including this one.
 
 **Machine acceptance.** Produce a phase report satisfying C-17, then run
-`python scripts/run_phase_gate.py 5 6`. Acceptance requires verdict
-`PHASE_ACCEPTED_BY_MACHINE`: C1–C5 PASS, 8 architecture gates non-failing,
-0 open BLOCKER/HIGH, prerequisites accepted.
-
-**Read before starting.** ADR-0006, `ARCHITECTURE.md` §10 (persistence),
-`STATE_MACHINES.md` §9, and `CONTRACT_INVENTORY.md` rows C-03 and C-12.
+`python scripts/run_phase_gate.py 6 7`. Acceptance requires verdict `PHASE_ACCEPTED_BY_MACHINE`.
 
 ## 9. Next exact action
 
-**Phase 5 — Atomic Package 5: real browser E2E, final evidence, traceability,
-phase acceptance.** Phase 5 is IN PROGRESS and NOT ACCEPTED. Packages 1–4 are
-complete; do **not** rebuild any of them.
+**Begin Phase 6 — Artifact / Evidence Plane (C-14, C-15).** Phase 5 is MACHINE-ACCEPTED and Phase 6
+is unlocked. Do not re-run the Phase 5 gate: Phase 5 now carries an acceptance record, so a re-run
+correctly returns `AWAITING_RESCORING_AUTHORITY` (GOV-001). That is the mechanism, not a regression,
+and the recorded acceptance stands.
 
-**What Package 4 delivered, in full.** The Command Center API under
-`surfaces.command` (seven routes) and its frontend: React 18, TypeScript 5,
-Vite 5 and Tailwind 3, one typed API client, and the Project Registry page with
-list, empty state, detail, revisions, registration, one lifecycle action, and
-explicit loading, validation, refusal and success states. `ARK-REQ-0009`,
-`ARK-REQ-0178` and `ARK-REQ-0229` are **implemented and controlled at package
-level**. **None is discharged.**
+**What Phase 5 delivered, and what it did not.** SQLite+WAL persistence behind engine-neutral
+repositories, the C-12 Project/Revision Registry, minimal backup/restore under `lifecycle.recovery`,
+the `surfaces.command` API under the Phase 4 PEP, and the React/TypeScript/Vite/Tailwind Project
+Registry frontend — closed by **9 real browser tests** in Chromium against the Vite production build,
+a live uvicorn-served API and a real SQLite file. All **7/7** Phase 5 requirements are SATISFIED with
+named implementations and named evidence, and discharged under C6.
 
-**What Package 5 owes.**
+**Not delivered, and not claimed:** cross-browser E2E (Chromium only), a browser journey for any
+capability other than the Project Registry, the Recovery *Supervisor* or `ROLLBACK_STABLE` (Phase
+22B; the PDP denies it for every actor), restore across a schema-revision change (Phase 20),
+content-addressed revision identity (Phase 6 — this is the next job), the T6 property tier
+(`hypothesis` absent), and bypass resistance across all six execution surfaces, five of which do not
+exist (ARK-REQ-0325/0347, Phase 31).
 
-1. **The T10 browser journey.** `ARK-REQ-0178` and `ARK-REQ-0229` are verified by
-   `arch, e2e`. The `arch` half is controlled by
-   `backend/tests/structural/test_vertical_slice_linkage.py`,
-   `test_contract_drift.py` and `test_frontend_boundaries.py`. The `e2e` half is
-   **unmet**: Playwright is not installed, no browser has run, and **T10 is
-   NOT_CONFIGURED**. Install a browser runtime through real npm tooling and run a
-   genuine journey against the live API, or record NOT_CONFIGURED and say plainly
-   that the obligation is unmet. The 23 jsdom component tests under
-   `frontend/tests` are **not** browser E2E and may never be reported as such.
-2. **`phase_5_report.json`, `docs/acceptance/phase_5_traceability.json`, then
-   `python scripts/run_phase_gate.py 5 6`.**
+**Controls added in Phase 5 that must not be weakened.** All were mutation-tested before being
+relied on:
 
-**The three acceptance rules that bind the Phase 5 report.**
+* `backend/tests/structural/test_vertical_slice_linkage.py` — ARK-REQ-0229, both chains;
+* `test_contract_drift.py` — frontend transport types vs the live OpenAPI document, field by field;
+* `test_frontend_boundaries.py` — no shadow state machine, no shadow policy, no fabricated data;
+* `test_frontend_stack.py` — ARK-REQ-0009, the stack parsed from the Master Spec;
+* `test_browser_journey_integrity.py` — the T10 harness cannot be hollowed out;
+* `test_engine_confinement.py` — ARK-REQ-0012.
 
-* **C6** — a requirement may appear in `ark_req_ids_closed` only if
-  `phase_5_traceability.json` claims it SATISFIED with a named implementation and
-  a named evidence source. Any other state fails the gate.
-* **PROTECTED_CORE** — Phase 5 touches `lifecycle.recovery`, which is Protected
-  Core, so the report must carry three real executions whose summaries name
-  *security review*, *adversarial review* and *full regression*. No flag
-  substitutes for them.
-* **RESCORING** — Phase 5 has no prior acceptance record, so its first acceptance
-  needs no authorization (GOV-001, RSA-001).
+**Standing acceptance rules.** C6 (a requirement may be discharged only if traceability claims it
+SATISFIED with a named implementation and evidence), PROTECTED_CORE (three real executions if the
+change set touches a protected-core path — derived from the paths, never declared), and RESCORING
+(GOV-001: an accepted phase needs explicit authorization bound to its exact evidence-package digest
+before it may be re-scored).
 
-**Nothing is discharged.** `ARK-REQ-0009`, `0011`, `0012`, `0153`, `0178`, `0229`
-and `0335` are all implemented and proven at package level and all remain open.
-No requirement may be counted closed until the report and traceability record
-exist and the gate returns a verdict.
-
-**Where the frontend controls live**, because they are easy to weaken by
-accident: `backend/tests/structural/test_frontend_boundaries.py` bans a shadow
-state machine, a shadow policy and fabricated production data;
-`test_contract_drift.py` compares `frontend/src/api/contracts.ts` field by field
-against the live OpenAPI document; `test_vertical_slice_linkage.py` proves the
-slice's two chains. Every one was mutation-tested. Do not relax any of them to
-make later work green.
-
-Do not begin any later phase. Do not activate the Capability Graph — that is
-Phase 9B. Do not implement the Recovery Supervisor or Stable Core promotion.
+Do not begin any later phase. Do not activate the Capability Graph — that is Phase 9B. Do not
+implement the Recovery Supervisor or Stable Core promotion.
 
 ## 10. New-session bootstrap protocol
 
@@ -367,7 +340,8 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | `6ab0692fb4b7c9a5e9eee84b548b2ef13f6030b3` |
-| Generated after | **Phase 5 Atomic Package 4 (complete)** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. `BUILD_STATE.md` and `DECISION_LOG.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. React/TypeScript/Vite/Tailwind now actually run: `npm ci` from the tracked lockfile, the Vitest tier added through real npm tooling, typecheck clean, 23 component tests green, production build succeeds. One backend contract was added — `GET /api/lifecycle/project` publishes the machine's state *vocabulary* and deliberately not its transition relation — for a demonstrated defect, recorded in `DECISION_LOG.md` and tested in both directions. **`ARK-REQ-0009`, `ARK-REQ-0178` and `ARK-REQ-0229` are implemented and controlled but NOT discharged**, and their `e2e` obligation is **unmet**: **T10 = NOT_CONFIGURED**, no browser ran, and the jsdom tests are not a substitute. Every new control was mutation-tested; the first linkage check did not fail its mutation and was repaired before being believed. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
+| Generated after | **PHASE 5 MACHINE ACCEPTANCE** — Atomic Package 5: the real T10 browser journey, the evidence records, `phase_5_traceability.json`, `phase_5_report.json` and the gate run, which returned `PHASE_ACCEPTED_BY_MACHINE` with C1–C6 PASS and PROTECTED_CORE COMPLETE. **Both acceptance guards were proved able to fail** before the verdict was recorded: setting one traceability claim to DEFERRED yields `PHASE_BLOCKED` on C6, and removing the adversarial-review run yields `PHASE_BLOCKED` on PROTECTED_CORE. Phase 5 is accepted and Phase 6 is unlocked; cumulative verified rises 65 → **72**. **F-0031** was opened and closed: two re-scoring controls named Phase 5 as their example of an unaccepted phase and expired on its acceptance — proven mechanically to be a stale subject rather than a defect, since the same path still returns NOT_APPLICABLE for phase 6, and repaired by deriving the subject from `GovernanceState`. Eighth instance of the phase-scoped-check family. `EVIDENCE_INDEX.md`'s deliberately-absent table was also repaired: rows Phase 5 made false are moved to a superseded table rather than deleted. Phase 4 remains MACHINE-ACCEPTED under RSA-001 |
+| Previously generated after | **Phase 5 Atomic Package 4 (complete)** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. `BUILD_STATE.md` and `DECISION_LOG.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. React/TypeScript/Vite/Tailwind now actually run: `npm ci` from the tracked lockfile, the Vitest tier added through real npm tooling, typecheck clean, 23 component tests green, production build succeeds. One backend contract was added — `GET /api/lifecycle/project` publishes the machine's state *vocabulary* and deliberately not its transition relation — for a demonstrated defect, recorded in `DECISION_LOG.md` and tested in both directions. **`ARK-REQ-0009`, `ARK-REQ-0178` and `ARK-REQ-0229` are implemented and controlled but NOT discharged**, and their `e2e` obligation is **unmet**: **T10 = NOT_CONFIGURED**, no browser ran, and the jsdom tests are not a substitute. Every new control was mutation-tested; the first linkage check did not fail its mutation and was repaired before being believed. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 4 (partial)** — the Command Center API under `surfaces.command`, backend half only.  `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The package was stopped at a green, internally consistent checkpoint rather than rushed; **the frontend is not built and ARK-REQ-0009/0178/0229 are not satisfied**. A Phase 4 tripwire fired as designed when the first execution surface appeared and was replaced by the obligation it named — see `DECISION_LOG.md`; not a finding, because nothing was defective. **No requirement is discharged.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 3 (complete)** — minimal backup/restore under `lifecycle.recovery`, with the canonical A→backup→B→restore→verify proof and 18 lifecycle negative controls. `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The change set was classified **PROTECTED_CORE** by `select_profile` from its own changed paths, and all three required categories ran at exit 0. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 3 (partial)** — WAL-safe backup/restore mechanics in `kernel.persistence`. `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The package was stopped deliberately at a green, internally consistent checkpoint rather than rushed; `lifecycle.recovery` is untouched, so no half-written Protected Core surface exists. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
@@ -435,11 +409,12 @@ verified_by_phase:
   "2": 23
   "3": 4
   "4": 33
-cumulative_verified: 65
+  "5": 7
+cumulative_verified: 72
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4"]
-unlocked_phase: "5"
-next_exact_action_phase: "5"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5"]
+unlocked_phase: "6"
+next_exact_action_phase: "6"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9

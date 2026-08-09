@@ -1,6 +1,6 @@
 # EVIDENCE INDEX — ARKALI GENESIS v2
 
-**Phase 0 ACCEPTED (HGR-001). Phase 1 MACHINE-ACCEPTED after governance erratum ERR-001.** Evidence recorded here is limited to what was actually executed. Every non-executed check carries an honest state and a reason; none is reported as PASS.
+**Phases 0–5 accepted. Phase 5 is the first to record REAL EXECUTION evidence.** Evidence recorded here is limited to what was actually executed. Every non-executed check carries an honest state and a reason; none is reported as PASS.
 
 ## Evidence records
 
@@ -57,31 +57,59 @@ Every command above was executed and its exit code recorded. No result in this i
 | **EV-0040** | **GOV-001 enforcement — re-scoring authorization** | mechanical validation | `pytest tests/governance/test_rescoring_authorization.py` | **exit 0. 35 tests.** All fourteen mandated controls: first-time acceptance needs no authorization; an accepted phase without one cannot be re-accepted; a valid exact authorization permits it; an authorization for one phase cannot authorize another; one for a different evidence package cannot authorize this one; tampering with the report changes the digest and voids the grant; malformed rows, unknown status and revoked status all fail closed; issuers from `stable_mutation.prohibited_actors` can never grant; no flag or argument can bypass; historical acceptance preserved; the superseding revision does not rewrite the old one; GOV-001's Phase 4 ratification remains valid; Phase 5 is not treated as a re-score. Plus drift controls: revoking the authorization or changing its issuer flips the verdict with no validator edited | ARK-REQ-0205, 0216 |
 | **EV-0041** | **F-0026 remediation under its own stronger profile** | real execution | profile applied to this remediation's change set | **PROTECTED_CORE**, member `acceptance.engine`, all three canonical categories satisfied by real runs: security review 184 passed · adversarial review 172 passed · full regression 889 passed. The mechanism that enforces authorization was itself verified under the profile it enforces | ARK-REQ-0111 |
 | **EV-0042** | **Phase 4 superseding verdict under enforcement** | real execution | `python scripts/run_phase_gate.py 4 5` | **exit 0. `PHASE_ACCEPTED_BY_MACHINE`** with `RESCORING: superseding re-acceptance authorized by RSA-001`. Without RSA-001 the same evaluation returns `AWAITING_RESCORING_AUTHORITY`, demonstrated in the controls. Phases 2 and 3, which carry acceptance records and no authorization, correctly return `AWAITING_RESCORING_AUTHORITY`; their recorded acceptance in `BUILD_STATE.md` is untouched | GOV-001 |
+| EV-0043 | Phase 5 full regression on real persistence | real test run | `python -m pytest -q` (backend/) | **exit 0. 1139 passed, 13 skipped, 0 failed.** Every applicable backend tier: T1 static, T3 unit, T4 contract, T5 integration on real SQLite, T9 security, T11 persistence, plus the architecture and structural controls. Satisfies the *full regression* category of the stronger Protected Core profile | ARK-REQ-0011, 0012, 0153, 0335 |
+| EV-0044 | Phase 5 security review | real test run | `python -m pytest tests/security -q` | **exit 0. 185 passed.** T9 tier over the first execution surface that has ever existed: PDP determinism, PEP enforcement and bypass resistance across `surfaces.command`, Protected Core boundary, Secret Vault, Local-Only, and the secret-leakage and path-leakage negative controls. Satisfies the *security review* category | ARK-REQ-0229 |
+| EV-0045 | Phase 5 adversarial review — the negative-control tier | real test run | `python -m pytest tests/structural tests/governance -q` + `python scripts/check_repository_structure_negative.py` + `python scripts/check_phase_graph_negative.py` | **exit 0 for all three. 356 passed; structure negatives 23/23; phase-graph negative control behaved correctly.** Engine confinement, no shadow state machine, no shadow policy, no fabricated production data, one API boundary, backend/frontend contract drift, T10 harness integrity and the vertical-slice linkage control. **Every control added in this phase was mutation-tested**: a renamed backend field, a changed nullable type, a removed client call, a reintroduced transition map, an in-memory database and an intercepted browser route each fail their control. Satisfies the *adversarial review* category | ARK-REQ-0012, 0229 |
+| EV-0046 | T11 persistence tier — restart, durability, backup→restore→verify | real test run | `python -m pytest tests/persistence -q` | **exit 0. 113 passed, 2 skipped.** Real SQLite with WAL asserted by querying the live journal mode; durability across close and reopen; the real Alembic chain; and the canonical A→backup→B→restore→verify proof, with **file copy alone asserted as FAIL** and `restore_proof_guard` refusing `BACKUP_VERIFIED` without an actual restore | ARK-REQ-0011, 0153, 0335 |
+| EV-0047 | T5 integration — Command Center API on real persistence | real test run | `python -m pytest tests/surfaces -q` | **exit 0. 28 passed.** Seven routes driven end to end against a real migrated SQLite file, including persistence proven through a full engine **and** application restart, a refused write proven absent after the same restart, and refusal bodies proven to carry no path, ORM object, traceback, dialect name or secret-shaped field | ARK-REQ-0229 |
+| EV-0048 | **T10 browser / E2E — the first real user journey in this build** | **real browser run (execution level L2)** | `npx playwright test` — Chromium **151.0.7922.34**, Vite **production build** served by `vite preview`, proxied to a live `uvicorn`-served `surfaces.command` process over a real Alembic-migrated SQLite file | **exit 0. 9 passed.** Journey: honest empty state → create project → list → detail → record revision → **forbidden transition DRAFT→ACTIVE refused by the Project machine** with its own code `ARK-ERR-0013` and the displayed state unchanged → duplicate registration refused with `ARK-ERR-0012` → legal transition to SPECIFIED → **page reload** → **completely fresh browser context** with `localStorage` and `sessionStorage` both empty, still showing the project, its state and its revision. **Nothing substituted**: `test_browser_journey_integrity.py` fails if the launcher serves an in-memory database, builds an application of its own, or the spec intercepts a request | ARK-REQ-0178, 0229 |
+| EV-0049 | Frontend toolchain — install, typecheck, component tests, production build | real build/test run | `npm ci` · `npm run typecheck` · `npm test` · `npm run build` | **exit 0 for all four.** Dependencies installed from the tracked lockfile, all later additions made by real npm tooling (`INSTALL_DEPENDENCY` is LOCKFILE_BOUND; nothing hand-written). `tsc --noEmit` clean under `strict`. Vitest **23 passed** in 2 files — component/integration tier under jsdom, **explicitly not T10 and nowhere offered as it**. Vite build: 38 modules, 12.77 kB CSS and 158.75 kB JS emitted | ARK-REQ-0009, 0178 |
+| EV-0050 | Phase 5 machine acceptance | **Phase Gate Checker verdict** | `python scripts/run_phase_gate.py 5 6` | **exit 0. `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED.** C1–C6 PASS; **PROTECTED_CORE COMPLETE** — profile derived as PROTECTED_CORE from the changed paths (`lifecycle.recovery`), with all three canonical categories satisfied by real executions; RESCORING NOT_APPLICABLE (no prior acceptance record); FINDINGS and PREREQ PASS; 8 architecture gates PASS over 64 edges; 9 budgets, no violation. **Both guards were proved able to fail**: setting one claim to DEFERRED yields `PHASE_BLOCKED` on C6, and removing the adversarial-review run yields `PHASE_BLOCKED` on PROTECTED_CORE | ARK-REQ-0009, 0011, 0012, 0153, 0178, 0229, 0335 |
 
 ## Evidence deliberately absent
 
+Every row states what is **still** absent as of the latest accepted phase. Rows that Phase 5
+made false are recorded as superseded rather than deleted: the state a phase honestly reported
+is part of the record, and quietly rewriting it would be the drift F-0002 and F-0011 were opened
+for.
+
 | Evidence class | State | Reason |
 |---|---|---|
-| Unit / contract / integration tests | NOT_APPLICABLE | no capability implemented; only structural tests exist |
-| Architecture gate results (the 8 canonical gates) | NOT_TESTED | Phase 2 deliverable; Phase 1 ran a structure validator, which is not one of the 8 gates |
-| TypeScript / Vite build validation | NOT_CONFIGURED | frontend dependencies not installed |
+| Cross-browser E2E (Firefox, WebKit) | NOT_CONFIGURED | only Chromium is installed; no cross-browser claim is made |
+| Browser journeys for capabilities other than the Project Registry | NOT_APPLICABLE | no other capability has a frontend yet |
+| T6 property tier | NOT_CONFIGURED | `hypothesis` is not installed; none fabricated |
+| T7 mutation · T8 fuzz · T12 chaos | NOT_APPLICABLE | Phase 31 deliverables |
+| T13 real-product / Golden suite | NOT_APPLICABLE | the factory does not exist until Phase 16 |
+| T14 clean-environment on the packaged release | NOT_APPLICABLE | Phase 36; no packaged artifact exists |
+| L3 execution evidence | NOT_APPLICABLE | requires a packaged release on the snapshot baseline (Phase 36) |
 | Rust / Tauri workspace validation | UNSUPPORTED | no Rust toolchain on this machine |
 | Python 3.13 canonical-runtime validation | NOT_CONFIGURED | local runtime is 3.12.10 |
 | Python lockfile | NOT_CONFIGURED | no lock tool (poetry/uv/pip-tools) available; none fabricated |
 | ruff lint | NOT_CONFIGURED | ruff not installed |
-| Negative-control fixtures for gates | NOT_TESTED | built with the gates in Phase 2 |
-| Phase Gate Checker verdict | NOT_TESTED | Checker implemented in Phase 2 |
-| Security / sandbox escape tests | NOT_TESTED | no executable surface; isolation probe at Phase 4 |
-| Real runtime / browser / persistence | NOT_APPLICABLE | no runtime exists |
-| Real generated product | NOT_APPLICABLE | factory does not exist until Phase 16 |
-| Provider evidence | NOT_CONFIGURED | no provider configured; none required for Phase 0 or 1 |
-| Golden Repair corpus **definition** | **PASS** | delivered: `docs/canonical/GOLDEN_REPAIR_CORPUS_DEFINITION.md` (ARK-REQ-0090, 0091) |
+| Provider evidence | NOT_CONFIGURED | no provider configured; none required before Phase 9 |
 | Golden Repair corpus **instantiation** | NOT_APPLICABLE | ARK-REQ-0187/0188 — no accepted Golden Product to inject into until Phase 30 |
 | Golden Repair benchmark run | NOT_APPLICABLE | requires an accepted Golden Product |
-| Mutation / property / chaos | NOT_APPLICABLE | nothing to mutate or perturb |
-| L2 / L3 execution evidence | NOT_APPLICABLE | no packaged artifact exists |
+| Bypass resistance across all six execution surfaces | NOT_APPLICABLE | five of the six do not exist; ARK-REQ-0325/0347 are Phase 31 |
+| Restore across a schema-revision change | NOT_APPLICABLE | Phase 5 restore requires an exactly matching revision; migrating across one is Phase 20 |
+| Content-addressed revision identity | NOT_APPLICABLE | `provenance_ref` is a nullable reference until Phase 6 delivers C-14/C-15 |
+| Golden Repair corpus **definition** | **PASS** | delivered: `docs/canonical/GOLDEN_REPAIR_CORPUS_DEFINITION.md` (ARK-REQ-0090, 0091) |
 | HUMAN GATE 1 record | **PASS — GRANTED** | see EV-0006 |
+
+### Superseded by later phases
+
+| Evidence class | Was | Now | Superseded by |
+|---|---|---|---|
+| Unit / contract / integration tests | NOT_APPLICABLE — no capability implemented | **PASS** | EV-0043, EV-0047 |
+| Architecture gate results (the 8 canonical gates) | NOT_TESTED — Phase 2 deliverable | **PASS** — 8 gates over 64 edges | Phase 2 onward; EV-0050 |
+| Negative-control fixtures for gates | NOT_TESTED | **PASS** | EV-0045 |
+| Phase Gate Checker verdict | NOT_TESTED — implemented in Phase 2 | **PASS** | EV-0050 |
+| Security / sandbox escape tests | NOT_TESTED — no executable surface | **PASS** for TRUST-0/1; TRUST-2/3/4 remain UNSUPPORTED on this host | Phase 4; EV-0044 |
+| TypeScript / Vite build validation | NOT_CONFIGURED — dependencies not installed | **PASS** | EV-0049 |
+| Real runtime / browser / persistence | NOT_APPLICABLE — no runtime exists | **PASS** | EV-0046, EV-0047, EV-0048 |
+| L2 execution evidence | NOT_APPLICABLE — no packaged artifact | **PASS** at T5, T10 and T11 | EV-0046, EV-0047, EV-0048 |
 
 ## Coverage statement
 
-Mandatory requirement coverage is **65 verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3, 33 from Phase 4), restored after the ERR-004 remediation genuinely satisfied `ARK-REQ-0111`. Every Phase 4 claim is recorded in `phase_4_traceability.json` and reconciled against the phase report by check C6, so this figure is now mechanically defended rather than asserted. No Phase 4 requirement claims REAL EXECUTION, because no execution surface exists. The denominator is read from the Canonical Requirement Register (snapshot at this candidate: 303 MANDATORY); it is not maintained independently here. Phase 1 verified only its own five governance requirements; it implemented no capability. No capability coverage is claimed.
+Mandatory requirement coverage is **72 verified** (5 from Phase 1, 23 from Phase 2, 4 from Phase 3, 33 from Phase 4, **7 from Phase 5**). Every Phase 5 claim is recorded in `phase_5_traceability.json` with a named implementation and a named evidence source, and check C6 reconciled it against the phase report's discharged set — the figure is mechanically defended, not asserted. The denominator is read from the Canonical Requirement Register (snapshot at this candidate: 303 MANDATORY); it is not maintained independently here.
+
+**Phase 5 is the first phase to claim REAL EXECUTION evidence.** Prior phases could not: no execution surface existed. Phase 5 records L2 evidence at three tiers — T5 integration and T11 persistence against real SQLite, and T10 in a real browser against the production build. What is still **not** claimed: cross-browser coverage (Chromium only), any browser journey for a capability other than the Project Registry, packaged-release or clean-environment evidence (T14, Phase 36), the property/mutation/fuzz/chaos tiers (T6 NOT_CONFIGURED — hypothesis absent; T7/T8/T12 are Phase 31), and end-to-end bypass resistance across all six canonical execution surfaces, five of which do not exist (ARK-REQ-0325, 0347 — Phase 31).

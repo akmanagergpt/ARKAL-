@@ -1,0 +1,55 @@
+{
+  "phase_id": "5",
+  "note": "Derived from REQUIREMENT_REGISTER.md by reading the Phase column, not from any earlier summary. Seven MANDATORY requirements are assigned to Phase 5. Each is evaluated against an actual implementation and an actual executed control, and each claim names both. A requirement may appear in phase_5_report.json's ark_req_ids_closed only if it is SATISFIED here with an implementation and an evidence source; Phase Gate Checker check C6 enforces that reconciliation (F-0024). The register's Verified-by column was read per requirement rather than assumed: 0009 and 0012 owe arch; 0011 owes arch+persist; 0153 owes persist+integ; 0335 owes persist; 0178 and 0229 owe arch+e2e, and the e2e obligation is discharged by the real T10 Playwright journey in frontend/tests/e2e/project-registry.spec.ts, run against a real Chromium, the real Vite production build, a real uvicorn-served surfaces.command process and a real SQLite file. No component or jsdom test is offered as e2e evidence anywhere in this record.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0009",
+      "state": "SATISFIED",
+      "implementation": "frontend/ - React 18 entry frontend/src/main.tsx, TypeScript 5.6 under strict, Vite 5.4 build (frontend/vite.config.ts), Tailwind 3.4 (frontend/tailwind.config.ts, frontend/src/index.css)",
+      "evidence": "backend/tests/structural/test_frontend_stack.py (arch control: the four technologies are parsed from MS Frozen technology direction, required to be resolved in package-lock.json, and required to be doing work - React rendering a real root, TypeScript strict, Vite owning the build script, Tailwind compiled with content globs covering src); executed by `python -m pytest tests/structural -q` exit 0, and by `npm run typecheck` / `npm run build` exit 0",
+      "note": "Verified by arch. The control reads only tracked files, so it gives the same answer on a fresh clone; toolchain execution is recorded separately in the phase report."
+    },
+    {
+      "req_id": "ARK-REQ-0011",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/kernel/persistence/engine.py - SQLite engine with WAL set and verified on connect; backend/arkali/kernel/persistence/session.py",
+      "evidence": "backend/tests/persistence/test_persistence_foundation.py::TestSqliteEngine, ::TestWalIsEnabledAndVerified, ::TestDurabilityAcrossCloseAndReopen; executed by `python -m pytest tests/persistence -q` exit 0, 113 passed",
+      "note": "Verified by arch+persist. WAL is asserted by querying the live journal mode, not by reading the pragma the code sent."
+    },
+    {
+      "req_id": "ARK-REQ-0012",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/kernel/persistence/repository.py - engine-neutral repository over SQLAlchemy 2.x ORM; no engine-specific SQL outside kernel.persistence",
+      "evidence": "backend/tests/structural/test_engine_confinement.py::TestEngineAccessIsConfined and ::TestDetectorRejectsAViolation (AST-based, drivers/dialects/engine-construction named and confined); backend/tests/persistence/test_persistence_foundation.py::TestRepositoryIsEngineNeutral; executed by `python -m pytest tests/structural tests/persistence -q` exit 0",
+      "note": "Verified by arch. Restated to the canonical property when F-0030 showed the first version was stricter than the requirement; the negative control proves the detector rejects a real violation."
+    },
+    {
+      "req_id": "ARK-REQ-0153",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/lifecycle/recovery/backup_service.py - a backup reaches BACKUP_VERIFIED only through restore_proof_guard, which refuses the state without an actual restore; backend/arkali/lifecycle/recovery/manifest.py",
+      "evidence": "backend/tests/persistence/test_recovery_lifecycle.py::TestCanonicalProof, ::TestFileCopyAloneIsNotVerification, ::TestVerificationFailure, ::TestStateMachineIntegration; executed by `python -m pytest tests/persistence -q` exit 0",
+      "note": "Verified by persist+integ. TestFileCopyAloneIsNotVerification is the negative control the requirement's wording demands."
+    },
+    {
+      "req_id": "ARK-REQ-0178",
+      "state": "SATISFIED",
+      "implementation": "frontend/src/features/projects/ - the Project Registry increment delivered by this capability phase: list, empty state, detail, revisions, registration, one lifecycle action, loading, validation, refusal and success states, over frontend/src/api/client.ts",
+      "evidence": "arch: backend/tests/structural/test_vertical_slice_linkage.py::TestFrontendReachesTheApiClient and backend/tests/structural/test_frontend_boundaries.py, executed by `python -m pytest tests/structural -q` exit 0. e2e: frontend/tests/e2e/project-registry.spec.ts, executed by `npx playwright test` exit 0, 9 passed in real Chromium 151 against the Vite production build and the real API",
+      "note": "Verified by arch+e2e. Both columns are discharged by their own tier; the 23 jsdom component tests are recorded in the report as T5-adjacent component evidence and are explicitly not offered as e2e."
+    },
+    {
+      "req_id": "ARK-REQ-0229",
+      "state": "SATISFIED",
+      "implementation": "the Command Center vertical slice: backend/arkali/kernel/persistence (data), backend/arkali/control/registry/project (domain + service), backend/arkali/surfaces/command/app.py (API), frontend/src (frontend), backend/arkali/control/policy PEP/PDP at every route (policy/security), the Phase 4 audit trail (audit), plus the tests and evidence named here",
+      "evidence": "arch: backend/tests/structural/test_vertical_slice_linkage.py - proves the chain React entry -> typed client -> surfaces.command routes -> ProjectRegistry -> Project state machine -> persistence session -> a real SQLite file at runtime, and independently operation -> PEP -> PDP -> audit; plus test_contract_drift.py comparing frontend transport types field by field against the live OpenAPI document. e2e: frontend/tests/e2e/project-registry.spec.ts exit 0, 9 passed, including a forbidden-transition refusal surfaced in the browser with the machine's own code and the stored state unchanged, and persistence proven across a page reload and a fresh browser context with empty storage",
+      "note": "Verified by arch+e2e. Every layer the Build Protocol names for a vertical slice is asserted against the thing it links to; file presence is nowhere accepted as proof, and each control was mutation-tested."
+    },
+    {
+      "req_id": "ARK-REQ-0335",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/lifecycle/recovery/backup_service.py - the canonical A -> backup -> B -> restore -> verify sequence, with integrity and schema-compatibility gates",
+      "evidence": "backend/tests/persistence/test_recovery_lifecycle.py::TestCanonicalProof (A/B state distinguishable and restored), ::TestIntegrityAndCompatibilityGates, ::TestFileCopyAloneIsNotVerification (file copy alone = FAIL, as the requirement demands); executed by `python -m pytest tests/persistence -q` exit 0",
+      "note": "Verified by persist."
+    }
+  ]
+}

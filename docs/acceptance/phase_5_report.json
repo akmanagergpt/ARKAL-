@@ -1,0 +1,230 @@
+{
+ "phase_id": "5",
+ "objective": "Persistence + Project Registry + Minimal Backup/Restore, delivered as five atomic packages: the kernel.persistence C-03 foundation on SQLite+WAL behind engine-neutral repositories; the C-12 Project/Revision Registry with transitions delegated to the canonical Project state machine; minimal backup/restore under lifecycle.recovery, where a backup is not verified until an actual restore proves it; and the first Command Center vertical slice - the surfaces.command API under the Phase 4 PEP plus the React/TypeScript/Vite/Tailwind Project Registry frontend - closed by a real T10 browser journey.",
+ "ark_req_ids_closed": [
+  "ARK-REQ-0009",
+  "ARK-REQ-0011",
+  "ARK-REQ-0012",
+  "ARK-REQ-0153",
+  "ARK-REQ-0178",
+  "ARK-REQ-0229",
+  "ARK-REQ-0335"
+ ],
+ "files_created": [
+  "backend/alembic.ini",
+  "backend/alembic/env.py",
+  "backend/alembic/script.py.mako",
+  "backend/alembic/versions/0001_persistence_base_schema.py",
+  "backend/alembic/versions/0002_project_registry.py",
+  "backend/arkali/control/registry/project/errors.py",
+  "backend/arkali/control/registry/project/records.py",
+  "backend/arkali/control/registry/project/registry.py",
+  "backend/arkali/kernel/persistence/backup.py",
+  "backend/arkali/kernel/persistence/base.py",
+  "backend/arkali/kernel/persistence/engine.py",
+  "backend/arkali/kernel/persistence/migrations.py",
+  "backend/arkali/kernel/persistence/repository.py",
+  "backend/arkali/kernel/persistence/session.py",
+  "backend/arkali/lifecycle/recovery/backup_service.py",
+  "backend/arkali/lifecycle/recovery/manifest.py",
+  "backend/arkali/surfaces/command/app.py",
+  "backend/arkali/surfaces/command/contracts.py",
+  "backend/arkali/surfaces/command/error_mapping.py",
+  "backend/tests/persistence/__init__.py",
+  "backend/tests/persistence/test_backup_mechanics.py",
+  "backend/tests/persistence/test_migrations.py",
+  "backend/tests/persistence/test_persistence_foundation.py",
+  "backend/tests/persistence/test_project_registry.py",
+  "backend/tests/persistence/test_project_registry_integrity.py",
+  "backend/tests/persistence/test_recovery_lifecycle.py",
+  "backend/tests/structural/test_browser_journey_integrity.py",
+  "backend/tests/structural/test_contract_drift.py",
+  "backend/tests/structural/test_engine_confinement.py",
+  "backend/tests/structural/test_frontend_boundaries.py",
+  "backend/tests/structural/test_frontend_stack.py",
+  "backend/tests/structural/test_vertical_slice_linkage.py",
+  "backend/tests/structural/typescript_reader.py",
+  "backend/tests/surfaces/__init__.py",
+  "backend/tests/surfaces/test_command_api.py",
+  "docs/acceptance/phase_5_traceability.json",
+  "docs/contracts/persistence.md",
+  "docs/contracts/project_record.md",
+  "frontend/index.html",
+  "frontend/playwright.config.ts",
+  "frontend/src/api/client.ts",
+  "frontend/src/api/contracts.ts",
+  "frontend/src/app/App.tsx",
+  "frontend/src/components/ui.tsx",
+  "frontend/src/features/projects/CreateProjectForm.tsx",
+  "frontend/src/features/projects/ProjectDetail.tsx",
+  "frontend/src/features/projects/ProjectList.tsx",
+  "frontend/src/features/projects/ProjectRegistryPage.tsx",
+  "frontend/src/features/projects/useProjectRegistry.ts",
+  "frontend/src/index.css",
+  "frontend/src/main.tsx",
+  "frontend/src/vite-env.d.ts",
+  "frontend/tests/api/client.test.ts",
+  "frontend/tests/e2e/project-registry.spec.ts",
+  "frontend/tests/features/project-registry.test.tsx",
+  "frontend/tests/fixtures.ts",
+  "frontend/tests/setup.ts",
+  "scripts/run_command_center.py"
+ ],
+ "files_modified": [
+  "ARKALI_HANDOFF.md",
+  "backend/tests/security/test_pep_and_bypass.py",
+  "docs/build/BUILD_STATE.md",
+  "docs/build/DECISION_LOG.md",
+  "docs/build/KNOWN_FAILURES.md",
+  "docs/build/OPEN_BLOCKERS.md",
+  "frontend/package-lock.json",
+  "frontend/package.json",
+  "frontend/src/README.md",
+  "frontend/tsconfig.json",
+  "frontend/vite.config.ts",
+  "scripts/check_handoff.py"
+ ],
+ "public_contracts": [
+  "C-03 persistence contract - docs/contracts/persistence.md",
+  "C-12 project/revision record - docs/contracts/project_record.md",
+  "Command Center API (surfaces.command): GET /api/health, GET /api/lifecycle/project, GET /api/projects, POST /api/projects, GET /api/projects/{project_id}, POST /api/projects/{project_id}/transitions, POST /api/projects/{project_id}/revisions; refusals as {\"detail\": {\"code\", \"message\"}} with 400/403/404/409/422",
+  "frontend transport contract - frontend/src/api/contracts.ts, compared field by field against the live OpenAPI document by test_contract_drift.py"
+ ],
+ "migrations": [
+  "0001_persistence_base_schema",
+  "0002_project_registry"
+ ],
+ "state_machine_capability_changes": "No state machine added, removed or redefined. Phase 5 gives two existing Phase 3 machines a real executor and real persistence: Project (transitions issued through control.registry.project, evaluated by the canonical machine, stored in SQLite) and BackupRestore (lifecycle.recovery, where BACKUP_VERIFIED is reachable only through restore_proof_guard). Both remain reconciled against STATE_MACHINES.md on every run. The Capability Graph remains schema-only; every query still returns NOT_CONFIGURED (ADR-0003, activation is Phase 9B).",
+ "tests_executed": [
+  {
+   "command": "python -m pytest -q",
+   "exit_code": 0,
+   "passed": 1139,
+   "failed": 0,
+   "summary": "full regression: every applicable backend tier (T1-T5, T9, T11 and the architecture/structural controls) executed on real SQLite; 1139 passed, 13 skipped, 0 failed"
+  },
+  {
+   "command": "python -m pytest tests/security -q",
+   "exit_code": 0,
+   "passed": 185,
+   "failed": 0,
+   "summary": "security review: T9 tier - PDP determinism, PEP enforcement and bypass resistance over the now-existing surfaces.command surface, Protected Core boundary, Secret Vault, Local-Only, secret-leakage and no-path-leakage negative controls; 185 passed"
+  },
+  {
+   "command": "python -m pytest tests/structural tests/governance -q",
+   "exit_code": 0,
+   "passed": 356,
+   "failed": 0,
+   "summary": "adversarial review: the negative-control tier - engine confinement, no shadow state machine, no shadow policy, no fabricated production data, one API boundary, backend/frontend contract drift, T10 harness integrity and the vertical-slice linkage control, each written to fail on a real defect and each mutation-tested; 356 passed"
+  },
+  {
+   "command": "python scripts/check_repository_structure_negative.py",
+   "exit_code": 0,
+   "passed": 23,
+   "failed": 0,
+   "summary": "adversarial review: structure negative controls 23/23 - a violating construct is rejected in every non-owning context, survives rename and move, and the validator fails closed on unresolvable authority"
+  },
+  {
+   "command": "python scripts/check_phase_graph_negative.py",
+   "exit_code": 0,
+   "passed": 3,
+   "failed": 0,
+   "summary": "adversarial review: the phase-graph validator rejects a defective authoritative input and reports the injected deadlock rather than passing vacuously"
+  },
+  {
+   "command": "python -m pytest tests/persistence -q",
+   "exit_code": 0,
+   "passed": 113,
+   "failed": 0,
+   "summary": "T11 persistence tier: real SQLite, verified WAL, durability across close and reopen, migrations, and the canonical A -> backup -> B -> restore -> verify proof with file copy alone asserted as FAIL; 113 passed, 2 skipped"
+  },
+  {
+   "command": "python -m pytest tests/surfaces -q",
+   "exit_code": 0,
+   "passed": 28,
+   "failed": 0,
+   "summary": "T5 integration tier on real persistence: the Command Center API driven end to end, including persistence proven through a full engine and application restart; 28 passed"
+  },
+  {
+   "command": "python -m mypy --ignore-missing-imports arkali",
+   "exit_code": 0,
+   "passed": 108,
+   "failed": 0,
+   "summary": "T1 static tier: mypy strict, success, no issues found in 108 source files"
+  },
+  {
+   "command": "python scripts/check_repository_structure.py",
+   "exit_code": 0,
+   "passed": 12,
+   "failed": 0,
+   "summary": "repository structure validator 12/12 PASS, including check 12 confining runtime constructs to their canonical authority over 108 shipping modules"
+  },
+  {
+   "command": "python scripts/check_phase_graph.py",
+   "exit_code": 0,
+   "passed": 10,
+   "failed": 0,
+   "summary": "phase dependency graph 10/10 PASS, parsed from the authoritative documents"
+  },
+  {
+   "command": "python scripts/check_phase0_deliverables.py",
+   "exit_code": 0,
+   "passed": 27,
+   "failed": 0,
+   "summary": "Phase 0A 16/16 and Phase 0B 11/11 deliverables still resolved by file existence and content probe"
+  },
+  {
+   "command": "npm ci",
+   "exit_code": 0,
+   "passed": 0,
+   "failed": 0,
+   "summary": "frontend dependencies installed from the tracked lockfile; later additions (the Vitest tier, @playwright/test, @types/node) were made by real npm tooling, which updated package.json and package-lock.json - INSTALL_DEPENDENCY is LOCKFILE_BOUND and nothing was hand-written"
+  },
+  {
+   "command": "npm run typecheck",
+   "exit_code": 0,
+   "passed": 0,
+   "failed": 0,
+   "summary": "frontend TypeScript strict typecheck clean over src, tests and the Playwright configuration"
+  },
+  {
+   "command": "npm test",
+   "exit_code": 0,
+   "passed": 23,
+   "failed": 0,
+   "summary": "frontend component/integration tier under jsdom: 23 passed in 2 files, driving the real ArkaliApiClient with only the network controlled. This is NOT browser E2E and is not offered as T10 evidence anywhere"
+  },
+  {
+   "command": "npm run build",
+   "exit_code": 0,
+   "passed": 0,
+   "failed": 0,
+   "summary": "Vite production build succeeded: 38 modules transformed, dist/assets 12.77 kB CSS and 158.75 kB JS, proving the Tailwind and TypeScript sources compile to a shippable artifact"
+  },
+  {
+   "command": "npx playwright test",
+   "exit_code": 0,
+   "passed": 9,
+   "failed": 0,
+   "summary": "T10 browser/E2E at execution level L2: 9 passed in real Chromium 151.0.7922.34 against the Vite production build served by vite preview, proxied to a real uvicorn-served surfaces.command process over a real Alembic-migrated SQLite file. Journey: empty state, create, list, detail, revision, a forbidden transition refused by the Project machine with its own code ARK-ERR-0013 and the displayed state unchanged, a duplicate registration refused with ARK-ERR-0012, a legal transition to SPECIFIED, a page reload, and a completely fresh browser context with empty localStorage and sessionStorage. Nothing substituted"
+  }
+ ],
+ "architecture_checks": "8 canonical gates executed by GateRunner: all PASS over 64 real cross-context edges, with reconcile() confirming the declared and implemented gate sets agree. All 9 numeric budgets evaluated under the ratified measurement contract 1.0.0 (ERR-003): no violation. max_contexts_touched_by_module was the binding constraint on surfaces.command and is why error mapping lives in its own module (ADR-0008 decomposition) rather than being granted an exception. Structure validator 12/12; structure negative controls 23/23; phase graph 10/10 plus its negative control.",
+ "duplicate_shadow_check": "PASS. The Project machine remains the only transition authority: control.registry.project calls evaluate() and declares no transition table, surfaces.command declares no lifecycle state literal, and the frontend is forbidden by executable control from naming a canonical state as a whole token or declaring any relation-shaped identifier. GET /api/lifecycle/project publishes the machine's state vocabulary only - transitions, forbidden and terminal are deliberately never published, asserted by a negative control - so no client can decide legality for itself. Policy authority is likewise single: no operation class from the canonical vocabulary, no TRUST tier and no PDP/PEP identifier appears in frontend production source. Persistence is single: no browser store is used, and the transport types are compared field by field against the live OpenAPI document rather than maintained as a second model.",
+ "security_findings": "None open. Every Command Center route enforces through the Phase 4 PEP - READ_FILE for reads, WRITE_WORKSPACE_FILE for writes - and a control parses the deployed source and fails if any route skips the guard, so a new unguarded endpoint cannot become a silent bypass. WRITE_STABLE_FILE and ROLLBACK_STABLE are never requested by this surface and both remain DENY to its actor. Refusal bodies carry only a stable code and the domain message: no filesystem path, no database URL, no ORM object, no traceback, no dialect name and no secret-shaped field, each asserted by a negative control. A refused write is proven absent after a restart. lifecycle.recovery is Protected Core and was changed, so the stronger verification profile applies and its three categories were executed.",
+ "fake_success_scan": "Clean. Structure validator checks 9-12 PASS. No capability is claimed from the existence of a file: the ARK-REQ-0229 control asserts each link against the thing it links to and proves the runtime chain by writing through HTTP, discarding the application, and reading the row back through a separate engine. The first version of that control was vacuous - it searched the whole module graph for each client operation and found them in the client that declares them - and a mutation removing the page's transition call did not fail it; that was found by mutation testing, fixed, and recorded in DECISION_LOG.md. Every control added in this phase was mutation-tested before being relied on. T10 is real and its harness is itself controlled: an in-memory database, an intercepted route or a substituted application fails test_browser_journey_integrity.py. The 23 jsdom component tests are recorded as component evidence and are nowhere offered as browser E2E.",
+ "evidence_created": [
+  "EV-0043",
+  "EV-0044",
+  "EV-0045",
+  "EV-0046",
+  "EV-0047",
+  "EV-0048",
+  "EV-0049",
+  "EV-0050"
+ ],
+ "limitations": "T10 covers one capability - the Project Registry - in Chromium only. Firefox and WebKit are not installed and no cross-browser claim is made. The journey runs on loopback against a locally served build; there is no packaged-release or clean-environment evidence (T14, Phase 36). Backup/restore is MINIMAL: no Recovery Supervisor (Phase 22B), no ROLLBACK_STABLE, which the PDP denies for every actor, and no cross-schema-revision restore - a restore requires an exactly matching schema revision rather than migrating across one (Phase 20). Python is 3.12.10, not the canonical 3.13; no Python lockfile exists because no lock tool is present; ruff and hypothesis are absent, so the T6 property tier is NOT_CONFIGURED. Rust/Tauri is UNSUPPORTED on this host. Five of the six canonical execution surfaces do not exist, so end-to-end bypass resistance across all six (ARK-REQ-0325, 0347) remains Phase 31 and is not claimed. provenance_ref is a nullable reference: content-addressed revision identity is Phase 6.",
+ "blockers": "none. 0 BLOCKER, 0 HIGH. No finding was opened by this phase.",
+ "next_exact_action": "Begin Phase 6 - Artifact / Evidence Plane (C-14, C-15) per IMPLEMENTATION_DEPENDENCY_MATRIX.md, once the Phase Gate Checker records Phase 5 as accepted and unlocks it.",
+ "status": "PASS"
+}
