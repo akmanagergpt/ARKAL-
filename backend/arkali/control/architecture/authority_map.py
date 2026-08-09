@@ -11,7 +11,7 @@ consumer changes with it.
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Self
+from typing import Any, Final, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict
@@ -19,6 +19,16 @@ from pydantic import BaseModel, ConfigDict
 from arkali.kernel.contracts.errors import AuthoritativeSourceError
 
 AUTHORITY_MAP_RELPATH = "docs/canonical/AUTHORITY_MAP.yaml"
+
+#: `dependency_rules` key suffixes that declare an exception to the layer
+#: direction rule (ARCHITECTURE.md section 4 rules 5 and 6). The SUBJECT is the
+#: part before the suffix and is resolved against the map at call time, so an
+#: exemption is added or removed by editing AUTHORITY_MAP.yaml and never here
+#: (F-0028). Keys not ending in one of these are not exemptions.
+_EXEMPTION_SUFFIXES: Final[tuple[str, ...]] = (
+    "_callable_from_any_layer",
+    "_write_from_any_layer",
+)
 
 
 class BoundedContext(BaseModel):
@@ -56,6 +66,10 @@ class AuthorityMap(BaseModel):
     contexts: dict[str, BoundedContext]
     concerns: tuple[ConcernOwnership, ...]
     sibling_edges: tuple[SiblingEdge, ...]
+    #: Declared dependency direction rules. Parsed rather than assumed: the
+    #: gate that enforces direction reads this, so the canonical declaration
+    #: and the executable rule cannot diverge (F-0028).
+    dependency_rules: dict[str, Any]
     architecture_budgets: dict[str, Any]
     #: Measurement formulas for the budgets above (ERR-003). Data, not code:
     #: the gate reads it and no validator holds a private copy.
@@ -121,6 +135,7 @@ class AuthorityMap(BaseModel):
             contexts=contexts,
             concerns=concerns,
             sibling_edges=edges,
+            dependency_rules=raw.get("dependency_rules", {}),
             architecture_budgets=raw["architecture_budgets"],
             architecture_budget_measurement=raw.get(
                 "architecture_budget_measurement", {}
@@ -140,6 +155,72 @@ class AuthorityMap(BaseModel):
         if context is None:
             raise AuthoritativeSourceError(f"unknown context {context_name!r}")
         return self.layer_ranks[context.layer]
+
+    @staticmethod
+    def _exemption_subject(key: str) -> str | None:
+        """The subject of a cross-layer exemption key, or None if not one."""
+        for suffix in _EXEMPTION_SUFFIXES:
+            if key.endswith(suffix):
+                return key[: -len(suffix)]
+        return None
+
+    def _contexts_for_subject(self, subject: str) -> set[str]:
+        """Resolve an exemption subject to contexts.
+
+        Namespace first, then context final segment, then layer name. Order is
+        load-bearing: `evidence` must resolve to the `evidence.*` contexts and
+        NOT to `acceptance.engine`, which merely shares the `evidence` layer.
+        ARCHITECTURE.md section 4 rule 5 grants the write exception to
+        `evidence.*` by name; rule 6 names `control.policy`.
+        """
+        namespace = {n for n in self.contexts
+                     if n == subject or n.startswith(subject + ".")}
+        if namespace:
+            return namespace
+        segment = {n for n in self.contexts if n.rsplit(".", 1)[-1] == subject}
+        if segment:
+            return segment
+        return {n for n, c in self.contexts.items() if c.layer == subject}
+
+    def cross_layer_exempt_contexts(self) -> frozenset[str]:
+        """Contexts reachable from any layer, derived from `dependency_rules`.
+
+        An enabled rule whose subject resolves to nothing raises rather than
+        silently granting or silently dropping the exemption.
+        """
+        exempt: set[str] = set()
+        for key, enabled in self.dependency_rules.items():
+            subject = self._exemption_subject(key)
+            if subject is None or not enabled:
+                continue
+            resolved = self._contexts_for_subject(subject)
+            if not resolved:
+                raise AuthoritativeSourceError(
+                    f"dependency rule {key!r} is enabled but its subject "
+                    f"{subject!r} matches no context, namespace or layer",
+                    source=self.source_path,
+                )
+            exempt |= resolved
+        return frozenset(exempt)
+
+    def edge_permitted(self, source: str, target: str) -> bool:
+        """Whether an import edge `source -> target` is allowed.
+
+        Every clause reads `dependency_rules`; none is assumed. The defaults
+        below are the strict reading, so a map that omits a rule cannot widen
+        the architecture by omission.
+        """
+        if target in self.cross_layer_exempt_contexts():
+            return True
+        if (source, target) in {(e.source, e.target) for e in self.sibling_edges}:
+            return True
+        rules = self.dependency_rules
+        source_rank, target_rank = self.rank_of(source), self.rank_of(target)
+        if target_rank < source_rank:
+            return bool(rules.get("allow_lower_layer", False))
+        if target_rank == source_rank:
+            return bool(rules.get("allow_same_layer", False))
+        return bool(rules.get("allow_higher_layer", False))
 
     def context_for_module(self, dotted: str) -> str | None:
         """Longest-prefix match from a dotted module path to its owning context."""

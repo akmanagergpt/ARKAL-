@@ -20,7 +20,10 @@ Checks (Phase 1 scope only):
   9  no secret-bearing file is tracked
  10  no fake implementation markers
  11  no Stable mutation path introduced
- 12  no forward-phase runtime construct (web app / ORM engine)
+ 12  every runtime construct is built inside the bounded context canonical
+     architecture makes responsible for it (ORM/database engine, web
+     application/router). Authority is resolved from ARCHITECTURE.md section 3
+     and AUTHORITY_MAP.yaml, never from a list held here (F-0027)
 
 Exit 0 = all PASS. Exit 1 = at least one FAIL.
 """
@@ -35,6 +38,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUTH = os.path.join(ROOT, "docs/canonical/AUTHORITY_MAP.yaml")
+ARCH = os.path.join(ROOT, "docs/canonical/ARCHITECTURE.md")
 
 def _is_illegal_module_segment(seg: str) -> bool:
     """Authoritative, generic test - not a hand-maintained word list.
@@ -83,6 +87,108 @@ def is_stable_mutation_path(body: str, classes: list[str]) -> bool:
         return False
     named = re.compile("|".join(re.escape(c) for c in classes))
     return bool(named.search(body) and STABLE_WRITE_PATTERN.search(body))
+
+#: Check 12: runtime construct classes, each bound to the canonical sentence
+#: that assigns it an owning bounded context. Defect F-0027.
+#:
+#: The predecessor listed the same constructs and forbade them everywhere,
+#: with a comment conceding they "belong to Phase 5 and beyond" - a rule
+#: authored knowing it would become wrong. The durable rule is not "later
+#: phase" but "wrong authority": a runtime construct may only be built inside
+#: the context canonical architecture makes responsible for it.
+#:
+#: NOTHING BELOW IS A PATH. `responsibility_phrase` is matched against the
+#: ARCHITECTURE.md section 3 bounded-context responsibility table at run time
+#: and the result is cross-validated against AUTHORITY_MAP.yaml. Moving a
+#: responsibility in the canonical document moves the rule with it; a phrase
+#: that resolves to nothing FAILS the check rather than passing vacuously
+#: (F-0008, F-0013, F-0016).
+RUNTIME_CONSTRUCTS: dict[str, dict[str, object]] = {
+    "persistence/ORM engine": {
+        "responsibility_phrase": "DB engine",
+        "patterns": [r"\bcreate_engine\s*\(", r"\bcreate_async_engine\s*\(",
+                     r"\bsessionmaker\s*\(", r"\basync_sessionmaker\s*\(",
+                     r"\bdeclarative_base\s*\(", r"\bDeclarativeBase\b"],
+    },
+    "web application/router": {
+        "responsibility_phrase": "API",
+        "patterns": [r"\bFastAPI\s*\(", r"\bAPIRouter\s*\(", r"@app\.",
+                     r"@router\.", r"\buvicorn\.run\s*\("],
+    },
+}
+
+#: A section 3 row: | n | `context.name` | Ln | canonical responsibility |
+CONTEXT_ROW = re.compile(
+    r"^\|\s*\d+\s*\|\s*`([a-z0-9_.]+)`\s*\|\s*L\d\s*\|\s*(.+?)\s*\|\s*$"
+)
+
+
+def canonical_responsibilities(arch_text: str) -> dict[str, str]:
+    """context -> canonical responsibility, parsed from ARCHITECTURE.md section 3."""
+    return {m.group(1): m.group(2)
+            for m in (CONTEXT_ROW.match(ln) for ln in arch_text.splitlines()) if m}
+
+
+def construct_authority(phrase: str, responsibilities: dict[str, str],
+                        contexts: dict) -> tuple[list[str], str]:
+    """Contexts canonically responsible for `phrase`, or an error explaining why not.
+
+    Fails closed in both directions: a phrase matching no context, or matching a
+    context the authority map does not declare, yields no authority and an error.
+    """
+    owners = sorted(c for c, text in responsibilities.items() if phrase in text)
+    undeclared = [c for c in owners if c not in contexts]
+    if not owners:
+        return [], f"{phrase!r} matches no ARCHITECTURE section 3 responsibility"
+    if undeclared:
+        return [], f"{phrase!r} resolves to contexts absent from AUTHORITY_MAP: {undeclared}"
+    return owners, ""
+
+
+def shipping_root(contexts: dict) -> str:
+    """The package prefix shared by every declared context, derived not listed."""
+    roots = [m["module_root"] for m in contexts.values()]
+    prefix = os.path.commonprefix(roots)
+    return prefix[: prefix.rfind("/") + 1]
+
+
+def owning_context(rel_path: str, contexts: dict) -> str | None:
+    """Longest module_root match for a repository-relative path."""
+    best, best_len = None, -1
+    for name, meta in contexts.items():
+        root = meta["module_root"] + "/"
+        if rel_path.startswith(root) and len(root) > best_len:
+            best, best_len = name, len(root)
+    return best
+
+
+def construct_violations(files: dict[str, str], contexts: dict,
+                         responsibilities: dict[str, str]) -> list[str]:
+    """Runtime constructs built outside the authority canonically responsible.
+
+    `files` maps repository-relative path -> source text, already restricted to
+    the shipping package. Ownership is resolved only for a file that actually
+    contains a construct, so grouping `__init__.py` files owned by no context
+    are irrelevant until one of them builds something.
+    """
+    found: list[str] = []
+    for label, spec in RUNTIME_CONSTRUCTS.items():
+        authority, error = construct_authority(
+            str(spec["responsibility_phrase"]), responsibilities, contexts)
+        if error:
+            found.append(f"{label}: canonical authority unresolvable - {error}")
+            continue
+        for rel, body in sorted(files.items()):
+            if not any(re.search(p, body) for p in spec["patterns"]):  # type: ignore[union-attr]
+                continue
+            owner = owning_context(rel, contexts)
+            if owner is None:
+                found.append(f"{rel}: {label} in a file owned by no declared context")
+            elif owner not in authority:
+                found.append(f"{rel}: {label} owned by {owner}, "
+                             f"canonical authority is {authority}")
+    return found
+
 
 results: list[tuple[str, str, str]] = []   # (state, name, detail)
 
@@ -330,25 +436,34 @@ def main() -> int:
            f"11 no Stable mutation path introduced "
            f"(classes derived: {stable_classes})", str(stable))
 
-    # 12 no forward-phase RUNTIME construct
-    #   Phase-scoped predecessor ("no Phase 2+ capability") retired: Phase 2
-    #   legitimately implements Pydantic contract models per the canonical stack.
-    #   What remains forbidden is genuinely later-phase runtime: a web app or an
-    #   ORM engine, which belong to Phase 5 and beyond.
-    forbidden = []
+    # 12 runtime construct built outside its canonical authority (F-0027)
+    #
+    #   The predecessor was phase-scoped: it forbade ORM-engine and web-app
+    #   construction everywhere, and its own comment conceded those belong to
+    #   "Phase 5 and beyond". Sixth instance of a phase-scoped check outliving
+    #   its phase (cf. F-0008, F-0013, F-0016, F-0019, F-0022), and the first to
+    #   fail in the rejecting direction.
+    #
+    #   The durable rule is authority, not phase. The owning context for each
+    #   construct class is resolved from ARCHITECTURE.md section 3 and validated
+    #   against AUTHORITY_MAP.yaml; the validator holds no path list. Scope is
+    #   the shipping package - itself derived from the declared module roots -
+    #   over tracked AND untracked working-tree files, so a construct added by
+    #   the phase under validation is visible before it is committed (F-0016).
+    responsibilities = canonical_responsibilities(
+        open(ARCH, encoding="utf-8").read())
+    prefix = shipping_root(contexts)
+    shipping: dict[str, str] = {}
     for f in tracked_files():
-        if not f.endswith(".py") or f.startswith(("scripts/", "backend/tests/")):
+        if not f.endswith(".py") or not f.startswith(prefix):
             continue
         fp = os.path.join(ROOT, f)
-        if not os.path.isfile(fp):
-            continue
-        body = open(fp, encoding="utf-8").read()
-        for pat in [r"FastAPI\(", r"APIRouter\(", r"@app\.", r"create_engine\(",
-                    r"declarative_base\(", r"sessionmaker\("]:
-            if re.search(pat, body):
-                forbidden.append(f"{f}: {pat}")
+        if os.path.isfile(fp):
+            shipping[f] = open(fp, encoding="utf-8").read()
+    forbidden = construct_violations(shipping, contexts, responsibilities)
     record("PASS" if not forbidden else "FAIL",
-           "12 no forward-phase runtime construct (web app / ORM engine)",
+           f"12 runtime constructs confined to their canonical authority "
+           f"({len(shipping)} shipping modules under {prefix!r})",
            str(forbidden))
 
     print()

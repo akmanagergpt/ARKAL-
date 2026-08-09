@@ -25,7 +25,7 @@ from arkali.control.architecture.budget_measurement import (
 from arkali.control.architecture.gates.base import ArchitectureGate, GateContext
 from arkali.kernel.contracts.results import CheckResult, HonestState
 
-_SRC = "AUTHORITY_MAP.yaml + ARCHITECTURE.md dependency direction rules"
+_SRC = "AUTHORITY_MAP.yaml dependency_rules + ARCHITECTURE.md section 4"
 PACKAGE_ROOT = "backend/arkali"
 
 
@@ -96,14 +96,21 @@ def _context_edges(ctx: GateContext) -> tuple[dict[str, set[str]], int]:
 
 
 class ForbiddenDependencyDirectionGate(ArchitectureGate):
-    """A context may depend only on strictly lower layers, plus declared siblings."""
+    """Every import edge must be permitted by the declared `dependency_rules`.
+
+    NO SHADOW MODEL (F-0028). An earlier version implemented layer rank plus
+    `allowed_sibling_edges` only, while the map declared two further exceptions
+    - `policy_callable_from_any_layer`, `evidence_write_from_any_layer` - that
+    `AuthorityMap` did not even parse, so the gate rejected two edge classes
+    ARCHITECTURE.md section 4 rules 5 and 6 permit. The decision now belongs to
+    `AuthorityMap.edge_permitted`, which reads the declaration.
+    """
 
     gate_id = "forbidden_dependency_direction"
     authoritative_source = _SRC
 
     def evaluate(self, ctx: GateContext) -> CheckResult:
         amap = ctx.authority_map
-        siblings = {(e.source, e.target) for e in amap.sibling_edges}
         edges = 0
         violations: list[str] = []
         for path in iter_modules(ctx.repo_root):
@@ -115,9 +122,7 @@ class ForbiddenDependencyDirectionGate(ArchitectureGate):
                 if target is None or target == owner:
                     continue
                 edges += 1
-                if amap.rank_of(target) < amap.rank_of(owner):
-                    continue
-                if (owner, target) in siblings:
+                if amap.edge_permitted(owner, target):
                     continue
                 violations.append(
                     f"{owner} (rank {amap.rank_of(owner)}) imports "
