@@ -131,6 +131,14 @@ class ProjectRegistry:
         self._session.flush()
         return record
 
+    def list_projects(self) -> tuple[ProjectRecord, ...]:
+        """Every registered project, ordered by identity for deterministic output."""
+        return tuple(
+            self._session.execute(
+                select(ProjectRecord).order_by(ProjectRecord.project_id)
+            ).scalars().all()
+        )
+
     def revision(self, revision_id: str) -> ProjectRevisionRecord | None:
         return self._session.execute(
             select(ProjectRevisionRecord).where(

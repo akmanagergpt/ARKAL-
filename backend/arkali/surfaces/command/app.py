@@ -1,0 +1,199 @@
+"""Command Center API — the Phase 5 vertical slice surface.
+
+Owner: `surfaces.command` (layer rank 6). `ARCHITECTURE.md` section 3 assigns
+"Command Center API + frontend" to this context, and it is the only context in
+which structure check 12 permits a web application to be constructed.
+
+DELEGATION, NOT DATA ACCESS. Every route calls `ProjectRegistry`. This module
+issues no query, builds no statement and touches no mapped column directly: the
+registry is the Project/Revision identity authority and the Project state
+machine is the lifecycle authority, and a surface that reached past either would
+become a second one. A control parses this source and fails if it does.
+
+POLICY IS ENFORCED HERE. Rank 6 may call `control.policy` at rank 1, so this is
+the legal call site the lower layers deliberately left empty. Reads request
+`READ_FILE`, writes request `WRITE_WORKSPACE_FILE`; every decision lands on the
+Phase 4 audit trail. `WRITE_STABLE_FILE` and `ROLLBACK_STABLE` are never
+requested by this surface.
+
+SCOPE. The minimum needed to prove the slice end to end: health, list, create,
+get, one lifecycle transition, and revision creation. This is not a generic CRUD
+API and deliberately offers no delete, no update and no bulk operation.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Final
+
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from sqlalchemy import Engine
+from sqlalchemy.orm import Session
+
+from arkali.control.policy.pdp import PolicyDecisionPoint
+from arkali.control.policy.pep import PolicyEnforcementPoint
+from arkali.control.policy.policy_contract import PolicyRequest
+from arkali.control.registry.project.records import ProjectRecord
+from arkali.control.registry.project.registry import ProjectRegistry
+from arkali.kernel.persistence.migrations import applied_revision
+from arkali.kernel.persistence.session import create_session_factory, unit_of_work
+from arkali.surfaces.command.contracts import (
+    CreateProjectRequest,
+    CreateRevisionRequest,
+    ErrorResponse,
+    HealthResponse,
+    ProjectDetailResponse,
+    ProjectListResponse,
+    ProjectResponse,
+    RevisionResponse,
+    TransitionRequest,
+)
+from arkali.surfaces.command.error_mapping import code_of, message_of, status_for
+
+#: The actor this surface presents to the PDP.
+ACTOR: Final[str] = "surfaces.command"
+TRUST_TIER: Final[str] = "TRUST-0"
+SURFACE: Final[str] = "surfaces.command.api"
+
+READ: Final[str] = "READ_FILE"
+WRITE: Final[str] = "WRITE_WORKSPACE_FILE"
+
+
+def _project_response(record: ProjectRecord) -> ProjectResponse:
+    return ProjectResponse(
+        project_id=record.project_id,
+        name=record.name,
+        lifecycle_state=record.lifecycle_state,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
+
+
+def _detail(registry: ProjectRegistry, record: ProjectRecord) -> ProjectDetailResponse:
+    revisions = tuple(
+        RevisionResponse(
+            revision_id=r.revision_id,
+            sequence=r.sequence,
+            created_at=r.created_at,
+            provenance_ref=r.provenance_ref,
+        )
+        for r in registry.revisions_of(record.project_id)
+    )
+    return ProjectDetailResponse(
+        **_project_response(record).model_dump(), revisions=revisions
+    )
+
+
+def create_app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
+    """Build the Command Center API over a real engine and a real PDP.
+
+    Both are injected. There is no default that would let a caller obtain an
+    application backed by something other than the Phase 5 persistence layer.
+    """
+    factory = create_session_factory(engine)
+    pep = PolicyEnforcementPoint(pdp, SURFACE)
+    app = FastAPI(title="ARKALI Command Center", version="0.1.0")
+    app.state.pep = pep
+
+    def session_scope() -> Iterator[Session]:
+        with unit_of_work(factory) as session:
+            yield session
+
+    def guard(operation: str) -> None:
+        pep.require_auto(
+            PolicyRequest(
+                operation_class=operation, trust_tier=TRUST_TIER, actor=ACTOR
+            )
+        )
+
+    def refuse(error: Exception) -> HTTPException:
+        """Turn a domain refusal into its mapped response, or re-raise it."""
+        status = status_for(error)
+        if status is None:
+            raise error
+        return HTTPException(
+            status_code=status,
+            detail=ErrorResponse(
+                code=code_of(error), message=message_of(error)
+            ).model_dump(),
+        )
+
+    router = APIRouter(prefix="/api")
+
+    @router.get("/health", response_model=HealthResponse)
+    def health() -> HealthResponse:
+        guard(READ)
+        return HealthResponse(status="ready", schema_revision=applied_revision(engine))
+
+    @router.get("/projects", response_model=ProjectListResponse)
+    def list_projects(
+        session: Session = Depends(session_scope),
+    ) -> ProjectListResponse:
+        guard(READ)
+        registry = ProjectRegistry(session)
+        return ProjectListResponse(
+            projects=tuple(_project_response(p) for p in registry.list_projects())
+        )
+
+    @router.post("/projects", response_model=ProjectDetailResponse, status_code=201)
+    def create_project(
+        body: CreateProjectRequest, session: Session = Depends(session_scope)
+    ) -> ProjectDetailResponse:
+        guard(WRITE)
+        registry = ProjectRegistry(session)
+        try:
+            record = registry.create_project(body.project_id, body.name)
+        except Exception as error:
+            raise refuse(error) from error
+        return _detail(registry, record)
+
+    @router.get("/projects/{project_id}", response_model=ProjectDetailResponse)
+    def get_project(
+        project_id: str, session: Session = Depends(session_scope)
+    ) -> ProjectDetailResponse:
+        guard(READ)
+        registry = ProjectRegistry(session)
+        try:
+            record = registry.require(project_id)
+        except Exception as error:
+            raise refuse(error) from error
+        return _detail(registry, record)
+
+    @router.post(
+        "/projects/{project_id}/transitions", response_model=ProjectDetailResponse
+    )
+    def transition(
+        project_id: str,
+        body: TransitionRequest,
+        session: Session = Depends(session_scope),
+    ) -> ProjectDetailResponse:
+        guard(WRITE)
+        registry = ProjectRegistry(session)
+        try:
+            registry.transition(project_id, body.target)
+            record = registry.require(project_id)
+        except Exception as error:
+            raise refuse(error) from error
+        return _detail(registry, record)
+
+    @router.post(
+        "/projects/{project_id}/revisions",
+        response_model=ProjectDetailResponse,
+        status_code=201,
+    )
+    def create_revision(
+        project_id: str,
+        body: CreateRevisionRequest,
+        session: Session = Depends(session_scope),
+    ) -> ProjectDetailResponse:
+        guard(WRITE)
+        registry = ProjectRegistry(session)
+        try:
+            registry.create_revision(project_id, body.revision_id, body.provenance_ref)
+            record = registry.require(project_id)
+        except Exception as error:
+            raise refuse(error) from error
+        return _detail(registry, record)
+
+    app.include_router(router)
+    return app

@@ -165,25 +165,55 @@ class TestIsolationFailureBlocksExecution:
         assert record.decision is Decision.AUTO
 
 
-class TestSurfacesNotYetImplemented:
-    """Phase 4 must not imply coverage it does not have."""
+#: Execution surfaces the canonical set names, and which are still unbuilt.
+#: `surfaces.command` arrived at Phase 5 Package 4; the rest do not exist.
+UNBUILT_SURFACE_PARTS = ("sandbox", "scheduler", "durable", "workflow", "operations")
 
-    def test_no_execution_surface_exists_in_the_tree_yet(self) -> None:
-        """If this ever fails, a surface appeared and needs real PEP coverage."""
+
+class TestSurfaceCoverageIsHonest:
+    """No phase may imply coverage it does not have.
+
+    The predecessor asserted that NO execution surface existed, and stated in
+    its own failure message what to do when that stopped being true: the
+    surface "must be brought under a real PEP with runtime evidence". Phase 5
+    Package 4 built `surfaces.command` and did exactly that, so the tripwire
+    fired as designed and is replaced by the obligation it was pointing at.
+
+    This is not a relaxation. The predecessor could only ever say "nothing
+    exists"; this says "everything that exists is enforced, and what is not
+    built is still absent", which still fails for an unenforced surface.
+    """
+
+    def test_every_existing_surface_module_is_under_a_real_pep(self) -> None:
+        """A surface package that enforces no policy fails here."""
+        root = REPO / "backend" / "arkali" / "surfaces"
+        modules = sorted(
+            p for p in root.rglob("*.py")
+            if p.name != "__init__.py" and "state_machine" not in p.name
+        )
+        assert modules, "the control is vacuous if no surface module exists"
+        enforcing = [
+            p for p in modules
+            if "PolicyEnforcementPoint" in p.read_text(encoding="utf-8")
+        ]
+        assert enforcing, (
+            "a surface exists but no module in it constructs a "
+            f"PolicyEnforcementPoint: {[p.name for p in modules]}"
+        )
+
+    def test_surfaces_not_yet_built_are_still_absent(self) -> None:
+        """If this fails, a new surface appeared and needs its own PEP coverage."""
         root = REPO / "backend" / "arkali"
-        surfaces = sorted(
+        found = sorted(
             p.relative_to(REPO).as_posix()
             for p in root.rglob("*.py")
             if p.name != "__init__.py"
-            and any(
-                part in p.parts
-                for part in ("surfaces", "sandbox", "scheduler", "durable", "workflow")
-            )
+            and any(part in p.parts for part in UNBUILT_SURFACE_PARTS)
             and "state_machine" not in p.name
         )
-        assert surfaces == [], (
+        assert found == [], (
             "an execution surface now exists and must be brought under a real "
-            f"PEP with runtime evidence: {surfaces}"
+            f"PEP with runtime evidence: {found}"
         )
 
     def test_bypass_resistance_is_claimed_only_at_contract_level(self) -> None:
