@@ -35,7 +35,7 @@ from arkali.kernel.contracts.state_machine_errors import (
 )
 from arkali.kernel.persistence.backup import SQLITE_MAGIC
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.kernel.persistence.migrations import applied_revision
+from arkali.kernel.persistence.migrations import applied_revision, head_revision
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 from arkali.lifecycle.recovery.backup_restore_state_machine import DEFINITION, build
@@ -297,7 +297,10 @@ class TestIntegrityAndCompatibilityGates:
     ) -> None:
         """NEGATIVE CONTROL 6 and 7: manifest/database revision mismatch."""
         backup = backup_of(service, engine, tmp_path)
-        assert backup.manifest.schema_revision == "0002_project_registry"
+        # F-0032: the chain head is derived, never transcribed. A literal here
+        # pinned the head that was current when the test was written and
+        # expired the moment a legitimate migration was added.
+        assert backup.manifest.schema_revision == head_revision(BACKEND)
         wrong = backup.manifest.model_copy(
             update={"schema_revision": "9999_not_a_real_revision"}
         )

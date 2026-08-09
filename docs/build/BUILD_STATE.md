@@ -1,19 +1,21 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 5 MACHINE-ACCEPTED. PHASE 6 UNLOCKED, NOT STARTED.**
+**Current state:** **PHASE 5 MACHINE-ACCEPTED. PHASE 6 UNLOCKED — IN PROGRESS, NOT ACCEPTED.**
 
-Phase 5 was submitted to the real Phase Gate Checker and returned `PHASE_ACCEPTED_BY_MACHINE`: C1–C6 PASS, PROTECTED_CORE **COMPLETE**, RESCORING NOT_APPLICABLE (Phase 5 has no prior acceptance record), FINDINGS and PREREQ PASS, and all 8 architecture gates non-failing. **7/7** Phase 5 MANDATORY requirements are SATISFIED in `phase_5_traceability.json` with a named implementation and a named evidence source, and C6 reconciled every one of them against the report's discharged set.
+Phase 5 is accepted and unchanged; its record stands. Phase 6 has begun and is delivered in atomic packages.
 
-**The change set is Protected Core.** `select_profile` classified it from its own changed paths — `lifecycle.recovery` was touched — and returned PROTECTED_CORE. All three canonical categories were executed at exit 0: *security review* (185 tests), *adversarial review* (356 tests plus both negative-control validators) and *full regression* (1139 passed, 13 skipped). The profile was derived, not declared: nothing in the report can propose one.
+**Package 1 (C-14) is complete.** `evidence.artifact` now holds the artifact descriptor, the provenance record and parent edges, with identity that *is* the content address — derived from the bytes by the only hashing site in the context, never supplied by a caller. Artifacts and provenance records are immutable by ORM refusal; stored bytes are verified on every read and a mismatch is reported, never repaired. Blob writes are governed by the Phase 4 PEP under `WRITE_WORKSPACE_FILE`; the two stable-mutation classes are never requested and never named. Migration `0003_artifact_provenance` extends the existing chain. C-12 was **not** touched: a 71-character address fits its existing `String(200)` column, and `control.registry.project` still imports nothing from `evidence.artifact`.
 
-**T10 is real for the first time in this build.** Nine browser tests ran in Chromium 151.0.7922.34 against the Vite **production build**, proxied to a live uvicorn-served `surfaces.command` process over a real Alembic-migrated SQLite file. The journey covers create → list → detail → revision → forbidden transition refused by the Project machine with its own code → legal transition → page reload → a completely fresh browser context with empty storage. Nothing was substituted, and `test_browser_journey_integrity.py` fails if the harness ever is.
+**Package 2 (C-15, the audit / evidence integrity chain) is NOT started.** It is owned by `evidence.audit`, which is **Protected Core**, so the stronger verification profile will apply to the phase — it has **not** been run or claimed yet. A control asserts `evidence.artifact` builds no audit chain of its own in the meantime.
 
-**Cumulative verified MANDATORY requirements: 72** (5 + 23 + 4 + 33 + **7**).
+**ARK-REQ-0004, ARK-REQ-0057 and ARK-REQ-0349 are NOT discharged.** No Phase 6 report, no traceability record, no gate run. Cumulative verified stays at **72**.
+
+**F-0032 opened and closed** — three tests transcribed the migration-chain head and expired when the chain legitimately advanced. Proven mechanically to be stale literals rather than a defect, then repaired by deriving the head. Ninth instance of that family.
 
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 5 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
+**Last updated by:** Phase 6 Atomic Package 1 (C-14 artifact descriptor + provenance)
 **Governance errata and rulings:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) · **ERR-004** (confirms F-0024, orders remediation) · **GOV-001** (superseding re-acceptance rule; ratifies the Phase 4 re-acceptance) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -30,7 +32,7 @@ Phase 5 was submitted to the real Phase Gate Checker and returned `PHASE_ACCEPTE
 | 3 | Formal State Machines + Capability Graph Schema | **MACHINE-ACCEPTED** (12 machines, C-13 schema, 444 new tests) |
 | 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED** (re-accepted after the ERR-004 remediation; the defective first revision is retained as evidence) |
 | 5 | Persistence + Project Registry + Minimal Backup/Restore | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`; C1–C6 PASS, PROTECTED_CORE COMPLETE. Five atomic packages; 7/7 requirements SATISFIED and discharged under C6. First real T10: 9 browser tests in Chromium against the production build, a live API and a real SQLite file) |
-| 6 | Artifact / Evidence Plane (C-14, C-15) | **UNLOCKED — NOT_STARTED** ← next |
+| 6 | Artifact / Evidence Plane (C-14, C-15) | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Package 1 complete: C-14 artifact descriptor + provenance under `evidence.artifact`, content addressing, immutability and migration `0003_artifact_provenance`. Package 2 (C-15 `evidence.audit`, Protected Core) not started. No phase report, no traceability record, no gate run |
 | 7 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
@@ -49,9 +51,9 @@ Phase 5 was submitted to the real Phase Gate Checker and returned `PHASE_ACCEPTE
 - **No Python lockfile exists** (no lock tool on this machine). Node dependencies **are** installed: `npm ci` from the tracked `package-lock.json`, then the Vitest/Testing-Library tier, `@playwright/test` and `@types/node` added through real npm tooling, which updated `package.json` and `package-lock.json` as `INSTALL_DEPENDENCY`/`LOCKFILE_BOUND` requires. Nothing was hand-written into the lockfile. The Chromium runtime was downloaded by `npx playwright install chromium` and is not vendored into the repository.
 - **No browser/E2E evidence beyond the Project Registry, and none outside Chromium.** T10 is configured and green for one capability: 9 Playwright tests against the production build, a live API and a real SQLite file. Firefox and WebKit are not installed and no cross-browser claim is made. No other capability has a browser journey, because no other capability has a frontend. The 23 jsdom component tests are component evidence and are never reported as T10.
 - **The first execution surface now exists.** Phase 4's "no execution surface" statement is superseded for `surfaces.command` only: every route enforces through the Phase 4 PEP and is audited. The other five canonical paths — sandbox, scheduler, durable, workflow, operations — remain absent, and end-to-end bypass resistance across all six (ARK-REQ-0325, 0347) is still Phase 31 and is not claimed.
-- **No Recovery Supervisor, Stable rollback or `ROLLBACK_STABLE` capability.** Package 3 delivers *minimal* backup/restore only; the Supervisor is Phase 22B and `ROLLBACK_STABLE` remains DENY for every actor. `ARK-REQ-0153` and `ARK-REQ-0335` are **implemented and proven at package level** — A→backup→B→restore→verify runs against real SQLite and the `restore_proof_guard` refuses `BACKUP_VERIFIED` without it — but are **NOT discharged**: discharge belongs to the Phase 5 traceability record, phase report and gate run, none of which exists.
+- **No Recovery Supervisor, Stable rollback or `ROLLBACK_STABLE` capability.** Phase 5 delivered *minimal* backup/restore only; the Supervisor is Phase 22B and `ROLLBACK_STABLE` remains DENY for every actor. `ARK-REQ-0153` and `ARK-REQ-0335` **are discharged** — Phase 5 is accepted and its traceability record claims both SATISFIED under C6 — but what they discharge is the minimal capability, not the Supervisor.
 - No Phase 20 migration-safety workflow: restore requires an exactly matching schema revision rather than migrating across one.
-- No content-addressed revision identity or provenance record: `provenance_ref` is a nullable reference and `evidence.artifact` owns the real thing at Phase 6.
+- **Content-addressed artifact identity now exists** (Phase 6 Package 1): `evidence.artifact` registers artifacts by the address of their bytes, with provenance and parent edges. A revision's `provenance_ref` resolves to one. What still does **not** exist is the audit / evidence integrity chain (C-15, Package 2), evidence-graph computation and coverage (Phase 13), and release manifests with cryptographic hashes (C-31, Phase 26).
 - No runtime database is committed. `.gitignore` excludes `*.db`, `*.db-wal`, `*.db-shm`; migrations are committed.
 - **No Rust/Tauri manifest** — toolchain absent; nothing fabricated.
 - No Phase Gate Checker implementation (Phase 2).
@@ -99,11 +101,15 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Begin Phase 6 — Artifact / Evidence Plane (C-14, C-15)** per `IMPLEMENTATION_DEPENDENCY_MATRIX.md`. Phase 5 is accepted and Phase 6 is unlocked by the checker's `progression: PERMITTED`.
+**Phase 6 Atomic Package 2 — C-15 Audit / Evidence Integrity Chain.** Build `evidence.audit`:
 
-Read before starting: `CONTRACT_INVENTORY.md` rows C-14 and C-15, `VERIFICATION_ARCHITECTURE.md` Part 2 (evidence graph strategy), and ADR-0006. Phase 6 supplies the content-addressed revision identity that Phase 5 deliberately left as a nullable `provenance_ref`, and it is a prerequisite of Phase 22B.
+- it is **Protected Core**, so `select_profile` will require the stronger profile for the phase — security review, adversarial review and full regression, each a real execution;
+- `VERIFICATION_ARCHITECTURE.md` §2.2 rule 7 gives it sole authority over the chain: no other context may write or amend an evidence record;
+- rule 1 makes evidence append-only, with a superseded result retained under a `supersedes` edge;
+- `docs/contracts/audit_record.md` is its C-15 definition and does not exist yet;
+- `artifact_provenance.evidence` already holds references, so the join is a reference resolution, not a schema change to C-14.
 
-Still out of scope and not to be pulled forward: Capability Graph activation (Phase 9B, ADR-0003), provider runtime (Phase 9), durable jobs, the Recovery Supervisor and `ROLLBACK_STABLE` (Phase 22B — the PDP denies it for every actor), Stable Core promotion (Phase 23, GATE 2), Phase 20 migration/recovery expansion, and the T7/T8/T12 tiers (Phase 31).
+Then, and only then: `phase_6_report.json`, `docs/acceptance/phase_6_traceability.json` and `python scripts/run_phase_gate.py 6 7`. Nothing before that discharges a requirement.
 
 *(superseded guidance retained for continuity)*
 

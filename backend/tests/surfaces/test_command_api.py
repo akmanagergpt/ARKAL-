@@ -26,7 +26,11 @@ from sqlalchemy import Engine
 
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.kernel.persistence.migrations import ALEMBIC_INI, applied_revision
+from arkali.kernel.persistence.migrations import (
+    ALEMBIC_INI,
+    applied_revision,
+    head_revision,
+)
 from arkali.surfaces.command.app import ACTOR, create_app
 from arkali.surfaces.command.error_mapping import mapped_error_types, status_for
 
@@ -88,7 +92,10 @@ class TestReadinessAndListing:
         body = client.get("/api/health").json()
         assert body["status"] == "ready"
         assert body["schema_revision"] == applied_revision(engine)
-        assert body["schema_revision"] == "0002_project_registry"
+        # F-0032: the chain head is derived, never transcribed. A literal here
+        # pinned the head that was current when the test was written and
+        # expired the moment a legitimate migration was added.
+        assert body["schema_revision"] == head_revision(BACKEND)
 
     def test_empty_registry_lists_nothing(self, client: TestClient) -> None:
         assert client.get("/api/projects").json() == {"projects": []}
@@ -259,7 +266,7 @@ class TestPersistenceThroughRestart:
                 assert body["lifecycle_state"] == "SPECIFIED"
                 assert [r["revision_id"] for r in body["revisions"]] == ["rev-1"]
                 assert restarted.get("/api/health").json()["schema_revision"] == (
-                    "0002_project_registry"
+                    head_revision(BACKEND)  # F-0032: derived, never transcribed
                 )
         finally:
             restarted_engine.dispose()

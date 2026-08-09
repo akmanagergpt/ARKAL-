@@ -6,6 +6,17 @@ NO SHADOW MODEL: phase status, prerequisites, human-gate records and open
 findings are all parsed from the accepted artifacts at call time. Nothing here
 stores a second copy of governed data, and nothing here repairs it - malformed
 state raises so the checker can fail closed.
+
+REFUSALS ARE BUILT BY `governance_source`, NOT HERE. This module only ever
+*raises* the canonical refusal; it never catches or annotates one. Importing the
+exception type directly was therefore a second edge from this context to
+`kernel.contracts.errors`, whose fan-in budget is 15 and which Phase 6 pushed to
+16. ADR-0008 makes decomposition the answer to a budget rather than an
+exception, and the budget was pointing at something real: every module reaching
+into one error module turns the kernel into a hub. The refusal factory that
+already existed in this context is now the single path, exactly as
+`control.registry.project` keeps one importer of the kernel taxonomy. Same
+exception type, same message, same source - one fewer edge.
 """
 
 from __future__ import annotations
@@ -16,7 +27,7 @@ import re
 from pydantic import BaseModel, ConfigDict
 
 from arkali.acceptance.findings import stopping_findings
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
+from arkali.acceptance.governance_source import refuse
 
 BUILD_STATE = "docs/build/BUILD_STATE.md"
 HUMAN_GATES = "docs/acceptance/HUMAN_GATE_RECORDS.md"
@@ -37,7 +48,7 @@ _ACCEPTED_GATE = re.compile(r"##\s+HGR-\d+\s+—\s+HUMAN GATE (?P<gate>\d+)")
 def _read(repo_root: pathlib.Path, relpath: str) -> str:
     path = repo_root / relpath
     if not path.is_file():
-        raise AuthoritativeSourceError("governance artifact missing", source=relpath)
+        raise refuse("governance artifact missing", relpath)
     return path.read_text(encoding="utf-8")
 
 
@@ -84,11 +95,11 @@ class GovernanceState:
         gates = cls._parse_human_gates(_read(repo_root, HUMAN_GATES))
         findings = cls._parse_open_findings(_read(repo_root, OPEN_BLOCKERS))
         if not phases:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "no phase status rows parsed", source=BUILD_STATE
             )
         if not phase_gates:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "no phase-to-human-gate mapping parsed", source=DEPENDENCY_MATRIX
             )
         return cls(phases, prereqs, phase_gates, gates, findings)
@@ -159,14 +170,14 @@ class GovernanceState:
     def phase(self, phase_id: str) -> PhaseStatus:
         status = self.phases.get(phase_id)
         if status is None:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"phase {phase_id!r} has no status row", source=BUILD_STATE
             )
         return status
 
     def prerequisites_of(self, phase_id: str) -> tuple[str, ...]:
         if phase_id not in self.prerequisites:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"phase {phase_id!r} absent from the dependency matrix",
                 source=DEPENDENCY_MATRIX,
             )
