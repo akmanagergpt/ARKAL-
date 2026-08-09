@@ -54,6 +54,53 @@ Acceptance of Phase 0 does not close the following, which remain open and tracke
 
 ---
 
+## GOV-001 — CANONICAL GOVERNANCE RULE: superseding re-acceptance
+
+| Field | Value |
+|---|---|
+| **Type** | Human governance ruling establishing a standing rule |
+| **Raised by** | The re-scoring question left unsettled by **ERR-004** |
+| **Decision** | The Phase 4 superseding re-acceptance is **RATIFIED and VALID**. It is not withdrawn |
+| **Scope** | Standing rule for every future phase re-acceptance. Phase 4 is not reopened or redesigned |
+| **Cross-reference** | **ERR-004** (F-0024 confirmed, remediation ordered) |
+
+### The rule
+
+1. An accepted phase may later be found defective.
+2. Discovery of a real BLOCKER/HIGH does **not** erase or rewrite the historical acceptance record.
+3. The original acceptance remains **immutable historical evidence**, marked defective or superseded where applicable.
+4. Remediation produces a **new** candidate/evidence package.
+5. The implementing actor may implement the remediation but may **not** silently grant itself authority to supersede a prior accepted verdict.
+6. Re-acceptance of a previously accepted phase requires explicit **RE-SCORING AUTHORIZATION** from either the applicable Human Gate / human governance authority, or a future canonical independent Acceptance Authority explicitly authorized to perform such supersession.
+7. After authorization, the deterministic Phase Gate Checker / acceptance mechanism performs the actual re-score.
+8. A successful re-score creates a **new superseding acceptance record**.
+9. It must never amend the old acceptance commit, delete the defective evidence, rewrite historical reports, or conceal the discovered defect.
+10. The Phase 4 remediation is **explicitly authorized** under this rule.
+
+### What this changes about the Phase 4 sequence, stated plainly
+
+Rule 6 requires authorization **before** the re-score. In the Phase 4 remediation the order was different: the implementing actor remediated, ran the checker, obtained `PHASE_ACCEPTED_BY_MACHINE`, and *then* reported the re-score together with the reasoning and an explicit statement that the position could be overturned. Rule 10 authorizes that instance retrospectively.
+
+**Future sessions must not read Phase 4 as precedent for the ordering.** The compliant sequence is: remediate → produce the complete evidence package → **stop and request re-scoring authorization** → on authorization, run the acceptance mechanism → record the superseding verdict. A session that reaches a completed remediation of a previously accepted phase without authorization reports `PHASE_N_REACCEPTANCE_AWAITING_AUTHORITY` and waits.
+
+### What was preserved, verified at this ruling
+
+| Artifact | State |
+|---|---|
+| `docs/acceptance/phase_4_report_rev1_defective.json` | present, unmodified — the defective revision |
+| Commit `1ea79f3` | intact — the original machine verdict |
+| Commit `6d6296d` | intact — F-0024 reopened at HIGH, Phase 5 blocked |
+| `KNOWN_FAILURES.md` F-0024 / F-0025 | retained in full, marked CLOSED with their resolutions |
+| `PHASE_HISTORY.md` rows 16 and 17 | the defect and the remediation both recorded |
+
+Nothing was amended, deleted or concealed.
+
+### Enforcement status
+
+This rule is **governance-only**: no mechanical control currently prevents an implementing actor from re-running the checker against a previously accepted phase without authorization. That gap is recorded as **F-0026** so it is visible rather than assumed, in keeping with the F-0020 lesson that a threshold without a mechanism is not a control.
+
+---
+
 ## ERR-004 — HUMAN RULING (post-Phase 4): F-0024 confirmed, remediation ordered
 
 | Field | Value |
@@ -76,7 +123,9 @@ The remediation raised a governance question the canonical set does not address 
 * §2.2 rule 1 explicitly contemplates supersession: "Evidence is never edited or deleted. A superseded result is retained with a `supersedes` edge." The defective revision is retained as `phase_4_report_rev1_defective.json` and the original verdict stands in history at `1ea79f3`.
 * Precedent: Phase 1 was re-submitted and machine-accepted after erratum ERR-001, at `1ae0835`.
 
-The distinction between re-scoring a *rejected* phase (Phase 1) and a *previously accepted* one (Phase 4) is not addressed by the canonical set. This position may be overturned by the acceptance authority; if it is, the superseding record is withdrawn and Phase 4 returns to the defective state, since nothing was overwritten.
+The distinction between re-scoring a *rejected* phase (Phase 1) and a *previously accepted* one (Phase 4) is not addressed by the canonical set.
+
+**RESOLVED by GOV-001.** The acceptance authority ratified this superseding re-acceptance as valid and established a standing rule for all future cases. The open question recorded here is closed; the answer is that re-acceptance is permitted but requires explicit re-scoring authorization **before** the re-score, which GOV-001 grants retrospectively for this instance only. See GOV-001 above.
 
 ---
 

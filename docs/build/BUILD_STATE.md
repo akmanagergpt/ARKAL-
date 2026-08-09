@@ -3,11 +3,13 @@
 **Current state:** **PHASE 4 RE-ACCEPTED after the ERR-004 remediation. PHASE 5 UNLOCKED, NOT STARTED.**
 
 F-0024 and F-0025 are closed. `ARK-REQ-0111` is genuinely implemented and was applied to its own remediation candidate. Phase 4 was re-submitted to the real Phase Gate Checker and returned `PHASE_ACCEPTED_BY_MACHINE` with the two new checks — **C6** discharge integrity and **PROTECTED_CORE** — both passing. The defective revision is preserved unmodified as `docs/acceptance/phase_4_report_rev1_defective.json`, and the original verdict at `1ea79f3` stands in history as the record of the defect.
+
+The superseding re-acceptance is **RATIFIED** by the acceptance authority under **GOV-001**, which also establishes the standing rule for every future re-acceptance: authorization is required **before** the re-score. The Phase 4 ordering was remediate-then-report, authorized retrospectively, and is explicitly **not** precedent.
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
 **Last updated by:** Phase 4 machine acceptance (verdict PHASE_ACCEPTED_BY_MACHINE)
-**Governance errata:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
+**Governance errata and rulings:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) · **ERR-004** (confirms F-0024, orders remediation) · **GOV-001** (superseding re-acceptance rule; ratifies the Phase 4 re-acceptance) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
 
