@@ -84,8 +84,21 @@ class TraceabilityRecord:
             )
         raw, source = read_json(repo_root, relpath)
         entries = raw.get("claims")
-        if not isinstance(entries, list) or not entries:
-            raise refuse("traceability record declares no claims", source)
+        if not isinstance(entries, list):
+            raise refuse(
+                "traceability record declares no claims list; `claims` must be "
+                "a list, present and well-formed",
+                source,
+            )
+        # AN EMPTY LIST IS WELL-FORMED, NOT MALFORMED (F-0040). Whether a phase
+        # is entitled to claim nothing depends on its requirement denominator,
+        # which this loader cannot see and must not guess: four canonical phases
+        # - 8, 15, 33 and 34 - own no registered requirement at all, and for
+        # them `claims: []` is the only truthful record. The judgement belongs
+        # to check C6, which already holds the register. Refusing it here also
+        # protected nothing: against an empty record `reconcile_discharge`
+        # already refuses every non-empty discharged set, so the only case this
+        # line uniquely blocked was the honest empty-discharge one.
         claims: dict[str, RequirementClaim] = {}
         for entry in entries:
             claim = RequirementClaim(**entry)

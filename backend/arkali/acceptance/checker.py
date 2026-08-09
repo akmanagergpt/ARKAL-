@@ -22,6 +22,7 @@ from arkali.acceptance.protected_core_check import (
     evaluate_report_profile,
     load_protected_core,
 )
+from arkali.acceptance.discharge_shape import check_claim_shape
 from arkali.acceptance.requirement_claim import TraceabilityRecord, reconcile_discharge
 from arkali.acceptance.rescoring_authorization import (
     evidence_package_digest,
@@ -168,6 +169,10 @@ class PhaseGateChecker:
             record = TraceabilityRecord.load(self.repo_root, report.phase_id)
         except AuthoritativeSourceError as exc:
             return _fail("C6", "traceability record missing or unreadable", str(exc))
+        expected = self._denominator(report.phase_id)
+        refusal = check_claim_shape(expected, record)
+        if refusal is not None:
+            return _fail("C6", *refusal)
         violations = reconcile_discharge(
             report.ark_req_ids_closed, record, frozenset(self.register.all_ids())
         )
@@ -180,8 +185,17 @@ class PhaseGateChecker:
             "C6",
             f"all {len(report.ark_req_ids_closed)} discharged requirements are "
             f"claimed SATISFIED with named evidence",
+            f"denominator={len(expected)} claims={len(record)} "
             f"non_satisfied_claims={[c.req_id for c in record.non_satisfied()]}",
         )
+
+    def _denominator(self, phase_id: str) -> frozenset[str]:
+        """The requirements the register assigns to this phase. The denominator.
+
+        Read from `RequirementRegister`, never from the record under test: a
+        record that defined its own denominator could always agree with itself.
+        """
+        return frozenset(r.req_id for r in self.register.for_phase(phase_id))
 
     def check_protected_core_profile(self, report: PhaseReport) -> CheckResult:
         """ARK-REQ-0111: a change touching Protected Core needs the stronger profile.

@@ -19,6 +19,7 @@ import json
 import pathlib
 
 import pytest
+from arkali.acceptance.discharge_shape import check_claim_shape
 from arkali.acceptance.requirement_claim import (
     ClaimState,
     RequirementClaim,
@@ -40,7 +41,7 @@ def satisfied(req_id: str) -> RequirementClaim:
         req_id=req_id,
         state=ClaimState.SATISFIED,
         implementation="module.py",
-        evidence="test_module.py::TestThing",
+        evidence="test_module.py",
     )
 
 
@@ -156,14 +157,52 @@ class TestRecordLoadingFailsClosed:
         with pytest.raises(AuthoritativeSourceError):
             TraceabilityRecord.load(tmp_path, "4")
 
-    def test_an_empty_record_is_refused(self, tmp_path: pathlib.Path) -> None:
+    def test_an_absent_claims_list_is_still_refused(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A MISSING or non-list `claims` key is malformed and stays refused.
+
+        REPLACES `test_an_empty_record_is_refused` (F-0040). That control
+        asserted the loader refuses `claims: []` for phase "4". It was verified
+        firing for exactly the intended reason before being touched: after the
+        repair it reported DID NOT RAISE, because the judgement moved to check
+        C6 where the register is available — the loader had been refusing an
+        empty list for **every** phase without consulting any denominator, and
+        four canonical phases (8, 15, 33, 34) own no requirement at all, so for
+        them the only truthful record was the one being rejected.
+
+        What the loader still owns is well-formedness, and that is unchanged:
+        an absent or non-list `claims` key is malformed and refused here.
+        Whether an *empty but well-formed* list is permitted is a question about
+        the phase, not about the file, and is proven in
+        `TestZeroDenominatorShape`.
+        """
+        target = tmp_path / "docs" / "acceptance"
+        target.mkdir(parents=True)
+        for payload in ({"phase_id": "4"}, {"phase_id": "4", "claims": {}},
+                        {"phase_id": "4", "claims": "none"}):
+            (target / "phase_4_traceability.json").write_text(
+                json.dumps(payload), encoding="utf-8"
+            )
+            with pytest.raises(AuthoritativeSourceError):
+                TraceabilityRecord.load(tmp_path, "4")
+
+    def test_a_well_formed_empty_list_now_loads(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The loader no longer judges emptiness; it only parses.
+
+        Non-vacuity for the control above: an empty list really does reach the
+        caller now, so the refusals there are about malformedness and not about
+        emptiness by accident.
+        """
         target = tmp_path / "docs" / "acceptance"
         target.mkdir(parents=True)
         (target / "phase_4_traceability.json").write_text(
             json.dumps({"phase_id": "4", "claims": []}), encoding="utf-8"
         )
-        with pytest.raises(AuthoritativeSourceError):
-            TraceabilityRecord.load(tmp_path, "4")
+        record = TraceabilityRecord.load(tmp_path, "4")
+        assert len(record) == 0 and record.ids() == ()
 
     def test_a_duplicate_claim_is_refused(self, tmp_path: pathlib.Path) -> None:
         """Two conflicting statuses for one requirement cannot both stand."""
@@ -197,6 +236,7 @@ class TestRecordLoadingFailsClosed:
         )
         with pytest.raises(Exception):
             TraceabilityRecord.load(tmp_path, "4")
+
 
 
 class TestLiveRecordIsHonest:
