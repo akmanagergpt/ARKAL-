@@ -33,6 +33,9 @@ from sqlalchemy.orm import Session
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.control.policy.policy_contract import PolicyRequest
+from arkali.control.registry.project.project_state_machine import (
+    DEFINITION as PROJECT_MACHINE,
+)
 from arkali.control.registry.project.records import ProjectRecord
 from arkali.control.registry.project.registry import ProjectRegistry
 from arkali.kernel.persistence.migrations import applied_revision
@@ -42,6 +45,7 @@ from arkali.surfaces.command.contracts import (
     CreateRevisionRequest,
     ErrorResponse,
     HealthResponse,
+    LifecycleMachineResponse,
     ProjectDetailResponse,
     ProjectListResponse,
     ProjectResponse,
@@ -124,6 +128,20 @@ def create_app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
     def health() -> HealthResponse:
         guard(READ)
         return HealthResponse(status="ready", schema_revision=applied_revision(engine))
+
+    @router.get("/lifecycle/project", response_model=LifecycleMachineResponse)
+    def project_lifecycle() -> LifecycleMachineResponse:
+        """Publish the canonical machine's vocabulary, projected, never restated.
+
+        Both values are read off the canonical definition, so this route cannot
+        drift from it. The transition relation is deliberately not published:
+        a client that received it could decide legality itself, which is exactly
+        the second authority the slice forbids.
+        """
+        guard(READ)
+        return LifecycleMachineResponse(
+            machine=PROJECT_MACHINE.machine, states=PROJECT_MACHINE.states
+        )
 
     @router.get("/projects", response_model=ProjectListResponse)
     def list_projects(

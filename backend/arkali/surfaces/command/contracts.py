@@ -78,6 +78,28 @@ class ProjectListResponse(BaseModel):
     projects: tuple[ProjectResponse, ...] = ()
 
 
+class LifecycleMachineResponse(BaseModel):
+    """The declared state *vocabulary* of a canonical machine - never its relation.
+
+    ADDED IN PACKAGE 4B, for a demonstrated contract defect rather than for
+    convenience. The frontend must offer a lifecycle action without holding a
+    transition map, and the only alternatives were to hard-code the state names
+    in TypeScript - the shadow authority the slice forbids - or to make the user
+    type a state by hand. So the surface publishes the machine's own vocabulary.
+
+    `states` is NOT permission. Which of these is reachable from the project's
+    current state is the Project machine's answer, given only when the move is
+    attempted. A client that renders all of them and lets the backend refuse is
+    behaving correctly; a client that filters them has invented a second
+    relation.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    machine: str
+    states: tuple[str, ...]
+
+
 class HealthResponse(BaseModel):
     """Readiness for the slice: is the persistence layer actually reachable."""
 

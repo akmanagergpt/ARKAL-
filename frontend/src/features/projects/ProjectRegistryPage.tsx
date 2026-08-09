@@ -1,0 +1,59 @@
+import type { ArkaliApiClient } from '@/api/client';
+import { Callout } from '@/components/ui';
+
+import { CreateProjectForm } from './CreateProjectForm';
+import { ProjectDetail } from './ProjectDetail';
+import { ProjectList } from './ProjectList';
+import { useProjectRegistry } from './useProjectRegistry';
+
+export function ProjectRegistryPage({ client }: { client: ArkaliApiClient }) {
+  const registry = useProjectRegistry(client);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">Project Registry</h1>
+        <p className="mt-1 max-w-2xl text-sm text-slate-600">
+          Every project below is read from the ARKALI registry through the Command Center
+          API. Lifecycle state, revisions and the legality of any transition are decided
+          there.
+        </p>
+      </div>
+
+      {registry.notice === null ? null : (
+        <Callout tone="success" title="Done">
+          <p>{registry.notice}</p>
+        </Callout>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <ProjectList
+            projects={registry.projects}
+            selectedId={registry.selected?.project_id ?? null}
+            loading={registry.loadingList}
+            failure={registry.listFailure}
+            onSelect={(projectId) => {
+              registry.dismissNotice();
+              registry.select(projectId);
+            }}
+            onReload={registry.reload}
+          />
+          <CreateProjectForm
+            submitting={registry.submitting}
+            onCreate={registry.createProject}
+          />
+        </div>
+        <ProjectDetail
+          project={registry.selected}
+          lifecycleStates={registry.lifecycleStates}
+          loading={registry.loadingDetail}
+          submitting={registry.submitting}
+          failure={registry.actionFailure}
+          onTransition={registry.requestTransition}
+          onCreateRevision={registry.createRevision}
+        />
+      </div>
+    </div>
+  );
+}

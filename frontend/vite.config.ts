@@ -1,10 +1,11 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// Phase 1 bootstrap: workspace configuration only.
-// No application entry, route or component exists yet. The Command Center is
-// delivered as per-capability slices from Phase 5 and consolidated at Phase 27.
+// Phase 5 Package 4B delivers the first slice: the Project Registry page over
+// the Command Center API. The Command Center itself is delivered as
+// per-capability slices and consolidated at Phase 27.
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -19,5 +20,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
+    // A component test is not a browser test. T10 browser/E2E is NOT_CONFIGURED
+    // and is owned by a later package; nothing here may be reported as T10.
+    restoreMocks: true,
   },
 });

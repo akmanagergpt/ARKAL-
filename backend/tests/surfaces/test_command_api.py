@@ -102,6 +102,46 @@ class TestReadinessAndListing:
         assert [p["project_id"] for p in listed] == ["prj-a", "prj-b"]
 
 
+class TestLifecycleVocabulary:
+    """Package 4B contract addition. Why it exists is recorded in `contracts.py`.
+
+    The frontend needs a state list to render a lifecycle action; without this
+    route its only options were to hard-code the states - the shadow authority
+    the slice forbids - or make the user type one.
+    """
+
+    def test_the_route_projects_the_canonical_machine(
+        self, client: TestClient
+    ) -> None:
+        from arkali.control.registry.project.project_state_machine import DEFINITION
+
+        body = client.get("/api/lifecycle/project").json()
+        assert body["machine"] == DEFINITION.machine
+        assert tuple(body["states"]) == DEFINITION.states
+
+    def test_the_transition_relation_is_never_published(
+        self, client: TestClient
+    ) -> None:
+        """NEGATIVE CONTROL: a client must not be able to decide legality.
+
+        Publishing the relation would let the browser answer a question the
+        Project machine owns. Only the vocabulary crosses the boundary.
+        """
+        body = client.get("/api/lifecycle/project").json()
+        assert set(body) == {"machine", "states"}
+        for forbidden in ("transitions", "forbidden", "terminal", "allowed"):
+            assert forbidden not in client.get("/api/lifecycle/project").text
+
+    def test_the_route_is_policy_guarded_like_every_other_read(
+        self, client: TestClient, app: FastAPI
+    ) -> None:
+        client.get("/api/lifecycle/project")
+        assert any(
+            record.operation_class == "READ_FILE"
+            for record in app.state.pep.audit_trail
+        )
+
+
 class TestCreateAndRead:
     def test_create_returns_the_registry_state(self, client: TestClient) -> None:
         body = created(client)
@@ -302,7 +342,7 @@ class TestPolicyEnforcement:
                 for d in node.decorator_list
             )
         ]
-        assert len(routes) == 6
+        assert len(routes) == 7
         for route in routes:
             called = {
                 inner.func.id
