@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `765bb077facbbaecdf5ee75b03ebeb8a6c4133b8` |
+| Current HEAD | `bd41b344835a211c6c847f69b7164b30fb5b72d8` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -105,14 +105,14 @@ repository, the repository wins.
 | Phase 1 | **MACHINE-ACCEPTED** |
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
-| Phase 4 | **MACHINE-ACCEPTED** — re-accepted after the ERR-004 remediation; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
+| Phase 4 | **MACHINE-ACCEPTED** — superseding verdict, **RATIFIED** under GOV-001; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
 | Phase 5 | **UNLOCKED — NOT_STARTED** ← current work |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
 | Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4), reconciled by check C6 against `phase_4_traceability.json` |
 | BLOCKER / HIGH | **0 / 0** |
-| MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every Phase 3 finding is closed |
+| MEDIUM / LOW | 15 / 9 (tracked, non-blocking) — F-0026 open: GOV-001 has no mechanism behind it |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over 41 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
@@ -152,7 +152,9 @@ repository, the repository wins.
 | 24 | `191958d` | handoff manifest refreshed after Phase 4 acceptance (§12 rule) |
 | 25 | `6d6296d` | **F-0024 reopened** — ARK-REQ-0111 discharged without an implementation; Phase 5 blocked |
 | 26 | `0bf585c` | handoff manifest refreshed after F-0024 (§12 rule) |
-| 27 | `765bb07` | **ERR-004 remediation** — ARK-REQ-0111 implemented, finding parser fixed, **Phase 4 re-accepted** ← HEAD at generation |
+| 27 | `765bb07` | **ERR-004 remediation** — ARK-REQ-0111 implemented, finding parser fixed, **Phase 4 re-accepted** |
+| 28 | `e5e36bd` | handoff manifest refreshed after the remediation (§12 rule) |
+| 29 | `bd41b34` | **GOV-001** — superseding re-acceptance rule; Phase 4 re-acceptance ratified ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -205,7 +207,8 @@ No unavailable toolchain may be reported as PASS.
 | 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
 | Every Phase 3 finding (F-0018 … F-0021) is **closed**; F-0018 by ERR-002 and F-0020 by ERR-003 | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
 | Every Phase 4 finding (F-0022 … F-0025) is **closed**; F-0024 and F-0025 by the ERR-004 remediation | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
-| **A machine re-score of an already-accepted phase** is not settled by the canonical set. The position taken, and its basis, are recorded and may be overturned | **ERR-004** in `HUMAN_GATE_RECORDS.md` |
+| **F-0026 open (MEDIUM)** — GOV-001's re-scoring authorization rule has no mechanism; nothing stops an actor re-running the gate on an accepted phase | `KNOWN_FAILURES.md` · GOV-001 |
+| **Re-accepting a previously accepted phase requires explicit re-scoring authorization *before* the re-score.** The original record stays immutable and marked superseded; nothing is amended, deleted or concealed. Phase 4's remediate-then-report ordering was authorized retrospectively and is **not** precedent | **GOV-001** in `HUMAN_GATE_RECORDS.md` (resolves the question left open by ERR-004) |
 | **TRUST-2/3/4 are UNSUPPORTED on this host** — a real probe result, not a defect. Re-probe on any new host | `phase_4_report.json` · EV-0033 |
 | **No execution surface exists**, so policy bypass resistance is CONTRACT-level only | EV-0032 |
 | Isolation backend probe deferral **DEF-003 is closed** | `OPEN_BLOCKERS.md` |
@@ -296,8 +299,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `765bb077facbbaecdf5ee75b03ebeb8a6c4133b8` |
-| Generated after | **The ERR-004 remediation and Phase 4 re-acceptance.** F-0024 and F-0025 closed, `ARK-REQ-0111` genuinely satisfied, cumulative verified restored 64 → 65, NEXT EXACT ACTION back to "begin Phase 5". Multiple §12 triggers |
+| Generated at HEAD | `bd41b344835a211c6c847f69b7164b30fb5b72d8` |
+| Generated after | **GOV-001**, a human governance ruling ratifying the Phase 4 superseding re-acceptance and establishing the standing re-scoring rule. Four governed artifacts changed, so the §12 refresh was mechanically required. No phase, gate, ADR or requirement state changed: Phase 4 remains MACHINE-ACCEPTED and Phase 5 remains UNLOCKED |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -345,7 +348,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 765bb077facbbaecdf5ee75b03ebeb8a6c4133b8
+head: bd41b344835a211c6c847f69b7164b30fb5b72d8
 branch: main
 working_tree_clean: true
 
