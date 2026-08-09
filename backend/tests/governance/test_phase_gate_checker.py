@@ -54,11 +54,33 @@ def checker() -> PhaseGateChecker:
 
 
 class TestChecksPass:
-    def test_complete_report_is_accepted(self, checker: PhaseGateChecker) -> None:
+    def test_every_check_passes_for_a_complete_report(
+        self, checker: PhaseGateChecker
+    ) -> None:
+        """Coverage of the happy path, strengthened rather than relaxed.
+
+        Phase 2 is already accepted, so since GOV-001 enforcement (F-0026) the
+        checker declines to re-issue its verdict without authorization. That is
+        the mechanism working. What this test still asserts - and now asserts
+        more explicitly than before - is that a complete, honest report satisfies
+        every substantive check: no check FAILs, and C1-C6 all PASS.
+        """
         verdict = checker.evaluate(build_report(), requested_next_phase="3")
-        assert verdict.verdict is Verdict.PHASE_ACCEPTED_BY_MACHINE
-        assert verdict.progression_permitted is True
         assert verdict.failed_checks() == ()
+        substantive = {
+            c.check_id: c.state for c in verdict.checks
+            if c.check_id in {"C1", "C2", "C3", "C4", "C5", "C6"}
+        }
+        assert substantive == {c: HonestState.PASS for c in substantive}
+        assert len(substantive) == 6
+
+    def test_an_accepted_phase_is_not_re_issued_without_authorization(
+        self, checker: PhaseGateChecker
+    ) -> None:
+        """GOV-001: Phase 2 carries an acceptance record and no authorization."""
+        verdict = checker.evaluate(build_report(), requested_next_phase="3")
+        assert verdict.verdict is Verdict.AWAITING_RESCORING_AUTHORITY
+        assert verdict.progression_permitted is False
 
 
 class TestC1ReportCompleteness:

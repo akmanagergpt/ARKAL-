@@ -23,6 +23,10 @@ from arkali.acceptance.protected_core_check import (
     load_protected_core,
 )
 from arkali.acceptance.requirement_claim import TraceabilityRecord, reconcile_discharge
+from arkali.acceptance.rescoring_authorization import (
+    evidence_package_digest,
+    find_authorization,
+)
 from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.architecture.gates.runner import GateRunner
 from arkali.control.specification.register_parser import RequirementRegister
@@ -59,6 +63,17 @@ def _fail(check_id: str, summary: str, detail: str = "") -> CheckResult:
                 source=_SPEC,
             ),
         ),
+    )
+
+
+def _blocked(check_id: str, summary: str, detail: str = "") -> CheckResult:
+    """Refused pending an authority decision. Not a failure of the phase itself."""
+    return CheckResult(
+        check_id=check_id,
+        state=HonestState.BLOCKED,
+        summary=summary,
+        detail=detail,
+        authoritative_source=_SPEC,
     )
 
 
@@ -217,6 +232,43 @@ class PhaseGateChecker:
 
         return rank(phase_id) >= rank(owing_phase)
 
+    def check_rescoring_authority(self, report: PhaseReport) -> CheckResult:
+        """GOV-001: superseding an accepted verdict needs explicit authorization.
+
+        First-time acceptance is untouched — a phase with no acceptance record
+        takes the NOT_APPLICABLE path and behaves exactly as before. Only a
+        phase that already carries one must present an authorization bound to
+        this exact evidence package.
+        """
+        status = self.state.phases.get(report.phase_id)
+        if status is None or not status.is_accepted:
+            return CheckResult(
+                check_id="RESCORING",
+                state=HonestState.NOT_APPLICABLE,
+                summary=f"phase {report.phase_id} has no prior acceptance record",
+                detail="first-time acceptance requires no re-scoring authorization",
+                authoritative_source=_SPEC,
+            )
+        try:
+            digest = evidence_package_digest(self.repo_root, report.phase_id)
+        except AuthoritativeSourceError as exc:
+            return _blocked(
+                "RESCORING", "evidence package identity cannot be computed", str(exc)
+            )
+        authorization = find_authorization(self.repo_root, report.phase_id, digest)
+        if authorization is None:
+            return _blocked(
+                "RESCORING",
+                f"phase {report.phase_id} is already accepted; superseding it "
+                "requires a recorded re-scoring authorization (GOV-001)",
+                f"evidence_package={digest}",
+            )
+        return _ok(
+            "RESCORING",
+            f"superseding re-acceptance authorized by {authorization.identifier}",
+            authorization.render(),
+        )
+
     def check_open_findings(self) -> CheckResult:
         open_rows = self.state.open_stopping_findings
         if open_rows:
@@ -285,6 +337,7 @@ class PhaseGateChecker:
             self.check_honest_state_integrity(report),
             self.check_discharge_integrity(report),
             self.check_protected_core_profile(report),
+            self.check_rescoring_authority(report),
             self.check_open_findings(),
             self.check_prerequisites(report.phase_id),
             self.check_human_gate(report.phase_id),
@@ -333,6 +386,18 @@ class PhaseGateChecker:
                 Verdict.PHASE_BLOCKED,
                 False,
                 self._blocking_reason(checks, findings),
+                human,
+            )
+        rescoring = next(
+            (c for c in checks if c.check_id == "RESCORING"
+             and c.state is HonestState.BLOCKED),
+            None,
+        )
+        if rescoring is not None:
+            return (
+                Verdict.AWAITING_RESCORING_AUTHORITY,
+                False,
+                rescoring.summary,
                 human,
             )
         if human is not None:

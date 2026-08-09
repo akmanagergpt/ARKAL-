@@ -23,6 +23,11 @@ class Verdict(str, enum.Enum):
     PHASE_ACCEPTED_BY_MACHINE = "PHASE_ACCEPTED_BY_MACHINE"
     PHASE_BLOCKED = "PHASE_BLOCKED"
     AWAITING_HUMAN_GATE = "AWAITING_HUMAN_GATE"
+    #: The phase already carries an acceptance record and no valid re-scoring
+    #: authorization covers this evidence package (GOV-001, closes F-0026).
+    #: Distinct from AWAITING_HUMAN_GATE: that is a gate the phase always
+    #: carried, this is permission to supersede a verdict already issued.
+    AWAITING_RESCORING_AUTHORITY = "AWAITING_RESCORING_AUTHORITY"
 
 
 class GateVerdict(BaseModel):

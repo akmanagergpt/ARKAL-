@@ -22,12 +22,11 @@ register at all fails, since the register is the sole denominator.
 from __future__ import annotations
 
 import enum
-import json
 import pathlib
 
 from pydantic import BaseModel, ConfigDict
 
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
+from arkali.acceptance.governance_source import read_json, refuse
 
 
 class ClaimState(str, enum.Enum):
@@ -76,33 +75,24 @@ class TraceabilityRecord:
 
     @classmethod
     def load(cls, repo_root: pathlib.Path, phase_id: str) -> TraceabilityRecord:
-        path = repo_root / "docs" / "acceptance" / f"phase_{phase_id}_traceability.json"
-        if not path.is_file():
-            raise AuthoritativeSourceError(
+        relpath = f"docs/acceptance/phase_{phase_id}_traceability.json"
+        if not (repo_root / relpath).is_file():
+            raise refuse(
                 f"no traceability record for phase {phase_id}; a phase report "
                 "cannot be reconciled against nothing",
-                source=str(path),
+                str(repo_root / relpath),
             )
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise AuthoritativeSourceError(
-                f"traceability record is not parseable JSON: {exc}", source=str(path)
-            ) from exc
+        raw, source = read_json(repo_root, relpath)
         entries = raw.get("claims")
         if not isinstance(entries, list) or not entries:
-            raise AuthoritativeSourceError(
-                "traceability record declares no claims", source=str(path)
-            )
+            raise refuse("traceability record declares no claims", source)
         claims: dict[str, RequirementClaim] = {}
         for entry in entries:
             claim = RequirementClaim(**entry)
             if claim.req_id in claims:
-                raise AuthoritativeSourceError(
-                    f"duplicate claim for {claim.req_id}", source=str(path)
-                )
+                raise refuse(f"duplicate claim for {claim.req_id}", source)
             claims[claim.req_id] = claim
-        return cls(str(raw.get("phase_id", phase_id)), claims, str(path))
+        return cls(str(raw.get("phase_id", phase_id)), claims, source)
 
     def __len__(self) -> int:
         return len(self._claims)

@@ -38,9 +38,9 @@ import re
 
 from pydantic import BaseModel, ConfigDict
 
+from arkali.acceptance.governance_source import read_document, refuse
 from arkali.acceptance.phase_report import TestExecutionRecord
 from arkali.control.policy.protected_core import ProtectedCoreBoundary
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
 
 MASTER_SPEC_RELPATH = "docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md"
 
@@ -118,17 +118,13 @@ class ProfileVerdict(BaseModel):
 
 def required_categories(repo_root: pathlib.Path) -> tuple[str, ...]:
     """The stronger profile's evidence categories, parsed from the Master Spec."""
-    path = repo_root / MASTER_SPEC_RELPATH
-    if not path.is_file():
-        raise AuthoritativeSourceError(
-            "master specification not found", source=str(path)
-        )
-    found = _PROFILE_SENTENCE.search(path.read_text(encoding="utf-8"))
+    text, source = read_document(repo_root, MASTER_SPEC_RELPATH)
+    found = _PROFILE_SENTENCE.search(text)
     if found is None:
-        raise AuthoritativeSourceError(
+        raise refuse(
             "the Master Specification declares no stronger verification profile; "
             "refusing to invent its categories",
-            source=str(path),
+            source,
         )
     categories = tuple(
         part.strip().lower()
@@ -136,8 +132,8 @@ def required_categories(repo_root: pathlib.Path) -> tuple[str, ...]:
         if part.strip()
     )
     if not categories:
-        raise AuthoritativeSourceError(
-            "stronger verification profile declares no categories", source=str(path)
+        raise refuse(
+            "stronger verification profile declares no categories", source
         )
     return categories
 

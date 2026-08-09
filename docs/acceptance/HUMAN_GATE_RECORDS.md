@@ -95,9 +95,21 @@ Rule 6 requires authorization **before** the re-score. In the Phase 4 remediatio
 
 Nothing was amended, deleted or concealed.
 
-### Enforcement status
+### Enforcement status — ENFORCED (F-0026 closed)
 
-This rule is **governance-only**: no mechanical control currently prevents an implementing actor from re-running the checker against a previously accepted phase without authorization. That gap is recorded as **F-0026** so it is visible rather than assumed, in keeping with the F-0020 lesson that a threshold without a mechanism is not a control.
+GOV-001 is no longer prose-only. `acceptance/rescoring_authorization.py` is consulted by the Phase Gate Checker: a phase that already carries an acceptance record cannot receive `PHASE_ACCEPTED_BY_MACHINE` without a granted authorization in the table below bound to its exact evidence package. Without one the deterministic verdict is `AWAITING_RESCORING_AUTHORITY`.
+
+There is no parameter, flag, environment variable or report field by which authorization can be asserted — the checker consults this document, and an implementing actor has nowhere to pass one in. Issuers named in `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` (and the generic `implementing_actor`) can never grant one.
+
+**The limit of the mechanism, stated plainly.** It cannot stop an actor with write access from editing this file. No mechanical control in a single-actor repository can. What it does stop is the silent case: authorization must now be an explicit, scoped, auditable record in a human-governance document rather than an unstated assumption in an actor's head.
+
+### RE-SCORING AUTHORIZATIONS
+
+Each row authorizes one supersession of one phase, bound to the digest of that phase's exact evidence package (`phase_N_report.json` + `phase_N_traceability.json`). Changing either file changes the digest and the authorization no longer applies.
+
+| ID | Phase | Evidence package | Issuer | Status | Basis |
+|---|---|---|---|---|---|
+| RSA-001 | 4 | sha256:6275ac092a624cb12cb1d40b68bdd59da01e87f761f41852da0ac4ccab9bb3cd | human acceptance authority | GRANTED | **GOV-001 rule 10** — "The current Phase 4 remediation is explicitly authorized under this rule." This row does not create a new authorization; it records the existing one in the form the checker can read, bound to the evidence package GOV-001 ratified |
 
 ---
 
