@@ -28,9 +28,21 @@ where work resumed from, and a record that can be edited or removed is not a
 durability record. The job row itself stays mutable, because the machine declares
 non-terminal states and the row follows it.
 
-NOTHING HERE SCHEDULES. No queue, claim, lease, owner or resource field exists.
-Admission and allocation are C-21 at Phase 8, and a column added now for a
-behaviour that does not exist would be a claim.
+EXECUTION ATTEMPTS ARE THE RETRY ACCOUNTING. Package 2 adds
+`job_execution_attempt`, one row per attempt, keyed (`job_id`, `attempt`). The
+attempt count is therefore *derived from rows*, never held in a counter that a
+restart could reset or a caller could set. The primary key is also the
+concurrency backstop: two writers racing to open the same next attempt cannot
+both succeed, whatever the service does.
+
+`owner` RECORDS WHO IS EXECUTING; IT DOES NOT DECIDE WHO SHOULD. Package 2
+refuses a heartbeat or completion from a stale owner, which is a durability
+property. Choosing an owner, allocating one, or balancing across them is
+`execution.scheduler` at Phase 8 and appears nowhere here.
+
+NOTHING HERE SCHEDULES. No queue, admission, priority, capacity or resource
+field exists. Admission and allocation are C-21 at Phase 8, and a column added
+now for a behaviour that does not exist would be a claim.
 
 ENGINE-NEUTRAL (ARK-REQ-0012). Declarative mapping only - `String`, `Integer`,
 `DateTime`, `JSON` and standard constraints, all rendered for SQLite and
@@ -60,10 +72,17 @@ from arkali.kernel.persistence.base import PersistenceBase
 
 JOB_TABLE: Final[str] = "durable_job"
 CHECKPOINT_TABLE: Final[str] = "job_checkpoint"
+ATTEMPT_TABLE: Final[str] = "job_execution_attempt"
 
 IDENTITY_LENGTH: Final[int] = 64
 FIELD_LENGTH: Final[int] = 200
 STATE_LENGTH: Final[int] = 40
+
+#: Retry bound and per-attempt timeout applied when a submission names none.
+#: Recorded on the row, so the bound a job was admitted under survives a restart
+#: and cannot be widened by changing a default later.
+DEFAULT_MAX_ATTEMPTS: Final[int] = 3
+DEFAULT_ATTEMPT_TIMEOUT_SECONDS: Final[int] = 300
 
 #: The named constraint that IS the idempotency authority.
 IDEMPOTENCY_CONSTRAINT: Final[str] = "uq_durable_job_idempotency"
@@ -97,6 +116,17 @@ class DurableJobRecord(PersistenceBase):
     #: The job's input. Opaque to this contract; the runtime that executes a job
     #: type owns its meaning.
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    #: The retry bound this job was admitted under. Persisted rather than read
+    #: from configuration at retry time, so changing a default later cannot
+    #: widen the budget of a job already in flight.
+    max_attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=DEFAULT_MAX_ATTEMPTS
+    )
+    #: How long one attempt may run before it is timed out. The basis is stored
+    #: per attempt as an absolute deadline, so a restart cannot move it.
+    attempt_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=DEFAULT_ATTEMPT_TIMEOUT_SECONDS
+    )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -105,6 +135,9 @@ class DurableJobRecord(PersistenceBase):
     )
 
     checkpoints: Mapped[list[JobCheckpointRecord]] = relationship(
+        back_populates="job", cascade="save-update"
+    )
+    attempts: Mapped[list[JobExecutionAttempt]] = relationship(
         back_populates="job", cascade="save-update"
     )
 
@@ -130,6 +163,57 @@ class JobCheckpointRecord(PersistenceBase):
     )
 
     job: Mapped[DurableJobRecord] = relationship(back_populates="checkpoints")
+
+
+class JobExecutionAttempt(PersistenceBase):
+    """One execution attempt of a job: who ran it, until when, and how it ended.
+
+    The rows ARE the retry accounting. `attempt` is part of the primary key, so
+    the database refuses two rows for one attempt number however the service
+    behaves - the concurrency backstop, not a service-level check.
+
+    An attempt is OPEN while `ended_at` is NULL and CLOSED once it is set. A
+    closed attempt is history: the service refuses to write to one, and a closed
+    attempt's outcome is what a later reopen reads.
+    """
+
+    __tablename__ = ATTEMPT_TABLE
+
+    job_id: Mapped[str] = mapped_column(
+        String(IDENTITY_LENGTH),
+        ForeignKey(f"{JOB_TABLE}.job_id"),
+        primary_key=True,
+    )
+    #: 1-based. Derived from the stored rows, never supplied by a caller.
+    attempt: Mapped[int] = mapped_column(Integer, primary_key=True)
+    #: Who is executing. Recorded, never chosen here - see the module docstring.
+    owner: Mapped[str] = mapped_column(String(FIELD_LENGTH), nullable=False)
+    started_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    #: Last proof of life. Compared against the injected clock; never slept on.
+    heartbeat_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    #: Absolute, computed once when the attempt opens. An absolute deadline
+    #: cannot be reset by a restart the way a remaining-duration counter could.
+    deadline_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    #: NULL while open. Set once, with `outcome`, when the attempt closes.
+    ended_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: The recorded Job state this attempt ended in. A value, not a decision:
+    #: the canonical machine decided it before it was written here.
+    outcome: Mapped[str | None] = mapped_column(String(STATE_LENGTH), nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(FIELD_LENGTH), nullable=True)
+
+    job: Mapped[DurableJobRecord] = relationship(back_populates="attempts")
+
+    @property
+    def is_open(self) -> bool:
+        return self.ended_at is None
 
 
 def _refuse(action: str, identity: str) -> CheckpointImmutabilityViolation:

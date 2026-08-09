@@ -8,17 +8,23 @@ All fields above are the `CONTRACT_INVENTORY.md` row for C-19, not a restatement
 Where this document and the code or the canonical set disagree, they win and this
 document is the defect.
 
-## 0. Scope of this revision — Phase 7 Atomic Package 1
+## 0. Scope of this revision — Phase 7 Atomic Package 2
 
-This document defines the **persistence foundation only**: the durable job
-record, its idempotency identity, and the checkpoint record. It is deliberately
-incomplete against `MS §Durable Runtime`, which also names heartbeat, progress
-evidence, bounded retries, timeout, cancel, pause/resume, approvals/signals,
-crash recovery and dead-letter. Those are later Phase 7 packages and **are not
-implemented, not claimed, and not represented by an unused column here**. A
-column that exists for a behaviour that does not is a claim, and STRICT
-compatibility permits adding optional fields later with a defined absent-value
-meaning, so nothing is lost by waiting.
+Package 1 defined the persistence foundation: the durable job record, its
+idempotency identity and the checkpoint record. **Package 2 adds the durability
+semantics**: execution attempts with an ownership and heartbeat record, a
+persisted retry bound with row-derived accounting, an absolute per-attempt
+deadline, cancellation and dead-lettering.
+
+Still **not** implemented, not claimed, and not represented by an unused column:
+**pause/resume**, the `supports_pause` job-type registry, the crash-recovery
+sweep, and approvals/signals. Those are Package 3 and later. A column that
+exists for a behaviour that does not is a claim, and STRICT compatibility
+permits adding optional fields later with a defined absent-value meaning, so
+nothing is lost by waiting.
+
+Package 2 records what Package 3 will need — `heartbeat_at`, `deadline_at` and a
+`RECOVERABLE` disposition — and stops there. It never enters `RESUMING`.
 
 No Phase 7 requirement is discharged by this package.
 
@@ -77,15 +83,56 @@ A rejected transition raises the machine's own typed error
 (`IllegalTransition`, `ForbiddenTransition`, `TerminalStateEscape`,
 `UnknownState`) unchanged, and the row is not touched.
 
+**Package 2 chooses between declared transitions; it never adds one.** On a
+failed attempt the job moves `RUNNING → FAILED`, then to `RECOVERABLE` when the
+recorded bound leaves another attempt and to `DEAD_LETTER` when it does not.
+Both are edges the machine already declares, and it evaluates each one, so
+retry exhaustion cannot bypass the machine.
+
+Three properties follow from the canonical relation rather than from code here,
+and are asserted as such:
+
+- **`DEAD_LETTER` has no outgoing transition.** A dead-lettered job cannot be
+  retried at all, silently or otherwise, until canonical authority declares an
+  edge out of it.
+- **`CANCELLED` is reachable only from `RUNNING`.** A queued job cannot be
+  cancelled, and a terminal job cannot be cancelled again.
+- **`RESUMING` is never entered by this package.** Retry disposition stops at
+  `RECOVERABLE`, which is exactly what Package 3's recovery needs and no more.
+
 ## 4. Records this contract owns
 
 | Record | Fields |
 |---|---|
-| `durable_job` | `job_id` (PK) · `job_type` · `idempotency_key` · `lifecycle_state` · `payload` (JSON) · `created_at` · `updated_at` — unique (`job_type`, `idempotency_key`) |
+| `durable_job` | `job_id` (PK) · `job_type` · `idempotency_key` · `lifecycle_state` · `payload` (JSON) · `max_attempts` · `attempt_timeout_seconds` · `created_at` · `updated_at` — unique (`job_type`, `idempotency_key`) |
 | `job_checkpoint` | `job_id` (PK, FK → `durable_job`) · `sequence` (PK) · `payload` (JSON) · `recorded_at` |
+| `job_execution_attempt` | `job_id` (PK, FK → `durable_job`) · `attempt` (PK) · `owner` · `started_at` · `heartbeat_at` · `deadline_at` · `ended_at` · `outcome` · `detail` |
 
 A control reads this table against the mapped columns, so the mapping cannot
 drift into two descriptions of the same thing.
+
+**Retry accounting is rows, not a counter.** The attempt count is
+`count(job_execution_attempt)`. It therefore cannot be reset by restarting a
+process, cannot be set by a caller, and cannot drift from what happened. The
+primary key (`job_id`, `attempt`) is also the concurrency backstop: two writers
+opening the same next attempt cannot both succeed, whatever the service does.
+
+**The bound and the timeout are recorded on the job.** `max_attempts` and
+`attempt_timeout_seconds` are the terms a job was admitted under, so they
+survive a restart and cannot be widened by changing a default later.
+
+**The deadline is absolute.** `deadline_at` is computed once, when the attempt
+opens, from the injected clock. A remaining-duration counter would silently
+restart with the process; an instant does not.
+
+**An attempt is open while `ended_at` is NULL.** At most one may be open at a
+time. Closing sets `ended_at` and `outcome` together, and the service refuses to
+write to a closed attempt — which is what makes a superseded owner unable to
+keep a dead execution looking alive.
+
+**`owner` records who is executing; it does not decide who should.** Refusing a
+stale owner is a durability property. Choosing, allocating or balancing owners is
+C-21 at Phase 8 and appears nowhere in this contract.
 
 **Checkpoint ordering is identity.** The primary key is (`job_id`, `sequence`),
 so two checkpoints cannot claim one position in a job's history and an ordinal

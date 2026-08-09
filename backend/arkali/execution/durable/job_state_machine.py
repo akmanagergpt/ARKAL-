@@ -15,6 +15,8 @@ FAILED is deliberately not terminal so a failed job can still reach either.
 
 from __future__ import annotations
 
+from typing import Final
+
 from arkali.kernel.contracts.state_machine import StateMachine, StateMachineDefinition
 
 MACHINE = "Job"
@@ -54,6 +56,30 @@ DEFINITION = StateMachineDefinition(
     forbidden=(),
     terminal=("SUCCEEDED", "CANCELLED", "DEAD_LETTER"),
 )
+
+
+#: Named states, for modules that must select WHICH declared transition to ask
+#: for. They resolve through the definition above, so a state this machine stops
+#: declaring becomes a KeyError at import rather than a string that quietly
+#: reaches `evaluate` and is rejected at run time.
+#:
+#: These belong here and nowhere else. Phase 7 Package 2 needs to name a target
+#: to request a move; writing the literal in the requesting module would put a
+#: second copy of the vocabulary in this context, which
+#: `test_durable_authority.py` forbids and which is exactly how a shadow
+#: authority starts. The requester imports the name; the relation stays here.
+_DECLARED: Final[dict[str, str]] = {state: state for state in DEFINITION.states}
+
+QUEUED: Final[str] = _DECLARED["QUEUED"]
+RUNNING: Final[str] = _DECLARED["RUNNING"]
+CHECKPOINTED: Final[str] = _DECLARED["CHECKPOINTED"]
+PAUSED: Final[str] = _DECLARED["PAUSED"]
+RESUMING: Final[str] = _DECLARED["RESUMING"]
+SUCCEEDED: Final[str] = _DECLARED["SUCCEEDED"]
+FAILED: Final[str] = _DECLARED["FAILED"]
+CANCELLED: Final[str] = _DECLARED["CANCELLED"]
+DEAD_LETTER: Final[str] = _DECLARED["DEAD_LETTER"]
+RECOVERABLE: Final[str] = _DECLARED["RECOVERABLE"]
 
 
 def build() -> StateMachine:

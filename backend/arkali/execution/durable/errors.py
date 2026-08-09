@@ -55,3 +55,42 @@ class CheckpointImmutabilityViolation(ContractViolation):
     """
 
     code = "ARK-ERR-0073"
+
+
+class StaleExecutionOwnership(ContractViolation):
+    """A heartbeat or completion arrived from an owner that no longer holds the
+    attempt, or for an attempt that has already closed.
+
+    The durability property this protects: a slow writer from a superseded
+    attempt must not be able to keep a dead execution looking alive, nor decide
+    the outcome of an execution it is no longer running.
+    """
+
+    code = "ARK-ERR-0074"
+
+
+class RetryBudgetExhausted(ContractViolation):
+    """A further attempt was requested beyond the bound the job was admitted
+    under.
+
+    Refused rather than silently capped: a caller that believes it may retry and
+    is quietly ignored has no way to distinguish that from a retry that ran.
+    """
+
+    code = "ARK-ERR-0075"
+
+
+class NoOpenAttempt(ContractViolation):
+    """An operation needs an open execution attempt and the job has none."""
+
+    code = "ARK-ERR-0076"
+
+
+class DeadlineNotReached(ContractViolation):
+    """A timeout was forced on an attempt whose deadline has not passed.
+
+    Refused so that timing out is a consequence of the clock, never of a caller
+    deciding it would like the attempt to end.
+    """
+
+    code = "ARK-ERR-0077"
