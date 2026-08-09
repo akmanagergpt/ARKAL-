@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `bd41b344835a211c6c847f69b7164b30fb5b72d8` |
+| Current HEAD | `c99cf145a2968f71abd51bd73c502552c8542725` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -112,7 +112,7 @@ repository, the repository wins.
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
 | Cumulative verified | **65** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4), reconciled by check C6 against `phase_4_traceability.json` |
 | BLOCKER / HIGH | **0 / 0** |
-| MEDIUM / LOW | 15 / 9 (tracked, non-blocking) — F-0026 open: GOV-001 has no mechanism behind it |
+| MEDIUM / LOW | 14 / 9 (tracked, non-blocking) — every recorded finding through F-0026 is closed |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over 41 real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0) |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
@@ -154,7 +154,9 @@ repository, the repository wins.
 | 26 | `0bf585c` | handoff manifest refreshed after F-0024 (§12 rule) |
 | 27 | `765bb07` | **ERR-004 remediation** — ARK-REQ-0111 implemented, finding parser fixed, **Phase 4 re-accepted** |
 | 28 | `e5e36bd` | handoff manifest refreshed after the remediation (§12 rule) |
-| 29 | `bd41b34` | **GOV-001** — superseding re-acceptance rule; Phase 4 re-acceptance ratified ← HEAD at generation |
+| 29 | `bd41b34` | **GOV-001** — superseding re-acceptance rule; Phase 4 re-acceptance ratified |
+| 30 | `552c80f` | handoff manifest refreshed after GOV-001 (§12 rule) |
+| 31 | `c99cf14` | **F-0026 closed** — GOV-001 enforced in the acceptance path ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -207,7 +209,8 @@ No unavailable toolchain may be reported as PASS.
 | 17 MEDIUM, 9 LOW | `OPEN_BLOCKERS.md` |
 | Every Phase 3 finding (F-0018 … F-0021) is **closed**; F-0018 by ERR-002 and F-0020 by ERR-003 | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
 | Every Phase 4 finding (F-0022 … F-0025) is **closed**; F-0024 and F-0025 by the ERR-004 remediation | `KNOWN_FAILURES.md` · `HUMAN_GATE_RECORDS.md` |
-| **F-0026 open (MEDIUM)** — GOV-001's re-scoring authorization rule has no mechanism; nothing stops an actor re-running the gate on an accepted phase | `KNOWN_FAILURES.md` · GOV-001 |
+| **F-0026 closed** — GOV-001 is enforced by the checker. Re-running the gate on an accepted phase without authorization returns `AWAITING_RESCORING_AUTHORITY` | `KNOWN_FAILURES.md` · EV-0040 |
+| Re-running the gate for **Phase 2 or 3** returns `AWAITING_RESCORING_AUTHORITY`. That is the mechanism, not a regression — their recorded acceptance stands | `BUILD_STATE.md` · EV-0042 |
 | **Re-accepting a previously accepted phase requires explicit re-scoring authorization *before* the re-score.** The original record stays immutable and marked superseded; nothing is amended, deleted or concealed. Phase 4's remediate-then-report ordering was authorized retrospectively and is **not** precedent | **GOV-001** in `HUMAN_GATE_RECORDS.md` (resolves the question left open by ERR-004) |
 | **TRUST-2/3/4 are UNSUPPORTED on this host** — a real probe result, not a defect. Re-probe on any new host | `phase_4_report.json` · EV-0033 |
 | **No execution surface exists**, so policy bypass resistance is CONTRACT-level only | EV-0032 |
@@ -276,6 +279,11 @@ implemented, and they are not optional:
   must carry three real executions whose summaries name *security review*,
   *adversarial review* and *full regression*. There is no flag that substitutes
   for them.
+* **RESCORING** — a phase with **no** prior acceptance record is unaffected;
+  Phase 5's first acceptance needs no authorization. Re-running the gate on an
+  already-accepted phase returns `AWAITING_RESCORING_AUTHORITY` unless
+  `HUMAN_GATE_RECORDS.md` carries a GRANTED authorization for that phase and its
+  exact evidence-package digest (GOV-001, RSA-001).
 
 ## 10. New-session bootstrap protocol
 
@@ -299,8 +307,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `bd41b344835a211c6c847f69b7164b30fb5b72d8` |
-| Generated after | **GOV-001**, a human governance ruling ratifying the Phase 4 superseding re-acceptance and establishing the standing re-scoring rule. Four governed artifacts changed, so the §12 refresh was mechanically required. No phase, gate, ADR or requirement state changed: Phase 4 remains MACHINE-ACCEPTED and Phase 5 remains UNLOCKED |
+| Generated at HEAD | `c99cf145a2968f71abd51bd73c502552c8542725` |
+| Generated after | **F-0026 closure** — GOV-001 given a mechanism in the acceptance path. Five governed artifacts changed, so the §12 refresh was mechanically required. No phase, gate, ADR or requirement state changed: Phase 4 remains MACHINE-ACCEPTED under RSA-001 and Phase 5 remains UNLOCKED |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
 | Validator | `scripts/check_handoff.py` |
 | Refresh rule | see §12 |
@@ -348,7 +356,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: bd41b344835a211c6c847f69b7164b30fb5b72d8
+head: c99cf145a2968f71abd51bd73c502552c8542725
 branch: main
 working_tree_clean: true
 
