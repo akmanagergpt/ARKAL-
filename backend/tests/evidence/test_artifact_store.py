@@ -41,7 +41,11 @@ from arkali.evidence.artifact.records import (
 from arkali.evidence.artifact.revision_link import provenance_ref_of, resolve
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.kernel.persistence.migrations import ALEMBIC_INI, applied_revision
+from arkali.kernel.persistence.migrations import (
+    ALEMBIC_INI,
+    applied_revision,
+    head_revision,
+)
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -325,7 +329,14 @@ class TestPersistenceThroughRestart:
         finally:
             restarted.dispose()
 
-    def test_the_schema_revision_is_the_artifact_migration(
+    def test_the_database_is_at_the_declared_chain_head(
         self, engine: Engine
     ) -> None:
-        assert applied_revision(engine) == "0003_artifact_provenance"
+        """F-0032 again, in a site this package authored.
+
+        The repair derived the head at three places and missed this one, written
+        in the same package that closed the finding. Naming a revision here
+        expires the moment a legitimate migration is added - which 0004 promptly
+        did.
+        """
+        assert applied_revision(engine) == head_revision(BACKEND)

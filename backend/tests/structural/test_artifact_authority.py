@@ -85,21 +85,74 @@ def called_names(tree: ast.AST) -> set[str]:
 
 
 class TestIdentityHasOneAuthority:
-    def test_only_content_address_computes_a_digest(self) -> None:
-        """NEGATIVE CONTROL: no second hashing site may exist in this context."""
+    def test_no_module_in_this_context_computes_a_digest(self) -> None:
+        """NEGATIVE CONTROL: strengthened in Package 2.
+
+        The bytes-to-digest mechanism moved to `kernel.contracts` so
+        `evidence.audit` could reach it without importing this sibling. So the
+        ban is now absolute here rather than excepting one module: no module in
+        `evidence.artifact` hashes anything. Identity authority stayed - this
+        context still decides what an artifact address is and refuses a
+        malformed one - but the hashing itself happens in exactly one place in
+        the repository.
+        """
         for module in modules():
-            if module.name == "content_address.py":
-                continue
             body = strip_comments(source_of(module))
             for forbidden in ("hashlib", "sha256(", "md5(", "blake2", "sha1("):
                 assert forbidden not in body, (
-                    f"{module.name} computes a digest of its own; "
-                    "content_address.py is the only identity authority"
+                    f"{module.name} computes a digest of its own; the primitive "
+                    "lives in kernel.contracts.content_address"
                 )
 
-    def test_the_address_helper_really_hashes(self) -> None:
-        """Otherwise the check above is vacuous."""
-        assert "hashlib" in source_of(CONTEXT / "content_address.py")
+    def test_the_kernel_primitive_really_hashes(self) -> None:
+        """Otherwise the check above is vacuous - nothing would hash at all."""
+        primitive = REPO / "backend/arkali/kernel/contracts/content_address.py"
+        assert primitive.is_file()
+        assert "hashlib" in source_of(primitive)
+
+    def test_neither_evidence_context_hashes(self) -> None:
+        """One *content-address* mechanism, shared by both evidence contexts.
+
+        Deliberately not "the only hashing site in the repository" - that would
+        be false and was, on first writing. Other contexts hash for their own
+        concerns: `acceptance` digests an evidence package for GOV-001,
+        `kernel.observability` builds correlation envelopes,
+        `kernel.persistence` checksums a backup. None of those is content
+        addressing. What matters here is that the two contexts sharing this
+        identity mechanism both take it from rank 0 rather than one of them
+        owning it and the other importing across the layer.
+        """
+        evidence = REPO / "backend" / "arkali" / "evidence"
+        hashing = sorted(
+            path.relative_to(REPO).as_posix()
+            for path in evidence.rglob("*.py")
+            if "hashlib" in strip_comments(source_of(path))
+        )
+        assert hashing == [], (
+            f"an evidence context hashes bytes directly: {hashing}; the "
+            "primitive lives in kernel.contracts.content_address"
+        )
+
+    def test_this_context_still_owns_artifact_identity(self) -> None:
+        """The mechanism moved; the authority did not.
+
+        A malformed address is refused here, in this context's taxonomy, and the
+        storage layout is decided here. The kernel primitive is total and types
+        nothing.
+        """
+        body = strip_comments(source_of(CONTEXT / "content_address.py"))
+        assert "InvalidArtifactIdentity" in body
+        assert "def relative_path" in body
+        # Comments stripped: the primitive's prose explains what its callers do
+        # with a None, and naming a type in that explanation is not using it.
+        primitive = strip_comments(
+            source_of(REPO / "backend/arkali/kernel/contracts/content_address.py")
+        )
+        assert "InvalidArtifactIdentity" not in primitive
+        assert "raise" not in primitive, (
+            "the kernel primitive raises; deciding what a malformed identity "
+            "means belongs to the context that owns the identity"
+        )
 
     def test_no_module_accepts_an_artifact_id_argument(self) -> None:
         """Identity is derived. A parameter named for it would be a way in."""

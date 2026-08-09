@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
+from arkali.control.architecture.refusal import refuse
 
 MEASUREMENT_KEY = "architecture_budget_measurement"
 
@@ -93,14 +93,14 @@ class MeasurementContract:
         self.source_path = source_path
         self.version = str(raw.get("contract_version", "")).strip()
         if not self.version:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "budget measurement contract declares no contract_version",
                 source=source_path,
             )
         self._cyclomatic = raw.get("cyclomatic_complexity") or {}
         self._depth = raw.get("orchestration_depth") or {}
         if not self._cyclomatic or not self._depth:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "budget measurement contract is missing a required section",
                 source=source_path,
             )
@@ -111,7 +111,7 @@ class MeasurementContract:
     ) -> MeasurementContract:
         section = raw_map.get(MEASUREMENT_KEY)
         if not section:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"authority map declares no {MEASUREMENT_KEY!r} section; budgets "
                 "cannot be measured without a ratified formula",
                 source=source_path,

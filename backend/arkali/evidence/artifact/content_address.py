@@ -1,80 +1,88 @@
-"""Content addressing for C-14 (ARK-REQ-0057).
+"""Artifact identity: content addressing for C-14 (ARK-REQ-0057).
 
-Owner: `evidence.artifact` - `ARCHITECTURE.md` section 3 row 11 names this
-context the authority for "Artifact Fabric, content addressing, provenance".
+Owner: `evidence.artifact` - AUTHORITY_MAP.yaml concern
+`artifact_identity_and_provenance`. `ARCHITECTURE.md` section 3 row 11 names
+this context the authority for "Artifact Fabric, content addressing,
+provenance".
 
-THE ADDRESS IS DERIVED, NEVER SUPPLIED. Every function here takes bytes and
-returns an address. There is no constructor that accepts a digest from a caller,
-because an identity a caller can choose is an identity that can disagree with its
+THE AUTHORITY IS HERE; THE MECHANISM IS IN THE KERNEL. The bytes-to-digest
+primitive moved to `kernel.contracts.content_address` in Phase 6 Package 2,
+because `evidence.audit` needs the same mechanism and the two contexts are
+siblings that `allow_same_layer: false` forbids from importing each other. Only
+rank 0 is reachable from both. This is the Phase 3 shape recorded in
+`DECISION_LOG.md`: the mechanism is a kernel contract, the authority stays with
+the context the authority map names.
+
+WHAT REMAINED HERE, AND WHY IT IS THE AUTHORITY. The kernel primitive is total -
+it returns values and decides nothing. This module decides:
+
+  * that a malformed address is `InvalidArtifactIdentity`, a typed refusal in
+    this context's taxonomy;
+  * that an artifact's address is the canonical form and no other spelling is
+    accepted;
+  * where an artifact's bytes live (`relative_path`), which is storage layout
+    and has nothing to do with hashing.
+
+THE ADDRESS IS DERIVED, NEVER SUPPLIED. Every function takes bytes and returns
+an address. There is no constructor that accepts a digest from a caller, because
+an identity a caller can choose is an identity that can disagree with its
 content - the single failure content addressing exists to prevent.
 
-DETERMINISTIC AND TOTAL. The digest is taken over the raw bytes only. No
-timestamp, filename, host fact or ordering participates, so identical bytes yield
-an identical address in any process on any host. The empty byte string has an
-address like any other.
-
-NO PERSISTENCE, NO POLICY, NO FILESYSTEM. This module is pure. It is the piece
-every other artifact module depends on, so keeping it free of I/O is what lets
-the determinism control test it directly rather than through a store.
+NO PERSISTENCE, NO POLICY, NO FILESYSTEM. This module is pure, which is what
+lets the determinism controls test it directly rather than through a store.
 """
 
 from __future__ import annotations
 
-import hashlib
-import re
 from typing import Final
 
 from arkali.evidence.artifact.errors import InvalidArtifactIdentity
+from arkali.kernel.contracts.content_address import (
+    ADDRESS_LENGTH,
+    ALGORITHM,
+    address_of,
+    digest_of,
+    is_address,
+    split,
+)
 
-#: The algorithm this phase ships. Named once; the address carries it explicitly
-#: so a future algorithm is a new prefix rather than a silent reinterpretation of
-#: existing rows.
-ALGORITHM: Final[str] = "sha256"
+__all__ = [
+    "ADDRESS_LENGTH",
+    "ALGORITHM",
+    "address_of",
+    "digest_of",
+    "is_address",
+    "matches",
+    "parse",
+    "relative_path",
+]
 
-#: `<algorithm>:<lowercase hex digest>`. Anchored, lowercase-only and
-#: length-exact, so a truncated or upper-cased digest is rejected rather than
-#: stored as a second spelling of the same artifact.
-ADDRESS_PATTERN: Final[re.Pattern[str]] = re.compile(r"^(?P<algorithm>sha256):(?P<digest>[0-9a-f]{64})$")
-
-
-def digest_of(payload: bytes) -> str:
-    """The lowercase hex digest of `payload`."""
-    return hashlib.sha256(payload).hexdigest()
-
-
-def address_of(payload: bytes) -> str:
-    """The canonical content address of `payload`.
-
-    The only way an `artifact_id` is ever produced.
-    """
-    return f"{ALGORITHM}:{digest_of(payload)}"
+#: Re-exported so this context's own modules read artifact identity from their
+#: own authority rather than reaching past it to the primitive.
+_ALGORITHM: Final[str] = ALGORITHM
 
 
 def parse(address: str) -> tuple[str, str]:
-    """Split a well-formed address into `(algorithm, digest)`.
+    """Split a well-formed artifact address into `(algorithm, digest)`.
 
     Refuses anything that is not exactly canonical. Accepting a lenient spelling
-    would let the same bytes be filed under two identities.
+    would let the same bytes be filed under two identities. This is where the
+    kernel primitive's `None` becomes a typed refusal in this taxonomy.
     """
-    match = ADDRESS_PATTERN.match(address)
-    if match is None:
+    parts = split(address)
+    if parts is None:
         raise InvalidArtifactIdentity(
             f"{address!r} is not a canonical content address "
             f"('{ALGORITHM}:<64 lowercase hex digits>')"
         )
-    return match.group("algorithm"), match.group("digest")
-
-
-def is_address(candidate: str) -> bool:
-    """Whether `candidate` is a canonical content address."""
-    return ADDRESS_PATTERN.match(candidate) is not None
+    return parts
 
 
 def matches(payload: bytes, address: str) -> bool:
     """Whether `payload` really hashes to `address`.
 
-    Parses first, so a malformed address is a typed refusal rather than a
-    quiet False that a caller might read as "different content".
+    Parses first, so a malformed address is a typed refusal rather than a quiet
+    False a caller might read as "different content".
     """
     parse(address)
     return address_of(payload) == address
@@ -83,6 +91,7 @@ def matches(payload: bytes, address: str) -> bool:
 def relative_path(address: str) -> str:
     """Where the bytes for `address` live, relative to the store root.
 
+    Storage layout, not hashing - which is why it stayed in this context.
     Sharded on the first two digest characters so a directory does not grow to
     hold every artifact ever produced. The path is a pure function of the
     address, so the filesystem layout *is* the index: a blob cannot be misfiled

@@ -35,7 +35,7 @@ import re
 
 from pydantic import BaseModel, ConfigDict
 
-from arkali.kernel.contracts.errors import AuthoritativeSourceError
+from arkali.control.architecture.refusal import refuse
 
 STATE_MACHINES_RELPATH = "docs/canonical/STATE_MACHINES.md"
 
@@ -92,7 +92,7 @@ def _expand(token: str, states: tuple[str, ...]) -> tuple[list[str], bool]:
     if text.startswith("any pre-"):
         pivot = text[len("any pre-"):].strip()
         if pivot not in states:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"'any pre-{pivot}' names an undeclared state",
                 source=STATE_MACHINES_RELPATH,
             )
@@ -172,13 +172,13 @@ def _parse_block(match: re.Match[str], block: str) -> MachineSpec:
     states_match = _STATES.search(block)
     transitions_match = _TRANSITIONS.search(block)
     if states_match is None or transitions_match is None:
-        raise AuthoritativeSourceError(
+        raise refuse(
             f"machine {document_name!r} lacks a States or Transitions line",
             source=STATE_MACHINES_RELPATH,
         )
     states = tuple(_BACKTICKED.findall(states_match.group("body")))
     if not states:
-        raise AuthoritativeSourceError(
+        raise refuse(
             f"machine {document_name!r} declares no states",
             source=STATE_MACHINES_RELPATH,
         )
@@ -196,7 +196,7 @@ def _parse_block(match: re.Match[str], block: str) -> MachineSpec:
         {s for pair in transitions + forbidden for s in pair} - set(states)
     )
     if unknown:
-        raise AuthoritativeSourceError(
+        raise refuse(
             f"machine {document_name!r} references undeclared states {unknown}",
             source=STATE_MACHINES_RELPATH,
         )
@@ -221,13 +221,13 @@ class StateMachineInventory:
     def load(cls, repo_root: pathlib.Path) -> StateMachineInventory:
         path = repo_root / STATE_MACHINES_RELPATH
         if not path.is_file():
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "state machine inventory not found", source=str(path)
             )
         text = path.read_text(encoding="utf-8")
         headers = list(_HEADER.finditer(text))
         if not headers:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 "no machine declarations parsed", source=str(path)
             )
         machines: dict[str, MachineSpec] = {}
@@ -239,7 +239,7 @@ class StateMachineInventory:
             )
             spec = _parse_block(match, text[match.start():end])
             if spec.machine in machines:
-                raise AuthoritativeSourceError(
+                raise refuse(
                     f"duplicate machine {spec.machine!r}", source=str(path)
                 )
             machines[spec.machine] = spec
@@ -254,7 +254,7 @@ class StateMachineInventory:
     def get(self, machine: str) -> MachineSpec:
         spec = self.machines.get(machine)
         if spec is None:
-            raise AuthoritativeSourceError(
+            raise refuse(
                 f"unknown machine {machine!r}", source=self.source_path
             )
         return spec

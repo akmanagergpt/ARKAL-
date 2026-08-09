@@ -2,20 +2,22 @@
 
 **Current state:** **PHASE 5 MACHINE-ACCEPTED. PHASE 6 UNLOCKED — IN PROGRESS, NOT ACCEPTED.**
 
-Phase 5 is accepted and unchanged; its record stands. Phase 6 has begun and is delivered in atomic packages.
+Phase 5 is accepted and unchanged. Phase 6 is delivered in atomic packages; **Packages 1 and 2 are complete**.
 
-**Package 1 (C-14) is complete.** `evidence.artifact` now holds the artifact descriptor, the provenance record and parent edges, with identity that *is* the content address — derived from the bytes by the only hashing site in the context, never supplied by a caller. Artifacts and provenance records are immutable by ORM refusal; stored bytes are verified on every read and a mismatch is reported, never repaired. Blob writes are governed by the Phase 4 PEP under `WRITE_WORKSPACE_FILE`; the two stable-mutation classes are never requested and never named. Migration `0003_artifact_provenance` extends the existing chain. C-12 was **not** touched: a 71-character address fits its existing `String(200)` column, and `control.registry.project` still imports nothing from `evidence.artifact`.
+**Package 1 (C-14).** `evidence.artifact` holds the artifact descriptor, provenance record and parent edges. Identity *is* the content address, derived from the bytes and never supplied. Artifacts and provenance are immutable by ORM refusal; a tampered blob is detected and never repaired. Blob writes are PEP-governed under `WRITE_WORKSPACE_FILE`. C-12 was not touched.
 
-**Package 2 (C-15, the audit / evidence integrity chain) is NOT started.** It is owned by `evidence.audit`, which is **Protected Core**, so the stronger verification profile will apply to the phase — it has **not** been run or claimed yet. A control asserts `evidence.artifact` builds no audit chain of its own in the meantime.
+**Package 2 (C-15).** `evidence.audit` — **Protected Core** — holds the append-only evidence chain: `record_hash` is a digest over every field *including* the predecessor's digest, so the chain is a real hash chain and `verify()` **recomputes** rather than reading any stored flag. Update and delete are both refused at the ORM; the public authority is `append/get/require/head/records/verify/superseded_by` with no amend or delete escape. Supersession appends and preserves. A record must name a requirement the canonical register declares and an artifact C-14 actually registered.
+
+**The two evidence contexts share a mechanism, not an authority.** The content-address primitive moved to `kernel.contracts` so both siblings could reach it at rank 0; `allow_same_layer` stays false, no exemption was widened, and `test_live_repository_uses_no_exempt_edge` passes. Artifact linkage is enforced by the persisted foreign key rather than by importing the sibling's ORM record.
+
+**The Package 2 change set is PROTECTED_CORE** by `select_profile` from its own paths — members `control.architecture` and `evidence.audit`. All three canonical categories were executed at exit 0: *security review* (185), *adversarial review* (413 plus both negative-control validators) and *full regression* (1293 passed, 13 skipped).
 
 **ARK-REQ-0004, ARK-REQ-0057 and ARK-REQ-0349 are NOT discharged.** No Phase 6 report, no traceability record, no gate run. Cumulative verified stays at **72**.
-
-**F-0032 opened and closed** — three tests transcribed the migration-chain head and expired when the chain legitimately advanced. Proven mechanically to be stale literals rather than a defect, then repaired by deriving the head. Ninth instance of that family.
 
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 6 Atomic Package 1 (C-14 artifact descriptor + provenance)
+**Last updated by:** Phase 6 Atomic Package 2 (C-15 audit / evidence integrity chain)
 **Governance errata and rulings:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) · **ERR-004** (confirms F-0024, orders remediation) · **GOV-001** (superseding re-acceptance rule; ratifies the Phase 4 re-acceptance) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -32,7 +34,7 @@ Phase 5 is accepted and unchanged; its record stands. Phase 6 has begun and is d
 | 3 | Formal State Machines + Capability Graph Schema | **MACHINE-ACCEPTED** (12 machines, C-13 schema, 444 new tests) |
 | 4 | Security + Governance + Isolation Backends | **MACHINE-ACCEPTED** (re-accepted after the ERR-004 remediation; the defective first revision is retained as evidence) |
 | 5 | Persistence + Project Registry + Minimal Backup/Restore | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`; C1–C6 PASS, PROTECTED_CORE COMPLETE. Five atomic packages; 7/7 requirements SATISFIED and discharged under C6. First real T10: 9 browser tests in Chromium against the production build, a live API and a real SQLite file) |
-| 6 | Artifact / Evidence Plane (C-14, C-15) | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Package 1 complete: C-14 artifact descriptor + provenance under `evidence.artifact`, content addressing, immutability and migration `0003_artifact_provenance`. Package 2 (C-15 `evidence.audit`, Protected Core) not started. No phase report, no traceability record, no gate run |
+| 6 | Artifact / Evidence Plane (C-14, C-15) | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Packages 1–2 complete: C-14 artifact descriptor + provenance under `evidence.artifact`, and C-15 append-only evidence integrity chain under `evidence.audit` (Protected Core), with migrations `0003_artifact_provenance` and `0004_audit_record`. Package 3 owes final integration, evidence, traceability and the gate. No phase report, no traceability record, no gate run |
 | 7 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
@@ -101,15 +103,16 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Phase 6 Atomic Package 2 — C-15 Audit / Evidence Integrity Chain.** Build `evidence.audit`:
+**Phase 6 Atomic Package 3 — Final Integration + Evidence + Traceability + Phase Acceptance.**
 
-- it is **Protected Core**, so `select_profile` will require the stronger profile for the phase — security review, adversarial review and full regression, each a real execution;
-- `VERIFICATION_ARCHITECTURE.md` §2.2 rule 7 gives it sole authority over the chain: no other context may write or amend an evidence record;
-- rule 1 makes evidence append-only, with a superseded result retained under a `supersedes` edge;
-- `docs/contracts/audit_record.md` is its C-15 definition and does not exist yet;
-- `artifact_provenance.evidence` already holds references, so the join is a reference resolution, not a schema change to C-14.
+C-14 and C-15 both exist and are controlled. What remains:
 
-Then, and only then: `phase_6_report.json`, `docs/acceptance/phase_6_traceability.json` and `python scripts/run_phase_gate.py 6 7`. Nothing before that discharges a requirement.
+1. **Integration evidence** that the two halves work together as the Evidence Plane the register's `ARK-REQ-0004` names — an artifact registered by C-14 and evidenced by C-15, end to end.
+2. **`docs/acceptance/phase_6_traceability.json`** — three claims (0004, 0057, 0349), each SATISFIED only with a named implementation and a named evidence source. C-15 has no register row of its own, so it must be mapped explicitly to `ARK-REQ-0004` or the audit half discharges nothing.
+3. **`docs/acceptance/phase_6_report.json`** (C-17, 17 fields), carrying the three Protected Core categories as real executions — the profile applies because `evidence.audit` and `control.architecture` were touched.
+4. **`python scripts/run_phase_gate.py 6 7`**, and record the acceptance only if the verdict is genuinely `PHASE_ACCEPTED_BY_MACHINE`.
+
+Out of scope and not to be pulled forward: Phase 13 evidence-graph computation, coverage and verdicts (C-16); the Acceptance Engine; provider runtime (9); Capability Graph activation (9B); durable jobs (7); Recovery Supervisor and `ROLLBACK_STABLE` (22B); Stable Core promotion (23); release/SBOM (26); T7/T8/T12 (31).
 
 *(superseded guidance retained for continuity)*
 
