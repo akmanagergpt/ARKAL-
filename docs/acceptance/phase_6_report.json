@@ -1,0 +1,199 @@
+{
+ "phase_id": "6",
+ "objective": "Artifact / Evidence Plane (C-14, C-15), delivered as three atomic packages: the C-14 artifact descriptor and provenance record under evidence.artifact, where identity IS the content address and both records are immutable by ORM refusal; the C-15 append-only audit / evidence integrity chain under evidence.audit (Protected Core), where record_hash is a digest over every field including the predecessor's and verification recomputes rather than reading a stored flag; and the integration, provenance and graph-readiness evidence that proves the two compose into one Evidence Plane without either acquiring the other's authority.",
+ "ark_req_ids_closed": [
+  "ARK-REQ-0004",
+  "ARK-REQ-0057",
+  "ARK-REQ-0349"
+ ],
+ "files_created": [
+  "backend/alembic/versions/0003_artifact_provenance.py",
+  "backend/alembic/versions/0004_audit_record.py",
+  "backend/arkali/control/architecture/refusal.py",
+  "backend/arkali/evidence/artifact/blob_store.py",
+  "backend/arkali/evidence/artifact/content_address.py",
+  "backend/arkali/evidence/artifact/errors.py",
+  "backend/arkali/evidence/artifact/records.py",
+  "backend/arkali/evidence/artifact/revision_link.py",
+  "backend/arkali/evidence/artifact/store.py",
+  "backend/arkali/evidence/audit/chain.py",
+  "backend/arkali/evidence/audit/errors.py",
+  "backend/arkali/evidence/audit/integrity.py",
+  "backend/arkali/evidence/audit/records.py",
+  "backend/arkali/kernel/contracts/content_address.py",
+  "backend/tests/evidence/__init__.py",
+  "backend/tests/evidence/plane_harness.py",
+  "backend/tests/evidence/test_artifact_boundaries.py",
+  "backend/tests/evidence/test_artifact_store.py",
+  "backend/tests/evidence/test_audit_boundaries.py",
+  "backend/tests/evidence/test_audit_chain.py",
+  "backend/tests/evidence/test_content_address.py",
+  "backend/tests/evidence/test_evidence_plane_integration.py",
+  "backend/tests/evidence/test_evidence_plane_provenance.py",
+  "backend/tests/structural/test_artifact_authority.py",
+  "backend/tests/structural/test_evidence_authority.py",
+  "docs/acceptance/phase_6_report.json",
+  "docs/acceptance/phase_6_traceability.json",
+  "docs/contracts/artifact.md",
+  "docs/contracts/audit_record.md"
+ ],
+ "files_modified": [
+  "ARKALI_HANDOFF.md",
+  "backend/alembic/env.py",
+  "backend/arkali/acceptance/governance_state.py",
+  "backend/arkali/control/architecture/budget_measurement.py",
+  "backend/arkali/control/architecture/state_machine_spec.py",
+  "backend/tests/persistence/test_migrations.py",
+  "backend/tests/persistence/test_recovery_lifecycle.py",
+  "backend/tests/surfaces/test_command_api.py",
+  "docs/acceptance/EVIDENCE_INDEX.md",
+  "docs/build/BUILD_STATE.md",
+  "docs/build/DECISION_LOG.md",
+  "docs/build/KNOWN_FAILURES.md",
+  "docs/build/OPEN_BLOCKERS.md",
+  "docs/build/PHASE_HISTORY.md"
+ ],
+ "public_contracts": [
+  "C-14 artifact descriptor + provenance record - docs/contracts/artifact.md. Identity is the canonical content address (sha256:<64 hex>), derived from the bytes and never supplied. Records: artifact (artifact_id PK, hash_algorithm, digest, byte_size, normalization, created_at), artifact_provenance (artifact_id PK/FK, producer_agent, provider_model, task_id, specification_version, context_hash, tests, evidence, recorded_at), artifact_parent (artifact_id FK, parent_artifact_id FK, position). Immutable: no update path exists on any of the three.",
+  "C-15 audit record - docs/contracts/audit_record.md, Protected Core. Append-only chain: record_hash PK (derived), sequence, previous_hash, requirement_id, contract_id, artifact_id FK into C-14, test_id, producer, result, recorded_at, supersedes FK. Public authority: append, get, require, head, records, verify, superseded_by. No amend, update, overwrite, replace, delete or purge exists.",
+  "arkali.kernel.contracts.content_address - the shared bytes-to-digest primitive (ALGORITHM, ADDRESS_LENGTH, address_of, digest_of, is_address, split). Mechanism only: it is total, decides nothing, and mints no artifact identity."
+ ],
+ "migrations": [
+  "0003_artifact_provenance",
+  "0004_audit_record"
+ ],
+ "state_machine_capability_changes": "No state machine was added, removed or redefined; the twelve Phase 3 machines remain reconciled against STATE_MACHINES.md on every run and no Phase 6 module declares a transition table. The Capability Graph remains schema-only and every query still returns NOT_CONFIGURED (ADR-0003; activation is Phase 9B). Phase 6 introduces no lifecycle of its own: an artifact has no states because it is immutable, and an evidence record has none because it is append-only - a corrected outcome is a new record carrying a supersedes edge, which is a graph edge and not a transition.",
+ "tests_executed": [
+  {
+   "command": "python -m pytest -q",
+   "exit_code": 0,
+   "passed": 1311,
+   "failed": 0,
+   "summary": "full regression: every applicable backend tier (T1-T5, T9, T11 and the architecture/structural/governance controls) executed on real SQLite against the final Phase 6 tree; 1311 passed, 13 skipped, 0 failed. The 13 skips are declared NOT_CONFIGURED/not-applicable cases (no PostgreSQL driver on this host; machines declaring no forbidden pairs or no terminal state), never substituted results"
+  },
+  {
+   "command": "python -m pytest tests/security -q",
+   "exit_code": 0,
+   "passed": 185,
+   "failed": 0,
+   "summary": "security review: T9 tier against the final Phase 6 tree - PDP determinism, PEP enforcement and bypass resistance, Protected Core boundary, Secret Vault, Local-Only, secret-leakage and no-path-leakage negative controls; 185 passed"
+  },
+  {
+   "command": "python -m pytest tests/structural tests/governance -q",
+   "exit_code": 0,
+   "passed": 413,
+   "failed": 0,
+   "summary": "adversarial review: the negative-control tier against the final Phase 6 tree, including the two Phase 6 authority modules - test_artifact_authority.py (34: one identity authority, no shadow audit chain, no second persistence authority, no Stable mutation path, contract/schema reconciliation, C-12 dependency direction) and test_evidence_authority.py (22: sole chain writer, no artifact-identity minting, no same-layer sibling import, no mutation escape, no stored verification flag, every persisted column in the digest); 413 passed"
+  },
+  {
+   "command": "python scripts/check_repository_structure_negative.py",
+   "exit_code": 0,
+   "passed": 23,
+   "failed": 0,
+   "summary": "adversarial review: structure negative controls 23/23 - a violating construct is rejected in every non-owning context, survives rename and move, is seen in untracked files, and the validator fails closed on unresolvable authority"
+  },
+  {
+   "command": "python scripts/check_phase_graph_negative.py",
+   "exit_code": 0,
+   "passed": 3,
+   "failed": 0,
+   "summary": "adversarial review: the phase-graph validator rejects a defective authoritative input and reports the injected deadlock rather than passing vacuously; the repository matrix is verified unmodified afterwards"
+  },
+  {
+   "command": "python -m pytest tests/evidence -q",
+   "exit_code": 0,
+   "passed": 111,
+   "failed": 0,
+   "summary": "the Phase 6 evidence tier on real persistence: C-14 identity/immutability/provenance (26 + 19 + 15), C-15 chain/integrity/supersession/boundaries (20 + 17), and the Package 3 composition - the C-14/C-15 journey across four separate engines (4) and the provenance and graph-readiness evidence (10); 111 passed"
+  },
+  {
+   "command": "python -m pytest tests/persistence -q",
+   "exit_code": 0,
+   "passed": 117,
+   "failed": 0,
+   "summary": "T11 persistence tier standalone: real SQLite, verified WAL, durability across close and reopen, the declared migration chain applied to head, the migrated schema compared against the complete ORM registry (F-0033), and the A -> backup -> B -> restore -> verify proof; 117 passed, 2 skipped"
+  },
+  {
+   "command": "python -m pytest tests/surfaces -q",
+   "exit_code": 0,
+   "passed": 28,
+   "failed": 0,
+   "summary": "T5 integration tier: the Command Center API driven end to end on real persistence, unchanged by Phase 6 and re-run to prove it; 28 passed"
+  },
+  {
+   "command": "python -m mypy --ignore-missing-imports arkali",
+   "exit_code": 0,
+   "passed": 120,
+   "failed": 0,
+   "summary": "T1 static tier: mypy strict, success, no issues found in 120 source files"
+  },
+  {
+   "command": "python scripts/check_repository_structure.py",
+   "exit_code": 0,
+   "passed": 12,
+   "failed": 0,
+   "summary": "repository structure validator 12/12 PASS over 120 shipping modules, including check 11 (no Stable mutation path introduced) and check 12 (runtime constructs confined to their canonical authority). Two of its checks fired against the first draft of the Package 3 evidence and were answered rather than exempted: the 400-logical-line budget by decomposing the module into plane_harness.py plus two test modules per ADR-0008, and the fake-implementation-marker check by rewording a docstring that contained the banned token"
+  },
+  {
+   "command": "python scripts/check_phase_graph.py",
+   "exit_code": 0,
+   "passed": 10,
+   "failed": 0,
+   "summary": "phase dependency graph 10/10 PASS, parsed from the authoritative documents; Phase 6's prerequisite is Phase 5 and Phase 5 is accepted"
+  },
+  {
+   "command": "python scripts/check_phase0_deliverables.py",
+   "exit_code": 0,
+   "passed": 27,
+   "failed": 0,
+   "summary": "Phase 0A 16/16 and Phase 0B 11/11 deliverables still resolved by file existence and content probe"
+  },
+  {
+   "command": "python scripts/check_handoff.py",
+   "exit_code": 0,
+   "passed": 19,
+   "failed": 0,
+   "summary": "cross-session handoff manifest agrees with repository truth on all 19 derived claims. Recorded at the Package 3 entry state (HEAD 712be6c, clean tree). During an uncommitted package the same validator correctly reports HANDOFF_DRIFT on the working-tree claim - that is the control working, not a regression - so it is re-derived and re-run to exit 0 by the section 12 refresh that closes this phase"
+  },
+  {
+   "command": "python scratch/mutate.py (7 controlled source mutations, each restored and byte-verified)",
+   "exit_code": 0,
+   "passed": 7,
+   "failed": 0,
+   "summary": "adversarial review: mutation audit of the Package 3 evidence. Seven real defects were injected into shipping source one at a time - a constant record digest, a blob read that skips verification, unpersisted parent edges, unpersisted provenance rows, superseded records hidden from history, the artifact foreign key removed from migration 0004, and the orphan-requirement guard disabled - and all seven were caught. Two mutations that turned out to be semantic no-ops were identified as bad mutations and replaced rather than recorded as passes. Every file was restored byte-for-byte and the restoration asserted"
+  },
+  {
+   "command": "python scratch/controls.py (22 anti-vacuity controls run by exact node id)",
+   "exit_code": 0,
+   "passed": 22,
+   "failed": 0,
+   "summary": "adversarial review: the twenty-two Phase 6 negative controls executed individually by node id, so a renamed or absent control is a failure rather than a silent skip - artifact content mutation, identity mismatch, immutable-metadata mutation, audit-record update, audit-record deletion, chain-record mutation, predecessor/hash mutation, orphan requirement, unregistered artifact, broken supersession target, historical rewrite, second chain writer, artifact-identity minting in evidence.audit, chain writes from evidence.artifact, secrets into an artifact, secrets into an evidence record, Stable mutation requested, stored verification flag, corruption after reopen, and the three traceability guards; 22/22 PASS"
+  },
+  {
+   "command": "python scratch/false_discharge.py (7 acceptance-guard proofs against the real Phase 6 package)",
+   "exit_code": 0,
+   "passed": 7,
+   "failed": 0,
+   "summary": "adversarial review: proof that the acceptance mechanism would reject a defective Phase 6 package, executed BEFORE the real gate run and recording nothing. Six temporary mutations of the real phase_6 artifacts each produced PHASE_BLOCKED - ARK-REQ-0004 SATISFIED changed to DEFERRED (C6), ARK-REQ-0057 SATISFIED stripped of its implementation (C6), ARK-REQ-0349 SATISFIED stripped of its evidence (C6), ARK-REQ-0004 stripped of its evidence entirely (C6), the adversarial-review category removed from tests_executed (PROTECTED_CORE), and the security-review category removed (PROTECTED_CORE). The seventh case is reported as an ACCEPT and is the honest answer rather than a failure to control: removing only the C-15 half of ARK-REQ-0004's evidence while leaving the C-14 half is still accepted, because the traceability contract requires a SATISFIED claim to NAME an implementation and an evidence source and has no per-contract granularity. That case was predicted before it ran, and the limitation is recorded in the limitations field. Every mutation was reverted and both artifacts verified byte-identical to their pre-run SHA-256 digests"
+  }
+ ],
+ "architecture_checks": "8 canonical gates executed by GateRunner: all PASS over 77 real cross-context edges, with reconcile() confirming the declared and implemented gate sets agree. All 9 numeric budgets evaluated under the ratified measurement contract 1.0.0 (ERR-003): no violation. Two budgets bound real design decisions in this phase and both were answered by decomposition per ADR-0008 rather than by an exception: kernel error fan-in reached 16 against a budget of 15, which is why acceptance.engine now raises through its own governance_source.refuse factory instead of importing the kernel taxonomy a second time; and max_contexts_touched_by_module is why the C-12 registry edge lives alone in revision_link.py rather than in store.py. allow_same_layer remains false and no exemption was widened: when the first shape of C-15 imported evidence.artifact across the layer, test_live_repository_uses_no_exempt_edge caught it, and the answer was to move the content-address mechanism to kernel.contracts at rank 0 - the Phase 3 shape, mechanism in the kernel and authority with the context - while artifact linkage became the persisted foreign key. Structure validator 12/12 over 120 shipping modules; structure negative controls 23/23; phase graph 10/10 plus its negative control.",
+ "duplicate_shadow_check": "PASS. Artifact identity has exactly one authority: evidence.artifact. The bytes-to-digest primitive moved to kernel.contracts so both rank-2 evidence siblings could reach it legally, and test_artifact_authority.py::TestIdentityHasOneAuthority proves the kernel module is total mechanism - typed refusal, canonical form and storage layout stayed with the context the authority map names, and no module in either evidence context computes a digest of its own. The evidence chain has exactly one writer: test_evidence_authority.py proves no other context constructs an AuditRecord or imports the chain table, that evidence.artifact never writes the chain, and that evidence.audit mints no artifact identity and stores no copy of artifact metadata beyond the foreign key. Neither context imports its sibling. There is no second persistence authority - both contexts use the kernel declarative base and neither constructs an engine, names a driver or emits raw SQL. There is no shadow integrity state: no integrity_verified column, no cached verdict, and every persisted column enters the digest, asserted field by field against the mapped columns.",
+ "security_findings": "None open. Every filesystem write in evidence.artifact and every operation in evidence.audit is a governed operation through the Phase 4 PEP - READ_FILE for reads, WRITE_WORKSPACE_FILE for writes - and the PEP is injected with no default, so a caller cannot obtain a store or a chain that acts without a policy decision. WRITE_STABLE_FILE and ROLLBACK_STABLE are never requested and are deliberately not named anywhere in either context, which is how structure check 11 can keep verifying it; the real PDP is asked directly in both boundary suites and denies a Stable write to both actors. Secrets are refused at both boundaries through the existing Phase 4 guard with sink 'evidence artifact' - no second secret model was introduced - and a refused value is proven to persist nothing. Appending does not recurse: the PEP records its decision on its own Phase 4 trail, which is not this chain, so the boundary is structural rather than a depth counter. Evidence linkage fails closed in both directions: an unknown requirement is refused against the canonical register read at call time, and an unregistered artifact is refused by the database's own foreign key inside a SAVEPOINT, translated into a typed domain refusal.",
+ "fake_success_scan": "Clean. Structure validator checks 9-12 PASS. Nothing in this phase is claimed from the existence of a file. Verification is recomputation, never a stored flag: verify() rehashes every record and every link, and a control asserts no verification column exists. Content verification re-reads the bytes and rehashes them; a tampered blob is detected, reported and never repaired. The Package 3 integration evidence uses a real SQLite file migrated by the real Alembic chain, a real PDP from the authority map and a real blob store on disk, with four separate engines in one journey so a value read after a reopen genuinely came off the disk. All seven mutations injected into shipping source were caught, and two proposed mutations that turned out to be semantic no-ops were discarded as bad mutations rather than recorded as passes. One assertion in the first draft compared a driver representation rather than record content - SQLite returns a naive datetime for a timezone-aware column - and was restated in the contract's own terms (the canonical digest payload) rather than deleted. A genuine defect was found by running the T11 tier the way this report records it and was opened, repaired and verified before acceptance: F-0033, Alembic's autogenerate target holding one table out of seven.",
+ "evidence_created": [
+  "EV-0051",
+  "EV-0052",
+  "EV-0053",
+  "EV-0054",
+  "EV-0055",
+  "EV-0056",
+  "EV-0057",
+  "EV-0058",
+  "EV-0059"
+ ],
+ "limitations": "Phase 6 delivers the Evidence Plane's storage and integrity contracts and nothing above them. The evidence GRAPH does not exist: no coverage is computed, no requirement verdict is derived and no acceptance conclusion is drawn from any evidence record - that is C-16 and the Acceptance Engine at Phase 13, and TestGraphReadiness asserts only that Phase 6 writes data a later graph could use. Release provenance is contract-level only: ARK-REQ-0349's subject here is a Phase 6 test artifact, because no release pipeline, release manifest, SBOM or signing exists - C-31 at Phase 26 - and none was simulated. ARK-REQ-0015 (SBOM/signing-ready design) belongs to Phase 26 and is not claimed. There is no garbage collection, compaction or deletion of artifacts, by design. A revision's provenance_ref is resolvable but remains nullable, and no existing revision carries one, so no production data yet exercises that link. PostgreSQL remains unexercised: engine neutrality is the abstraction, not verified operation on another engine, and the two persistence skips report that honestly. No Phase 6 code is reachable from any execution surface - the Command Center API exposes no artifact or evidence route - so the Evidence Plane has no browser, e2e or runtime evidence and none is claimed. Python is 3.12.10, not the canonical 3.13; ruff and hypothesis are absent, so lint and the T6 property tier remain NOT_CONFIGURED; Rust/Tauri is UNSUPPORTED on this host. The frontend was not touched by this phase and its toolchain was therefore not re-run. One acceptance guard is weaker than this phase's own traceability record: C-15 is mapped onto ARK-REQ-0004 here in full, but the contract behind check C6 requires only that a SATISFIED claim NAME an implementation and an evidence source - it has no per-contract granularity, so deleting the C-15 half of that claim's evidence while leaving the C-14 half would still be accepted. That was proven mechanically rather than assumed, and no control was added for it, because no accepted phase's traceability record names a contract id at all and a repository-wide rule demanding one would retroactively invalidate the accepted evidence of Phases 2, 3, 4 and 5. Strengthening the traceability contract to per-contract linkage is an Acceptance Engine change and belongs to Phase 13, not here.",
+ "blockers": "none. 0 BLOCKER, 0 HIGH, and open_stopping_findings is empty. Two findings were opened and closed within Phase 6: F-0032 in Package 1 (three tests transcribed the migration-chain head and expired when the chain legitimately advanced) and F-0033 in Package 3 (Alembic's autogenerate target held one table out of seven because the metadata is populated by import side effect). Both are MEDIUM, both failed in the detecting direction, and both were proven mechanically to be defects before anything was changed.",
+ "next_exact_action": "Refresh ARKALI_HANDOFF.md from repository truth under the section 12 rule and verify with python scripts/check_handoff.py, then begin Phase 7 - Durable Job / Workflow Runtime per IMPLEMENTATION_DEPENDENCY_MATRIX.md, once the Phase Gate Checker records Phase 6 as accepted and unlocks it. Do not pull Phase 13 evidence-graph computation, coverage or verdicts (C-16) forward into Phase 7.",
+ "status": "PASS"
+}
