@@ -65,10 +65,22 @@ def derive_truth(repo: pathlib.Path) -> dict[str, Any]:
     accepted_phases = sorted(
         pid for pid, status in state.phases.items() if status.is_accepted
     )
+    # The current work phase: declared UNLOCKED and not yet accepted.
+    #
+    # Defect F-0029. The predecessor additionally required NOT_STARTED, so the
+    # derivation recognised only the two states that existed while every phase
+    # was delivered in a single commit: not started, or accepted. Phase 5 is the
+    # first phase delivered in atomic packages, and the moment BUILD_STATE
+    # truthfully said "IN PROGRESS, NOT ACCEPTED" the phase became invisible
+    # here and the manifest's next-action claim drifted against nothing.
+    # Seventh instance of a rule that only understood the states existing when
+    # it was written (F-0008, F-0013, F-0016, F-0019, F-0022, F-0027).
+    #
+    # Acceptance is still read from `PhaseStatus.is_accepted`, so this is not a
+    # second acceptance model, and exactly one such phase is still required.
     unlocked = sorted(
         pid for pid, status in state.phases.items()
-        if "UNLOCKED" in status.status_text.upper()
-        and "NOT_STARTED" in status.status_text.upper().replace(" ", "_")
+        if "UNLOCKED" in status.status_text.upper() and not status.is_accepted
     )
     return {
         "head": git("rev-parse", "HEAD", repo=repo),
