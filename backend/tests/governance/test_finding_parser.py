@@ -13,6 +13,7 @@ the single instance: no test here mentions F-0024 as a special case.
 from __future__ import annotations
 
 import pathlib
+import re
 
 import pytest
 from arkali.acceptance.findings import (
@@ -171,3 +172,31 @@ class TestLiveDocumentIsStructured:
         for finding in parse_findings(text):
             assert finding.identifier.strip()
             assert finding.severity.strip()
+
+    def test_no_declared_finding_row_is_invisible_to_the_parser(self) -> None:
+        """F-0035. A row the document declares must reach `parse_findings`.
+
+        `_collect_tables` ends a table at a blank line and reads the next row as
+        a header, so a blank line inside a findings table turns a data row into
+        a header of prose - `declares_id` is then false and the whole fragment
+        is skipped. Four such blank lines had accumulated in the live document
+        and hid F-0027 through F-0034 from `stopping_findings`. Every hidden row
+        was CLOSED, so nothing was falsely passed, but the first OPEN HIGH
+        written into the natural place was silently ignored.
+
+        The subject is derived from the document, not listed: any line that
+        looks like a finding row must appear in the parsed set. That keeps
+        working as findings are added, and fails the moment layout hides one.
+        """
+        text = (REPO / "docs/build/OPEN_BLOCKERS.md").read_text(encoding="utf-8")
+        declared = {
+            line.split("|")[1].strip().replace("*", "")
+            for line in text.splitlines()
+            if re.match(r"^\|\s*(?:F-\d{4}|EXT-\d{3})\s*\|", line)
+        }
+        assert declared, "no finding rows found; this control would be vacuous"
+        parsed = {f.identifier for f in parse_findings(text)}
+        assert declared - parsed == set(), (
+            "these rows are declared in OPEN_BLOCKERS.md but invisible to the "
+            f"acceptance gate: {sorted(declared - parsed)}"
+        )

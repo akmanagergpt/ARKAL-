@@ -17,6 +17,8 @@ import subprocess
 
 import pytest
 
+from arkali.acceptance.governance_state import GovernanceState
+
 REPO = pathlib.Path(__file__).resolve().parents[3]
 VALIDATOR = REPO / "scripts" / "check_handoff.py"
 HANDOFF = REPO / "ARKALI_HANDOFF.md"
@@ -262,6 +264,82 @@ class TestControlsDoNotDecay:
         assert current["requirements_total"] - 2 != current["requirements_total"]
         assert current["adr_accepted"] + 1 != current["adr_accepted"]
         assert current["adr_proposed"] + 9 != current["adr_proposed"]
+
+
+class TestCurrentPhaseDerivationIgnoresProse:
+    """F-0034. The current work phase is read from declared state, not prose.
+
+    `derive_truth` selected the unlocked phase with
+    `"UNLOCKED" in status.status_text.upper()`, the same substring habit that let
+    commentary decide acceptance. A row that merely *mentions* an unlocked phase
+    would have matched, and two matches collapse `unlocked_phase` to None - so a
+    sentence added to an unrelated row could silently break the manifest.
+
+    The temp repository is a copy; no governed file is written.
+    """
+
+    @staticmethod
+    def _repo_copy(tmp_path: pathlib.Path) -> pathlib.Path:
+        for relative in (
+            "docs/build/BUILD_STATE.md",
+            "docs/build/OPEN_BLOCKERS.md",
+            "docs/acceptance/HUMAN_GATE_RECORDS.md",
+            "docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md",
+        ):
+            target = tmp_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                (REPO / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            )
+        return tmp_path
+
+    def _unlocked_phase(self, root: pathlib.Path) -> str | None:
+        state = GovernanceState.load(root)
+        found = [
+            pid for pid, status in state.phases.items()
+            if status.is_unlocked and not status.is_accepted
+        ]
+        return found[0] if len(found) == 1 else None
+
+    def test_prose_mentioning_unlocked_on_another_row_changes_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        root = self._repo_copy(tmp_path)
+        build_state = root / "docs/build/BUILD_STATE.md"
+        before = self._unlocked_phase(root)
+        assert before is not None, "fixture must start from a resolvable phase"
+
+        original = build_state.read_text(encoding="utf-8")
+        accepted_row = next(
+            line for line in original.splitlines()
+            if line.startswith("| 1 |") and "MACHINE-ACCEPTED" in line
+        )
+        # An accepted phase's row now also mentions unlockedness in commentary.
+        injected = accepted_row.rstrip("| ") + " This phase UNLOCKED the next one. |"
+        build_state.write_text(
+            original.replace(accepted_row, injected, 1), encoding="utf-8"
+        )
+
+        assert self._unlocked_phase(root) == before, (
+            "commentary on an unrelated row moved the current work phase"
+        )
+
+    def test_a_second_declared_unlocked_phase_is_still_ambiguous(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The derivation must stay strict: it is prose it ignores, not state."""
+        root = self._repo_copy(tmp_path)
+        build_state = root / "docs/build/BUILD_STATE.md"
+        original = build_state.read_text(encoding="utf-8")
+        accepted_row = next(
+            line for line in original.splitlines()
+            if line.startswith("| 1 |") and "MACHINE-ACCEPTED" in line
+        )
+        second = "| 1 | Repository Bootstrap | **UNLOCKED — NOT_STARTED** |"
+        build_state.write_text(
+            original.replace(accepted_row, second, 1), encoding="utf-8"
+        )
+        assert self._unlocked_phase(root) is None
 
 
 class TestFailClosed:

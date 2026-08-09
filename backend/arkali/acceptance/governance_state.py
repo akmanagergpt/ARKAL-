@@ -21,6 +21,7 @@ exception type, same message, same source - one fewer edge.
 
 from __future__ import annotations
 
+import enum
 import pathlib
 import re
 
@@ -52,21 +53,168 @@ def _read(repo_root: pathlib.Path, relpath: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+class DeclaredPhaseState(str, enum.Enum):
+    """The states a phase-status cell may declare.
+
+    Read off the canonical vocabulary `BUILD_STATE.md` already uses; nothing here
+    is invented. Every state below appears in a live row, and a cell declaring
+    anything else is refused rather than guessed at.
+    """
+
+    ACCEPTED = "ACCEPTED"
+    MACHINE_ACCEPTED = "MACHINE-ACCEPTED"
+    UNLOCKED = "UNLOCKED"
+    LOCKED = "LOCKED"
+    NOT_STARTED = "NOT_STARTED"
+
+    @property
+    def grants_acceptance(self) -> bool:
+        """Only an affirmative acceptance state accepts a phase.
+
+        Deliberately a whitelist. F-0034's predecessor inferred acceptance from
+        the *absence* of a negation, so every unrecognised cell that happened to
+        contain the token was accepted.
+        """
+        return self in (DeclaredPhaseState.ACCEPTED,
+                        DeclaredPhaseState.MACHINE_ACCEPTED)
+
+
+#: The declared state is the LEADING segment of the cell. Bold marks it in every
+#: live row (`**MACHINE-ACCEPTED** (66 tests…)`); an unbolded cell is read up to
+#: the first separator instead, so the syntax already in use is understood
+#: without a document rewrite.
+_BOLD_HEAD = re.compile(r"^\s*\*\*(?P<head>[^*]+)\*\*")
+_PLAIN_HEAD = re.compile(r"^\s*(?P<head>[^.(<←\n]+)")
+#: Em dash, en dash or a double hyphen separates the state from its qualifier.
+_QUALIFIER_SPLIT = re.compile(r"\s*(?:—|–|--)\s*")
+#: A negation, in any spelling that has appeared in this repository.
+_NEGATION = re.compile(r"\bNOT[ _-]ACCEPTED\b")
+#: An acceptance token standing on its own, used only to detect contradiction.
+_ACCEPTANCE_TOKEN = re.compile(r"\b(?:MACHINE-)?ACCEPTED\b")
+
+_STATE_SPELLINGS = {
+    "ACCEPTED": DeclaredPhaseState.ACCEPTED,
+    "MACHINE-ACCEPTED": DeclaredPhaseState.MACHINE_ACCEPTED,
+    "MACHINE ACCEPTED": DeclaredPhaseState.MACHINE_ACCEPTED,
+    "UNLOCKED": DeclaredPhaseState.UNLOCKED,
+    "LOCKED": DeclaredPhaseState.LOCKED,
+    "NOT_STARTED": DeclaredPhaseState.NOT_STARTED,
+    "NOT STARTED": DeclaredPhaseState.NOT_STARTED,
+}
+
+
+def _head_segment(status_text: str) -> str:
+    bold = _BOLD_HEAD.match(status_text)
+    if bold is not None:
+        return bold.group("head").strip()
+    plain = _PLAIN_HEAD.match(status_text)
+    return plain.group("head").strip() if plain else ""
+
+
+def parse_declared_state(
+    status_text: str, phase_id: str = "?"
+) -> DeclaredPhaseState:
+    """The state a status cell declares. Explanatory prose has no effect.
+
+    Closes **F-0034**. The predecessor asked whether the substring `ACCEPTED`
+    appeared anywhere in the whole cell and whether `NOT ACCEPTED` did not, so
+    prose decided acceptance: "Prerequisites Phases 5 and 6 are accepted" on
+    Phase 7's own row accepted Phase 7, and `NOT_ACCEPTED` with an underscore
+    accepted a phase that said the opposite. That is a fail-**open** in the
+    acceptance path, because `checker.check_prerequisites` reads the same
+    property.
+
+    The rule now mirrors `findings.py` (F-0025): state comes only from the
+    declared leading segment, everything after it is commentary, and anything
+    unreadable or self-contradictory is REFUSED rather than resolved to a
+    default. There is no path by which absence of a negation becomes acceptance.
+    """
+    head = _head_segment(status_text).upper()
+    if not head:
+        raise refuse(
+            f"phase {phase_id!r} declares no status; a status cell must begin "
+            "with a canonical state",
+            source=BUILD_STATE,
+        )
+    parts = [part.strip() for part in _QUALIFIER_SPLIT.split(head, maxsplit=1)]
+    primary_text = parts[0]
+    qualifier = parts[1] if len(parts) > 1 else ""
+    state = _STATE_SPELLINGS.get(primary_text)
+    if state is None:
+        raise refuse(
+            f"phase {phase_id!r} declares the unknown state {primary_text!r}; "
+            f"the canonical vocabulary is {sorted(_STATE_SPELLINGS)}",
+            source=BUILD_STATE,
+        )
+    _refuse_contradiction(state, qualifier, phase_id)
+    return state
+
+
+def _refuse_contradiction(
+    state: DeclaredPhaseState, qualifier: str, phase_id: str
+) -> None:
+    """A qualifier may narrow a state; it may never reverse it.
+
+    `UNLOCKED — IN PROGRESS, NOT ACCEPTED` narrows and is legal. An accepting
+    state carrying a negation, or a non-accepting state carrying a bare
+    acceptance token, is ambiguous and fails closed - the strict side, since the
+    alternative is choosing which half of a contradiction to believe.
+    """
+    negated = bool(_NEGATION.search(qualifier))
+    if state.grants_acceptance and negated:
+        raise refuse(
+            f"phase {phase_id!r} declares {state.value} qualified by a negation "
+            f"({qualifier!r}); a status cell may not both accept and refuse",
+            source=BUILD_STATE,
+        )
+    if not state.grants_acceptance and _ACCEPTANCE_TOKEN.search(
+        _NEGATION.sub("", qualifier)
+    ):
+        raise refuse(
+            f"phase {phase_id!r} declares the non-accepting state {state.value} "
+            f"qualified by an acceptance token ({qualifier!r})",
+            source=BUILD_STATE,
+        )
+
+
 class PhaseStatus(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     phase_id: str
     title: str
     status_text: str
+    #: Parsed once, at load time, so a malformed cell stops the checker rather
+    #: than being re-guessed at every call site.
+    declared_state: DeclaredPhaseState
+
+    @classmethod
+    def parse(cls, phase_id: str, title: str, status_text: str) -> PhaseStatus:
+        return cls(
+            phase_id=phase_id,
+            title=title,
+            status_text=status_text,
+            declared_state=parse_declared_state(status_text, phase_id),
+        )
 
     @property
     def is_accepted(self) -> bool:
-        upper = self.status_text.upper()
-        return "ACCEPTED" in upper and "NOT ACCEPTED" not in upper
+        return self.declared_state.grants_acceptance
+
+    @property
+    def is_unlocked(self) -> bool:
+        """Declared UNLOCKED. Not inferred from the absence of LOCKED."""
+        return self.declared_state is DeclaredPhaseState.UNLOCKED
 
     @property
     def is_locked(self) -> bool:
-        return "LOCKED" in self.status_text.upper()
+        """Declared LOCKED.
+
+        The predecessor asked whether `LOCKED` appeared in the cell, so every
+        `UNLOCKED` row reported itself locked. No caller consumed it, which is
+        the only reason that never surfaced; it is corrected rather than left
+        as a trap for the first caller who does.
+        """
+        return self.declared_state is DeclaredPhaseState.LOCKED
 
 
 class GovernanceState:
@@ -125,10 +273,8 @@ class GovernanceState:
         found: dict[str, PhaseStatus] = {}
         for match in _PHASE_ROW.finditer(section):
             phase_id = match.group(1)
-            found[phase_id] = PhaseStatus(
-                phase_id=phase_id,
-                title=match.group(2).strip(),
-                status_text=match.group(3).strip(),
+            found[phase_id] = PhaseStatus.parse(
+                phase_id, match.group(2).strip(), match.group(3).strip()
             )
         return found
 
@@ -174,6 +320,24 @@ class GovernanceState:
                 f"phase {phase_id!r} has no status row", source=BUILD_STATE
             )
         return status
+
+    def current_work_phase(self) -> str | None:
+        """The single phase declared UNLOCKED that carries no acceptance.
+
+        One derivation, owned here, so no consumer re-implements it. `F-0029`
+        established the rule; `F-0034` showed the cost of a consumer restating
+        it in prose terms - `check_handoff.py` had its own
+        `"UNLOCKED" in status_text` test, which a sentence on an unrelated row
+        could satisfy.
+
+        `None` when the answer is not exactly one phase, which is ambiguous and
+        must be reported as drift rather than resolved by picking the first.
+        """
+        found = sorted(
+            pid for pid, status in self.phases.items()
+            if status.is_unlocked and not status.is_accepted
+        )
+        return found[0] if len(found) == 1 else None
 
     def prerequisites_of(self, phase_id: str) -> tuple[str, ...]:
         if phase_id not in self.prerequisites:

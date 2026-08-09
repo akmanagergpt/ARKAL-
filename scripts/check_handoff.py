@@ -78,10 +78,13 @@ def derive_truth(repo: pathlib.Path) -> dict[str, Any]:
     #
     # Acceptance is still read from `PhaseStatus.is_accepted`, so this is not a
     # second acceptance model, and exactly one such phase is still required.
-    unlocked = sorted(
-        pid for pid, status in state.phases.items()
-        if "UNLOCKED" in status.status_text.upper() and not status.is_accepted
-    )
+    #
+    # Defect F-0034. This module used to restate the rule as
+    # `"UNLOCKED" in status_text.upper()`, the same prose-substring test that
+    # let unrelated commentary decide acceptance - a row merely *mentioning*
+    # that some phase was unlocked would have matched, and two matches collapse
+    # the answer to None. The derivation now belongs to `GovernanceState` and is
+    # called, not reimplemented, so there is one rule and one place to correct.
     return {
         "head": git("rev-parse", "HEAD", repo=repo),
         "branch": git("rev-parse", "--abbrev-ref", "HEAD", repo=repo),
@@ -91,7 +94,7 @@ def derive_truth(repo: pathlib.Path) -> dict[str, Any]:
         "requirements_conditional": counts["CONDITIONAL"],
         "requirements_optional": counts["OPTIONAL"],
         "accepted_phases": accepted_phases,
-        "unlocked_phase": unlocked[0] if len(unlocked) == 1 else None,
+        "unlocked_phase": state.current_work_phase(),
         "accepted_human_gates": sorted(state.accepted_human_gates),
         "adr_accepted": adr_text.count("| ACCEPTED |"),
         "adr_proposed": adr_text.count("| PROPOSED |"),
