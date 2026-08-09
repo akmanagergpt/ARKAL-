@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `baa581abe9113410905c1b583fc0f5b75f78d3e4` |
+| Current HEAD | `9b7bf61cfba2206cf91edde0823f2f8add0d5a39` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,7 +80,7 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (1447 passed, 13 skipped)
+backend/                                    pytest suite (1535 passed, 13 skipped)
 backend/tests/surfaces/                     Command Center API integration (T5)
 backend/tests/persistence/                  T11 persistence: real SQLite, WAL, durability, migrations
 backend/tests/structural/                   ARK-REQ-0012 confinement, ARK-REQ-0229 vertical-slice
@@ -137,7 +137,7 @@ repository, the repository wins.
 | Recorded findings | every finding through **F-0035** is closed |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over **82** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028). `kernel.contracts.errors` fan-in is **14** of 15 after Phase 7 Package 1 completed the `control.architecture` refusal decomposition |
+| Architecture violations | **0** (8 gates PASS over **86** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028). `kernel.contracts.errors` fan-in is **14** of 15 after Phase 7 Package 1 completed the `control.architecture` refusal decomposition. Package 3 hit the 400 logical-line budget on a test module and answered it by decomposition under ADR-0008; no GATE 8 exception was requested |
 | Evidence Plane | **storage and integrity only.** C-14 artifact identity/provenance and C-15 append-only chain exist and are accepted. The evidence **graph**, coverage and verdicts (C-16) are **Phase 13** and are not implemented, not computed and not claimed. No Phase 6 capability is reachable from any execution surface |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
@@ -209,7 +209,9 @@ repository, the repository wins.
 | 57 | `45726b7` | handoff manifest refreshed after the governance repair (§12 rule) |
 | 58 | `fa11e2d` | **PHASE 7 PACKAGE 1** — C-19 durable-job persistence foundation under `execution.durable`; migration `0005_durable_job`. The Phase 4 durable-surface tripwire fired as designed and was replaced by a stronger live PEP control. **Not a phase acceptance** |
 | 59 | `32a1e39` | handoff manifest refreshed after Package 1 (§12 rule) |
-| 60 | `baa581a` | **PHASE 7 PACKAGE 2** — C-19 durability semantics: attempts, heartbeat/ownership, bounded retries, timeout, cancellation, dead-letter; migration `0006_durable_execution`. **Not a phase acceptance** ← HEAD at generation |
+| 60 | `baa581a` | **PHASE 7 PACKAGE 2** — C-19 durability semantics: attempts, heartbeat/ownership, bounded retries, timeout, cancellation, dead-letter; migration `0006_durable_execution`. **Not a phase acceptance** |
+| 61 | `0e4c740` | handoff manifest refreshed after Package 2 (§12 rule) |
+| 62 | `9b7bf61` | **PHASE 7 PACKAGE 3** — C-19 job-type registry (`ARK-REQ-0060` made evaluable), pause/resume and the crash-recovery sweep; migration `0007_job_type_registry`. F-0036 opened and closed. **Not a phase acceptance** ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -322,47 +324,66 @@ the identifiers a later graph would need, and nothing more.
 
 ## 9. Next exact action
 
-**Phase 7 Atomic Package 3 — pause/resume and crash recovery.** They ship
-together because both converge on `RESUMING`: splitting them leaves a state
-reachable by only one path. Do not rebuild Packages 1–2.
+**Phase 7 Atomic Package 4 — the enqueue surface for `ARK-REQ-0027`.** Backend
+only, in `surfaces.command`. Do not rebuild Packages 1–3.
 
-The package owes `PAUSED → RESUMING → RUNNING`, the recovery sweep
-`EXECUTION_AND_CAPABILITY.md` §3 states verbatim — on start, every `RUNNING` job
-without a live heartbeat moves to `RECOVERABLE` and then `RESUMING`, and silent
-loss is a verification FAIL — and the job-type registry whose `supports_pause`
-flag `ARK-REQ-0060`'s Appendix A rule reads. **That rule cannot be avoided by not
-building the registry:** governing rule 7 makes an unevaluable rule APPLICABLE.
+The package owes an HTTP route that **persists and enqueues durable work and
+returns a durable job reference immediately**. `MS §Constitution 8` forbids long
+AI work inside an HTTP request, so the route submits through C-19 and returns; a
+control must prove the request does not execute the job. API constructs are
+confined to `surfaces.command` by structure check 12, and **no frontend is
+owed** — no Phase 7 requirement is owned by a surface context.
 
-Package 2 already persists everything the sweep reads: `heartbeat_at`, an
-absolute `deadline_at`, and `heartbeat_expired()`, which reports expiry without
-acting on it. Reuse the canonical `Job` machine for every move, the injected PEP
-for every governed operation, the injected clock for anything time-dependent,
-and `kernel.persistence` for the engine.
+Reuse what already exists rather than restating it. `JobStore.submit` is
+idempotent by the persisted unique constraint, so a repeated submission returns
+the recorded job instead of creating a second one; the route inherits that.
+Reuse the injected PEP for every governed operation, the injected clock for
+anything time-dependent, and `kernel.persistence` for the engine.
+`execution.durable → surfaces.command` is forbidden and absent — the dependency
+runs the other way. **Add no scheduler, worker, dispatch or queue arbitration:**
+that is C-21 at Phase 8.
 
 Still owed after that:
 
-- **Package 4** — the enqueue surface for ARK-REQ-0027: a backend route in
-  `surfaces.command` only. API constructs are confined there by structure
-  check 12, and **no frontend is owed** — no Phase 7 requirement is owned by a
-  surface context.
-- **Package 5** — integration and fault-injection evidence, traceability, the
-  C-17 report, and one gate run.
+- **Package 5** — integration and fault-injection evidence, provenance,
+  traceability, the C-17 report, and one gate run.
 
-**Controls added in Phase 7 Packages 1–2 that must not be weakened.** All
-mutation-tested (12/12 then 14/14 caught), split across
-`tests/structural/test_durable_authority.py` and
-`test_durable_governed_operations.py` over `durable_reader.py`: the canonical
-machine is the only transition authority; no state literal or transition table is
-restated; the lifecycle column is assigned in exactly one method, derived as the
-one that calls `evaluate`; no engine is constructed *or imported*; no raw SQL; no
-Stable class named; **nothing schedules, admits, claims, leases or allocates** —
-Phase 8 owns that and the control fails on the vocabulary; every method that
-operates on the session takes a policy decision; every service class holding a
-session consults the PEP; retry accounting is rows and no counter column may
-appear; the deadline stays an absolute instant; `RESUMING`, `PAUSED` and
-`supports_pause` are absent from Package 2's module — **Package 3 will change
-that last one, and should replace it with a control over the new boundary rather
-than deleting it.** Also `TestSurfaceCoverageIsHonest::test_every_built_execution_package_enforces_and_the_rest_are_absent`.
+**Controls added in Phase 7 Packages 1–3 that must not be weakened.** All
+mutation-tested (12/12, then 14/14, then 14/14 with each catch verified to be
+the *intended* control), split across
+`tests/structural/test_durable_authority.py`,
+`test_durable_governed_operations.py` and `test_durable_recovery_authority.py`
+over `durable_reader.py`: the canonical machine is the only transition
+authority; no state literal or transition table is restated; the lifecycle
+column is assigned in exactly one method, derived as the one that calls
+`evaluate`; no engine is constructed *or imported*; no raw SQL; no Stable class
+named; **nothing schedules, admits, claims, leases, allocates or selects an
+owner** — Phase 8 owns that and the controls fail on the vocabulary; every
+method that operates on the session takes a policy decision; every service class
+holding a session consults the PEP; retry accounting is rows and no counter
+column may appear; the deadline stays an absolute instant. Also
+`TestSurfaceCoverageIsHonest::test_every_built_execution_package_enforces_and_the_rest_are_absent`
+— **Package 4 builds a new package under a surface context and must satisfy it.**
+
+Package 3 added, and these are the ones most easily weakened by a later package:
+
+- **`RESUMING` has one authority and one entry shape.** Derived over the whole
+  context: only `recovery.py` may request it, every use of the name must be a
+  transition target, and the Package 2 retry/timeout/cancel/dead-letter methods
+  must have no path to it. This *replaced* Package 2's single-file tripwire,
+  which was proven unable to fire before it was touched.
+- **The heartbeat term and the deadline term stay distinct (F-0036).** Any
+  function named for the heartbeat must read `heartbeat_at`, resolved one level
+  through private helpers; the timeout rule must read `deadline_at` and must not
+  read `heartbeat_at`. The old conflated name is banned.
+- **Recovery is not scheduling.** The sweep must not call `begin_attempt`, must
+  not re-decide the disposition Package 2 owns, and must not name `DEAD_LETTER`.
+- **Time is injected.** Exactly one wall-clock source in the context, identified
+  by the function that holds it; nothing sleeps, waits or polls.
+- **Column types are derived, not listed.** Every mapped column's type must come
+  from SQLAlchemy's generic namespace, and the mapped-record set is derived from
+  the module — a record added later cannot escape the check the way
+  `JobTypeRecord` escaped the hand-written list.
 
 **Controls added in Phase 6 that must not be weakened.** All mutation-tested:
 `test_artifact_authority.py` (one identity authority, no shadow chain, no second
@@ -406,8 +427,9 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `baa581abe9113410905c1b583fc0f5b75f78d3e4` |
-| Generated after | **PHASE 7 ATOMIC PACKAGE 2** — the C-19 durability semantics. Not a phase acceptance: no requirement is discharged, no traceability record, no report, no gate run, and Phase 8 stays locked behind Phase 7. `job_execution_attempt` records one row per attempt — owner, `started_at`, `heartbeat_at`, an absolute `deadline_at`, and `ended_at`/`outcome` on close — with migration `0006_durable_execution`, which also records `max_attempts` and `attempt_timeout_seconds` on the job. **The canonical Job machine was checked first and found sufficient; nothing was added to it.** Three properties therefore come from the canonical relation rather than from code: `DEAD_LETTER` has no outgoing transition, so a dead-lettered job cannot be retried at all; `CANCELLED` is reachable only from `RUNNING`, so a queued job cannot be cancelled and a terminal one cannot be cancelled twice. **Retry accounting is rows, not a counter** — the count is `count(job_execution_attempt)`, and the primary key (`job_id`, `attempt`) is the concurrency backstop, proven by inserting a duplicate past the service and being refused by the database. The deadline is an absolute instant, so a restart cannot move the timeout basis. A stale owner cannot heartbeat, complete or fail an attempt; a closed attempt cannot be written again; timing out twice is idempotent and an unreached deadline is refused. **Nothing sleeps** — the clock is injected and advanced explicitly. **Package 2 never enters `RESUMING`**, runs no recovery sweep and implements no pause/resume: a control fails on those tokens, and what it records is exactly what Package 3 will read. Naming a target would have put a second copy of the state vocabulary in the context, so the names moved into `job_state_machine.py` resolved through `DEFINITION.states` — **the control was not relaxed to fit the code**. Classified **NORMAL** (no Protected Core touched); the battery ran in full anyway: 1447 passed / 13 skipped, 8 gates over **82** edges, 9 budgets, mypy clean over 124 modules. **14 mutations injected, 14 caught**; three initially missed were all real control gaps — a direct lifecycle-state write that every behavioural test tolerated, and a guard dropped from a private method the old sweep could not see — and both controls were strengthened. Both new test modules hit the 400-line budget and were decomposed under ADR-0008 |
+| Generated at HEAD | `9b7bf61cfba2206cf91edde0823f2f8add0d5a39` |
+| Generated after | **PHASE 7 ATOMIC PACKAGE 3** — the C-19 job-type registry, pause/resume and crash recovery. Not a phase acceptance: no requirement is discharged, no traceability record, no report, no gate run, and Phase 8 stays locked behind Phase 7. **The canonical relation was read before any code was written, and it decided the routes.** `RESUMING` has exactly two predecessors, `PAUSED` and `RECOVERABLE`, so pause and crash recovery share one lifecycle meaning because the machine says so rather than because this package arranged it; and `RUNNING → RECOVERABLE` is **not declared** — `evaluate` refuses it — so recovery travels `RUNNING → FAILED → RECOVERABLE → RESUMING`, which is exactly the disposition Package 2 already owns, **composed rather than repeated**. `EXECUTION_AND_CAPABILITY.md` §3 names the states a crashed job resolves *to*; `STATE_MACHINES.md` §3 owns the edges it travels, and the apparent conflict dissolves once the route is derived instead of read as an edge list. **Nothing was added to the canonical machine.** `durable_job_type` is the registry `ARK-REQ-0060`'s Appendix A rule reads; governing rule 7 resolves an unwaived unevaluable rule to APPLICABLE, so declining to build it never avoided the requirement. An unregistered type **raises rather than defaulting** — an absent row is an unanswered question, and answering it either way decides something nobody declared. Declaration is write-once, and the join is by natural key with **no foreign key**, because a FK would make registration a precondition of submitting, which is admission control and belongs to C-21. **Pause suspends, recovery disposes:** a paused job keeps its open attempt, owner, absolute deadline and place in the retry budget, because closing it would consume an attempt and pausing is not failing; a crashed job's attempt is closed, which is precisely what stops a returning zombie worker from heartbeating, completing or failing it. A paused job is **never swept however silent** — the sweep selects `RUNNING`, a filter that is load-bearing rather than tidy. The sweep is idempotent by construction, stops at `RESUMING` and starts nothing. **F-0036 was opened and closed:** Package 2's `heartbeat_expired` resolved to a comparison against `deadline_at` and never read `heartbeat_at`, proven by AST against the untouched tree first — harmless there, because both callers meant timeout, but the canonical recovery rule keys on the heartbeat, so consuming it as written would have swept live workers and left dead ones holding their jobs. The name is **gone rather than reinterpreted**. **Package 2's RESUMING tripwire read one file and could not fire** for work in any other module of the same context; it was verified passing against the finished Package 3 tree before being touched, then replaced with a context-wide derived control — the opposite proof from the usual stale-control case. Classified **NORMAL** by `select_profile` from its own paths, with no unresolved path; the battery ran in full anyway: **1535 passed / 13 skipped**, mypy strict clean over **126** modules, 8 gates PASS over **86** edges, 9 budgets, structure 12/12 with both negative controls, phase graph 10/10. **14 mutations injected, 14 caught**, each re-run to confirm it failed its *intended* control rather than incidentally. The 400 logical-line budget fired at 440 on a test module and was answered by **decomposition under ADR-0008** along a real seam — decide correctly versus survive a restart — with no GATE 8 exception requested |
+| Previously generated after | **PHASE 7 ATOMIC PACKAGE 2** — the C-19 durability semantics. Not a phase acceptance: no requirement is discharged, no traceability record, no report, no gate run, and Phase 8 stays locked behind Phase 7. `job_execution_attempt` records one row per attempt — owner, `started_at`, `heartbeat_at`, an absolute `deadline_at`, and `ended_at`/`outcome` on close — with migration `0006_durable_execution`, which also records `max_attempts` and `attempt_timeout_seconds` on the job. **The canonical Job machine was checked first and found sufficient; nothing was added to it.** Three properties therefore come from the canonical relation rather than from code: `DEAD_LETTER` has no outgoing transition, so a dead-lettered job cannot be retried at all; `CANCELLED` is reachable only from `RUNNING`, so a queued job cannot be cancelled and a terminal one cannot be cancelled twice. **Retry accounting is rows, not a counter** — the count is `count(job_execution_attempt)`, and the primary key (`job_id`, `attempt`) is the concurrency backstop, proven by inserting a duplicate past the service and being refused by the database. The deadline is an absolute instant, so a restart cannot move the timeout basis. A stale owner cannot heartbeat, complete or fail an attempt; a closed attempt cannot be written again; timing out twice is idempotent and an unreached deadline is refused. **Nothing sleeps** — the clock is injected and advanced explicitly. **Package 2 never enters `RESUMING`**, runs no recovery sweep and implements no pause/resume: a control fails on those tokens, and what it records is exactly what Package 3 will read. Naming a target would have put a second copy of the state vocabulary in the context, so the names moved into `job_state_machine.py` resolved through `DEFINITION.states` — **the control was not relaxed to fit the code**. Classified **NORMAL** (no Protected Core touched); the battery ran in full anyway: 1447 passed / 13 skipped, 8 gates over **82** edges, 9 budgets, mypy clean over 124 modules. **14 mutations injected, 14 caught**; three initially missed were all real control gaps — a direct lifecycle-state write that every behavioural test tolerated, and a guard dropped from a private method the old sweep could not see — and both controls were strengthened. Both new test modules hit the 400-line budget and were decomposed under ADR-0008 |
 | Previously generated after | **PHASE 7 ATOMIC PACKAGE 1** — the C-19 durable-job persistence foundation. Not a phase acceptance: no requirement is discharged, there is no traceability record, no report and no gate run, and Phase 8 stays locked behind Phase 7. `execution.durable` now holds the durable job record, its idempotency identity and the checkpoint record, with migration `0005_durable_job`. **Two identities, one store**: `job_id` is the primary key and (`job_type`, `idempotency_key`) is a named unique constraint, because a separate idempotency table would be a second place answering the same question — proven by writing the row past the service and being refused by the database, and by a repeat resolving to the existing job across a dispose/reopen. Checkpoint ordering *is* identity and checkpoints refuse update and delete. The Phase 3 `Job` machine remains the sole transition authority; the store writes no state literal and derives its initial state from the machine's own relation. Every governed operation passes an injected PEP, and a **real PDP loaded from a denying authority map** proves a refusal prevents the write. The clock is injected, so no test sleeps. **The Phase 4 durable-surface tripwire fired as designed** when the first module appeared, naming its own obligation; it was satisfied first and only then replaced — by a control that derives which execution packages are built and requires each to consult a PEP, so it keeps failing for the next unenforced package instead of going quiet. **The kernel error fan-in budget fired again at 16/15** and was answered by completing the `control.architecture` refusal decomposition Phase 6 had left half-applied, taking it to 14; no GATE 8 exception was requested. Classified **PROTECTED_CORE** (member `control.architecture`); security review 188, adversarial review 479 and full regression 1404 all at exit 0. **12 mutations injected, 12 caught** — three initially missed, of which two were semantic no-ops and one had the wrong subject; correcting them exposed two controls that measured the wrong thing, and both were strengthened |
 | Previously generated after | **PRE-PHASE-7 GOVERNANCE REPAIR** — F-0034 and F-0035. Not a phase acceptance, not a re-score, and no Phase 7 work. `PhaseStatus.is_accepted` decided acceptance by searching the whole status cell for `ACCEPTED` and inferring it from the absence of `NOT ACCEPTED`; five of fifteen reproduction fixtures returned a **false accept**, including the exact wording Phase 6's own acceptance recording had to be contorted to avoid. Because `checker.check_prerequisites` reads that property, an unimplemented phase could have satisfied a later phase's prerequisite — a fail-open in the acceptance path, hence HIGH by F-0024's consequence class rather than F-0025's mechanism class. Acceptance is now **declared**: the leading segment of the cell is resolved against a canonical vocabulary read off the rows that already exist, only `ACCEPTED` and `MACHINE-ACCEPTED` grant it, and unknown, empty or self-contradictory cells are refused. Two adjacent instances of the same habit went with it — `is_locked` read `LOCKED` out of `UNLOCKED`, and `check_handoff.py` kept its own prose search, now replaced by `GovernanceState.current_work_phase()`. **F-0035 was found while opening F-0034**: blank lines had split the findings table so that F-0027…F-0034 were invisible to the acceptance gate, which is why an OPEN HIGH produced an empty `open_stopping_findings`; repaired in the document rather than in Protected Core `findings.py`. Backward compatibility proven over all ten live rows — no phase changed meaning — and Phase 7's row is written plainly again as the live proof. 44 new controls, **none naming a phase number**; 9 mutations injected and all 9 caught. Phase 6 remains MACHINE-ACCEPTED with its report and traceability byte-unchanged; Phase 7 remains UNLOCKED — NOT_STARTED |
 | Previously generated after | **PHASE 6 MACHINE ACCEPTANCE** — Atomic Package 3: the composed C-14/C-15 evidence, the provenance and graph-readiness evidence, `phase_6_traceability.json`, `phase_6_report.json` and the gate run, which returned `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission with C1–C6 PASS and PROTECTED_CORE COMPLETE over three members. **The acceptance mechanism was proved able to fail before the verdict was taken**: six controlled mutations of the real Phase 6 package each produced `PHASE_BLOCKED` — a claim set to DEFERRED, a claim without an implementation, a claim without evidence, a claim with its evidence emptied, and each of two Protected Core categories removed — with both artifacts verified byte-identical to their pre-run digests afterwards. A seventh case is reported as an **ACCEPT** and is the honest result rather than a hidden gap: removing only the C-15 half of ARK-REQ-0004's evidence is still accepted, because check C6's contract has no per-contract granularity, and no control was added because no accepted phase's traceability record names a contract id at all. **F-0033 was opened and closed**: `alembic/env.py` held one table out of seven as its autogenerate target, so the migration tool was configured to propose dropping six real tables; found by running the T11 tier standalone, repaired at the migration composition root rather than in `kernel.persistence`, which cannot import rank 1 and rank 2 contexts. Seven injected mutations were all caught and 22 anti-vacuity controls all pass. Two structure-validator checks fired against this package's own first draft — a 400-line budget and a banned substitution marker — and the **evidence changed, not the checks**. `ARK-REQ-0004`, `0057` and `0349` are discharged; cumulative verified rises 72 → **75**; Phase 7 is unlocked and not started |
@@ -468,7 +490,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: baa581abe9113410905c1b583fc0f5b75f78d3e4
+head: 9b7bf61cfba2206cf91edde0823f2f8add0d5a39
 branch: main
 working_tree_clean: true
 
