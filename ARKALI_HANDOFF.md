@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `6ab0692fb4b7c9a5e9eee84b548b2ef13f6030b3` |
+| Current HEAD | `3edc17130883a298451c2c42ac5fac5ec7817dd8` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -183,7 +183,7 @@ repository, the repository wins.
 | 44 | `1880449` | handoff manifest refreshed after the partial checkpoint (§12 rule) |
 | 45 | `6ab0692` | **PHASE 5 PACKAGE 4 COMPLETE** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. Not a phase acceptance |
 | 46 | `4ff5004` | handoff manifest refreshed after Package 4 (§12 rule) |
-| 47 | `PENDING` | **PHASE 5 MACHINE-ACCEPTED** — Package 5: real T10 browser journey, evidence records, traceability, phase report and the gate run. **Phase 6 unlocked.** F-0031 opened and closed ← HEAD at generation |
+| 47 | `3edc171` | **PHASE 5 MACHINE-ACCEPTED** — Package 5: real T10 browser journey, evidence records, traceability, phase report and the gate run. **Phase 6 unlocked.** F-0031 opened and closed ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -339,7 +339,7 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `6ab0692fb4b7c9a5e9eee84b548b2ef13f6030b3` |
+| Generated at HEAD | `3edc17130883a298451c2c42ac5fac5ec7817dd8` |
 | Generated after | **PHASE 5 MACHINE ACCEPTANCE** — Atomic Package 5: the real T10 browser journey, the evidence records, `phase_5_traceability.json`, `phase_5_report.json` and the gate run, which returned `PHASE_ACCEPTED_BY_MACHINE` with C1–C6 PASS and PROTECTED_CORE COMPLETE. **Both acceptance guards were proved able to fail** before the verdict was recorded: setting one traceability claim to DEFERRED yields `PHASE_BLOCKED` on C6, and removing the adversarial-review run yields `PHASE_BLOCKED` on PROTECTED_CORE. Phase 5 is accepted and Phase 6 is unlocked; cumulative verified rises 65 → **72**. **F-0031** was opened and closed: two re-scoring controls named Phase 5 as their example of an unaccepted phase and expired on its acceptance — proven mechanically to be a stale subject rather than a defect, since the same path still returns NOT_APPLICABLE for phase 6, and repaired by deriving the subject from `GovernanceState`. Eighth instance of the phase-scoped-check family. `EVIDENCE_INDEX.md`'s deliberately-absent table was also repaired: rows Phase 5 made false are moved to a superseded table rather than deleted. Phase 4 remains MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 4 (complete)** — the frontend increment and the ARK-REQ-0229 vertical-slice linkage control. `BUILD_STATE.md` and `DECISION_LOG.md` changed and NEXT EXACT ACTION moved, so the §12 refresh was mechanically required. React/TypeScript/Vite/Tailwind now actually run: `npm ci` from the tracked lockfile, the Vitest tier added through real npm tooling, typecheck clean, 23 component tests green, production build succeeds. One backend contract was added — `GET /api/lifecycle/project` publishes the machine's state *vocabulary* and deliberately not its transition relation — for a demonstrated defect, recorded in `DECISION_LOG.md` and tested in both directions. **`ARK-REQ-0009`, `ARK-REQ-0178` and `ARK-REQ-0229` are implemented and controlled but NOT discharged**, and their `e2e` obligation is **unmet**: **T10 = NOT_CONFIGURED**, no browser ran, and the jsdom tests are not a substitute. Every new control was mutation-tested; the first linkage check did not fail its mutation and was repaired before being believed. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 4 (partial)** — the Command Center API under `surfaces.command`, backend half only.  `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The package was stopped at a green, internally consistent checkpoint rather than rushed; **the frontend is not built and ARK-REQ-0009/0178/0229 are not satisfied**. A Phase 4 tripwire fired as designed when the first execution surface appeared and was replaced by the obligation it named — see `DECISION_LOG.md`; not a finding, because nothing was defective. **No requirement is discharged.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
@@ -395,7 +395,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 6ab0692fb4b7c9a5e9eee84b548b2ef13f6030b3
+head: 3edc17130883a298451c2c42ac5fac5ec7817dd8
 branch: main
 working_tree_clean: true
 
