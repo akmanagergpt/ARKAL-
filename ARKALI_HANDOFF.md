@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Current HEAD | `3c116f2e79d0e7049313975c78fbf898d98a2b0b` |
+| Current HEAD | `7406ceffeb1a42074b77fab9de8c61d2bebf87b6` |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -80,7 +80,7 @@ scripts/check_handoff.py                    this manifest vs repository truth
 scripts/check_repository_structure.py       + _negative.py
 scripts/check_phase_graph.py                + _negative.py
 scripts/check_phase0_deliverables.py
-backend/                                    pytest suite (1010 passed, 12 skipped)
+backend/                                    pytest suite (1026 passed, 13 skipped)
 backend/tests/persistence/                  T11 persistence: real SQLite, WAL, durability, migrations
 backend/tests/structural/test_engine_confinement.py  ARK-REQ-0012 architecture control
 backend/tests/security/                     PDP, PEP, isolation, secrets, drift
@@ -109,7 +109,7 @@ repository, the repository wins.
 | Phase 2 | **MACHINE-ACCEPTED** |
 | Phase 3 | **MACHINE-ACCEPTED** |
 | Phase 4 | **MACHINE-ACCEPTED** — superseding verdict, **RATIFIED** under GOV-001; the defective first revision is retained as `phase_4_report_rev1_defective.json` |
-| Phase 5 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Package 1 (C-03 persistence foundation) at `11ebf14`; Package 2 (C-12 Project/Revision Registry) at `3c116f2`. No phase report, no traceability record, no gate run |
+| Phase 5 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Package 1 (C-03 foundation) `11ebf14`; Package 2 (C-12 registry) `3c116f2`; Package 3 **partial** (`7406cef`) — backup/restore *mechanics* only. No phase report, no traceability record, no gate run |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -166,7 +166,9 @@ repository, the repository wins.
 | 34 | `da27863` | handoff manifest refreshed after F-0027/F-0028 (§12 rule) |
 | 35 | `11ebf14` | **PHASE 5 PACKAGE 1** — `kernel.persistence` C-03 foundation (ARK-REQ-0011, 0012); F-0029 closed. **Not a phase acceptance** |
 | 36 | `0b93587` | handoff manifest refreshed after Package 1 (§12 rule) |
-| 37 | `3c116f2` | **PHASE 5 PACKAGE 2** — C-12 Project/Revision Registry persistence; F-0030 closed. **Not a phase acceptance** ← HEAD at generation |
+| 37 | `3c116f2` | **PHASE 5 PACKAGE 2** — C-12 Project/Revision Registry persistence; F-0030 closed. **Not a phase acceptance** |
+| 38 | `b7f0ff8` | handoff manifest refreshed after Package 2 (§12 rule) |
+| 39 | `7406cef` | **PHASE 5 PACKAGE 3 (PARTIAL)** — WAL-safe backup/restore *mechanics* in `kernel.persistence`. `lifecycle.recovery` untouched; ARK-REQ-0153/0335 **not** satisfied ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -281,9 +283,27 @@ subject to the PDP, `kernel.persistence` is not Protected Core but
 
 ## 9. Next exact action
 
-**Continue Phase 5 — Atomic Package 3: Minimal Backup/Restore.** Phase 5 is IN
-PROGRESS and NOT ACCEPTED. Packages 1 and 2 are done; do **not** re-do them and
-do **not** run the phase gate for Phase 5 yet.
+**Complete Phase 5 — Atomic Package 3: the `lifecycle.recovery` backup
+lifecycle.** Phase 5 is IN PROGRESS and NOT ACCEPTED. Packages 1 and 2 are done
+and Package 3 is **half done**; do **not** re-do what exists and do **not** run
+the phase gate for Phase 5 yet.
+
+**Package 3 remaining work**, all of it in `lifecycle.recovery`, which is
+**Protected Core**: the backup manifest and its recovery-specific metadata;
+integrity verification against the recorded digest; a schema/migration
+compatibility gate before restore; restore verification; driving the **existing**
+BackupRestore state machine through its executable API — the `restore_proof_guard`
+already refuses `BACKUP_RUNNING → BACKUP_VERIFIED` without a proven restore, so
+do not copy its transition table; and PEP enforcement of the write operation
+classes (`WRITE_WORKSPACE_FILE`/`READ_FILE`, never `WRITE_STABLE_FILE` or
+`ROLLBACK_STABLE`, which stay DENY). `lifecycle.recovery` is rank 5 and
+`control.policy` is rank 1, so that call is a legal downward edge.
+
+**Already delivered by the partial commit** (`7406cef`, `kernel.persistence`):
+WAL-safe online backup, restore, streamed SHA-256 digest, SQLite-header probe
+and `PRAGMA integrity_check`, with 16 controls. This is byte mechanics only.
+**ARK-REQ-0153 and ARK-REQ-0335 are NOT satisfied** — a mechanism that moves
+bytes is not a backup proven by restore, and nothing marks a backup verified.
 
 **Delivered so far.** Package 1 (`11ebf14`): the `kernel.persistence` C-03
 foundation — engine with verified WAL, base schema, engine-neutral repository,
@@ -345,8 +365,9 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `3c116f2e79d0e7049313975c78fbf898d98a2b0b` |
-| Generated after | **Phase 5 Atomic Package 2** — the C-12 Project/Revision Registry, plus the closure of F-0030. `BUILD_STATE.md` and `OPEN_BLOCKERS.md` changed, so the §12 refresh was mechanically required. **Phase 5 is not accepted**: no phase report, no traceability record, no gate run, no requirement discharged, and Phase 6 is not unlocked. Phase 4 remains MACHINE-ACCEPTED under RSA-001 |
+| Generated at HEAD | `7406ceffeb1a42074b77fab9de8c61d2bebf87b6` |
+| Generated after | **Phase 5 Atomic Package 3 (partial)** — WAL-safe backup/restore mechanics in `kernel.persistence`. `BUILD_STATE.md` changed, so the §12 refresh was mechanically required. The package was stopped deliberately at a green, internally consistent checkpoint rather than rushed; `lifecycle.recovery` is untouched, so no half-written Protected Core surface exists. **No requirement is discharged and no finding was opened.** Phase 5 remains IN PROGRESS, NOT ACCEPTED; Phase 6 LOCKED; Phase 4 MACHINE-ACCEPTED under RSA-001 |
+| Previously generated after | **Phase 5 Atomic Package 2** — the C-12 Project/Revision Registry, plus the closure of F-0030. `BUILD_STATE.md` and `OPEN_BLOCKERS.md` changed, so the §12 refresh was mechanically required. **Phase 5 is not accepted**: no phase report, no traceability record, no gate run, no requirement discharged, and Phase 6 is not unlocked. Phase 4 remains MACHINE-ACCEPTED under RSA-001 |
 | Previously generated after | **Phase 5 Atomic Package 1** — the `kernel.persistence` C-03 foundation, plus the closure of F-0029. `BUILD_STATE.md` and `OPEN_BLOCKERS.md` changed, so the §12 refresh was mechanically required. **Phase 5 is not accepted**: no phase report, no traceability record, no gate run, no requirement discharged, and Phase 6 is not unlocked. Phase 4 remains MACHINE-ACCEPTED under RSA-001. Superseded note follows |
 | Previously generated after | **F-0027 + F-0028 closure** — the pre-Phase-5 structural governance repair. Governed artifacts changed (`BUILD_STATE.md`, `OPEN_BLOCKERS.md`), so the §12 refresh was mechanically required. **No Phase 5 functionality was implemented.** No phase, gate, ADR or requirement state changed: Phase 4 remains MACHINE-ACCEPTED under RSA-001 and Phase 5 remains UNLOCKED — NOT_STARTED. Two stale values in the previous revision were corrected by re-derivation rather than carried forward: the §7 MEDIUM count, which disagreed with §3 and which no artifact derives mechanically, is now a pointer to `OPEN_BLOCKERS.md`; and §8's reading of the matrix's `T5, T11` as state machines is corrected to the test tiers `VERIFICATION_ARCHITECTURE.md` defines |
 | Generating role | Principal Software Architect / implementation lead (not the acceptance authority) |
@@ -396,7 +417,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 3c116f2e79d0e7049313975c78fbf898d98a2b0b
+head: 7406ceffeb1a42074b77fab9de8c61d2bebf87b6
 branch: main
 working_tree_clean: true
 
