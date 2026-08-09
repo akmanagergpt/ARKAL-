@@ -33,6 +33,7 @@ from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.execution.durable.execution import JobExecution
 from arkali.execution.durable.job_store import JobSubmission
 from arkali.execution.durable.records import DurableJobRecord
+from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
@@ -42,6 +43,13 @@ BACKEND = REPO / "backend"
 
 START = dt.datetime(2026, 1, 2, 3, 4, 5, tzinfo=dt.timezone.utc)
 OWNER = "worker-a"
+
+#: The job type the Package 1/2 fixtures submit under. Package 3 declares it
+#: explicitly where pause capability is part of what is being tested; the
+#: default is deliberately NOT auto-declared, so a test that needs the
+#: capability has to say so and a test that does not exercises the fail-closed
+#: path for free.
+JOB_TYPE = "arkali.test.noop"
 
 #: Canonical documents a real PDP needs in order to load at all.
 PDP_DOCUMENTS = (
@@ -85,6 +93,29 @@ class Reopener:
             def __enter__(self) -> tuple[JobExecution, object]:
                 session = uow.__enter__()
                 return JobExecution(session, outer._pep, outer._clock), session
+
+            def __exit__(self, *exc: object) -> bool:
+                try:
+                    return bool(uow.__exit__(*exc))
+                finally:
+                    engine.dispose()
+
+        return _Scope()
+
+    def recovery(self):  # noqa: ANN201 - a context manager
+        """The same file, the same new-engine-each-time discipline, but the
+        Package 3 service. Separate rather than returning both, so a Package 2
+        test cannot accidentally acquire pause or recovery powers.
+        """
+        self.opens += 1
+        engine: Engine = create_persistence_engine(sqlite_url(self._path))
+        uow = unit_of_work(create_session_factory(engine))
+        outer = self
+
+        class _Scope:
+            def __enter__(self) -> tuple[JobRecovery, object]:
+                session = uow.__enter__()
+                return JobRecovery(session, outer._pep, outer._clock), session
 
             def __exit__(self, *exc: object) -> bool:
                 try:
@@ -142,7 +173,14 @@ def submit(execution: JobExecution, **overrides: object) -> DurableJobRecord:
     return execution.jobs.submit(submission(**overrides))
 
 
-def set_bound(session: object, job_id: str, *, attempts: int, timeout: int) -> None:
+def set_bound(
+    session: object,
+    job_id: str,
+    *,
+    attempts: int,
+    timeout: int,
+    heartbeat: int | None = None,
+) -> None:
     """Record different admission terms, through the mapped row.
 
     The job row is mutable by design - its lifecycle state follows the machine -
@@ -153,6 +191,20 @@ def set_bound(session: object, job_id: str, *, attempts: int, timeout: int) -> N
     ).scalar_one()
     record.max_attempts = attempts
     record.attempt_timeout_seconds = timeout
+    if heartbeat is not None:
+        record.heartbeat_timeout_seconds = heartbeat
+
+
+def declare(recovery: JobRecovery, *, supports_pause: bool, job_type: str = JOB_TYPE):  # noqa: ANN201
+    """Declare the fixture job type's pause capability."""
+    return recovery.job_types.declare(job_type, supports_pause=supports_pause)
+
+
+def run(recovery: JobRecovery, owner: str = OWNER, **overrides: object) -> None:
+    """Submit a job and put it in RUNNING with an open attempt."""
+    recovery.execution.jobs.submit(submission(**overrides))
+    job_id = str(overrides.get("job_id", "JOB-0001"))
+    recovery.execution.begin_attempt(job_id, owner)
 
 
 def denying_pep(root: pathlib.Path) -> PolicyEnforcementPoint:

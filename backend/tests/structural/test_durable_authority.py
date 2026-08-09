@@ -30,6 +30,8 @@ from tests.structural.durable_reader import (
     DURABLE,
     ENGINE_CONSTRUCTORS,
     MACHINE_MODULE,
+    NEUTRAL_TYPE_NAMESPACE,
+    NEUTRAL_TYPES,
     RAW_SQL,
     READ,
     SCHEDULING_NAMES,
@@ -44,6 +46,7 @@ from tests.structural.durable_reader import (
     called,
     code_only,
     imported,
+    mapped_records,
     modules,
     read,
 )
@@ -191,11 +194,24 @@ class TestNoSecondPersistenceAuthority:
         assert "arkali.kernel.persistence.base" in imported(tree)
 
     def test_column_types_stay_engine_neutral(self) -> None:
-        for table in (DurableJobRecord, JobCheckpointRecord, JobExecutionAttempt):
+        """Two independent checks over a DERIVED record set.
+
+        The whitelist alone was both incomplete and unenforceable against a
+        type it had never heard of, so the namespace check is the real control:
+        every generic SQLAlchemy type lives in `sqlalchemy.sql.sqltypes`, and
+        anything out of `sqlalchemy.dialects` - which is what ARK-REQ-0012
+        actually forbids - does not, whether or not it is on any list.
+        """
+        for table in mapped_records():
             for column in table.__table__.columns:
-                rendered = type(column.type).__name__
-                assert rendered in {"String", "Integer", "DateTime", "JSON"}, (
-                    f"{table.__tablename__}.{column.name} uses {rendered}"
+                rendered = type(column.type)
+                assert rendered.__module__ == NEUTRAL_TYPE_NAMESPACE, (
+                    f"{table.__tablename__}.{column.name} uses "
+                    f"{rendered.__module__}.{rendered.__name__}, which is not a "
+                    "generic SQLAlchemy type"
+                )
+                assert rendered.__name__ in NEUTRAL_TYPES, (
+                    f"{table.__tablename__}.{column.name} uses {rendered.__name__}"
                 )
 
 

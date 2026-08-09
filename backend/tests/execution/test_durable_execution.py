@@ -63,17 +63,39 @@ class TestHeartbeatAndOwnership:
             assert (stored.owner, stored.attempt) == (OWNER, 1)
             assert execution.jobs.require("JOB-0001").lifecycle_state == "RUNNING"
 
-    def test_liveness_is_computed_from_the_injected_clock(
+    def test_the_deadline_is_computed_from_the_injected_clock(
         self, reopen: Reopener, clock: MovableClock
     ) -> None:
+        """`timed_out` measures ELAPSED WORK against `deadline_at`.
+
+        Renamed from `heartbeat_expired` by the F-0036 repair: the function
+        never consulted `heartbeat_at` and never did measure the heartbeat.
+        Whether an execution has stopped reporting is `JobRecovery`.
+        """
         with reopen.session() as (execution, _):
             submit(execution)
             execution.begin_attempt("JOB-0001", OWNER)
-            assert execution.heartbeat_expired("JOB-0001") is False
+            assert execution.timed_out("JOB-0001") is False
             clock.advance(299)
-            assert execution.heartbeat_expired("JOB-0001") is False
+            assert execution.timed_out("JOB-0001") is False
             clock.advance(1)
-            assert execution.heartbeat_expired("JOB-0001") is True
+            assert execution.timed_out("JOB-0001") is True
+
+    def test_a_fresh_heartbeat_does_not_postpone_the_deadline(
+        self, reopen: Reopener, clock: MovableClock
+    ) -> None:
+        """The F-0036 defect, stated as a permanent control.
+
+        A worker that has heartbeated this very instant is still timed out once
+        its deadline passes. If `timed_out` were measuring the heartbeat - as
+        the name it shipped under promised - this would be False.
+        """
+        with reopen.session() as (execution, _):
+            submit(execution)
+            execution.begin_attempt("JOB-0001", OWNER)
+            clock.advance(300)
+            execution.heartbeat("JOB-0001", OWNER)
+            assert execution.timed_out("JOB-0001") is True
 
     def test_a_heartbeat_is_recorded_and_survives_reopen(
         self, reopen: Reopener, clock: MovableClock
@@ -128,17 +150,22 @@ class TestHeartbeatAndOwnership:
             with pytest.raises(StaleExecutionOwnership):
                 execution.begin_attempt("JOB-0001", "   ")
 
-    def test_reopen_preserves_what_package_3_recovery_will_need(
+    def test_reopen_preserves_the_facts_recovery_reads(
         self, reopen: Reopener, clock: MovableClock
     ) -> None:
-        """Package 2 records expiry; it deliberately does not act on it."""
+        """Package 2 records the facts; acting on them is the sweep.
+
+        The execution service still does not recover: opening a fresh engine
+        over a job whose deadline passed long ago leaves it RUNNING with its
+        attempt open. Only `JobRecovery` moves it.
+        """
         with reopen.session() as (execution, _):
             submit(execution)
             execution.begin_attempt("JOB-0001", OWNER)
         clock.advance(1_000)
         with reopen.session() as (execution, _):
             assert execution.jobs.require("JOB-0001").lifecycle_state == "RUNNING"
-            assert execution.heartbeat_expired("JOB-0001") is True
+            assert execution.timed_out("JOB-0001") is True
             attempt = execution.current_attempt("JOB-0001")
             assert attempt is not None and attempt.is_open
 

@@ -15,13 +15,16 @@ import pathlib
 import re
 from typing import Final
 
+from arkali.execution.durable import records as _records
 from arkali.execution.durable.job_state_machine import DEFINITION
 from arkali.execution.durable.job_store import READ, WRITE, JobStore
 from arkali.execution.durable.records import (
     DurableJobRecord,
     JobCheckpointRecord,
     JobExecutionAttempt,
+    JobTypeRecord,
 )
+from arkali.kernel.persistence.base import PersistenceBase
 
 REPO: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parents[3]
 PACKAGE: Final[pathlib.Path] = REPO / "backend" / "arkali"
@@ -49,8 +52,38 @@ SESSION_OPERATIONS: Final[frozenset[str]] = frozenset(
 #: Phase 8 vocabulary. Present here would mean scheduling had leaked forward.
 SCHEDULING_NAMES: Final[tuple[str, ...]] = (
     "admit", "admission", "claim", "lease", "dequeue", "enqueue_to_worker",
-    "worker_pool", "resource_budget", "allocate",
+    "worker_pool", "resource_budget", "allocate", "priority", "capacity",
+    "dispatch", "worker_class", "concurrency_limit",
 )
+
+#: Generic SQLAlchemy types render on every supported engine. A type from
+#: `sqlalchemy.dialects` would not, which is what ARK-REQ-0012 forbids.
+NEUTRAL_TYPE_NAMESPACE: Final[str] = "sqlalchemy.sql.sqltypes"
+NEUTRAL_TYPES: Final[frozenset[str]] = frozenset(
+    {"String", "Integer", "DateTime", "JSON", "Boolean"}
+)
+
+
+def mapped_records() -> tuple[type[PersistenceBase], ...]:
+    """Every record this context maps, DERIVED from the module.
+
+    Package 3 found the hand-written list stale: `JobTypeRecord` was mapped,
+    persisted and migrated while three controls still named only the Package
+    1/2 tables, so the new record was checked by none of them. Deriving the set
+    means the next record cannot escape the same way.
+    """
+    found = tuple(
+        value for value in vars(_records).values()
+        if isinstance(value, type)
+        and issubclass(value, PersistenceBase)
+        and value is not PersistenceBase
+        and hasattr(value, "__tablename__")
+    )
+    assert len(found) >= 4, (
+        f"only {len(found)} mapped records found; this control would be weaker "
+        "than the hand-written list it replaced"
+    )
+    return found
 
 
 def modules(root: pathlib.Path) -> list[pathlib.Path]:
@@ -83,6 +116,57 @@ def called(tree: ast.AST) -> set[str]:
             elif isinstance(node.func, ast.Attribute):
                 names.add(node.func.attr)
     return names
+
+
+#: The method every lifecycle move must go through. Named once, here.
+TRANSITION_RECORDER: Final[str] = "transition"
+
+
+def transition_requests(path: pathlib.Path) -> dict[str, set[str]]:
+    """Every lifecycle target this module asks the recorder to move to.
+
+    Maps the enclosing function name to the target names passed to
+    `...transition(job_id, TARGET)`. Derived from the AST, so a module cannot
+    request a state without this seeing it, and the *shape* of the request -
+    going through the recorder at all - is what makes it visible. A direct
+    assignment would not appear here, which is exactly why the companion
+    control on `lifecycle_state` assignment is a separate check.
+    """
+    found: dict[str, set[str]] = {}
+    tree = ast.parse(read(path))
+    for holder in ast.walk(tree):
+        if not isinstance(holder, ast.FunctionDef):
+            continue
+        targets: set[str] = set()
+        for node in ast.walk(holder):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else (
+                func.id if isinstance(func, ast.Name) else ""
+            )
+            if name != TRANSITION_RECORDER or len(node.args) < 2:
+                continue
+            target = node.args[1]
+            if isinstance(target, ast.Name):
+                targets.add(target.id)
+            elif isinstance(target, ast.Constant) and isinstance(target.value, str):
+                targets.add(target.value)
+        if targets:
+            found[holder.name] = targets
+    return found
+
+
+def requested_states(root: pathlib.Path) -> dict[str, set[str]]:
+    """Per module, every lifecycle target requested anywhere in it."""
+    per_module: dict[str, set[str]] = {}
+    for path in modules(root):
+        if path.name == MACHINE_MODULE:
+            continue
+        requests = transition_requests(path)
+        if requests:
+            per_module[path.name] = set().union(*requests.values())
+    return per_module
 
 
 def _assigns_lifecycle_state(node: ast.AST) -> bool:

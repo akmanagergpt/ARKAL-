@@ -33,9 +33,16 @@ would silently restart with the process; an absolute instant does not.
 NOTHING HERE SLEEPS. Liveness and expiry are comparisons against the injected
 clock, so every control is deterministic.
 
-PACKAGE 3 IS NOT PRE-IMPLEMENTED. This module never enters `RESUMING` and runs
-no recovery sweep. A failure with budget remaining is disposed to `RECOVERABLE`,
-which is exactly the information Package 3 needs and no more.
+TIMEOUT IS NOT HEARTBEAT STALENESS. `timed_out` reads `deadline_at`: it measures
+elapsed work. Whether an execution has stopped *reporting* reads `heartbeat_at`
+against a separate recorded bound and belongs to `recovery.py`. Package 2 shipped
+the first question under a name that promised the second - F-0036 - and the name
+is gone rather than reinterpreted.
+
+PAUSE, RESUME AND RECOVERY ARE NOT HERE. This module enters neither `PAUSED` nor
+`RESUMING` and runs no sweep. A failure with budget remaining is disposed to
+`RECOVERABLE`, and `recovery.py` composes that disposition rather than repeating
+it.
 
 TRANSACTION BOUNDARIES BELONG TO THE CALLER. Like every sibling service, this
 one never commits.
@@ -156,21 +163,20 @@ class JobExecution:
         record = self._jobs.require(job_id)
         return self.attempt_count(job_id) < record.max_attempts
 
-    def heartbeat_expired(self, job_id: str) -> bool:
-        """Whether the open attempt's heartbeat is older than its deadline.
+    def timed_out(self, job_id: str) -> bool:
+        """Whether the open attempt has passed its absolute deadline.
 
-        A pure comparison against the injected clock. Reporting expiry is a
-        durability question; *acting* on it is the Package 3 recovery sweep and
-        is deliberately not here.
+        A pure comparison against the injected clock. This measures ELAPSED
+        WORK, not silence: a job that has heartbeated a moment ago is timed out
+        once its deadline passes, and one that has not heartbeated in a week is
+        not. Whether an execution has stopped REPORTING is a different question
+        with a different persisted basis, answered by
+        `JobRecovery.heartbeat_stale` (F-0036).
         """
         attempt = self.current_attempt(job_id)
         if attempt is None:
             return False
         return self._expired(attempt)
-
-    def timed_out(self, job_id: str) -> bool:
-        """Whether the open attempt has passed its absolute deadline."""
-        return self.heartbeat_expired(job_id)
 
     def _expired(self, attempt: JobExecutionAttempt) -> bool:
         return _as_utc(self._clock()) >= _as_utc(attempt.deadline_at)

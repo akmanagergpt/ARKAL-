@@ -8,25 +8,42 @@ All fields above are the `CONTRACT_INVENTORY.md` row for C-19, not a restatement
 Where this document and the code or the canonical set disagree, they win and this
 document is the defect.
 
-## 0. Scope of this revision — Phase 7 Atomic Package 2
+## 0. Scope of this revision — Phase 7 Atomic Package 3
 
 Package 1 defined the persistence foundation: the durable job record, its
-idempotency identity and the checkpoint record. **Package 2 adds the durability
-semantics**: execution attempts with an ownership and heartbeat record, a
+idempotency identity and the checkpoint record. Package 2 added the durability
+semantics: execution attempts with an ownership and heartbeat record, a
 persisted retry bound with row-derived accounting, an absolute per-attempt
-deadline, cancellation and dead-lettering.
+deadline, cancellation and dead-lettering. **Package 3 adds the job-type
+contract registry, pause/resume, and the crash-recovery sweep.**
 
 Still **not** implemented, not claimed, and not represented by an unused column:
-**pause/resume**, the `supports_pause` job-type registry, the crash-recovery
-sweep, and approvals/signals. Those are Package 3 and later. A column that
+**approvals/signals**, and everything the boundary in §5 disclaims. A column that
 exists for a behaviour that does not is a claim, and STRICT compatibility
 permits adding optional fields later with a defined absent-value meaning, so
 nothing is lost by waiting.
 
-Package 2 records what Package 3 will need — `heartbeat_at`, `deadline_at` and a
-`RECOVERABLE` disposition — and stops there. It never enters `RESUMING`.
+**No Phase 7 requirement is discharged by this package.** `ARK-REQ-0060` is now
+mechanically *evaluable*, which is not the same as discharged: no traceability
+record, no phase report and no gate run exist, and `ARK-REQ-0059`/`ARK-REQ-0061`
+carry a `chaos` evidence obligation whose formal tier begins at **Phase 31**.
+The restart evidence below is real deterministic fault injection at the
+available tier; it is not the T12 corpus and `ARK-REQ-0327` is not claimed.
 
-No Phase 7 requirement is discharged by this package.
+## 0.1 `ARK-REQ-0060` applicability
+
+The Appendix A rule is `job_type.supports_pause == true` **in the job-type
+contract registry**. Before Package 3 that registry did not exist, so the rule
+was **unevaluable**, and governing rule 7 of `REQUIREMENT_REGISTER.md` resolves
+an unwaived unevaluable rule to **APPLICABLE**. Declining to build the registry
+therefore never avoided the requirement — it only left the question
+unanswerable. Package 3 makes it answerable from persisted data.
+
+`durable_job_type` is the **only** authority for that answer. It is not read
+from a request body, a caller identity, a UI affordance or the job's current
+lifecycle state, and an unregistered type raises rather than defaulting: an
+absent row is an unanswered question, and converting it to `false` would decide
+something nobody declared.
 
 ## 1. Compatibility semantics
 
@@ -83,13 +100,13 @@ A rejected transition raises the machine's own typed error
 (`IllegalTransition`, `ForbiddenTransition`, `TerminalStateEscape`,
 `UnknownState`) unchanged, and the row is not touched.
 
-**Package 2 chooses between declared transitions; it never adds one.** On a
+**This context chooses between declared transitions; it never adds one.** On a
 failed attempt the job moves `RUNNING → FAILED`, then to `RECOVERABLE` when the
 recorded bound leaves another attempt and to `DEAD_LETTER` when it does not.
 Both are edges the machine already declares, and it evaluates each one, so
 retry exhaustion cannot bypass the machine.
 
-Three properties follow from the canonical relation rather than from code here,
+Properties that follow from the canonical relation rather than from code here,
 and are asserted as such:
 
 - **`DEAD_LETTER` has no outgoing transition.** A dead-lettered job cannot be
@@ -97,19 +114,91 @@ and are asserted as such:
   edge out of it.
 - **`CANCELLED` is reachable only from `RUNNING`.** A queued job cannot be
   cancelled, and a terminal job cannot be cancelled again.
-- **`RESUMING` is never entered by this package.** Retry disposition stops at
-  `RECOVERABLE`, which is exactly what Package 3's recovery needs and no more.
+- **`RESUMING` has exactly two predecessors, `PAUSED` and `RECOVERABLE`.** Pause
+  and crash recovery therefore share one lifecycle meaning because the canonical
+  relation says so, not because this contract arranges it.
+- **`RUNNING → RECOVERABLE` is not declared and `evaluate` refuses it.**
+
+### 3.1 The two paths through `RESUMING`
+
+Both are read off the canonical relation, not chosen here:
+
+| Path | Route | Owner |
+|---|---|---|
+| Pause | `RUNNING → PAUSED → RESUMING → RUNNING` | `JobRecovery.pause` / `.resume` |
+| Crash recovery | `RUNNING → FAILED → RECOVERABLE → RESUMING` | `JobRecovery.recover_lost_executions` |
+
+`EXECUTION_AND_CAPABILITY.md` §3 says a `RUNNING` job without a live heartbeat
+"transitions to `RECOVERABLE`, then `RESUMING`". It names the states a crashed
+job resolves **to**; `STATE_MACHINES.md` §3 owns the **edges** it travels, and
+`RUNNING → RECOVERABLE` is not one of them. The route through `FAILED` is the
+only one the relation declares, and it is exactly the disposition Package 2
+already owns — so recovery composes that path rather than repeating it, and the
+canonical machine was not modified.
+
+**There is one `RESUMING` and one meaning.** No pause-specific or
+recovery-specific resuming state exists, no `is_resuming` flag exists, and
+nothing records the *origin* of a resume in a way that decides transition
+legality.
+
+### 3.2 Pause leaves the attempt open; recovery closes it
+
+A paused execution is **suspended**, not lost. Its attempt stays open under the
+same owner, with the same absolute `deadline_at` and the same position in the
+retry budget. Closing it would consume an attempt — and pausing is not failing —
+while extending its deadline would reset the timeout basis the job was admitted
+under. Resume therefore returns to exactly the attempt that was interrupted, and
+a job paused for longer than its attempt timeout is timed out on resume by the
+ordinary Package 2 rule.
+
+A crashed execution **is** lost, so recovery closes its attempt through the
+Package 2 failure path. That is what makes the departed owner unable to act: a
+closed attempt refuses every write, so a zombie worker cannot heartbeat,
+complete or fail the execution it lost. The consumed attempt is honest
+accounting — the attempt really did happen and really did stop.
+
+A **paused** job is deliberately silent and is never swept. Recovery selects
+`RUNNING` jobs only, so pausing does not expose a job to being "recovered".
 
 ## 4. Records this contract owns
 
 | Record | Fields |
 |---|---|
-| `durable_job` | `job_id` (PK) · `job_type` · `idempotency_key` · `lifecycle_state` · `payload` (JSON) · `max_attempts` · `attempt_timeout_seconds` · `created_at` · `updated_at` — unique (`job_type`, `idempotency_key`) |
+| `durable_job` | `job_id` (PK) · `job_type` · `idempotency_key` · `lifecycle_state` · `payload` (JSON) · `max_attempts` · `attempt_timeout_seconds` · `heartbeat_timeout_seconds` · `created_at` · `updated_at` — unique (`job_type`, `idempotency_key`) |
 | `job_checkpoint` | `job_id` (PK, FK → `durable_job`) · `sequence` (PK) · `payload` (JSON) · `recorded_at` |
 | `job_execution_attempt` | `job_id` (PK, FK → `durable_job`) · `attempt` (PK) · `owner` · `started_at` · `heartbeat_at` · `deadline_at` · `ended_at` · `outcome` · `detail` |
+| `durable_job_type` | `job_type` (PK) · `supports_pause` · `registered_at` |
 
 A control reads this table against the mapped columns, so the mapping cannot
-drift into two descriptions of the same thing.
+drift into two descriptions of the same thing. The control **derives** the
+record set from the context's mapped classes rather than naming them, so a
+record added later cannot escape it.
+
+**The job-type registry is joined by the natural key, not by a foreign key.**
+`durable_job_type.job_type` is the same value `durable_job.job_type` already
+carries — the key idempotency is scoped by. A foreign key would make
+registration a *precondition of submitting*, which is admission control, and
+admission is C-21 at Phase 8. An unregistered type instead fails closed at the
+point its capability is asked about.
+
+**Declaration is write-once.** Re-declaring a registered type is refused rather
+than overwritten, so a job admitted while its type supported pause cannot have
+that capability changed underneath it. Canonical authority declares no
+versioning or mutation semantics for this registry, so none is invented.
+
+**Three timing terms, three different questions.** They are not
+interchangeable, and Package 2 shipped one under a name that promised another
+(F-0036):
+
+| Term | Question | Basis |
+|---|---|---|
+| `attempt_timeout_seconds` → `deadline_at` | has this attempt run too **long**? | elapsed work, absolute instant |
+| `heartbeat_timeout_seconds` → `heartbeat_at` | has this execution stopped **reporting**? | silence since last proof of life |
+| `max_attempts` | may another attempt be opened? | `count(job_execution_attempt)` |
+
+A worker can fall silent long before its deadline, and a worker that is very
+much alive can pass one. Crash recovery keys on the **heartbeat** term, per
+`EXECUTION_AND_CAPABILITY.md` §3; `JobExecution.timed_out` keys on the deadline.
 
 **Retry accounting is rows, not a counter.** The attempt count is
 `count(job_execution_attempt)`. It therefore cannot be reset by restarting a
@@ -145,11 +234,30 @@ resumed from; a checkpoint that can be edited or removed is not a durability
 record. The job row itself is mutable by design, because the machine declares
 non-terminal states and the row follows it.
 
+## 4.1 What the recovery sweep decides, and what it must not
+
+The sweep decides that an execution **is gone**. That is a durability judgement
+made from persisted facts — recorded owner, recorded heartbeat, recorded bound —
+against the injected clock.
+
+It does **not** decide who should run the job next, in what order, with what
+priority, on what resources, or whether there is capacity to run it at all. It
+leaves a recovered job in `RESUMING` for someone to pick up, and picking up is
+`execution.scheduler` / C-21 at **Phase 8**. A structural control fails on the
+scheduling vocabulary appearing anywhere in this context.
+
+**Idempotent by construction, not by a guard.** A recovered job is no longer
+`RUNNING` and no longer has an open attempt, so it cannot match the selection
+twice. The sweep returns the ids it resolved, so a second sweep returning empty
+is observable rather than assumed.
+
 ## 5. What this contract does NOT own
 
 - **Scheduling, admission, worker allocation, ownership and resource budget.**
   That is **C-21** / `execution.scheduler` at **Phase 8**. Nothing here queues,
-  claims, leases or admits; `submit` records a job and returns.
+  claims, leases or admits; `submit` records a job and returns. The job-type
+  registry holds one durability capability per type and no worker class,
+  concurrency limit, resource profile or TRUST tier.
 - **Workflow graphs and workflow execution.** That is **C-20** /
   `execution.workflow` at **Phase 17**. `execution.workflow → execution.durable`
   is a declared sibling edge; the reverse is forbidden and absent.

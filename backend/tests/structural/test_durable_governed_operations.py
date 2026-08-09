@@ -23,6 +23,8 @@ from tests.structural.durable_reader import (
     SESSION_OPERATIONS,
     STABLE_CLASSES,
     WRITE,
+    requested_states,
+    transition_requests,
     DurableJobRecord,
     JobCheckpointRecord,
     JobExecutionAttempt,
@@ -31,6 +33,7 @@ from tests.structural.durable_reader import (
     called,
     code_only,
     imported,
+    mapped_records,
     modules,
     read,
 )
@@ -177,14 +180,168 @@ class TestRetryAccountingIsPersistedNotCounted:
             imported_from_machine
         )
 
-    def test_the_execution_module_never_enters_resuming(self) -> None:
-        """Package 3 boundary: recovery and resume are not pre-implemented."""
-        source = code_only(read(DURABLE / "execution.py"))
-        for forbidden in ("RESUMING", "PAUSED", "supports_pause"):
-            assert forbidden not in source, (
-                f"{forbidden} belongs to Package 3; Package 2 records what "
-                "recovery will need and stops there"
+
+class TestResumingHasOneAuthorityAndOneEntryShape:
+    """Replaces Package 2's `test_the_execution_module_never_enters_resuming`.
+
+    WHY IT WAS REPLACED, AND WHAT WAS PROVEN FIRST. That control read a single
+    file - `execution.py` - and asserted the tokens `RESUMING`, `PAUSED` and
+    `supports_pause` were absent from it. Package 3 implemented all three, in
+    `recovery.py` and `job_type.py`, and the control **still passed**. It was
+    verified passing against the finished Package 3 tree before being touched,
+    so it did not fire "because Package 3 arrived": its subject was one module,
+    never the context, and a second module in the same context was always
+    outside it. Deleting a control that had started failing would need the
+    fires-for-the-right-reason proof; this one needed the opposite proof, that
+    it could not fire at all.
+
+    What replaces it is the property the original was reaching for, stated over
+    the whole context and derived from the source rather than from a token list.
+    """
+
+    def test_resuming_is_requested_only_by_the_recovery_module(self) -> None:
+        """One authority. Derived: which modules ask to move to `RESUMING`.
+
+        The subject is not a file list - it is every module in the context,
+        with the requesting module identified by what it does. A third module
+        acquiring a `RESUMING` path fails this without anyone editing it.
+        """
+        askers = {
+            name for name, targets in requested_states(DURABLE).items()
+            if "RESUMING" in targets
+        }
+        assert askers == {"recovery.py"}, (
+            f"RESUMING is requested by {sorted(askers)}; pause and crash "
+            "recovery share one authority and it is recovery.py"
+        )
+
+    def test_the_package_2_execution_module_has_no_resuming_path(self) -> None:
+        """Retry, timeout, cancel and dead-letter cannot initiate a resume.
+
+        Stated over the methods that own those dispositions rather than over
+        the file as a whole, so it keeps its meaning if the module grows.
+        """
+        requests = transition_requests(DURABLE / "execution.py")
+        assert requests, "no transition request found; this control would be vacuous"
+        for method, targets in requests.items():
+            assert "RESUMING" not in targets, (
+                f"execution.py::{method} requests RESUMING; the Package 2 "
+                "dispositions stop at RECOVERABLE"
             )
+        assert {"begin_attempt", "complete_attempt", "cancel", "_fail"} <= set(
+            requests
+        ), f"the disposition methods are not the ones measured: {sorted(requests)}"
+
+    def test_every_resuming_request_passes_through_the_transition_recorder(
+        self,
+    ) -> None:
+        """One entry shape. `RESUMING` may appear only as a target given to
+        `transition`, which is the method that calls `evaluate`.
+
+        A module could otherwise import the name and use it for something that
+        never reaches the machine - a comparison that gates behaviour, a value
+        written somewhere, a default. Counting occurrences of the name and
+        requiring every one to be accounted for by a transition request or an
+        import is what makes the entry shape checkable rather than assumed.
+        """
+        source = read(DURABLE / "recovery.py")
+        tree = ast.parse(source)
+        uses = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node.id == "RESUMING"
+        ]
+        requested = sum(
+            1 for targets in transition_requests(DURABLE / "recovery.py").values()
+            for target in targets if target == "RESUMING"
+        )
+        assert uses, "RESUMING is not used at all; this control would be vacuous"
+        assert len(uses) == requested, (
+            f"RESUMING is named {len(uses)} times but only {requested} of those "
+            "are transition targets; the remainder reach no machine"
+        )
+
+    def test_the_recorder_every_request_lands_on_still_asks_the_machine(
+        self,
+    ) -> None:
+        """The shape above is only worth anything if the recorder evaluates."""
+        recorder = next(
+            node for node in ast.walk(ast.parse(read(DURABLE / "job_store.py")))
+            if isinstance(node, ast.FunctionDef) and node.name == "transition"
+        )
+        assert "evaluate" in called(recorder)
+
+    def test_the_job_type_registry_carries_no_per_job_lifecycle_state(self) -> None:
+        """The registry declares what a TYPE supports, never where a JOB is.
+
+        This is what makes the scoping of the next control principled rather
+        than an exception: a record holding no job identity and no lifecycle
+        column cannot be a second place a job's state lives, so a capability
+        flag on it is a declaration and not a shadow state.
+        """
+        registry = next(
+            table for table in mapped_records()
+            if table.__tablename__ == "durable_job_type"
+        )
+        columns = {column.name for column in registry.__table__.columns}
+        assert "lifecycle_state" not in columns
+        assert "job_id" not in columns, (
+            "a per-job column on the type registry would make it a second "
+            "store of job state"
+        )
+
+    def test_no_second_lifecycle_state_or_flag_exists(self) -> None:
+        """NEGATIVE CONTROL for a duplicated lifecycle meaning.
+
+        Subject: every record that actually carries job lifecycle - identified
+        by holding `job_id` or `lifecycle_state`, derived from the columns
+        themselves. On those, no column other than `lifecycle_state` may be
+        named after a state the canonical machine declares. The forbidden
+        vocabulary is read from `DEFINITION.states`, so a state the relation
+        stops or starts declaring changes this control with it.
+
+        `job_execution_attempt.outcome` holds a state VALUE and is not named
+        after one; recording which state an attempt ended in is history, not a
+        second authority on where the job is now.
+        """
+        vocabulary = {state.lower() for state in DEFINITION.states}
+        in_scope = [
+            table for table in mapped_records()
+            if {"job_id", "lifecycle_state"}
+            & {column.name for column in table.__table__.columns}
+        ]
+        assert len(in_scope) >= 3, "too few lifecycle-carrying records in scope"
+        for table in in_scope:
+            for column in table.__table__.columns:
+                if column.name == "lifecycle_state":
+                    continue
+                hits = {word for word in vocabulary if word in column.name}
+                assert hits == set(), (
+                    f"{table.__tablename__}.{column.name} is named after "
+                    f"{sorted(hits)}; the canonical relation already owns that "
+                    "meaning and a second column would be a second authority"
+                )
+        for path in modules(DURABLE):
+            if path.name == MACHINE_MODULE:
+                continue
+            source = code_only(read(path))
+            for shape in (r"\bis_resuming\b", r"\bis_paused\b", r"\bRESUMING_\w+"):
+                assert not re.search(shape, source), f"{path.name} matches {shape}"
+
+    def test_resuming_predecessors_are_a_property_of_the_canonical_relation(
+        self,
+    ) -> None:
+        """Shared authority is not arranged by this package; it is declared.
+
+        Both Package 3 paths converge on `RESUMING` because the machine gives
+        it exactly two predecessors. Read from the relation, so a canonical
+        change to it fails here rather than silently widening the sweep.
+        """
+        predecessors = {s for s, t in DEFINITION.transitions if t == "RESUMING"}
+        assert predecessors == {"PAUSED", "RECOVERABLE"}
+        assert ("RUNNING", "RECOVERABLE") not in DEFINITION.transition_set, (
+            "a direct RUNNING -> RECOVERABLE edge would let recovery skip the "
+            "FAILED disposition that closes the lost attempt"
+        )
 
 
 class TestContractAndSchemaAgree:
@@ -196,7 +353,7 @@ class TestContractAndSchemaAgree:
 
     def test_every_mapped_column_is_documented(self) -> None:
         text = read(CONTRACT_DOC)
-        for table in (DurableJobRecord, JobCheckpointRecord, JobExecutionAttempt):
+        for table in mapped_records():
             assert table.__tablename__ in text
             for column in table.__table__.columns:
                 assert f"`{column.name}`" in text, (
@@ -208,17 +365,19 @@ class TestContractAndSchemaAgree:
 
         Only the record ROWS of section 4 are read, not its prose: the prose
         legitimately names ORM events and constraints, which are not columns.
+        The table names other rows reference are subtracted by DERIVING them
+        from the mapped set, so adding a record cannot silently widen the
+        subtraction the way a hand-written exclusion list did.
         """
-        for table in (DurableJobRecord, JobCheckpointRecord, JobExecutionAttempt):
+        table_names = {table.__tablename__ for table in mapped_records()}
+        for table in mapped_records():
             mapped = {column.name for column in table.__table__.columns}
             row = next(
                 line for line in read(CONTRACT_DOC).splitlines()
                 if line.startswith(f"| `{table.__tablename__}` |")
             )
             fields = row.split("|")[2]
-            documented = set(re.findall(r"`([a-z_]+)`", fields)) - {
-                table.__tablename__, "durable_job", "job_checkpoint",
-            }
+            documented = set(re.findall(r"`([a-z_]+)`", fields)) - table_names
             assert documented == mapped, (
                 f"{table.__tablename__}: documented {sorted(documented)} but "
                 f"mapped {sorted(mapped)}"

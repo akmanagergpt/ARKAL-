@@ -94,3 +94,37 @@ class DeadlineNotReached(ContractViolation):
     """
 
     code = "ARK-ERR-0077"
+
+
+class UnknownJobType(ContractViolation):
+    """An operation needs a job type's declared contract and none is registered.
+
+    Package 3 fails CLOSED on this rather than assuming a default. The
+    applicability rule `ARK-REQ-0060` Appendix A reads
+    `job_type.supports_pause`; a missing declaration is an unanswered question,
+    and answering it with `false` would be a guess while answering it with
+    `true` would grant a capability nobody declared.
+    """
+
+    code = "ARK-ERR-0078"
+
+
+class DuplicateJobType(ContractViolation):
+    """A job type is already declared.
+
+    Registration is not idempotent by silence: re-declaring a type is refused
+    so that a second declaration cannot quietly replace the pause capability a
+    job in flight was admitted under.
+    """
+
+    code = "ARK-ERR-0079"
+
+
+class PauseNotSupported(ContractViolation):
+    """Pause was requested for a job type that does not declare `supports_pause`.
+
+    The refusal is read from the persisted registry, never from the request,
+    the caller or the job's current state.
+    """
+
+    code = "ARK-ERR-0080"

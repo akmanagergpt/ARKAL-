@@ -45,9 +45,11 @@ field exists. Admission and allocation are C-21 at Phase 8, and a column added
 now for a behaviour that does not exist would be a claim.
 
 ENGINE-NEUTRAL (ARK-REQ-0012). Declarative mapping only - `String`, `Integer`,
-`DateTime`, `JSON` and standard constraints, all rendered for SQLite and
-PostgreSQL alike. No PRAGMA, no raw SQL, no dialect branch. The engine is built
-only by `kernel.persistence`.
+`Boolean`, `DateTime`, `JSON` and standard constraints, all rendered for SQLite
+and PostgreSQL alike. No PRAGMA, no raw SQL, no dialect branch. The engine is
+built only by `kernel.persistence`. A control asserts every mapped column's type
+comes from SQLAlchemy's generic type namespace, so a `sqlalchemy.dialects` type
+fails whether or not anyone remembered to add it to a list.
 """
 
 from __future__ import annotations
@@ -56,6 +58,7 @@ import datetime as dt
 from typing import Final
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -73,6 +76,7 @@ from arkali.kernel.persistence.base import PersistenceBase
 JOB_TABLE: Final[str] = "durable_job"
 CHECKPOINT_TABLE: Final[str] = "job_checkpoint"
 ATTEMPT_TABLE: Final[str] = "job_execution_attempt"
+JOB_TYPE_TABLE: Final[str] = "durable_job_type"
 
 IDENTITY_LENGTH: Final[int] = 64
 FIELD_LENGTH: Final[int] = 200
@@ -83,6 +87,14 @@ STATE_LENGTH: Final[int] = 40
 #: and cannot be widened by changing a default later.
 DEFAULT_MAX_ATTEMPTS: Final[int] = 3
 DEFAULT_ATTEMPT_TIMEOUT_SECONDS: Final[int] = 300
+
+#: How long an attempt may go without proof of life before the execution behind
+#: it is presumed gone. A DIFFERENT term from the attempt timeout: a worker can
+#: stop reporting long before its deadline, and the canonical crash-recovery
+#: rule (`EXECUTION_AND_CAPABILITY.md` section 3) keys on the heartbeat, not on
+#: the deadline. Recorded on the job for the same reason as the other two - the
+#: terms a job was admitted under must survive a restart.
+DEFAULT_HEARTBEAT_TIMEOUT_SECONDS: Final[int] = 60
 
 #: The named constraint that IS the idempotency authority.
 IDEMPOTENCY_CONSTRAINT: Final[str] = "uq_durable_job_idempotency"
@@ -126,6 +138,12 @@ class DurableJobRecord(PersistenceBase):
     #: per attempt as an absolute deadline, so a restart cannot move it.
     attempt_timeout_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=DEFAULT_ATTEMPT_TIMEOUT_SECONDS
+    )
+    #: How long an attempt may go without a heartbeat before recovery presumes
+    #: the execution behind it is gone. Distinct from the attempt timeout above:
+    #: one measures silence, the other measures elapsed work.
+    heartbeat_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=DEFAULT_HEARTBEAT_TIMEOUT_SECONDS
     )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
@@ -214,6 +232,45 @@ class JobExecutionAttempt(PersistenceBase):
     @property
     def is_open(self) -> bool:
         return self.ended_at is None
+
+
+class JobTypeRecord(PersistenceBase):
+    """A declared job type and the durability capabilities it supports.
+
+    THIS ROW IS THE APPLICABILITY DATA. `ARK-REQ-0060`'s Appendix A rule is
+    `job_type.supports_pause == true` "in the job-type contract registry", and
+    this table is that registry. The flag is a persisted declaration, so the
+    answer cannot be derived from a request body, a caller, a UI affordance or
+    the job's current lifecycle state.
+
+    `job_type` IS THE IDENTITY, and it is the same value `durable_job.job_type`
+    already carries - the key idempotency is scoped by. Associating the two by
+    that natural key rather than by a foreign key is deliberate: a foreign key
+    would make registration a *precondition of submitting*, which is admission
+    control, and admission is C-21 at Phase 8. An unregistered type instead
+    fails closed at the point the capability is actually asked about.
+
+    ONE CAPABILITY, NOT A CAPABILITY SYSTEM. `supports_pause` is the only flag
+    canonical authority currently makes evaluable. Fields for capabilities that
+    do not exist yet would be claims, and STRICT compatibility permits adding
+    optional fields later with a defined absent-value meaning.
+
+    NOTHING HERE SCHEDULES. No concurrency limit, worker class, resource
+    profile, queue or priority appears: those are the C-21 worker declaration at
+    Phase 8, and a column added now for a behaviour that does not exist would be
+    a claim.
+    """
+
+    __tablename__ = JOB_TYPE_TABLE
+
+    job_type: Mapped[str] = mapped_column(String(FIELD_LENGTH), primary_key=True)
+    #: Explicit and NOT NULL with no server default, so a type cannot be
+    #: registered without stating the answer. There is no third value: an
+    #: undeclared type is an absent row, not a NULL flag.
+    supports_pause: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    registered_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
 
 
 def _refuse(action: str, identity: str) -> CheckpointImmutabilityViolation:
