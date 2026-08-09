@@ -32,7 +32,12 @@ from pydantic import BaseModel
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.surfaces.command import contracts
-from arkali.surfaces.command.contracts import ErrorResponse
+from arkali.surfaces.command.contracts import (
+    BACKEND_ONLY,
+    BROWSER_SLICE,
+    ROUTE_AUDIENCES,
+    ErrorResponse,
+)
 from arkali.surfaces.command.app import create_app
 from tests.structural.typescript_reader import (
     FRONTEND_SRC,
@@ -81,6 +86,14 @@ def canonical(schema: dict[str, Any]) -> str:
         return "number"
     if kind == "boolean":
         return "boolean"
+    if kind == "object" and not (schema.keys() & {"properties", "additionalProperties"}):
+        # A field the backend declares as deliberately opaque - C-19's job
+        # payload is the only one - reduces to an open record. Narrow on
+        # purpose: an object that constrains its `properties` or its
+        # `additionalProperties` is a real structure whose fields must be
+        # compared, so it still falls through to the refusal below rather than
+        # being flattened into something this control cannot protect.
+        return "Record<string,unknown>"
     raise AssertionError(f"unsupported contract schema fragment: {schema}")
 
 
@@ -196,16 +209,72 @@ class TestRoutesMatchTheBackend:
             f"the frontend calls routes the backend does not serve: {sorted(missing)}"
         )
 
-    def test_the_client_covers_every_route_the_backend_serves(
+    def audiences(self, app: FastAPI) -> dict[tuple[str, str], set[str]]:
+        """Each published route mapped to the audience tags it declares."""
+        return {
+            (method.upper(), path): set(operation.get("tags", ()))
+            for path, operations in app.openapi()["paths"].items()
+            for method, operation in operations.items()
+        }
+
+    def test_every_route_declares_exactly_one_known_audience(
         self, app: FastAPI
     ) -> None:
-        """The slice is meant to be complete: an unused route is a gap, not slack."""
-        published = {
-            (method.upper(), path)
-            for path, operations in app.openapi()["paths"].items()
-            for method in operations
+        """FAILS CLOSED on a route nobody classified.
+
+        Replaces `test_the_client_covers_every_route_the_backend_serves`, whose
+        premise — every backend route is also a browser-slice route — was true
+        for the Phase 5 vertical slice and expired when Package 4 added routes
+        for `ARK-REQ-0027`, a requirement owned by `execution.durable` with
+        `arch, integ` evidence and no `e2e`. Proven stale before replacement:
+        the old assertion failed on exactly the two new routes and on nothing
+        else, while every Phase 5 slice route remained covered (F-0037).
+
+        The audience is not a list in this test. It is declared on the router
+        and read back off the live document, so a route added later with no tag,
+        two tags, or a tag nobody declared fails here instead of choosing its
+        own exemption.
+        """
+        declared = self.audiences(app)
+        assert declared, "no route published; this control would be vacuous"
+        for route, tags in declared.items():
+            known = tags & ROUTE_AUDIENCES
+            assert len(known) == 1, (
+                f"{route} declares audiences {sorted(tags)}; exactly one of "
+                f"{sorted(ROUTE_AUDIENCES)} is required"
+            )
+
+    def test_the_client_covers_every_browser_slice_route(
+        self, app: FastAPI
+    ) -> None:
+        """The surviving half of the old control, and still the real one.
+
+        Within the slice an unused route is a gap, not slack. This is what the
+        replaced assertion was actually protecting, now stated over the routes
+        that genuinely belong to the browser.
+        """
+        slice_routes = {
+            route for route, tags in self.audiences(app).items()
+            if BROWSER_SLICE in tags
         }
-        assert published - self.declared_routes() == set()
+        assert slice_routes, "no browser-slice route found; control is vacuous"
+        assert slice_routes - self.declared_routes() == set()
+
+    def test_the_client_calls_no_backend_only_route(self, app: FastAPI) -> None:
+        """STRICTLY STRONGER than what was replaced.
+
+        The old control could not express this at all. A frontend reaching into
+        a route declared backend-only is drift in the opposite direction, and it
+        would have passed the coverage assertion by making the sets match.
+        """
+        backend_only = {
+            route for route, tags in self.audiences(app).items()
+            if BACKEND_ONLY in tags
+        }
+        assert backend_only, "no backend-only route found; control is vacuous"
+        assert backend_only & self.declared_routes() == set(), (
+            "the browser client calls a route declared backend-only"
+        )
 
     def test_a_renamed_route_would_be_detected(self, app: FastAPI) -> None:
         """NEGATIVE CONTROL: the path comparison is exact, not a prefix match."""

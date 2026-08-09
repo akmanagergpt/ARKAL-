@@ -23,10 +23,12 @@ API and deliberately offers no delete, no update and no bulk operation.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import datetime as dt
+from collections.abc import Callable, Iterator
 from typing import Final
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
@@ -41,6 +43,7 @@ from arkali.control.registry.project.registry import ProjectRegistry
 from arkali.kernel.persistence.migrations import applied_revision
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 from arkali.surfaces.command.contracts import (
+    BROWSER_SLICE,
     CreateProjectRequest,
     CreateRevisionRequest,
     ErrorResponse,
@@ -52,7 +55,13 @@ from arkali.surfaces.command.contracts import (
     RevisionResponse,
     TransitionRequest,
 )
-from arkali.surfaces.command.error_mapping import code_of, message_of, status_for
+from arkali.surfaces.command.error_mapping import (
+    DOMAIN_ERROR_BASE,
+    code_of,
+    message_of,
+    status_for,
+)
+from arkali.surfaces.command.jobs import build_jobs_router
 
 #: The actor this surface presents to the PDP.
 ACTOR: Final[str] = "surfaces.command"
@@ -88,11 +97,21 @@ def _detail(registry: ProjectRegistry, record: ProjectRecord) -> ProjectDetailRe
     )
 
 
-def create_app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
+def create_app(
+    engine: Engine,
+    pdp: PolicyDecisionPoint,
+    clock: Callable[[], dt.datetime] | None = None,
+) -> FastAPI:
     """Build the Command Center API over a real engine and a real PDP.
 
-    Both are injected. There is no default that would let a caller obtain an
-    application backed by something other than the Phase 5 persistence layer.
+    Engine and PDP are injected with no default, so a caller cannot obtain an
+    application backed by something other than the real persistence layer and
+    the real policy authority.
+
+    `clock` is optional and reaches only the durable-job routes, which pass it
+    to C-19. It is typed structurally - a callable returning a datetime - so
+    this module does not import `execution.durable` to name it: `app.py` is at
+    `max_contexts_touched_by_module` and a type import would put it over.
     """
     factory = create_session_factory(engine)
     pep = PolicyEnforcementPoint(pdp, SURFACE)
@@ -122,7 +141,40 @@ def create_app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
             ).model_dump(),
         )
 
-    router = APIRouter(prefix="/api")
+    @app.exception_handler(DOMAIN_ERROR_BASE)
+    def mapped_domain_error(_request: Request, error: Exception) -> JSONResponse:
+        """The mapping, reachable from anywhere a domain error can be raised.
+
+        CLOSES F-0039. `guard()` runs *before* a route's `try`, so a real
+        `PolicyDenied` escaped every handler and surfaced as HTTP 500 even
+        though the table mapped it to 403. Nothing was ever wrongly permitted —
+        the PEP still refused and nothing was written — but the client could
+        not tell a refusal from a broken server, and the control that was
+        supposed to cover this asserted `status_for(PolicyDenied(...)) == 403`,
+        which proves the *table* and never the *route*.
+
+        Registering it here rather than moving each `guard` inside a `try` fixes
+        it once for every route, including ones added later, and leaves an
+        unmapped error propagating exactly as before: `status_for` returning
+        None still means this surface has no opinion, and inventing a status
+        for it would be the failure mode the mapping exists to prevent.
+        """
+        status = status_for(error)
+        if status is None:
+            raise error
+        return JSONResponse(
+            status_code=status,
+            content={
+                "detail": ErrorResponse(
+                    code=code_of(error), message=message_of(error)
+                ).model_dump()
+            },
+        )
+
+    # Every route declares its audience; these are the Phase 5 vertical slice
+    # the browser actually drives, and the contract-drift control requires the
+    # TypeScript client to cover each of them.
+    router = APIRouter(prefix="/api", tags=[BROWSER_SLICE])
 
     @router.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -214,4 +266,10 @@ def create_app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
         return _detail(registry, record)
 
     app.include_router(router)
+    # The durable-job routes are built in their own module and handed the same
+    # session scope, the same policy guard and the same refusal mapping the
+    # routes above use, so there is one enforcement path on this surface rather
+    # than two. They live there because this module already touches three
+    # bounded contexts, which is the whole budget.
+    app.include_router(build_jobs_router(session_scope, guard, refuse, pep, clock))
     return app

@@ -18,7 +18,57 @@ from __future__ import annotations
 
 import datetime as dt
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Final
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+#: Every route this surface serves declares its AUDIENCE as an OpenAPI tag, and
+#: the contract-drift control reads it off the live document.
+#:
+#: ADDED IN PACKAGE 4, closing F-0037. Until Phase 7 every backend route was
+#: also a browser-slice route, so "the client covers every route the backend
+#: serves" was a true and useful statement. Package 4 adds routes for
+#: `ARK-REQ-0027`, which is owned by `execution.durable` with `arch, integ`
+#: evidence and no `e2e` — no Phase 7 requirement is owned by a surface context,
+#: so no frontend obligation exists. The premise expired; the invariant behind
+#: it did not.
+#:
+#: Declaring the audience in the application rather than listing exceptions in a
+#: test keeps the control derived: a route added later with no audience, or with
+#: one nobody declared, FAILS rather than being quietly excused.
+BROWSER_SLICE: Final[str] = "browser-slice"
+BACKEND_ONLY: Final[str] = "backend-only"
+
+#: The complete audience vocabulary. Read by the control, so it cannot drift.
+ROUTE_AUDIENCES: Final[frozenset[str]] = frozenset({BROWSER_SLICE, BACKEND_ONLY})
+
+
+class TransportModel(BaseModel):
+    """Base for every shape crossing this boundary.
+
+    ONE INSTANT, ONE RENDERING (F-0038). Every persisted timestamp in this
+    repository is UTC, but SQLite has no timezone type, so a row read back off
+    the disk returns a *naive* datetime while the same row still live in the
+    session is *aware*. The two serialise differently — `...07Z` against
+    `...07` — so one durable record had two wire representations depending on
+    nothing the caller could see or control. A client comparing, caching or
+    hashing a reference saw drift with no domain meaning behind it.
+
+    Normalising here rather than in each projection is deliberate: a route
+    added later cannot forget, and the rule sits with the boundary it governs.
+    The value is never *converted* — a naive column is already UTC by contract
+    (`kernel.persistence`), so this attaches the timezone it always had and
+    changes no instant.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _stamp_utc(cls, value: Any) -> Any:
+        if isinstance(value, dt.datetime) and value.tzinfo is None:
+            return value.replace(tzinfo=dt.timezone.utc)
+        return value
 
 
 class CreateProjectRequest(BaseModel):
@@ -47,18 +97,14 @@ class TransitionRequest(BaseModel):
     target: str = Field(min_length=1, max_length=40)
 
 
-class RevisionResponse(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
+class RevisionResponse(TransportModel):
     revision_id: str
     sequence: int
     created_at: dt.datetime
     provenance_ref: str | None
 
 
-class ProjectResponse(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
+class ProjectResponse(TransportModel):
     project_id: str
     name: str
     lifecycle_state: str
@@ -67,8 +113,6 @@ class ProjectResponse(BaseModel):
 
 
 class ProjectDetailResponse(ProjectResponse):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
     revisions: tuple[RevisionResponse, ...] = ()
 
 
@@ -107,6 +151,50 @@ class HealthResponse(BaseModel):
 
     status: str
     schema_revision: str | None
+
+
+class EnqueueJobRequest(BaseModel):
+    """What a producer must supply to enqueue one durable job.
+
+    ADDED IN PACKAGE 4 for `ARK-REQ-0027`. These are the three C-19 identities
+    and the job's opaque input, and nothing else. There is deliberately no
+    field for a lifecycle state, an owner, a priority, a queue, a worker class,
+    a deadline or a retry bound: the initial state is derived from the canonical
+    machine, the admission terms are recorded by C-19, and everything else on
+    that list is scheduling, which is C-21 at Phase 8.
+
+    `payload` is opaque here. This surface does not interpret it, does not
+    validate it against a job type's schema and does not execute anything in
+    it — the runtime that eventually executes a job type owns its meaning.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    job_id: str = Field(min_length=1, max_length=64)
+    job_type: str = Field(min_length=1, max_length=200)
+    idempotency_key: str = Field(min_length=1, max_length=200)
+    payload: dict[str, object] = Field(default_factory=dict)
+
+
+class JobReferenceResponse(TransportModel):
+    """A durable reference the caller can come back with.
+
+    The whole point of `ARK-REQ-0027` is that this is what an HTTP request
+    returns *instead of* the work's result. It carries the identity to ask
+    about later and the lifecycle state C-19 recorded, projected as a value.
+
+    NOTHING EXECUTIONAL CROSSES THIS BOUNDARY. No attempt number, owner,
+    heartbeat, deadline, retry count, worker, queue position or scheduling
+    metadata is representable here — partly because exposing them would invite
+    a client to reason about execution, and partly because several of them
+    describe decisions Phase 7 is not entitled to make.
+    """
+
+    job_id: str
+    job_type: str
+    idempotency_key: str
+    lifecycle_state: str
+    created_at: dt.datetime
 
 
 class ErrorResponse(BaseModel):

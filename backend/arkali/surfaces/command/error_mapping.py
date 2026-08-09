@@ -31,15 +31,32 @@ from arkali.control.registry.project.errors import (
     InvalidProjectIdentity,
     UnknownProject,
 )
+from arkali.kernel.contracts.errors import ArkaliError
 from arkali.kernel.contracts.state_machine_errors import (
     ForbiddenTransition,
     IllegalTransition,
     TerminalStateEscape,
     UnknownState,
 )
+from arkali.surfaces.command.job_error_mapping import DURABLE_STATUS_BY_ERROR
+
+#: The one base every mapped refusal derives from, re-exported so the
+#: application can register a handler for it WITHOUT importing
+#: `kernel.contracts` itself: `app.py` sits at `max_contexts_touched_by_module`
+#: and this module already counts that context. A control asserts every mapped
+#: type really is a subclass, so the handler cannot be registered on a base that
+#: misses one.
+DOMAIN_ERROR_BASE: Final[type[Exception]] = ArkaliError
 
 #: Ordered most-specific first: `isinstance` is checked in this order, and
 #: several of these share a base class.
+#:
+#: The durable half is COMPOSED from a same-context sibling rather than written
+#: here, because this module already touches three bounded contexts and that is
+#: the whole budget. The two tables are disjoint - no durable error is a project
+#: error or a state-machine error - so appending cannot shadow an entry above.
+#: `PolicyDenied` stays first regardless, since a refusal by policy is never a
+#: client formatting problem.
 STATUS_BY_ERROR: Final[tuple[tuple[type[Exception], int], ...]] = (
     # A refusal by policy is never a client formatting problem.
     (PolicyDenied, 403),
@@ -53,7 +70,7 @@ STATUS_BY_ERROR: Final[tuple[tuple[type[Exception], int], ...]] = (
     (TerminalStateEscape, 409),
     (ForbiddenTransition, 409),
     (IllegalTransition, 409),
-)
+) + DURABLE_STATUS_BY_ERROR
 
 
 def status_for(error: Exception) -> int | None:
