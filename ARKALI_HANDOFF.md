@@ -234,7 +234,7 @@ repository, the repository wins.
 | 80 | `3d9dfc5` | handoff manifest refreshed after F-0045 (§12 rule) |
 | 81 | `24fb3aa` | **F-0045 REMEDIATION + PHASE 8 SUPERSEDING RE-SCORE** under the scope-limited GOV-001 authorization `RSA-002`. The defective first report is preserved as `phase_8_report_rev1_defective.json`; the superseding report was genuinely re-executed record by record; the acceptance guard was re-proven with the true exit codes (14/14 refused, including G14 which reproduces F-0045 and is refused on C3/C5); the gate was run once and returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, RESCORING PASS. **F-0045 closed with HIGH severity intact. Cumulative verified unchanged at 80. Phase 9 unlocked by the superseding verdict** |
 | 82 | `15542e7` | handoff manifest refreshed after the Phase 8 superseding re-score (§12 rule) |
-| 83 | `PENDING` | **HANDOFF_DRIFT REPAIR (F-0046)** — `check_handoff.py` validated only the machine-readable claims block, so a §12 refresh that updated the YAML and part of the prose reported PASS while §4, §6, §7, §8 and §11 stayed stale. Seven derived narrative controls added; the stale sections re-derived from repository authority ← HEAD at generation |
+| 83 | `279afcc` | **HANDOFF_DRIFT REPAIR (F-0046)** — `check_handoff.py` validated only the machine-readable claims block, so a §12 refresh that updated the YAML and part of the prose reported PASS while §4, §6, §7, §8 and §11 stayed stale. Seven derived narrative controls added; the stale sections re-derived from repository authority ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -490,7 +490,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 24fb3aa9ade2bb8c898b24a37707f51024c3fa76
+head: 279afccd234fecacfc87ab78b7f38f9b488fcc91
 branch: main
 working_tree_clean: true
 
