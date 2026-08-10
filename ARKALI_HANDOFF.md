@@ -128,14 +128,14 @@ repository, the repository wins.
 | Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
-| Phase 8 | **UNLOCKED — NOT_STARTED** ← current work. Execution Scheduler + Worker Contract (C-21). `execution.scheduler` holds no module; Phase 7 asserted its absence with controls rather than assuming it. **Scope must be derived from repository authority before implementation** |
+| Phase 8 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Resource Scheduler + Worker Contracts (C-21). **Package 1 of 3 complete**: `docs/contracts/worker.md`, `execution.scheduler.worker_vocabulary` (canonical classes and dimensions parsed, never transcribed) and `worker_contract` (declaration model and PEP-governed declaration authority). C-21 is INT — no table, no migration, no state machine. **No admission decision exists**; that is Package 2. **No requirement discharged and none claimable** — the register assigns Phase 8 zero entries. No traceability record, phase report or gate run exists |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **75** MANDATORY (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + **3 Phase 6**), reconciled by check C6 against each phase's traceability record |
+| Cumulative verified | **80** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + **5 Phase 7**), reconciled by check C6 against each phase's traceability record. Of the 80, **79 are MANDATORY**: Phase 7's `ARK-REQ-0060` is the one CONDITIONAL discharged so far. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | every finding through **F-0035** is closed |
+| Recorded findings | every finding through **F-0041** is closed |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **91** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). The direction gate now consumes `dependency_rules` rather than modelling it (F-0028). `kernel.contracts.errors` fan-in is **14** of 15. Package 3 hit the 400 logical-line budget on a test module and answered it by decomposition under ADR-0008; Package 4 measured `max_contexts_touched_by_module` **before** writing and decomposed the surface from the first line. **`max_orchestration_depth` is now 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. A further context hop on that chain breaches it and must be decomposed, not excepted. No GATE 8 exception has ever been requested |
@@ -218,7 +218,9 @@ repository, the repository wins.
 | 65 | `872f138` | handoff manifest refreshed after Package 4 (§12 rule) |
 | 66 | `4bd2843` | **PHASE 7 MACHINE ACCEPTANCE** — Package 5: the composed durable journey across six runtimes, real fault-injection evidence at the available tier, `phase_7_traceability.json`, `phase_7_report.json` and one gate run returning `PHASE_ACCEPTED_BY_MACHINE` on the first submission. **5/5 requirements discharged; Phase 8 unlocked** |
 | 67 | `b76b730` | handoff manifest refreshed after Phase 7 acceptance (§12 rule) |
-| 68 | `f98ae16` | **PRE-PHASE-8 GOVERNANCE REPAIR** — F-0040: traceability emptiness is judged against the requirement denominator instead of absolutely, so the four canonical zero-denominator phases (8, 15, 33, 34) can hold an honest record. **Not a phase acceptance and not Phase 8 work**: no scheduler code, no Phase 8 artifact, no gate run ← HEAD at generation |
+| 68 | `f98ae16` | **PRE-PHASE-8 GOVERNANCE REPAIR** — F-0040: traceability emptiness is judged against the requirement denominator instead of absolutely, so the four canonical zero-denominator phases (8, 15, 33, 34) can hold an honest record. **Not a phase acceptance and not Phase 8 work**: no scheduler code, no Phase 8 artifact, no gate run |
+| 69 | `ec65d46` | handoff manifest refreshed after the pre-Phase-8 governance repair (§12 rule) |
+| 70 | `20f9d7e` | **PHASE 8 PACKAGE 1** — C-21 worker contract and worker declarations: `docs/contracts/worker.md`, the parsed worker vocabulary and the PEP-governed declaration authority. `kernel.contracts.error_base` decomposition under ADR-0008 after `errors.py` hit its fan-in budget — no call site changed, no GATE 8 exception. F-0041 opened and closed (two phase titles drifted from the canonical matrix). **Not a phase acceptance**: no admission decision, no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -331,11 +333,27 @@ the identifiers a later graph would need, and nothing more.
 
 ## 9. Next exact action
 
-**Begin Phase 8 Package 1 — the C-21 worker contract and worker declarations.**
-Phase 8 is unlocked and NOT_STARTED. Do not rebuild Phase 7.
+**Begin Phase 8 Package 2 — the admission decision.**
+Package 1 is complete and committed (`20f9d7e`). Do not rebuild it, and do not
+rebuild Phase 7.
 
-The scope derivation is **done** and the one governance question it raised is
-**resolved**. Two facts from it dominate everything Phase 8 does:
+**What Package 1 leaves ready.** `WorkerContract.require(worker_class)` returns
+a validated `WorkerDeclaration` carrying the six canonical dimensions — the
+declared TRUST tier and required isolation properties are exactly what Package
+2's isolation half must consume. The PEP is already injected and every governed
+read is decided under `READ_FILE`; extend that pattern rather than adding a
+second enforcement path. `worker_vocabulary` is the only worker-class authority
+and re-reads the canonical document on every call, so Package 2 must not cache
+a vocabulary either.
+
+**What Package 1 deliberately did not do.** It takes no admission decision,
+resolves no capability, composes no isolation backend and tracks no budget.
+Controls derive the scheduler's public operations and reject any admission-,
+queue-, priority- or fairness-shaped name, so the first admission operation will
+need those controls updated to permit precisely what Package 2 owns and nothing
+more. Update them deliberately; do not delete them.
+
+Two facts from the scope derivation still dominate everything Phase 8 does:
 
 - **Phase 8's requirement denominator is exactly zero.** No register row carries
   Phase 8; `execution.scheduler`'s only registered requirement is
@@ -381,12 +399,23 @@ evidenced through the report's `public_contracts`, `tests_executed` and
 `EvidenceInput` requires a register-validated `requirement_id`, so a C-21
 audit-chain record has no legal anchor — keep contract evidence in the report.
 
-**Two known corrections owed in Package 1.** `docs/contracts/worker.md` does not
-exist and C-21 declares it. And `BUILD_STATE.md`/this manifest call Phase 8
-*"Execution Scheduler + Worker Contract"* while the canonical matrix says
-**"Resource Scheduler + Worker Contracts"** — a naming inaccuracy introduced in
-the Phase 7 acceptance commit; no control reconciles phase titles, so fix it
-rather than assume it is checked.
+**Both corrections owed in Package 1 are done.** `docs/contracts/worker.md` now
+exists and reconciles with the implementation in both directions. The Phase 8
+title is now the canonical **"Resource Scheduler + Worker Contracts"**, and the
+same control caught a second drift nobody was looking for — Phase 6 read
+*"Artifact / Evidence Plane"* against the matrix's *"Evidence Plane +
+Provenance + Artifact Store"*. Both corrected under **F-0041**, and
+`test_every_build_state_phase_title_matches_the_matrix` now reconciles every
+phase both documents name.
+
+**One budget fact changed in Package 1.** `kernel.contracts.errors` was at
+`max_fan_in_per_module` (15) and the scheduler would have been the sixteenth
+importer, so under ADR-0008 the abstract base layer — `ArkaliError`,
+`ContractViolation`, `GovernanceStateError`, `AuthoritativeSourceError` — moved
+to **`kernel.contracts.error_base`**, which `errors.py` re-exports. No call site
+changed and no GATE 8 exception was authored. A context that needs a base error
+type must now import `error_base`; `errors.py` is back at **15 of 15** and has
+no headroom. Note `kernel.contracts.state_machine` is also at **15 of 15**.
 
 **Watch the surfaces controls if the scheduler is ever composed there.**
 `jobs.py` bans the identifier *scheduler* and the import
@@ -593,7 +622,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: f98ae16bcfbf6330b20c4985ce3c73a4eaf64c47
+head: 20f9d7eddf6ff90e73c560141cc4b853161a5acd
 branch: main
 working_tree_clean: true
 
