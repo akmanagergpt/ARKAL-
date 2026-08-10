@@ -128,7 +128,7 @@ repository, the repository wins.
 | Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
-| Phase 8 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first and only** submission (`docs/acceptance/phase_8_report.json`, `phase_8_traceability.json`). C1–C6 PASS; PROTECTED_CORE PASS (no member touched); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 100 edges. Three atomic packages delivering C-21: the declaration, the three-condition admission decision, and final integration. **The first zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B |
+| Phase 8 | **MACHINE-ACCEPTED (SUPERSEDING, under GOV-001 `RSA-002`)** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, with RESCORING PASS. **The FIRST submission was accepted on an inaccurate record** (F-0045, HIGH): it reported two validator runs at exit 0 that returned 11 pass / 1 fail at `bb845d8`, and with the true codes would have been PHASE_BLOCKED on C3/C5. The authority refused to downgrade the finding or leave that acceptance standing; the defective revision is retained as `phase_8_report_rev1_defective.json` and the superseding report was genuinely re-executed record by record. F-0045 closed **with HIGH intact**. Three atomic packages delivering C-21. **Zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B |
 | Phase 9 | **UNLOCKED — NOT_STARTED** ← current work. Provider + Model Runtime (C-11). Matrix prerequisites 4, 6 and 8 all accepted; Gate column empty. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`), unlike Phase 8 — its traceability record must carry real claims |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
@@ -230,7 +230,9 @@ repository, the repository wins.
 | 76 | `3c4cf6b` | handoff manifest refreshed after the pre-Package-3 remediation (§12 rule) |
 | 77 | `bb845d8` | **PHASE 8 MACHINE ACCEPTANCE** — Package 3: the composed C-21 plane, the zero-denominator traceability record (`claims: []`), the C-17 report and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. Thirteen defective acceptance artifacts were proven refused by the checker before the gate was run, each restored and digest-verified. **0/0 requirements discharged; cumulative verified unchanged at 80. Phase 9 unlocked** |
 | 78 | `7a19348` | handoff manifest refreshed after Phase 8 machine acceptance (§12 rule) |
-| 79 | `4be95c7` | **F-0045 OPENED (HIGH)** — post-commit verification found `phase_8_report.json` recorded two validator runs at exit 0 that were stale at the submitted commit; had the true exit codes been recorded the verdict would have been PHASE_BLOCKED. The prose that caused it is corrected and both validators are now genuinely green, but the finding is left OPEN because closing it means re-scoring an accepted phase, which GOV-001 reserves to a recorded human authorization. **Phase 9 must not begin while it is open** ← HEAD at generation |
+| 79 | `4be95c7` | **F-0045 OPENED (HIGH)** — post-commit verification found `phase_8_report.json` recorded two validator runs at exit 0 that were stale at the submitted commit; had the true exit codes been recorded the verdict would have been PHASE_BLOCKED. The prose that caused it is corrected and both validators are now genuinely green, but the finding is left OPEN because closing it means re-scoring an accepted phase, which GOV-001 reserves to a recorded human authorization. **Phase 9 must not begin while it is open** |
+| 80 | `3d9dfc5` | handoff manifest refreshed after F-0045 (§12 rule) |
+| 81 | `24fb3aa` | **F-0045 REMEDIATION + PHASE 8 SUPERSEDING RE-SCORE** under the scope-limited GOV-001 authorization `RSA-002`. The defective first report is preserved as `phase_8_report_rev1_defective.json`; the superseding report was genuinely re-executed record by record; the acceptance guard was re-proven with the true exit codes (14/14 refused, including G14 which reproduces F-0045 and is refused on C3/C5); the gate was run once and returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, RESCORING PASS. **F-0045 closed with HIGH severity intact. Cumulative verified unchanged at 80. Phase 9 unlocked by the superseding verdict** ← HEAD at generation |
 | 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
@@ -332,9 +334,19 @@ package described in §9; it has not begun.
 ## 9. Next exact action
 
 **Begin Phase 9 — Provider + Model Runtime (C-11).**
-Phase 9 is unlocked and NOT_STARTED. Phase 8 is accepted and closed; do not
-rebuild it, and do not re-run its gate — a second run would return
-`AWAITING_RESCORING_AUTHORITY` under GOV-001, which is the rule working.
+Phase 9 is unlocked and NOT_STARTED, by the **superseding** Phase 8 verdict. Do
+not rebuild Phase 8 and do not re-run its gate: `RSA-002` was exhausted by that
+one supersession and is bound to a digest that no longer matches once anything
+changes, so a further run returns `AWAITING_RESCORING_AUTHORITY` — the rule
+working, not a fault.
+
+**Read F-0045 before writing any phase report.** Phase 8's first submission was
+accepted on an inaccurate record: two validator runs were reported at exit 0
+that had not been re-run after a late file was added. The lesson is mechanical,
+not moral — **re-run every recorded command against the exact candidate you are
+submitting, after the last file change**, and never transcribe an earlier
+result. `phase_8_report_rev1_defective.json` is retained so the failure mode
+stays visible.
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15** in the repository-local `.venv`, which is git-ignored. Use
@@ -463,7 +475,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 4be95c751e7410cf999cd8f1a05286208efe887d
+head: 24fb3aa9ade2bb8c898b24a37707f51024c3fa76
 branch: main
 working_tree_clean: true
 
