@@ -5,46 +5,38 @@ Owner: kernel.contracts. Every governance failure raised by ARKALI derives from
 asserted against rather than matched by message text.
 
 Rule: no error type in this taxonomy may be caught and converted into a PASS.
+
+THE ABSTRACT BASE LAYER MOVED TO `error_base` (Phase 8 Package 1). `ArkaliError`,
+`ContractViolation`, `GovernanceStateError` and `AuthoritativeSourceError` are
+defined there and re-exported here, so every existing importer is unchanged. The
+reason is the same one recorded at the foot of this module: this is the taxonomy
+every context must reach, so it accumulates inbound edges until it hits
+`max_fan_in_per_module`, and ADR-0008 answers a budget with decomposition. A
+context declaring its own error types now imports `error_base` and adds no edge
+here.
 """
 
 from __future__ import annotations
 
+from arkali.kernel.contracts.error_base import (
+    ArkaliError,
+    AuthoritativeSourceError,
+    ContractViolation,
+    GovernanceStateError,
+)
 
-class ArkaliError(Exception):
-    """Base of the canonical error taxonomy."""
-
-    code: str = "ARK-ERR-0000"
-
-    def __init__(self, message: str, *, source: str = "") -> None:
-        super().__init__(message)
-        self.message = message
-        self.source = source
-
-    def __str__(self) -> str:
-        base = f"[{self.code}] {self.message}"
-        return f"{base} (source: {self.source})" if self.source else base
-
-
-class ContractViolation(ArkaliError):
-    """A value does not satisfy its declared contract."""
-
-    code = "ARK-ERR-0001"
-
-
-class GovernanceStateError(ArkaliError):
-    """Governance state is missing, malformed or self-contradictory.
-
-    Raised rather than repaired: the Phase Gate Checker must fail closed and
-    must never silently repair governance data.
-    """
-
-    code = "ARK-ERR-0002"
-
-
-class AuthoritativeSourceError(GovernanceStateError):
-    """An authoritative artifact is absent or unparseable."""
-
-    code = "ARK-ERR-0003"
+__all__ = [
+    "ArkaliError",
+    "ArchitectureBudgetError",
+    "AuthoritativeSourceError",
+    "AuthorityConflictError",
+    "ContractViolation",
+    "DependencyDirectionError",
+    "GovernanceStateError",
+    "HumanGateRequired",
+    "PhaseProgressionDenied",
+    "ProtectedCoreViolation",
+]
 
 
 class AuthorityConflictError(GovernanceStateError):
