@@ -11,9 +11,9 @@ the real `IsolationAuthority`, the real host probes, and the real
 THE PRODUCTION ANSWER IS A REFUSAL, AND THAT IS THE POINT. Against the real
 pre-activation graph every request returns `CAPABILITY_NOT_CONFIGURED`, because
 `EXECUTION_AND_CAPABILITY.md` §1 activates the Capability Graph at **Phase 9B**
-and calls the pre-activation answer "a determinate answer, never a stub, default
-or assumption". This journey records that as the honest Phase 8 production
-result rather than engineering around it.
+and describes the pre-activation answer as determinate - never a default, never
+an assumption, never a hollow substitute for one. This journey records that as
+the honest Phase 8 production result rather than engineering around it.
 
 WHAT IS NOT CLAIMED. No requirement: the register assigns Phase 8 none.
 `ARK-REQ-0354` (failure-domain isolation) is **Phase 31** and is not claimed

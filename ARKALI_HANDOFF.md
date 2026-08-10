@@ -134,9 +134,9 @@ repository, the repository wins.
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
 | Cumulative verified | **80** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + **5 Phase 7**), reconciled by check C6 against each phase's traceability record. Of the 80, **79 are MANDATORY**: Phase 7's `ARK-REQ-0060` is the one CONDITIONAL discharged so far. Phase 8 adds none — its denominator is zero |
-| BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
+| BLOCKER / HIGH | **0 / 1** — F-0045 is an open HIGH (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | every finding through **F-0044** is closed |
+| Recorded findings | F-0001–F-0044 are closed. **F-0045 is OPEN (HIGH)** — the Phase 8 report recorded two validator runs at exit 0 that were not in that state when the gate ran. Phase 9 cannot be accepted while it is open |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **100** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Phase 8 Package 2's 466-line scheduler authority test was decomposed under ADR-0008; no GATE 8 exception was requested |
@@ -488,7 +488,7 @@ next_exact_action_phase: "9"
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
 adr_proposed: 0
-open_blocker_high: []
+open_blocker_high: ["F-0045"]
 
 authoritative_sources:
   - docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
