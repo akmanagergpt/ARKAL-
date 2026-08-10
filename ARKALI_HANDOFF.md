@@ -135,7 +135,7 @@ repository, the repository wins.
 | Cumulative verified | **80** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + **5 Phase 7**), reconciled by check C6 against each phase's traceability record. Of the 80, **79 are MANDATORY**: Phase 7's `ARK-REQ-0060` is the one CONDITIONAL discharged so far. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | every finding through **F-0041** is closed |
+| Recorded findings | every finding through **F-0044** is closed |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **100** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Phase 8 Package 2's 466-line scheduler authority test was decomposed under ADR-0008; no GATE 8 exception was requested |
@@ -222,7 +222,10 @@ repository, the repository wins.
 | 69 | `ec65d46` | handoff manifest refreshed after the pre-Phase-8 governance repair (§12 rule) |
 | 70 | `20f9d7e` | **PHASE 8 PACKAGE 1** — C-21 worker contract and worker declarations: `docs/contracts/worker.md`, the parsed worker vocabulary and the PEP-governed declaration authority. `kernel.contracts.error_base` decomposition under ADR-0008 after `errors.py` hit its fan-in budget — no call site changed, no GATE 8 exception. F-0041 opened and closed (two phase titles drifted from the canonical matrix). **Not a phase acceptance**: no admission decision, no Phase 8 artifact, no gate run, no requirement discharged |
 | 71 | `95895d3` | handoff manifest refreshed after Phase 8 Package 1 (§12 rule) |
-| 72 | `ce25410` | **PHASE 8 PACKAGE 2** — the three-condition §4 admission decision: capability, isolation and resource, all required. Production admission returns `CAPABILITY_NOT_CONFIGURED` because Phase 9B has not activated the graph; the mechanism is real and the answer is honest. No cached capability verdict, proven by counting the authority's calls. `test_scheduler_authority.py` hit 466 logical lines and was split under ADR-0008. **Not a phase acceptance**: no allocation, no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
+| 72 | `ce25410` | **PHASE 8 PACKAGE 2** — the three-condition §4 admission decision: capability, isolation and resource, all required. Production admission returns `CAPABILITY_NOT_CONFIGURED` because Phase 9B has not activated the graph; the mechanism is real and the answer is honest. No cached capability verdict, proven by counting the authority's calls. `test_scheduler_authority.py` hit 466 logical lines and was split under ADR-0008. **Not a phase acceptance**: no allocation, no Phase 8 artifact, no gate run, no requirement discharged |
+| 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) |
+| 74 | `f9c983a` | handoff drift repaired after Phase 8 Package 2 |
+| 75 | `d3a0a9b` | **PRE-PACKAGE-3 ENVIRONMENT REMEDIATION** — the repository was installed from its own manifest onto a clean Python **3.13.15** for the first time, which exposed three latent MEDIUM defects. **F-0042**: the real runtime entrypoint imported `uvicorn`, declared in no manifest group — now `uvicorn>=0.52` in `[project].dependencies` by human ruling. **F-0043**: `fastapi.testclient` binds an HTTP backend declared nowhere, so pytest could not COLLECT the suite — now `httpx2>=2.0.0` in the `dev` extra, derived from starlette's own metadata. **F-0044**: a C-17 contract control refused an unchanged contract because Pydantic 2.13 spells `additionalProperties: true` explicitly where 2.8 left it implicit — proven stale before editing, strength unchanged for every real constraint. One derived control now covers the manifest family. **No lockfile created, no accepted evidence edited, no test weakened.** **Not a phase acceptance**: no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
 | 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
@@ -328,6 +331,13 @@ traceability (`claims: []`), the C-17 phase report, and the first machine-
 acceptance submission; Phase 9 unlocks only if it is genuinely earned.**
 Packages 1 (`20f9d7e`) and 2 (`ce25410`) are complete and committed. Do not
 rebuild either, and do not rebuild Phase 7.
+
+**RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
+Python **3.13.15** in the repository-local `.venv`, which is git-ignored. Use
+`.\.venv\Scripts\python.exe` for pytest, mypy, every validator and the gate.
+The system Python 3.12 is NOT canonical (`requires-python = ">=3.13"`), and it
+carries ad-hoc extras that masked F-0042, F-0043 and F-0044 for three phases.
+The repository still has **no Python lockfile**; do not create one.
 
 **What Packages 1 and 2 leave ready.** `AdmissionService.evaluate(request)`
 answers §4 for one request: it resolves the C-21 declaration through the
@@ -626,7 +636,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 3574e04c02baeaf3cb4350ba860eea68d7fcecfc
+head: d3a0a9b13785f748b1ac823d927138c9c06e1596
 branch: main
 working_tree_clean: true
 
