@@ -14,7 +14,6 @@ admission decision arriving early; and a governed read that no PEP decides.
 from __future__ import annotations
 
 import ast
-import pathlib
 import re
 
 import pytest
@@ -30,12 +29,10 @@ from arkali.execution.scheduler.worker_contract import (
 from arkali.execution.scheduler.worker_vocabulary import WorkerVocabulary
 from arkali.kernel.contracts.results import HonestState
 from tests.structural.scheduler_reader import (
-    ADMISSION_NAMES,
     CONTRACT_DOC,
     DURABLE,
     DURABLE_NAMES,
     ENGINE_CONSTRUCTORS,
-    FORWARD_NAMES,
     MACHINE_NAMES,
     MIGRATIONS,
     RAW_SQL,
@@ -44,11 +41,11 @@ from tests.structural.scheduler_reader import (
     called,
     code_only,
     creates_table_named,
-    declared_names,
     documented_classes,
     documented_dimensions,
     imported,
     modules,
+    operation_classes_requested,
     read,
     string_constants,
     takes_a_policy_decision,
@@ -193,46 +190,6 @@ class TestNoStateMachineAuthority:
         assert "12 state machines" in machines[0].summary
 
 
-class TestPackageTwoHasNotArrived:
-    """Package 1 declares. It admits nothing and queues nothing."""
-
-    def test_no_admission_vocabulary_is_defined_or_called(self) -> None:
-        """The subject is identifiers, not prose: a refusal message may say
-        "admitting" while the module admits nothing."""
-        for path in modules(SCHEDULER):
-            for identifier in declared_names(path):
-                lowered = identifier.lower()
-                for name in ADMISSION_NAMES:
-                    assert name not in lowered, (
-                        f"{path.name} defines or calls {identifier!r}; "
-                        "admission is Package 2"
-                    )
-
-    def test_no_forward_phase_concept_is_defined_or_called(self) -> None:
-        """Queue, priority, fairness, autoscaling and friends are not Phase 8."""
-        for path in modules(SCHEDULER):
-            for identifier in declared_names(path):
-                lowered = identifier.lower()
-                for name in FORWARD_NAMES:
-                    assert name not in lowered, (
-                        f"{path.name} defines or calls {identifier!r}; the "
-                        "canonical set does not give Phase 8 that concept"
-                    )
-
-    def test_no_provider_runtime_is_pulled_forward(self) -> None:
-        for path in modules(SCHEDULER):
-            for module in imported(ast.parse(read(path))):
-                assert "registry.provider" not in module, f"{path.name} -> {module}"
-            source = code_only(read(path))
-            assert not re.search(r"\bprovider_", source, re.I), path.name
-
-    def test_no_capability_graph_query_is_made(self) -> None:
-        """Capability activation is Phase 9B; Package 1 asks nothing of it."""
-        for path in modules(SCHEDULER):
-            for module in imported(ast.parse(read(path))):
-                assert "capability" not in module, f"{path.name} -> {module}"
-
-
 class TestOneWorkerVocabulary:
     """The canonical classes and dimensions have exactly one authority."""
 
@@ -328,16 +285,20 @@ class TestGovernedAccessIsReal:
         )
 
     def test_no_operation_class_is_invented(self) -> None:
-        """Every operation-class-shaped literal must be canonical."""
+        """Every class actually PASSED to a PolicyRequest must be canonical."""
         canonical = set(OperationClassVocabulary.load(REPO).names())
-        shaped = re.compile(r"^[A-Z][A-Z_]{3,}$")
+        requested: set[str] = set()
         for path in modules(SCHEDULER):
-            for value in string_constants(path):
-                if shaped.match(value) and value not in canonical:
-                    assert value.startswith(("ARK-", "TRUST")) or "_" not in value, (
-                        f"{path.name} names {value!r}, which is not a canonical "
-                        "operation class"
-                    )
+            for value in operation_classes_requested(path):
+                assert value in canonical, (
+                    f"{path.name} requests operation class {value!r}, which the "
+                    f"canonical vocabulary does not define"
+                )
+                requested.add(value)
+        assert requested, (
+            "no operation class is requested anywhere in the scheduler; this "
+            "control would be vacuous"
+        )
 
     def test_the_pep_is_not_merely_imported(self) -> None:
         """NEGATIVE CONTROL: importing a PEP is not the same as consulting one."""

@@ -8,25 +8,31 @@ All fields above are the `CONTRACT_INVENTORY.md` row for C-21, not a restatement
 Where this document and the code or the canonical set disagree, they win and this
 document is the defect.
 
-## 0. Scope of this revision — Phase 8 Atomic Package 1
+## 0. Scope of this revision — Phase 8 Atomic Package 2
 
-Package 1 delivers the **declaration** half of C-21: what a worker states about
-itself, and the validation that makes the statement canonical. `execution
-.scheduler` now holds `worker_vocabulary` (the canonical classes and dimensions,
-parsed) and `worker_contract` (the declaration model and the declaration
-authority, PEP-governed).
+Package 2 adds the **admission decision** — §7 below. The declaration half from
+Package 1 is unchanged: no dimension was added, removed or reinterpreted, and
+`WorkerDeclaration` is byte-for-byte the same contract.
 
-**Package 1 implements no admission decision.** `EXECUTION_AND_CAPABILITY.md` §4
-admits a job only when its capability resolves other than `NOT_CONFIGURED`, an
-isolation composition satisfies its tier, **and** resource budget is available.
-None of those three is evaluated here. That is **Package 2**, and a structural
-control asserts that no admission-shaped operation exists yet.
+**Two halves, deliberately separate.** §2 and §3 are the *worker declaration
+schema*: what a worker states about itself. §7 is *scheduler admission
+semantics*: what `execution.scheduler` does with that statement. C-21's
+inventory row names both — it is the worker contract, verified by *admission
+tests* — but a consumer that only produces declarations depends on §2/§3 alone.
 
-**No requirement is discharged by this package.** The register assigns Phase 8
+**No requirement is discharged by either package.** The register assigns Phase 8
 **zero** `ARK-REQ` entries, so there is nothing to discharge and nothing is
 claimed. Cumulative verified stays at 80. C-21 is evidenced as a *contract* —
 this document, the controls below, and `public_contracts` in the eventual C-17
 report — and no `ARK-REQ` anchor is fabricated for it.
+
+### Scope of the earlier revision — Phase 8 Atomic Package 1
+
+Package 1 delivered the **declaration** half of C-21: what a worker states about
+itself, and the validation that makes the statement canonical. `execution
+.scheduler` holds `worker_vocabulary` (the canonical classes and dimensions,
+parsed) and `worker_contract` (the declaration model and the declaration
+authority, PEP-governed).
 
 **Not implemented, not claimed, and not represented by an unused field:** queue
 ordering, priority, fairness, autoscaling, worker lifecycle state, scheduler
@@ -166,19 +172,91 @@ Codes are allocated from 0081 upward; 0070–0080 belong to `execution.durable`.
 | `ARK-ERR-0083` | `ForgedIsolationRequirement` | a required property the canonical set does not define |
 | `ARK-ERR-0084` | `DuplicateWorkerDeclaration` | a class is declared twice |
 | `ARK-ERR-0085` | `UndeclaredWorkerClass` | a canonical class with no declaration is required |
+| `ARK-ERR-0087` | `InvalidResourceAvailability` | an availability snapshot reports an impossible value |
 
 An unknown TRUST tier is **not** in this table: it raises
 `control.isolation`'s `TrustTierViolation`, because that context owns the
 vocabulary.
 
-## 7. What Packages 2 and 3 add
+## 7. Scheduler admission semantics
 
-**Package 2** adds the admission decision: live capability resolution, isolation
-satisfaction against the declared tier, and resource-budget availability — all
-three required, with an honest `NOT_CONFIGURED` outcome while Phase 9B is
-unbuilt, no cached capability verdict, no durable-job mutation and no
-scheduler → durable import.
+This section describes what `execution.scheduler` **does** with a declaration.
+It is not part of the declaration schema: a worker producing a §2 declaration
+conforms to C-21 whether or not it is ever submitted for admission.
 
-**Package 3** adds final integration and evidence, a zero-requirement
-traceability record (`claims: []` against an empty denominator), the C-17 report
-and the machine gate — only if earned.
+`EXECUTION_AND_CAPABILITY.md` §4 is the sole authority: a job is admitted only
+when **(a)** its capability resolves other than `NOT_CONFIGURED`, **(b)** an
+isolation composition satisfies its tier, and **(c)** resource budget is
+available. **All three are required.** There is no fourth condition.
+
+| Outcome | Meaning |
+|---|---|
+| `ADMITTED` | all three canonical conditions hold |
+| `CAPABILITY_NOT_CONFIGURED` | condition (a) — the capability did not resolve |
+| `ISOLATION_UNSATISFIED` | condition (b) — the declared tier or a declared property is not satisfiable |
+| `RESOURCE_UNAVAILABLE` | condition (c) — the concurrency limit is reached or the profile is unavailable |
+
+Exactly one member per condition, plus the one way all three can hold. The
+decision is a returned value, not a lifecycle: it has no transitions and no
+persistence, and `execution.scheduler` still declares no state machine.
+
+### 7.1 The capability predicate is the canonical one, not a stricter one
+
+Condition (a) is implemented as `state is not NOT_CONFIGURED`, which is §4's
+wording exactly. It is deliberately **not** narrowed to `state is PASS`: that
+would be a rule the canonical set does not state, and inventing a stricter rule
+is as much an invention as a weaker one. Post-activation resolution semantics
+belong to **Phase 9B**, which owns the graph.
+
+### 7.2 Before Phase 9B, production admission cannot succeed
+
+§1 delivers the Capability Graph schema at Phase 3 and activates it at **Phase
+9B**; before activation every query returns `NOT_CONFIGURED`, "a determinate
+answer, never a stub, default or assumption". Production admission therefore
+returns `CAPABILITY_NOT_CONFIGURED` for every request, and **that is designed
+behaviour, not a stub**. The mechanism is real and complete; the answer is
+honest.
+
+The `ADMITTED` path is exercised only with a test-only resolver implementing the
+same question. A control asserts that no module under `backend/arkali/` outside
+`control.capability` answers `can_perform`, so that resolver cannot be
+substituted into production.
+
+### 7.3 No cached capability verdict
+
+§1 names `execution.scheduler` (Phase 8) as a consumer that must handle
+`NOT_CONFIGURED` **and must not cache capability verdicts**. The evaluator
+therefore holds the *resolver* and never a result: it has exactly one attribute,
+no memoisation and no "last answer", and every evaluation is a fresh question.
+A control counts the authority's calls rather than the caller's, because calling
+twice proves nothing about whether the authority was asked twice.
+
+### 7.4 Evaluating admission changes nothing
+
+Admission is a **test**, not an allocation. Nothing is reserved, claimed,
+assigned, dispatched, queued, prioritised or started; no capacity is consumed;
+no durable job is read or written. Evaluating the same request twice returns the
+same answer and leaves the availability snapshot untouched. Availability is a
+frozen input supplied per evaluation, not a resource universe this context owns.
+
+### 7.5 A policy denial is not an admission outcome
+
+Every admission evaluation passes the same injected PEP under `READ_FILE`, and
+the decision is taken **before** any condition is evaluated. A denial raises
+`PolicyDenied` and is never reclassified as a capability, isolation or resource
+verdict: the three outcomes mean the canonical conditions were evaluated and one
+did not hold, while a denial means the evaluation was not permitted at all.
+
+### 7.6 Evaluation order is implementation behaviour
+
+§4 states a conjunction and defines no order. The implementation evaluates
+capability, then isolation, then resource, and short-circuits — a deterministic
+choice that affects only *which* refusal is reported when more than one condition
+fails, never *whether* a request is admitted. The conjunction, not the order, is
+what is canonical.
+
+## 8. What Package 3 adds
+
+Final integration and evidence, a zero-requirement traceability record
+(`claims: []` against an empty denominator), the C-17 report and the machine
+gate — only if earned.

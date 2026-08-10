@@ -92,6 +92,17 @@ class DuplicateWorkerDeclaration(ContractViolation):
     code = "ARK-ERR-0084"
 
 
+class InvalidResourceAvailability(ContractViolation):
+    """An availability snapshot reports a value that cannot be true.
+
+    Refused rather than clamped. A negative in-flight count read as spare
+    capacity would admit work on the strength of a caller's arithmetic bug,
+    which is the fail-open direction.
+    """
+
+    code = "ARK-ERR-0087"
+
+
 class UndeclaredWorkerClass(ContractViolation):
     """An operation needs a worker class's declaration and none was declared.
 

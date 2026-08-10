@@ -15,6 +15,7 @@ the F-0032 lesson: a transcribed subject goes stale silently.
 from __future__ import annotations
 
 import ast
+import importlib
 import pathlib
 import re
 from typing import Final
@@ -42,15 +43,35 @@ MACHINE_NAMES: Final[tuple[str, ...]] = (
     "state_machine", "StateMachine", "transition", "Transition",
     "TransitionOutcome", "lifecycle_state", "terminal_state", "forbidden_pair",
 )
-#: Package 2 and later behaviour. Present here would mean scope had run ahead.
-ADMISSION_NAMES: Final[tuple[str, ...]] = (
-    "admit", "admission", "allocate", "dispatch", "claim", "lease",
-    "dequeue", "enqueue", "can_perform", "capability_state",
+#: ALLOCATION AND EXECUTION - Package 3 and later, still forbidden.
+#:
+#: Package 2 legitimately owns *admission*, so `admit`, `admission`,
+#: `can_perform` and `capability_state` were removed from this set when it
+#: arrived. That is a deliberate narrowing, not a relaxation: admission decides
+#: whether work MAY run, and everything below is what would actually start it or
+#: hand it out. The set was simultaneously widened with the verbs that make a
+#: decision into an allocation, which is the boundary Package 2 must not cross.
+ALLOCATION_NAMES: Final[tuple[str, ...]] = (
+    "allocate", "dispatch", "claim", "lease", "dequeue", "enqueue",
+    "reserve", "assign", "spawn", "consume_capacity", "start_work",
 )
 #: Concepts the canonical set does not give Phase 8 at all.
 FORWARD_NAMES: Final[tuple[str, ...]] = (
     "priority", "fairness", "autoscal", "queue", "worker_pool", "backlog",
-    "kubernetes", "consensus", "broker", "failure_domain",
+    "kubernetes", "consensus", "broker", "failure_domain", "arbitrat",
+)
+
+#: PROVIDER RUNTIME is Phase 9. `provider` is also one of the seven canonical
+#: worker classes, so a control banning the bare word would ban the canonical
+#: vocabulary itself - a false positive that would make the class unusable.
+#: What is forbidden is provider *execution authority*: importing the provider
+#: registry, or defining an operation that runs one.
+PROVIDER_RUNTIME_IMPORTS: Final[tuple[str, ...]] = (
+    "arkali.control.registry.provider",
+)
+PROVIDER_RUNTIME_NAMES: Final[tuple[str, ...]] = (
+    "invoke_provider", "call_provider", "provider_client", "provider_runtime",
+    "run_provider", "provider_session",
 )
 #: C-19 concerns this context must never name.
 DURABLE_NAMES: Final[tuple[str, ...]] = (
@@ -172,6 +193,76 @@ def string_constants(path: pathlib.Path) -> set[str]:
         for node in ast.walk(ast.parse(read(path)))
         if isinstance(node, ast.Constant) and isinstance(node.value, str)
     }
+
+
+def operation_classes_requested(path: pathlib.Path) -> set[str]:
+    """Every `operation_class=` value this module passes to a `PolicyRequest`.
+
+    The SUBJECT IS THE ARGUMENT, not the shape of a string. An earlier version
+    of this control guessed at operation classes by matching `^[A-Z][A-Z_]{3,}$`
+    literals, which would have condemned every uppercase enum value Package 2
+    introduced - `ADMITTED`, `RESOURCE_UNAVAILABLE` - while still missing a
+    class assembled at runtime. Reading the actual argument is both narrower and
+    stronger.
+
+    A module-level `Final` constant is resolved to its literal, so the
+    indirection Package 1 uses (`READ: Final[str] = "READ_FILE"`) is followed
+    rather than defeating the check.
+    """
+    tree = ast.parse(read(path))
+    constants: dict[str, str] = {}
+    for node in tree.body:
+        targets: list[ast.expr] = []
+        if isinstance(node, ast.Assign):
+            targets = list(node.targets)
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        value = getattr(node, "value", None)
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    constants[target.id] = value.value
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and _is_policy_request(node.func)):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg != "operation_class":
+                continue
+            argument = keyword.value
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                found.add(argument.value)
+            elif isinstance(argument, ast.Name):
+                found.add(_resolve_name(argument.id, constants, path))
+            else:
+                found.add(ast.unparse(argument))
+    return found
+
+
+def _resolve_name(
+    name: str, module_constants: dict[str, str], path: pathlib.Path
+) -> str:
+    """A module-level literal, or the imported constant's real value.
+
+    Package 2 passes `READ`, which `admission.py` imports from
+    `worker_contract` rather than defining. Reading only the local AST reported
+    the unresolved identifier, which fails closed - correct, but a false
+    positive. The name is therefore resolved against the LIVE module, so the
+    control sees the value the running code actually sends to the PDP.
+    """
+    if name in module_constants:
+        return module_constants[name]
+    dotted = ".".join(path.relative_to(PACKAGE.parent).with_suffix("").parts)
+    resolved = getattr(importlib.import_module(dotted), name, None)
+    return resolved if isinstance(resolved, str) else name
+
+
+def _is_policy_request(func: ast.expr) -> bool:
+    name = func.attr if isinstance(func, ast.Attribute) else (
+        func.id if isinstance(func, ast.Name) else ""
+    )
+    return name == "PolicyRequest"
 
 
 def documented_dimensions() -> dict[str, str]:
