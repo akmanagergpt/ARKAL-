@@ -228,7 +228,9 @@ repository, the repository wins.
 | 74 | `f9c983a` | handoff drift repaired after Phase 8 Package 2 |
 | 75 | `d3a0a9b` | **PRE-PACKAGE-3 ENVIRONMENT REMEDIATION** — the repository was installed from its own manifest onto a clean Python **3.13.15** for the first time, which exposed three latent MEDIUM defects. **F-0042**: the real runtime entrypoint imported `uvicorn`, declared in no manifest group — now `uvicorn>=0.52` in `[project].dependencies` by human ruling. **F-0043**: `fastapi.testclient` binds an HTTP backend declared nowhere, so pytest could not COLLECT the suite — now `httpx2>=2.0.0` in the `dev` extra, derived from starlette's own metadata. **F-0044**: a C-17 contract control refused an unchanged contract because Pydantic 2.13 spells `additionalProperties: true` explicitly where 2.8 left it implicit — proven stale before editing, strength unchanged for every real constraint. One derived control now covers the manifest family. **No lockfile created, no accepted evidence edited, no test weakened.** **Not a phase acceptance**: no Phase 8 artifact, no gate run, no requirement discharged |
 | 76 | `3c4cf6b` | handoff manifest refreshed after the pre-Package-3 remediation (§12 rule) |
-| 77 | `bb845d8` | **PHASE 8 MACHINE ACCEPTANCE** — Package 3: the composed C-21 plane, the zero-denominator traceability record (`claims: []`), the C-17 report and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. Thirteen defective acceptance artifacts were proven refused by the checker before the gate was run, each restored and digest-verified. **0/0 requirements discharged; cumulative verified unchanged at 80. Phase 9 unlocked** ← HEAD at generation |
+| 77 | `bb845d8` | **PHASE 8 MACHINE ACCEPTANCE** — Package 3: the composed C-21 plane, the zero-denominator traceability record (`claims: []`), the C-17 report and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. Thirteen defective acceptance artifacts were proven refused by the checker before the gate was run, each restored and digest-verified. **0/0 requirements discharged; cumulative verified unchanged at 80. Phase 9 unlocked** |
+| 78 | `7a19348` | handoff manifest refreshed after Phase 8 machine acceptance (§12 rule) |
+| 79 | `4be95c7` | **F-0045 OPENED (HIGH)** — post-commit verification found `phase_8_report.json` recorded two validator runs at exit 0 that were stale at the submitted commit; had the true exit codes been recorded the verdict would have been PHASE_BLOCKED. The prose that caused it is corrected and both validators are now genuinely green, but the finding is left OPEN because closing it means re-scoring an accepted phase, which GOV-001 reserves to a recorded human authorization. **Phase 9 must not begin while it is open** ← HEAD at generation |
 | 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
@@ -461,7 +463,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: bb845d8f8153b724c4baf9939061ae90405279a8
+head: 4be95c751e7410cf999cd8f1a05286208efe887d
 branch: main
 working_tree_clean: true
 
