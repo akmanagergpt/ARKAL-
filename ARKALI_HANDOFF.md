@@ -128,7 +128,7 @@ repository, the repository wins.
 | Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
-| Phase 8 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Resource Scheduler + Worker Contracts (C-21). **Package 1 of 3 complete**: `docs/contracts/worker.md`, `execution.scheduler.worker_vocabulary` (canonical classes and dimensions parsed, never transcribed) and `worker_contract` (declaration model and PEP-governed declaration authority). C-21 is INT — no table, no migration, no state machine. **No admission decision exists**; that is Package 2. **No requirement discharged and none claimable** — the register assigns Phase 8 zero entries. No traceability record, phase report or gate run exists |
+| Phase 8 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Resource Scheduler + Worker Contracts (C-21). **Packages 1 and 2 of 3 complete.** Package 1: `docs/contracts/worker.md`, `worker_vocabulary` (canonical classes and dimensions parsed, never transcribed) and `worker_contract` (declaration model, PEP-governed). Package 2: the three-condition §4 admission decision — capability, isolation, resource, all required — decomposed across `capability_admission`, `isolation_admission`, `resource_admission` and `admission`. C-21 is INT — no table, no migration, no state machine, no allocation. **Production admission returns `CAPABILITY_NOT_CONFIGURED` for every request** because Phase 9B has not activated the Capability Graph; that is designed behaviour, not a stub. **No requirement discharged and none claimable** — the register assigns Phase 8 zero entries. No traceability record, phase report or gate run exists |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -220,7 +220,9 @@ repository, the repository wins.
 | 67 | `b76b730` | handoff manifest refreshed after Phase 7 acceptance (§12 rule) |
 | 68 | `f98ae16` | **PRE-PHASE-8 GOVERNANCE REPAIR** — F-0040: traceability emptiness is judged against the requirement denominator instead of absolutely, so the four canonical zero-denominator phases (8, 15, 33, 34) can hold an honest record. **Not a phase acceptance and not Phase 8 work**: no scheduler code, no Phase 8 artifact, no gate run |
 | 69 | `ec65d46` | handoff manifest refreshed after the pre-Phase-8 governance repair (§12 rule) |
-| 70 | `20f9d7e` | **PHASE 8 PACKAGE 1** — C-21 worker contract and worker declarations: `docs/contracts/worker.md`, the parsed worker vocabulary and the PEP-governed declaration authority. `kernel.contracts.error_base` decomposition under ADR-0008 after `errors.py` hit its fan-in budget — no call site changed, no GATE 8 exception. F-0041 opened and closed (two phase titles drifted from the canonical matrix). **Not a phase acceptance**: no admission decision, no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
+| 70 | `20f9d7e` | **PHASE 8 PACKAGE 1** — C-21 worker contract and worker declarations: `docs/contracts/worker.md`, the parsed worker vocabulary and the PEP-governed declaration authority. `kernel.contracts.error_base` decomposition under ADR-0008 after `errors.py` hit its fan-in budget — no call site changed, no GATE 8 exception. F-0041 opened and closed (two phase titles drifted from the canonical matrix). **Not a phase acceptance**: no admission decision, no Phase 8 artifact, no gate run, no requirement discharged |
+| 71 | `95895d3` | handoff manifest refreshed after Phase 8 Package 1 (§12 rule) |
+| 72 | `ce25410` | **PHASE 8 PACKAGE 2** — the three-condition §4 admission decision: capability, isolation and resource, all required. Production admission returns `CAPABILITY_NOT_CONFIGURED` because Phase 9B has not activated the graph; the mechanism is real and the answer is honest. No cached capability verdict, proven by counting the authority's calls. `test_scheduler_authority.py` hit 466 logical lines and was split under ADR-0008. **Not a phase acceptance**: no allocation, no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -333,25 +335,38 @@ the identifiers a later graph would need, and nothing more.
 
 ## 9. Next exact action
 
-**Begin Phase 8 Package 2 — the admission decision.**
-Package 1 is complete and committed (`20f9d7e`). Do not rebuild it, and do not
-rebuild Phase 7.
+**Begin Phase 8 Package 3 — final integration and evidence, zero-requirement
+traceability (`claims: []`), the C-17 phase report, and the first machine-
+acceptance submission; Phase 9 unlocks only if it is genuinely earned.**
+Packages 1 (`20f9d7e`) and 2 (`ce25410`) are complete and committed. Do not
+rebuild either, and do not rebuild Phase 7.
 
-**What Package 1 leaves ready.** `WorkerContract.require(worker_class)` returns
-a validated `WorkerDeclaration` carrying the six canonical dimensions — the
-declared TRUST tier and required isolation properties are exactly what Package
-2's isolation half must consume. The PEP is already injected and every governed
-read is decided under `READ_FILE`; extend that pattern rather than adding a
-second enforcement path. `worker_vocabulary` is the only worker-class authority
-and re-reads the canonical document on every call, so Package 2 must not cache
-a vocabulary either.
+**What Packages 1 and 2 leave ready.** `AdmissionService.evaluate(request)`
+answers §4 for one request: it resolves the C-21 declaration through the
+PEP-governed `WorkerContract`, asks `control.capability` live, asks
+`control.isolation` live, and applies the pure resource test to a caller-supplied
+availability snapshot. Every refusal carries the refusing authority's own reason.
+Package 3 composes and evidences this; it should not need to change it.
 
-**What Package 1 deliberately did not do.** It takes no admission decision,
-resolves no capability, composes no isolation backend and tracks no budget.
-Controls derive the scheduler's public operations and reject any admission-,
-queue-, priority- or fairness-shaped name, so the first admission operation will
-need those controls updated to permit precisely what Package 2 owns and nothing
-more. Update them deliberately; do not delete them.
+**The traceability record is `claims: []`, and that is the only truthful shape.**
+`ark_req_ids_closed` is `[]` too. This is legal because and only because the
+denominator is empty — F-0040's repair made C6 judge emptiness against the
+denominator rather than absolutely, and it now refuses a non-empty record against
+an empty denominator just as hard as the reverse. **No synthetic claim, no
+contract-id-as-requirement claim, no foreign-phase claim.** Cumulative verified
+stays **80**.
+
+**Report the capability position honestly.** Production admission returns
+`CAPABILITY_NOT_CONFIGURED` for every request, because Phase 9B has not
+activated the graph. State that plainly; never present the test-only-resolver
+success path as production capability. `ARK-REQ-0354` is **Phase 31** and must be
+named NOT CLAIMED.
+
+**Evidence comes from the test tier.** A `scheduler → evidence.*` production edge
+measures depth 5 and a control now asserts its absence. C-15's `EvidenceInput`
+requires a register-validated `requirement_id`, so C-21 has no legal audit-chain
+anchor — evidence C-21 through the report's `public_contracts`,
+`tests_executed` and `evidence_created`, exactly as Phases 6 and 7 did.
 
 Two facts from the scope derivation still dominate everything Phase 8 does:
 
@@ -622,7 +637,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 20f9d7eddf6ff90e73c560141cc4b853161a5acd
+head: ce2541026e25689b2f8c3b2b2830143b6bb1bfad
 branch: main
 working_tree_clean: true
 
