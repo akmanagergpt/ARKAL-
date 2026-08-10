@@ -10,23 +10,51 @@ readme = "../README.md"
 requires-python = ">=3.13"
 license = { text = "Proprietary" }
 
-# Canonical frozen technology direction (MASTER_SPECIFICATION §Frozen technology
-# direction). Versions are declared here in Phase 1; nothing is installed and no
-# runtime capability is implemented until Phase 2 and later.
+# The first four entries are the canonical frozen technology direction
+# (MASTER_SPECIFICATION §Frozen technology direction: "Python 3.13, FastAPI,
+# Pydantic v2, SQLAlchemy 2.x, Alembic"). Their versions were declared in Phase 1.
+#
+# `uvicorn` is NOT part of that canonical line, and is declared here for a
+# different and explicit reason (F-0042). `scripts/run_command_center.py` is the
+# real runtime entrypoint and the T10 browser-evidence harness; it imports
+# uvicorn directly and serves the application with it. Until Phase 8 the
+# repository declared it nowhere, so a canonical install produced an entrypoint
+# that could not start and an e2e tier that could not be reproduced, while
+# `EV-0048` records the accepted Phase 5 journey as running against "a real
+# uvicorn-served surfaces.command process".
+#
+# The floor follows this file's existing major.minor policy and is DERIVED, not
+# chosen: uvicorn 0.52.1 is the version mechanically verified on Python 3.13
+# during ARKALI LIVE CHECKPOINT 1. No lockfile exists in this repository and
+# none is introduced here.
 dependencies = [
     "fastapi>=0.115",
     "pydantic>=2.9",
     "sqlalchemy>=2.0",
     "alembic>=1.13",
+    "uvicorn>=0.52",
 ]
 
 [project.optional-dependencies]
+# Harness tooling. None of this is in the canonical frozen technology direction;
+# it is what the verification tiers need in order to run.
+#
+# `httpx2` is the HTTP backend `starlette.testclient` binds, and therefore what
+# `fastapi.testclient.TestClient` needs (F-0043). Four test modules use that
+# client, so without it pytest cannot even COLLECT the suite. It belongs here
+# rather than in `dependencies` because no module under `backend/arkali/` imports
+# `TestClient` or `httpx` - it is test-only, and shipping it to every install
+# would overstate what the product needs. The name and floor are DERIVED from
+# starlette's own metadata (`httpx2>=2.0.0; extra == 'full'`) and from its
+# `testclient` import, which binds `httpx2` and treats plain `httpx` as
+# deprecated; neither is chosen by us.
 dev = [
     "pytest>=8.3",
     "pytest-cov>=5.0",
     "mypy>=1.11",
     "ruff>=0.6",
     "pyyaml>=6.0",
+    "httpx2>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]

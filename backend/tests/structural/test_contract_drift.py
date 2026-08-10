@@ -86,13 +86,33 @@ def canonical(schema: dict[str, Any]) -> str:
         return "number"
     if kind == "boolean":
         return "boolean"
-    if kind == "object" and not (schema.keys() & {"properties", "additionalProperties"}):
+    if (
+        kind == "object"
+        and "properties" not in schema
+        and schema.get("additionalProperties", True) is True
+    ):
         # A field the backend declares as deliberately opaque - C-19's job
         # payload is the only one - reduces to an open record. Narrow on
         # purpose: an object that constrains its `properties` or its
         # `additionalProperties` is a real structure whose fields must be
         # compared, so it still falls through to the refusal below rather than
         # being flattened into something this control cannot protect.
+        #
+        # F-0044. The predecessor asked whether the KEY `additionalProperties`
+        # was present, which conflated "the key exists" with "the key
+        # constrains". `additionalProperties: true` is the explicit spelling of
+        # *unconstrained* - exactly the case this branch exists to accept.
+        # Pydantic 2.8 rendered `dict[str, object]` as `{type: object}` and
+        # Pydantic 2.13 renders the identical declaration as
+        # `{type: object, additionalProperties: true}`, so the control began
+        # refusing a contract that had not changed. The backend field
+        # (`contracts.py: payload: dict[str, object]`) and the frontend types
+        # are both untouched since `975b1df`; only the serialiser's spelling
+        # moved.
+        #
+        # STRENGTH IS UNCHANGED for every real constraint: `false` (a closed
+        # object) and a schema-valued `additionalProperties` both still fall
+        # through to the refusal, as does any object declaring `properties`.
         return "Record<string,unknown>"
     raise AssertionError(f"unsupported contract schema fragment: {schema}")
 
