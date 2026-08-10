@@ -219,6 +219,8 @@ def validate(repo: pathlib.Path, handoff_text: str,
     report.check("NEXT EXACT ACTION targets the unlocked phase",
                  next_phase, truth["unlocked_phase"])
 
+    check_narrative(repo, handoff_text, report)
+
     # the session prompt must exist and must not leak secrets
     prompt = session_prompt if session_prompt is not None else SESSION_PROMPT
     report.assert_true("new-session prompt present", prompt.is_file())
@@ -231,6 +233,155 @@ def validate(repo: pathlib.Path, handoff_text: str,
         report.assert_true("new-session prompt carries no secret or personal data",
                            leaked is None, leaked.group(0) if leaked else "")
     return report
+
+
+#: The heading of the section that describes the phase currently being worked.
+#: Matched by ROLE, not by number, so the section can be renumbered.
+_CURRENT_PHASE_HEADING = re.compile(
+    r"^##\s*\d+\.\s*Current phase contract\s*[-—–]\s*Phase\s*(\S+)\s*$", re.M
+)
+#: The single marker that says which commit a handoff revision was generated at.
+_HEAD_MARKER = "HEAD at generation"
+#: A commit id cited in the accepted-commit-history ledger.
+_LEDGER_COMMIT = re.compile(r"^\|\s*\d+\s*\|\s*`([0-9a-f]{7,40})`\s*\|", re.M)
+
+
+def _section(text: str, heading_pattern: str) -> str:
+    """The body of one `## ` section, or "" when it is absent."""
+    match = re.search(heading_pattern, text, re.M)
+    if match is None:
+        return ""
+    rest = text[match.end():]
+    end = re.search(r"^## ", rest, re.M)
+    return rest[: end.start()] if end else rest
+
+
+def check_narrative(repo: pathlib.Path, text: str, report: Report) -> None:
+    """Derived checks over the PROSE, not only the machine-readable claims.
+
+    WHY THIS EXISTS (F-0046). Every check above reads the `ARKALI-HANDOFF-CLAIMS`
+    block. Nothing read the document around it, so a refresh that updated the
+    YAML and whichever prose the author happened to remember still reported
+    `PASS` - and the handoff simultaneously said Phase 8 was accepted at the top
+    and "IN PROGRESS, NOT ACCEPTED" in its own current-phase section, carried two
+    `HEAD at generation` markers naming different commits, and described the
+    canonical interpreter as absent while running on it.
+
+    NOTHING HERE NAMES A PHASE, A VERSION OR A COMMIT. Every subject is derived
+    from `GovernanceState`, the register, `pyproject.toml`, the filesystem and
+    git, so these controls follow the repository instead of expiring with it.
+    """
+    from arkali.acceptance.governance_state import GovernanceState
+
+    state = GovernanceState.load(repo)
+    current = state.current_work_phase()
+
+    # -- exactly one generation marker, naming the recorded head ---------------
+    markers = [line for line in text.splitlines() if _HEAD_MARKER in line]
+    report.assert_true(
+        "exactly one HEAD-at-generation marker",
+        len(markers) == 1,
+        f"found {len(markers)}",
+    )
+
+    # -- the ledger must be a set, and must reach the recorded head ------------
+    ledger = _section(text, r"^##\s*\d+\.\s*Accepted commit history\s*$")
+    cited = _LEDGER_COMMIT.findall(ledger)
+    duplicated = sorted({c for c in cited if cited.count(c) > 1})
+    report.assert_true(
+        "no commit is cited twice in the accepted-commit history",
+        not duplicated,
+        str(duplicated),
+    )
+    # The ledger must reach the commit the handoff was GENERATED at, not the
+    # live HEAD: a §12 refresh commit cannot cite its own sha, which is the same
+    # reason `check_head` accepts a governed-clean ancestor.
+    recorded = str(parse_claims(text).get("head", ""))
+    reachable = any(recorded.startswith(c) for c in cited if c)
+    report.assert_true(
+        "the accepted-commit history reaches the recorded head",
+        reachable or not cited,
+        f"recorded head {recorded[:10]} is absent from {len(cited)} ledger rows",
+    )
+
+    # -- the current-phase section must describe the phase actually current ----
+    heading = _CURRENT_PHASE_HEADING.search(text)
+    report.assert_true(
+        "a current-phase contract section exists", heading is not None
+    )
+    if heading is not None and current is not None:
+        report.check(
+            "the current-phase section names the current work phase",
+            heading.group(1), current,
+        )
+        body = _section(text, _CURRENT_PHASE_HEADING.pattern)
+        declared = state.phase(current).declared_state.value
+        report.assert_true(
+            "the current-phase section states that phase's declared state",
+            declared.replace("_", " ") in body.replace("_", " ").upper()
+            or declared in body,
+            f"expected {declared!r} in the section body",
+        )
+
+    # -- an accepted phase may not be described as unaccepted ------------------
+    if heading is not None:
+        body = _section(text, _CURRENT_PHASE_HEADING.pattern).upper()
+        accepted = {p for p, s in state.phases.items() if s.is_accepted}
+        contradicted = sorted(
+            p for p in accepted if re.search(rf"PHASE {re.escape(p)}\b[^.]{{0,80}}NOT ACCEPTED", body)
+        )
+        report.assert_true(
+            "no accepted phase is described as unaccepted in the current section",
+            not contradicted,
+            str(contradicted),
+        )
+
+    # -- the canonical interpreter must not be reported absent while satisfied -
+    required = _required_python(repo)
+    running = ".".join(str(p) for p in sys.version_info[:2])
+    environment = _section(text, r"^##\s*\d+\.\s*Current environment\s*$").upper()
+    satisfied = _at_least(running, required) if required else False
+    stale_absent = bool(
+        required
+        and satisfied
+        and re.search(
+            rf"PYTHON {re.escape(required)}[^|]*\|\s*ABSENT", environment
+        )
+    )
+    report.assert_true(
+        "the environment section does not report the canonical interpreter absent",
+        not stale_absent,
+        f"requires-python >= {required}; running {running}",
+    )
+
+    # -- an execution surface that exists may not be reported as non-existent --
+    surfaces_root = repo / "backend" / "arkali" / "surfaces"
+    built = [
+        p for p in surfaces_root.rglob("*.py") if p.name != "__init__.py"
+    ] if surfaces_root.is_dir() else []
+    denies = re.search(r"(?i)no execution surface exists", text) is not None
+    report.assert_true(
+        "no claim that execution surfaces are absent while one is built",
+        not (built and denies),
+        f"{len(built)} surface modules exist",
+    )
+
+
+def _required_python(repo: pathlib.Path) -> str:
+    """The floor `backend/pyproject.toml` declares. Never transcribed here."""
+    manifest = repo / "backend" / "pyproject.toml"
+    if not manifest.is_file():
+        return ""
+    found = re.search(
+        r'requires-python\s*=\s*"[^0-9]*([0-9]+\.[0-9]+)', manifest.read_text(encoding="utf-8")
+    )
+    return found.group(1) if found else ""
+
+
+def _at_least(running: str, required: str) -> bool:
+    def parts(value: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in value.split(".") if p.isdigit())
+    return parts(running) >= parts(required)
 
 
 def main() -> int:

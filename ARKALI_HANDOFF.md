@@ -136,7 +136,7 @@ repository, the repository wins.
 | Cumulative verified | **80** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + **5 Phase 7**), reconciled by check C6 against each phase's traceability record. Of the 80, **79 are MANDATORY**: Phase 7's `ARK-REQ-0060` is the one CONDITIONAL discharged so far. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | every finding through **F-0045** is closed. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json` |
+| Recorded findings | every finding through **F-0046** is closed. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **100** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Phase 8 Package 2's 466-line scheduler authority test was decomposed under ADR-0008; no GATE 8 exception was requested |
@@ -145,7 +145,7 @@ repository, the repository wins.
 | Capability Graph | **schema only**; every query returns `NOT_CONFIGURED`; activation is Phase 9B (ADR-0003) |
 | Security | one PDP · 14 operation classes · 5 TRUST tiers · 7 properties · 7 backends probed · Protected Core, Secret Vault and Local-Only boundaries enforced |
 | Host isolation | TRUST-0/1 satisfiable. **TRUST-2/3/4 UNSUPPORTED** on this host (`NET_EGRESS_CONTROL`, `KERNEL_ISOLATION` unavailable). Re-probe; never assume |
-| Execution surfaces | **one exists: `surfaces.command`** (Command Center API — seven routes — plus its React frontend, Phase 5). Every route enforces through the Phase 4 PEP and is audited, and a real browser journey drives it end to end. The other five canonical paths — sandbox, scheduler, durable, workflow, operations — are absent. End-to-end bypass resistance across all six (ARK-REQ-0325, 0347) is Phase 31 and is **not** claimed |
+| Execution surfaces | **one exists: `surfaces.command`** (Command Center API — seven routes — plus its React frontend, Phase 5). Every route enforces through the Phase 4 PEP and is audited, and a real browser journey drives it end to end. Of the other five canonical paths, **`execution.durable` (Phase 7) and `execution.scheduler` (Phase 8) now exist and both enforce through a real PEP**; `sandbox`, `workflow` and `operations` remain absent, and the same derived control asserts that absence rather than assuming it. End-to-end bypass resistance across all six (ARK-REQ-0325, 0347) is Phase 31 and is **not** claimed |
 | Working tree | clean at HEAD |
 
 ## 4. Accepted commit history
@@ -232,8 +232,9 @@ repository, the repository wins.
 | 78 | `7a19348` | handoff manifest refreshed after Phase 8 machine acceptance (§12 rule) |
 | 79 | `4be95c7` | **F-0045 OPENED (HIGH)** — post-commit verification found `phase_8_report.json` recorded two validator runs at exit 0 that were stale at the submitted commit; had the true exit codes been recorded the verdict would have been PHASE_BLOCKED. The prose that caused it is corrected and both validators are now genuinely green, but the finding is left OPEN because closing it means re-scoring an accepted phase, which GOV-001 reserves to a recorded human authorization. **Phase 9 must not begin while it is open** |
 | 80 | `3d9dfc5` | handoff manifest refreshed after F-0045 (§12 rule) |
-| 81 | `24fb3aa` | **F-0045 REMEDIATION + PHASE 8 SUPERSEDING RE-SCORE** under the scope-limited GOV-001 authorization `RSA-002`. The defective first report is preserved as `phase_8_report_rev1_defective.json`; the superseding report was genuinely re-executed record by record; the acceptance guard was re-proven with the true exit codes (14/14 refused, including G14 which reproduces F-0045 and is refused on C3/C5); the gate was run once and returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, RESCORING PASS. **F-0045 closed with HIGH severity intact. Cumulative verified unchanged at 80. Phase 9 unlocked by the superseding verdict** ← HEAD at generation |
-| 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) ← HEAD at generation |
+| 81 | `24fb3aa` | **F-0045 REMEDIATION + PHASE 8 SUPERSEDING RE-SCORE** under the scope-limited GOV-001 authorization `RSA-002`. The defective first report is preserved as `phase_8_report_rev1_defective.json`; the superseding report was genuinely re-executed record by record; the acceptance guard was re-proven with the true exit codes (14/14 refused, including G14 which reproduces F-0045 and is refused on C3/C5); the gate was run once and returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, RESCORING PASS. **F-0045 closed with HIGH severity intact. Cumulative verified unchanged at 80. Phase 9 unlocked by the superseding verdict** |
+| 82 | `15542e7` | handoff manifest refreshed after the Phase 8 superseding re-score (§12 rule) |
+| 83 | `PENDING` | **HANDOFF_DRIFT REPAIR (F-0046)** — `check_handoff.py` validated only the machine-readable claims block, so a §12 refresh that updated the YAML and part of the prose reported PASS while §4, §6, §7, §8 and §11 stayed stale. Seven derived narrative controls added; the stale sections re-derived from repository authority ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -263,20 +264,30 @@ Referenced, not duplicated. Read the cited artifact before relying on any of the
 
 Re-detected at generation. **Re-detect rather than trusting these values.**
 
+**The canonical runtime is the repository-local `.venv`.** `backend/pyproject.toml`
+declares `requires-python = ">=3.13"`, and every command in this repository —
+pytest, mypy, the validators and the gate — must be run through
+`.\.venv\Scripts\python.exe`. The system Python 3.12 is **not** canonical, and
+its accumulated ad-hoc extras are exactly what masked F-0042, F-0043 and F-0044
+for three phases.
+
 | Tool | State | Terminology |
 |---|---|---|
-| Python 3.12.10 | present | PASS for structural work |
-| Python 3.13 (canonical target) | absent | **NOT_CONFIGURED** |
+| **Python 3.13.15 (canonical, repository-local `.venv`)** | **present** | **PASS** — satisfies `requires-python >= 3.13` |
+| Python 3.12.10 (system, non-canonical) | present | **NOT_APPLICABLE** — below the canonical floor; must not be used |
 | Node 24.18.0 / npm 11.16.0 | present | PASS |
 | TypeScript 5.6 / Vite 5.4 / React 18 / Tailwind 3.4 / Vitest 2.1 | installed (`frontend/node_modules`) | PASS — typecheck clean, 23 tests pass, production build succeeds |
 | Rust / Cargo / rustc | absent | **UNSUPPORTED** |
 | Git 2.55.0 | present | PASS |
-| ruff | absent | **NOT_CONFIGURED** |
-| mypy 2.3.0 | present | PASS (strict, clean) |
-| poetry / uv / pip-tools | absent | **NOT_CONFIGURED** (no Python lockfile) |
-| pytest 9.1.1 · pydantic 2.8.0 · PyYAML 6.0.3 | present | PASS |
-| SQLAlchemy 2.0.51 · Alembic 1.18.5 · FastAPI 0.111.0 | present | PASS — the Phase 5 backend stack is executable |
-| SQLite library 3.49.1 (WAL-capable) | present | PASS |
+| ruff 0.16.2 | present | PASS |
+| mypy 2.3.0 | present | PASS (strict, clean over 138 modules) |
+| pytest 9.1.1 · pytest-cov 7.1.0 | present | PASS |
+| pydantic 2.13.4 · PyYAML 6.0.3 | present | PASS |
+| SQLAlchemy 2.0.51 · Alembic 1.19.1 · FastAPI 0.141.1 · Starlette 1.6.0 | present | PASS — the backend stack is executable |
+| uvicorn 0.52.1 | present | PASS — declared in `[project].dependencies` (F-0042); the real runtime entrypoint needs it |
+| httpx2 2.10.0 | present | PASS — declared in the `dev` extra (F-0043); `fastapi.testclient` binds it, and without it pytest cannot COLLECT the suite |
+| SQLite library 3.50.4 (WAL-capable) | present | PASS |
+| poetry / uv / pip-tools | absent | **NOT_CONFIGURED** — there is still **no Python lockfile** and none may be created without authority |
 | hypothesis (T6 property tier) | absent | **NOT_CONFIGURED** |
 | Playwright 1.62.1 + Chromium 151.0.7922.34 (T10 browser/E2E) | installed | **PASS** — 9 browser tests green against the production build and a live API. Firefox and WebKit are NOT installed; no cross-browser claim |
 
@@ -302,7 +313,7 @@ No unavailable toolchain may be reported as PASS.
 | Re-running the gate for **Phase 2 or 3** returns `AWAITING_RESCORING_AUTHORITY`. That is the mechanism, not a regression — their recorded acceptance stands | `BUILD_STATE.md` · EV-0042 |
 | **Re-accepting a previously accepted phase requires explicit re-scoring authorization *before* the re-score.** The original record stays immutable and marked superseded; nothing is amended, deleted or concealed. Phase 4's remediate-then-report ordering was authorized retrospectively and is **not** precedent | **GOV-001** in `HUMAN_GATE_RECORDS.md` (resolves the question left open by ERR-004) |
 | **TRUST-2/3/4 are UNSUPPORTED on this host** — a real probe result, not a defect. Re-probe on any new host | `phase_4_report.json` · EV-0033 |
-| **No execution surface exists**, so policy bypass resistance is CONTRACT-level only | EV-0032 |
+| **Execution surfaces now exist**, so the Phase 4 CONTRACT-level-only statement is superseded. `surfaces.command` (Phase 5) enforces every route through the PEP and is audited; `execution.durable` (Phase 7) and `execution.scheduler` (Phase 8) each take real policy decisions, asserted by the derived control that every BUILT execution package must. **End-to-end bypass resistance across all six canonical paths (ARK-REQ-0325, 0347) is Phase 31 and is still NOT claimed** | EV-0032 (superseded in part) · `test_pep_and_bypass.py` |
 | Isolation backend probe deferral **DEF-003 is closed** | `OPEN_BLOCKERS.md` |
 | Register exhaustiveness is by construction, not mechanical extraction (M-P0-1) | `PHASE_0_AUDIT.md` |
 | Golden Repair corpus instantiation deferred to Phase 30 (DEF-004) | `OPEN_BLOCKERS.md` |
@@ -311,30 +322,34 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 8
+## 8. Current phase contract — Phase 9
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Resource Scheduler + Worker Contracts** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 8) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED**. Packages 1 and 2 of 3 complete; Package 3 not started |
-| Prerequisites | Phase **7**, MACHINE-ACCEPTED |
-| Contract IDs | **C-21** (worker contract and admission, `execution.scheduler`) — `docs/contracts/worker.md`; kind `INT`, so no table or migration |
-| Human gate | none (matrix Gate column `—`) |
-| ARK-REQ IDs | **none**. `RequirementRegister.for_phase("8")` returns an empty denominator; cumulative verified therefore remains 80 |
-| Verification profile | derive Package 3 from its changed paths with `select_profile`; Package 1 was PROTECTED_CORE and Package 2 was NORMAL |
-| Evidence hazard | C-21 must be evidenced from the test tier and C-17 report. A production `scheduler → evidence.*` edge would exceed orchestration depth; `ARK-REQ-0354` belongs to Phase 31 and is NOT CLAIMED |
+| Name | **Provider + Model Runtime** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 9) |
+| Status | **UNLOCKED — NOT_STARTED**. `GovernanceState.current_work_phase()` returns `9`; nothing is implemented |
+| Prerequisites | Phases **4, 6 and 8** — all MACHINE-ACCEPTED |
+| Contract IDs | **C-11** (`CONTRACT_INVENTORY.md` row 9). Read the row before designing; do not assume its kind |
+| Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
+| ARK-REQ IDs | **three** — `ARK-REQ-0052`, `ARK-REQ-0053`, `ARK-REQ-0219`. `RequirementRegister.for_phase("9")` is the authority |
+| Denominator | **NON-ZERO, unlike Phase 8.** Phase 8's `claims: []` was legal only because its denominator was empty; C6 refuses an empty record against a non-empty denominator just as hard as the reverse |
+| Verification profile | derive from the change set's own paths with `select_profile`; do **not** assume NORMAL |
+| Architecture hazard | `shadow_registry` is a live gate and is specifically about the provider registry this phase builds. ADR-0001 keeps health, cost, availability and fallback in `control.registry.provider` alone; the Capability Graph holds `provider_refs` and resolves them at query time |
+| Scope hazard | `provider` is one of the seven canonical C-21 **worker classes** — a vocabulary entry only. A control separates that class from provider **execution** authority, so building the runtime must not be mistaken for widening C-21 |
 
-Packages 1 and 2 are committed as `20f9d7e` and `ce25410`. Production admission
-honestly returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B activates the
-Capability Graph. Package 3 is the final integration/evidence/traceability/report
-package described in §9; it has not begun.
+**Phase 9 has not begun.** No provider runtime module, test, migration or evidence
+exists. Phase 8 is closed under `RSA-002`, which is exhausted and digest-bound:
+re-running the Phase 8 gate returns `AWAITING_RESCORING_AUTHORITY`, which is the
+rule working rather than a fault.
 
 ## 9. Next exact action
 
-**Begin Phase 9 — Provider + Model Runtime (C-11).**
-Phase 9 is unlocked and NOT_STARTED, by the **superseding** Phase 8 verdict. Do
+**Derive and begin Phase 9 — Provider + Model Runtime (C-11) — only now that
+the F-0046 handoff-drift repair is complete.** Phase 9 is unlocked and
+NOT_STARTED, by the **superseding** Phase 8 verdict. Nothing of Phase 9 has been
+implemented: no provider runtime module, test, migration or evidence exists. Do
 not rebuild Phase 8 and do not re-run its gate: `RSA-002` was exhausted by that
 one supersession and is bound to a digest that no longer matches once anything
 changes, so a further run returns `AWAITING_RESCORING_AUTHORITY` — the rule
@@ -408,8 +423,8 @@ A new session MUST, in order:
 | Field | Value |
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
-| Generated at HEAD | `3574e04c02baeaf3cb4350ba860eea68d7fcecfc` |
-| Refresh reason | **HANDOFF_DRIFT repair after the Phase 8 Package 2 §12 refresh** — all live HEAD/state claims re-derived from repository truth; no feature, runtime, accepted evidence or phase state changed |
+| Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
+| Refresh reason | **HANDOFF_DRIFT REPAIR (F-0046)** — a read-only inspection found this document internally inconsistent while `check_handoff.py` reported PASS. The validator read only the machine-readable claims block, so §4 carried a duplicate ledger row and two generation markers naming different commits, §6 described the canonical interpreter as absent while running on it, §7 and §3 denied execution surfaces that Phase 5, 7 and 8 built, and §8 still described Phase 8 as in progress. Seven derived narrative controls were added and every stale section re-derived from repository authority. **No feature, runtime, accepted evidence or phase state changed** |
 | Generated after | **PRE-PHASE-8 GOVERNANCE REPAIR (F-0040)** — the traceability loader assumed every phase owns at least one requirement, and four canonical phases do not. `TraceabilityRecord.load` refused any empty `claims` list; reproduced against the untouched tree, the refusal was **identical** for Phase 4 (denominator 33) and Phase 8 (denominator 0), so it consulted no denominator at all. `RequirementRegister.for_phase` returns zero for phases **8, 15, 33 and 34**, every one of which is in the canonical phase list — so the only truthful record was rejected while any non-empty record would assert a claim the phase does not own, and C6 failed either way. **The invariant had no canonical source:** "traceability" appears nowhere in the Build Protocol or the VDC and no ADR governs it; the record is `acceptance.engine`'s own mechanism from the F-0024 remediation, whose purpose is to make a *false discharge* impossible — and it was proven in memory that the refusal is not load-bearing for that purpose, because `reconcile_discharge` already refuses every non-empty discharged set against an empty record. **The C-17 report contract was already zero-aware** (`PhaseReport.ALLOWED_EMPTY` contains `ark_req_ids_closed`), so the report half of an acceptance package permitted exactly what the traceability half forbade. Not the transcribed-value family and nothing expired — an **unbacked invariant**, failing in the **rejecting** direction. MEDIUM. **The rule was moved, not deleted:** the loader keeps every well-formedness refusal and stops treating an empty-but-well-formed list as malformed, while C6 gains `discharge_shape.check_claim_shape`, where the register already lives. Both directions fail closed and the second is **strictly stronger than anything before** — a phase owning no requirement may not claim *anything*, so a synthetic, contract-id or foreign-phase claim can no longer be manufactured to satisfy an invariant, a hole the old absolute rule left open for every phase. `reconcile_discharge` is **unchanged**. The subject is derived from the register, so assigning a requirement to 8/15/33/34 moves these controls instead of expiring them, and all six live accepted records were asserted unchanged in meaning. Two 400 logical-line budgets fired (`checker.py` 424, `test_false_discharge.py` 405) and both were answered by **decomposition under ADR-0008** along real seams, not by an exception. Classified **PROTECTED_CORE** by `select_profile` from its own paths (member `acceptance.engine`); all three categories at exit 0 — security review 188, adversarial review 547, full regression **1623** — plus mypy strict clean over **129** modules, 8 gates over 91 edges, 9 budgets, structure 12/12 with both negative controls, phase graph 10/10. **9 mutations injected, 9 caught**; one was initially **missed** and exposed a real gap — every shape control exercised `check_claim_shape` directly, so none proved C6 *calls* it, and a mutation making C6 ignore the result passed (the F-0017 shape). A real end-to-end control now drives `PhaseGateChecker.check_discharge_integrity` over a copied canonical document tree. **Not a phase acceptance and not Phase 8 work:** no scheduler code, no Phase 8 traceability or report artifact, no gate run. Phase 7 remains MACHINE-ACCEPTED, Phase 8 remains UNLOCKED — NOT_STARTED, cumulative verified remains **80** |
 | Previously generated after | **PHASE 7 MACHINE ACCEPTANCE** — Atomic Package 5: the composed durable journey, real fault-injection evidence, traceability, the C-17 report and the gate run. **Verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the FIRST submission.** C1–C6 PASS; **PROTECTED_CORE COMPLETE** — the profile was derived from the phase's own changed paths and came out PROTECTED_CORE (member `control.architecture`, from Package 1's kernel-error decomposition), so it was **not assumed NORMAL from Packages 2–4**, and all three canonical categories ran at exit 0: security review 188, adversarial review 538, full regression 1614. RESCORING NOT_APPLICABLE; FINDINGS, PREREQ (2/2) and 8 gates over **91** edges PASS; HUMAN_GATE NOT_APPLICABLE. **The denominator was re-derived from the register**, not trusted: five requirements, four MANDATORY and one CONDITIONAL, all owned by `execution.durable`, all five SATISFIED with a named implementation and a named evidence source. **`ARK-REQ-0060` is the first CONDITIONAL requirement any phase has discharged, and it is applicable on its merits** — its Appendix A rule text is parsed out of `REQUIREMENT_REGISTER.md`, the field it names is asserted to be a real persisted column, and it evaluates TRUE against real data across restarts; an unpausable type coexisting with a pausable one is proven **not** to retire it, because reading the rule that way would let one registration silently retire a live obligation. **The chaos key for 0059/0061 is discharged at the available tier and nowhere near T12** — real process loss with persisted `RUNNING` state, heartbeat expiry observed by a process that never watched the job start, a returning zombie owner, a failed transaction, a duplicate attempt refused by the primary key, retry exhaustion to `DEAD_LETTER`, timeout while the worker still reports, and sweep idempotency across restarts; **T12, `ARK-REQ-0327` and Phase 31 are NOT CLAIMED**, and a control derives from the register that `ARK-REQ-0327` is not Phase 7's to discharge. The final journey carries one durable job across **six separate runtimes** on one real SQLite file, and Phase 7 evidence is recorded through the Phase 6 C-14/C-15 authorities unchanged — no second evidence mechanism, no Phase 13 graph. **15 anti-vacuity cases injected and 15 rejected; 8 defective traceability variants rejected by C6 before the gate ran**, with the real record restored byte-for-byte and its digest re-verified. Two background mutation runs were killed mid-flight and each left a mutation behind; both were caught and restored, after which **git became the restore authority**. Package 5 added **no production module and no import edge**, because `max_orchestration_depth` was already 4 of 4. Cumulative discharged 75 → **80**; MANDATORY verified 75 → **79** — the two diverge for the first time and both are recorded. **Phase 8 unlocked** |
 | Previously generated after | **PHASE 7 ATOMIC PACKAGE 4** — the `ARK-REQ-0027` enqueue surface under `surfaces.command`. Not a phase acceptance: no requirement is discharged, no traceability record, no report, no gate run, and Phase 8 stays locked behind Phase 7. `POST /api/jobs` persists durable work through C-19 and returns a durable reference; `GET /api/jobs/{job_id}` resolves one. **The guarantee is architectural, not a latency budget** — the register gives `ARK-REQ-0027` `arch` evidence, and **no timing measurement appears anywhere in the evidence**. What is asserted is that after the response the work demonstrably has *not* started: the job sits in the state the canonical machine declares initial, with **zero execution attempts and zero checkpoints**, which a handler that had run the job could not produce. The forbidden call set is **derived from the public surface of `JobExecution` and `JobRecovery`**, so a method added to either later is covered without editing a control. **`202 Accepted`** is the honest status — the request was accepted and the processing has not completed — and it avoids inventing a created-versus-existing distinction that C-19's persisted idempotency makes irrelevant; a repeated `(job_type, idempotency_key)` resolves to the recorded job **across a full application restart**, which an in-memory cache could not survive. The route builds no engine, issues no query, writes no lifecycle state and names no scheduler, worker, dispatch or provider concept. **The job-type registry is not an admission gate at the surface either:** an undeclared type enqueues, because requiring registration to submit would be admission control and that is C-21 at Phase 8. **The surface was decomposed before it was written** — `app.py` and `error_mapping.py` were each already at `max_contexts_touched_by_module`, measured first, so the routes went into `jobs.py` and the durable error table into `job_error_mapping.py` under ADR-0008. **Three findings opened and closed, two of them pre-existing Phase 5 defects reproduced on the Phase 5 routes alone before repair:** F-0037, a contract control that assumed every backend route was also a browser-slice route and expired on the repository's first backend-only route — routes now declare an audience tag read off the live OpenAPI document, failing closed on a route nobody classified; F-0038, one durable timestamp with two wire representations depending on whether the row was still in the session; F-0039, `PolicyDenied` mapped to 403 but unreachable from any route because `guard()` runs before the `try`, so a real denial surfaced as HTTP 500 — and the control meant to cover it asserted the *table*, never the *route*. All three MEDIUM; **none failed open**. Classified **NORMAL** by `select_profile` with no unresolved path; the battery ran in full: **1582 passed / 13 skipped**, mypy strict clean over **128** modules, 8 gates PASS over **91** edges, 9 budgets, structure 12/12 with both negative controls, phase graph 10/10. **13 mutations injected, 13 caught.** One was initially missed and exposed a genuinely weak control — a word-boundary search cannot match `provider_completion` because `_` is a word character, and an aliased import hid the original name — so the control was strengthened to derive identifiers from the AST and check both halves of an alias, then re-verified against four separate spellings. **`max_orchestration_depth` is now 4 of 4** and the next hop on that chain must be decomposed |
