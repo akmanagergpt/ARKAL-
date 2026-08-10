@@ -129,7 +129,7 @@ repository, the repository wins.
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
 | Phase 8 | **MACHINE-ACCEPTED (SUPERSEDING, under GOV-001 `RSA-002`)** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, with RESCORING PASS. **The FIRST submission was accepted on an inaccurate record** (F-0045, HIGH): it reported two validator runs at exit 0 that returned 11 pass / 1 fail at `bb845d8`, and with the true codes would have been PHASE_BLOCKED on C3/C5. The authority refused to downgrade the finding or leave that acceptance standing; the defective revision is retained as `phase_8_report_rev1_defective.json` and the superseding report was genuinely re-executed record by record. F-0045 closed **with HIGH intact**. Three atomic packages delivering C-21. **Zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B |
-| Phase 9 | **UNLOCKED — NOT_STARTED** ← current work. Provider + Model Runtime (C-11). Matrix prerequisites 4, 6 and 8 all accepted; Gate column empty. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`), unlike Phase 8 — its traceability record must carry real claims |
+| Phase 9 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Provider + Model Runtime (C-11). **Package 1 of 4 complete**: `docs/contracts/provider_record.md`, `provider_authority` (the seven owned concerns and five reference-only consumers parsed at call time, never transcribed) and `provider_record` (the C-11 record). The Phase 3 `ProviderHealth` machine is reused, not duplicated — count stays 12. C-11 is `INT`, so no table and no migration. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`) and **none is discharged yet**, so cumulative verified stays 80. Capability activation remains Phase 9B |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -231,6 +231,8 @@ repository, the repository wins.
 | 77 | `bb845d8` | **PHASE 8 MACHINE ACCEPTANCE** — Package 3: the composed C-21 plane, the zero-denominator traceability record (`claims: []`), the C-17 report and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. Thirteen defective acceptance artifacts were proven refused by the checker before the gate was run, each restored and digest-verified. **0/0 requirements discharged; cumulative verified unchanged at 80. Phase 9 unlocked** |
 | 78 | `7a19348` | handoff manifest refreshed after Phase 8 machine acceptance (§12 rule) |
 | 79 | `4be95c7` | **F-0045 OPENED (HIGH)** — post-commit verification found `phase_8_report.json` recorded two validator runs at exit 0 that were stale at the submitted commit; had the true exit codes been recorded the verdict would have been PHASE_BLOCKED. The prose that caused it is corrected and both validators are now genuinely green, but the finding is left OPEN because closing it means re-scoring an accepted phase, which GOV-001 reserves to a recorded human authorization. **Phase 9 must not begin while it is open** |
+| 84 | `eb5b8c6` | handoff manifest refreshed after the F-0046 drift repair (§12 rule) |
+| 85 | `8102f60` | **PHASE 9 PACKAGE 1** — the C-11 provider/model record. The seven owned concerns and five reference-only consumers are parsed from `AUTHORITY_MAP.yaml` at call time and appear nowhere in code; the Phase 3 `ProviderHealth` machine is reused so the count stays 12; C-11 is `INT`, so no table and no migration. Two controls forced better designs: `test_live_repository_uses_no_exempt_edge` refused the first live edge leaning on the policy same-layer exemption, and a structural control caught two owned concerns restated as string literals. 15 mutations injected, 15 caught. **Not a phase acceptance**: no requirement discharged, cumulative verified stays 80 |
 | 80 | `3d9dfc5` | handoff manifest refreshed after F-0045 (§12 rule) |
 | 81 | `24fb3aa` | **F-0045 REMEDIATION + PHASE 8 SUPERSEDING RE-SCORE** under the scope-limited GOV-001 authorization `RSA-002`. The defective first report is preserved as `phase_8_report_rev1_defective.json`; the superseding report was genuinely re-executed record by record; the acceptance guard was re-proven with the true exit codes (14/14 refused, including G14 which reproduces F-0045 and is refused on C3/C5); the gate was run once and returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, RESCORING PASS. **F-0045 closed with HIGH severity intact. Cumulative verified unchanged at 80. Phase 9 unlocked by the superseding verdict** |
 | 82 | `15542e7` | handoff manifest refreshed after the Phase 8 superseding re-score (§12 rule) |
@@ -329,7 +331,7 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Provider + Model Runtime** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 9) |
-| Status | **UNLOCKED — NOT_STARTED**. `GovernanceState.current_work_phase()` returns `9`; nothing is implemented |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED**. `GovernanceState.current_work_phase()` returns `9`. **Package 1 of 4 is complete**; Packages 2–4 are not started |
 | Prerequisites | Phases **4, 6 and 8** — all MACHINE-ACCEPTED |
 | Contract IDs | **C-11** (`CONTRACT_INVENTORY.md` row 9). Read the row before designing; do not assume its kind |
 | Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
@@ -339,17 +341,39 @@ Derived from authoritative artifacts, not from memory.
 | Architecture hazard | `shadow_registry` is a live gate and is specifically about the provider registry this phase builds. ADR-0001 keeps health, cost, availability and fallback in `control.registry.provider` alone; the Capability Graph holds `provider_refs` and resolves them at query time |
 | Scope hazard | `provider` is one of the seven canonical C-21 **worker classes** — a vocabulary entry only. A control separates that class from provider **execution** authority, so building the runtime must not be mistaken for widening C-21 |
 
-**Phase 9 has not begun.** No provider runtime module, test, migration or evidence
-exists. Phase 8 is closed under `RSA-002`, which is exhausted and digest-bound:
+**Package 1 is complete; Phase 9 is not accepted.** `control.registry.provider` holds
+the C-11 record and its parsed authority. **No provider runtime, no migration, no
+Phase 9 acceptance artifact and no discharged requirement exists**, and the
+`shadow_registry` gate still validates the declaration rather than consumer source —
+that gap is Package 2's and is stated in `docs/contracts/provider_record.md` §3. Phase 8 is closed under `RSA-002`, which is exhausted and digest-bound:
 re-running the Phase 8 gate returns `AWAITING_RESCORING_AUTHORITY`, which is the
 rule working rather than a fault.
 
 ## 9. Next exact action
 
-**Derive and begin Phase 9 — Provider + Model Runtime (C-11) — only now that
-the F-0046 handoff-drift repair is complete.** Phase 9 is unlocked and
-NOT_STARTED, by the **superseding** Phase 8 verdict. Nothing of Phase 9 has been
-implemented: no provider runtime module, test, migration or evidence exists. Do
+**Begin Phase 9 Atomic Package 2 — source-level enforcement of ARK-REQ-0053.**
+Package 1 is complete and committed. It established the authority side: the
+registry owns the seven concerns and the record cannot carry a raw secret or a
+copy of policy state. Package 2 must make *"no component may store, cache,
+mirror, default or re-derive these values"* checkable in the **consumers**.
+
+**The gap is real and already written down.** Today the `shadow_registry` gate
+validates the *declaration* — owner, consumer set, copying and caching flags —
+and not consumer source. `docs/contracts/provider_record.md` §3 states that
+plainly rather than papering over it. Derive the five reference-only consumers
+from `AUTHORITY_MAP.yaml`, never from a list.
+
+**Then Package 3 — ARK-REQ-0219, the never-fabricate control.** Note its owner
+is **`acceptance.engine`**, not the provider registry, and its evidence keys are
+`prov` + `sec`. Touching `acceptance.engine` makes the change set
+**PROTECTED_CORE**, so `select_profile` will require security review,
+adversarial review and full regression; derive the profile rather than assuming
+NORMAL.
+
+**Then Package 4 — final integration, traceability carrying three real claims,
+the C-17 report and the gate.** Phase 9's denominator is **non-zero**, unlike
+Phase 8's: C6 refuses an empty record against a non-empty denominator just as
+hard as the reverse. Do
 not rebuild Phase 8 and do not re-run its gate: `RSA-002` was exhausted by that
 one supersession and is bound to a digest that no longer matches once anything
 changes, so a further run returns `AWAITING_RESCORING_AUTHORITY` — the rule
@@ -490,7 +514,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 279afccd234fecacfc87ab78b7f38f9b488fcc91
+head: 8102f60a2c0dff835ff95bd045daceffacbc13d3
 branch: main
 working_tree_clean: true
 
