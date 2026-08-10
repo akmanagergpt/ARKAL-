@@ -1,6 +1,18 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 8 MACHINE-ACCEPTED. PHASE 9 UNLOCKED — NOT_STARTED.**
+**Current state:** **PHASE 8 MACHINE-ACCEPTED. PHASE 9 UNLOCKED — IN PROGRESS, NOT ACCEPTED (Package 1 of 4 complete).**
+
+**Phase 9 Package 1 (the C-11 provider/model record).** `control.registry.provider` now holds the record that makes `ARK-REQ-0052` concrete: the seven concerns `AUTHORITY_MAP.yaml` `provider_authority.fields_owned` assigns to this registry — identity, model identity, configuration, health, availability, cost metadata and fallback. **Neither the concern list nor the reference-only consumer list appears in code**: both are parsed at call time, and controls assert that no module in the context hard-codes either, reconciling the map, the model and `docs/contracts/provider_record.md` in all directions.
+
+**The Phase 3 ProviderHealth machine is reused, not duplicated.** The record reads `DEFINITION.states` and refuses anything outside it; it declares no state, no transition and no second machine, and a control asserts that no module except the machine itself contains a health-state literal. **The canonical machine count stays at 12.**
+
+**C-11 is `INT`, and that is governed data rather than a preference.** The inventory gives C-11 `INT` where C-12 — the Project/Revision Registry — is `DB+INT`, so this package adds no table, no migration and no ORM record. A control re-reads the inventory row and fails if the kind ever changes, so the reasoning cannot silently expire.
+
+**Configuration cannot carry a secret, and holds no policy state either.** `configuration` holds opaque C-09 handles and every string the record carries — including inside tuples — is scanned for raw-secret shapes and refused. **A control forced a better design here:** the first draft imported `control.policy.SecretReference`, which would have been the repository's **first live edge leaning on the `policy_callable_from_any_layer` exemption**, and `test_live_repository_uses_no_exempt_edge` refused it. The exemption was left alone and the dependency dropped — the same call Phase 6 Package 2 made. The deeper reason is better still: `SecretReference` carries `revoked`, which is *policy* state, so storing it here would have mirrored another authority's values inside this registry, which is precisely the disease `ARK-REQ-0053` names.
+
+**No requirement is discharged.** Phase 9 owns three and each is discharged only at phase acceptance; cumulative verified stays **80**. Package 1 contacts no provider, measures no health, simulates nothing, and does not activate the Capability Graph — that is **Phase 9B**, so `can_perform` still returns `NOT_CONFIGURED` and Phase 8 admission still refuses with `CAPABILITY_NOT_CONFIGURED`.
+
+**The Package 1 change set is NORMAL** by `select_profile` from its own paths, with no unresolved path. Full regression **1812 passed / 13 skipped**, mypy strict clean over **141** modules, 8 gates PASS, 9 budgets no violation, depth 4 of 4. **15 mutations injected, 15 caught** by their intended control, every file digest-verified after restore.
 
 **PHASE 8 IS MACHINE-ACCEPTED** on its **first and only** gate submission: verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, recorded in `docs/acceptance/phase_8_report.json` and `phase_8_traceability.json`. C1–C6 PASS; PROTECTED_CORE PASS (no member touched, so the normal profile applies); RESCORING NOT_APPLICABLE; FINDINGS and PREREQ (1/1) PASS; HUMAN_GATE NOT_APPLICABLE — the matrix Gate column for Phase 8 is empty; all 8 architecture gates PASS over **100** cross-context edges with 9 budgets and no violation.
 
@@ -115,7 +127,7 @@ Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic package
 **Canonical source commit:** `079c925996034017855fb9d1f1fa532077d7e86d`
 **Accepted Phase 0 candidate:** `007ebf6e9275fa99d932022004440b1b869701d4`
 **HUMAN GATE 1:** ACCEPTED — record `HGR-001` in `docs/acceptance/HUMAN_GATE_RECORDS.md`
-**Last updated by:** Phase 8 F-0045 remediation and superseding re-score under GOV-001 authorization RSA-002
+**Last updated by:** Phase 9 Atomic Package 1 (the C-11 provider/model record)
 **Governance errata and rulings:** ERR-001 (closes F-0015) · **ERR-002** (closes F-0018 — Plugin `REMOVED` is terminal) · **ERR-003** (closes F-0020 — architecture-budget measurement contract) · **ERR-004** (confirms F-0024, orders remediation) · **GOV-001** (superseding re-acceptance rule; ratifies the Phase 4 re-acceptance) — see `docs/acceptance/HUMAN_GATE_RECORDS.md`
 
 ---
@@ -135,7 +147,7 @@ Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic package
 | 6 | Evidence Plane + Provenance + Artifact Store (C-14, C-15) | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE` on first submission; C1–C6 PASS, PROTECTED_CORE COMPLETE over members `acceptance.engine`, `control.architecture`, `evidence.audit`. Three atomic packages; 3/3 requirements SATISFIED and discharged under C6. Migrations `0003_artifact_provenance` and `0004_audit_record`) |
 | 7 | Durable Job + Workflow Core (C-19) | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission; `docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). Five atomic packages: the C-19 durable-job persistence foundation, the durability semantics, the job-type registry with pause/resume and the crash-recovery sweep — migrations `0005_durable_job`, `0006_durable_execution`, `0007_job_type_registry` — the `ARK-REQ-0027` enqueue surface under `surfaces.command`, and final integration with real fault-injection evidence. C1–C6 PASS; PROTECTED_CORE **COMPLETE** (member `control.architecture`); RESCORING NOT_APPLICABLE; FINDINGS, PREREQ (2/2) and all 8 architecture gates PASS; HUMAN_GATE NOT_APPLICABLE. **5/5 requirements discharged.** Both prerequisites, Phases 5 and 6, are accepted; the matrix Gate column for Phase 7 is empty, so no human gate applies. *(This cell's prose is the exact wording F-0034 mis-read as accepting the phase; it is written plainly because the parser now reads the declared state and ignores prose — this row is the live proof.)* |
 | 8 | Resource Scheduler + Worker Contracts (C-21) | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first and only** submission; `docs/acceptance/phase_8_report.json`, `phase_8_traceability.json`). C1–C6 PASS; PROTECTED_CORE PASS (no member touched); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 100 edges. Three atomic packages: the C-21 declaration, the three-condition admission decision, and final integration. **The first zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B activates the Capability Graph; that is designed behaviour and is recorded as the phase's real outcome. |
-| 9 | Provider + Model Runtime (C-11) | **UNLOCKED — NOT_STARTED** ← current work. Unlocked by Phase 8's machine acceptance, which the gate recorded as progression PERMITTED. Matrix prerequisites 4, 6 and 8 are all accepted. Nothing is implemented: `control.registry.provider` holds no runtime, and Phase 8 asserted that absence with controls rather than assuming it. Scope must be derived from repository authority before any implementation. |
+| 9 | Provider + Model Runtime (C-11) | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Unlocked by Phase 8's superseding machine acceptance. **Package 1 (the C-11 provider/model record) is complete**; Packages 2–4 are not started. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`) and none is discharged yet, so cumulative verified stays 80. Capability activation remains Phase 9B. |
 | 9B … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23. **Phase 9B (Capability Graph Activation)** is what makes production admission able to succeed |
 
 ## What exists
@@ -205,7 +217,15 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Begin Phase 9 — Provider + Model Runtime (C-11).** Phase 9 is unlocked and not started. Matrix prerequisites 4, 6 and 8 are all accepted, and the Gate column is empty, so no human gate applies.
+**Phase 9 Atomic Package 2 — source-level enforcement of `ARK-REQ-0053`.** Package 1 established the authority side; Package 2 must make "no component may store, cache, mirror, default or re-derive these values" checkable in the **consumers**. Today the `shadow_registry` gate validates the *declaration* — owner, consumer set, copying and caching flags — and not consumer source; that gap is stated in `docs/contracts/provider_record.md` §3 rather than papered over. Derive the five reference-only consumers from the map, never a list.
+
+**Then Package 3 — `ARK-REQ-0219`,** the never-fabricate control. Note its owner is **`acceptance.engine`**, not the provider registry, and its evidence keys are `prov` + `sec`. Touching `acceptance.engine` makes the change set **PROTECTED_CORE**, so `select_profile` will require security review, adversarial review and full regression; derive the profile rather than assuming NORMAL.
+
+**Then Package 4 — final integration, traceability carrying three real claims, the C-17 report and the gate.** Unlike Phase 8, Phase 9's denominator is **non-zero**: C6 refuses an empty record against a non-empty denominator just as hard as the reverse.
+
+*(superseded guidance retained for continuity)*
+
+**Begin Phase 9 — Provider + Model Runtime (C-11).** Done for Package 1: `docs/contracts/provider_record.md`, the parsed provider authority and the C-11 record. Matrix prerequisites 4, 6 and 8 are all accepted, and the Gate column is empty, so no human gate applies.
 
 **Derive the scope from repository authority before writing anything.** Read `REQUIREMENT_REGISTER.md` for the rows whose Phase column is 9 — there are three: `ARK-REQ-0052`, `ARK-REQ-0053` and `ARK-REQ-0219` — `CONTRACT_INVENTORY.md` for C-11's row, and `ARCHITECTURE.md` §3 for what `control.registry.provider` owns. Phase 9 has a **non-zero denominator**, unlike Phase 8, so its traceability record must carry real claims.
 
