@@ -128,7 +128,8 @@ repository, the repository wins.
 | Phase 5 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` (`docs/acceptance/phase_5_report.json`, `phase_5_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `lifecycle.recovery`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0). Five atomic packages: C-03 persistence, C-12 registry, minimal backup/restore, the Command Center API, and the React/TypeScript/Vite/Tailwind frontend. **First real T10** in this build |
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
-| Phase 8 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Resource Scheduler + Worker Contracts (C-21). **Packages 1 and 2 of 3 complete.** Package 1: `docs/contracts/worker.md`, `worker_vocabulary` (canonical classes and dimensions parsed, never transcribed) and `worker_contract` (declaration model, PEP-governed). Package 2: the three-condition §4 admission decision — capability, isolation, resource, all required — decomposed across `capability_admission`, `isolation_admission`, `resource_admission` and `admission`. C-21 is INT — no table, no migration, no state machine, no allocation. **Production admission returns `CAPABILITY_NOT_CONFIGURED` for every request** because Phase 9B has not activated the Capability Graph; that is designed behaviour, not a stub. **No requirement discharged and none claimable** — the register assigns Phase 8 zero entries. No traceability record, phase report or gate run exists |
+| Phase 8 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first and only** submission (`docs/acceptance/phase_8_report.json`, `phase_8_traceability.json`). C1–C6 PASS; PROTECTED_CORE PASS (no member touched); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 100 edges. Three atomic packages delivering C-21: the declaration, the three-condition admission decision, and final integration. **The first zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B |
+| Phase 9 | **UNLOCKED — NOT_STARTED** ← current work. Provider + Model Runtime (C-11). Matrix prerequisites 4, 6 and 8 all accepted; Gate column empty. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`), unlike Phase 8 — its traceability record must carry real claims |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -225,7 +226,9 @@ repository, the repository wins.
 | 72 | `ce25410` | **PHASE 8 PACKAGE 2** — the three-condition §4 admission decision: capability, isolation and resource, all required. Production admission returns `CAPABILITY_NOT_CONFIGURED` because Phase 9B has not activated the graph; the mechanism is real and the answer is honest. No cached capability verdict, proven by counting the authority's calls. `test_scheduler_authority.py` hit 466 logical lines and was split under ADR-0008. **Not a phase acceptance**: no allocation, no Phase 8 artifact, no gate run, no requirement discharged |
 | 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) |
 | 74 | `f9c983a` | handoff drift repaired after Phase 8 Package 2 |
-| 75 | `d3a0a9b` | **PRE-PACKAGE-3 ENVIRONMENT REMEDIATION** — the repository was installed from its own manifest onto a clean Python **3.13.15** for the first time, which exposed three latent MEDIUM defects. **F-0042**: the real runtime entrypoint imported `uvicorn`, declared in no manifest group — now `uvicorn>=0.52` in `[project].dependencies` by human ruling. **F-0043**: `fastapi.testclient` binds an HTTP backend declared nowhere, so pytest could not COLLECT the suite — now `httpx2>=2.0.0` in the `dev` extra, derived from starlette's own metadata. **F-0044**: a C-17 contract control refused an unchanged contract because Pydantic 2.13 spells `additionalProperties: true` explicitly where 2.8 left it implicit — proven stale before editing, strength unchanged for every real constraint. One derived control now covers the manifest family. **No lockfile created, no accepted evidence edited, no test weakened.** **Not a phase acceptance**: no Phase 8 artifact, no gate run, no requirement discharged ← HEAD at generation |
+| 75 | `d3a0a9b` | **PRE-PACKAGE-3 ENVIRONMENT REMEDIATION** — the repository was installed from its own manifest onto a clean Python **3.13.15** for the first time, which exposed three latent MEDIUM defects. **F-0042**: the real runtime entrypoint imported `uvicorn`, declared in no manifest group — now `uvicorn>=0.52` in `[project].dependencies` by human ruling. **F-0043**: `fastapi.testclient` binds an HTTP backend declared nowhere, so pytest could not COLLECT the suite — now `httpx2>=2.0.0` in the `dev` extra, derived from starlette's own metadata. **F-0044**: a C-17 contract control refused an unchanged contract because Pydantic 2.13 spells `additionalProperties: true` explicitly where 2.8 left it implicit — proven stale before editing, strength unchanged for every real constraint. One derived control now covers the manifest family. **No lockfile created, no accepted evidence edited, no test weakened.** **Not a phase acceptance**: no Phase 8 artifact, no gate run, no requirement discharged |
+| 76 | `3c4cf6b` | handoff manifest refreshed after the pre-Package-3 remediation (§12 rule) |
+| 77 | `bb845d8` | **PHASE 8 MACHINE ACCEPTANCE** — Package 3: the composed C-21 plane, the zero-denominator traceability record (`claims: []`), the C-17 report and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. Thirteen defective acceptance artifacts were proven refused by the checker before the gate was run, each restored and digest-verified. **0/0 requirements discharged; cumulative verified unchanged at 80. Phase 9 unlocked** ← HEAD at generation |
 | 73 | `3574e04` | handoff manifest refreshed after Phase 8 Package 2 (§12 rule) ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
@@ -326,226 +329,48 @@ package described in §9; it has not begun.
 
 ## 9. Next exact action
 
-**Begin Phase 8 Package 3 — final integration and evidence, zero-requirement
-traceability (`claims: []`), the C-17 phase report, and the first machine-
-acceptance submission; Phase 9 unlocks only if it is genuinely earned.**
-Packages 1 (`20f9d7e`) and 2 (`ce25410`) are complete and committed. Do not
-rebuild either, and do not rebuild Phase 7.
+**Begin Phase 9 — Provider + Model Runtime (C-11).**
+Phase 9 is unlocked and NOT_STARTED. Phase 8 is accepted and closed; do not
+rebuild it, and do not re-run its gate — a second run would return
+`AWAITING_RESCORING_AUTHORITY` under GOV-001, which is the rule working.
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15** in the repository-local `.venv`, which is git-ignored. Use
 `.\.venv\Scripts\python.exe` for pytest, mypy, every validator and the gate.
-The system Python 3.12 is NOT canonical (`requires-python = ">=3.13"`), and it
-carries ad-hoc extras that masked F-0042, F-0043 and F-0044 for three phases.
-The repository still has **no Python lockfile**; do not create one.
+The system Python 3.12 is NOT canonical (`requires-python = ">=3.13"`), and its
+ad-hoc extras are exactly what masked F-0042, F-0043 and F-0044 for three
+phases. There is still **no Python lockfile**; do not create one.
 
-**What Packages 1 and 2 leave ready.** `AdmissionService.evaluate(request)`
-answers §4 for one request: it resolves the C-21 declaration through the
-PEP-governed `WorkerContract`, asks `control.capability` live, asks
-`control.isolation` live, and applies the pure resource test to a caller-supplied
-availability snapshot. Every refusal carries the refusing authority's own reason.
-Package 3 composes and evidences this; it should not need to change it.
+**Derive the scope from repository authority before writing anything.** Read
+`REQUIREMENT_REGISTER.md` for the rows whose Phase column is 9,
+`CONTRACT_INVENTORY.md` for C-11's row,
+`IMPLEMENTATION_DEPENDENCY_MATRIX.md` for prerequisites and any human gate, and
+`ARCHITECTURE.md` §3 for what `control.registry.provider` owns.
 
-**The traceability record is `claims: []`, and that is the only truthful shape.**
-`ark_req_ids_closed` is `[]` too. This is legal because and only because the
-denominator is empty — F-0040's repair made C6 judge emptiness against the
-denominator rather than absolutely, and it now refuses a non-empty record against
-an empty denominator just as hard as the reverse. **No synthetic claim, no
-contract-id-as-requirement claim, no foreign-phase claim.** Cumulative verified
-stays **80**.
+**Phase 9 has a NON-ZERO denominator — three requirements.** `ARK-REQ-0052`,
+`ARK-REQ-0053` and `ARK-REQ-0219`. Phase 8's `claims: []` was legal *because*
+its denominator was empty; Phase 9's record must carry real claims, and C6
+refuses an empty record against a non-empty denominator just as hard as it
+refuses the reverse.
 
-**Report the capability position honestly.** Production admission returns
-`CAPABILITY_NOT_CONFIGURED` for every request, because Phase 9B has not
-activated the graph. State that plainly; never present the test-only-resolver
-success path as production capability. `ARK-REQ-0354` is **Phase 31** and must be
-named NOT CLAIMED.
+**What Phase 8 leaves ready, and what it deliberately did not build.**
+`AdmissionService.evaluate` answers `EXECUTION_AND_CAPABILITY.md` §4 for one
+request and refuses every one with `CAPABILITY_NOT_CONFIGURED` until Phase 9B
+activates the Capability Graph. `provider` is one of the seven canonical worker
+*classes* — a vocabulary entry only. **No provider runtime exists**, and a
+control separates the canonical worker class from provider execution authority,
+so building the runtime must not be mistaken for widening C-21. ADR-0001 keeps
+health, cost, availability and fallback in `control.registry.provider` alone;
+the Capability Graph holds `provider_refs` and resolves them at query time.
 
-**Evidence comes from the test tier.** A `scheduler → evidence.*` production edge
-measures depth 5 and a control now asserts its absence. C-15's `EvidenceInput`
-requires a register-validated `requirement_id`, so C-21 has no legal audit-chain
-anchor — evidence C-21 through the report's `public_contracts`,
-`tests_executed` and `evidence_created`, exactly as Phases 6 and 7 did.
-
-Two facts from the scope derivation still dominate everything Phase 8 does:
-
-- **Phase 8's requirement denominator is exactly zero.** No register row carries
-  Phase 8; `execution.scheduler`'s only registered requirement is
-  `ARK-REQ-0354`, and it belongs to **Phase 31**. Phase 8's obligation is the
-  **C-21** contract from `CONTRACT_INVENTORY.md` — kind `INT`, ADDITIVE,
-  document `docs/contracts/worker.md`, verified by *admission tests*. `INT` is
-  not `DB`: **no table, no migration.**
-- **`execution.scheduler → execution.durable` is FORBIDDEN.** Both are rank 3,
-  `allow_same_layer: false`, and no sibling edge involves the scheduler. The
-  scheduler cannot import the durable runtime, so a second lease/heartbeat
-  authority is impossible by construction. It may reach `control.policy`,
-  `control.capability`, `control.isolation`, `control.registry.provider`,
-  `kernel.*` and `evidence.*`; the only legal composition root for scheduler and
-  durable together is a rank-6 `surfaces.*` context.
-
-**Admission cannot succeed at Phase 8, and must refuse honestly.**
-`EXECUTION_AND_CAPABILITY.md` §4 admits a job only when capability resolves
-other than `NOT_CONFIGURED`, an isolation composition satisfies its tier, and
-resource budget is available. §3 activates the Capability Graph at **Phase 9B**
-and names `execution.scheduler` (Phase 8) as a consumer that *must handle
-`NOT_CONFIGURED` and must not cache capability verdicts*. So condition (a) can
-never hold yet: build admission, and have it return a determinate
-`NOT_CONFIGURED` — never a stub, never a default, never `True`.
-
-**Canonical authority requires no queue, priority or fairness.** None appears in
-§4, in C-21 or in the register. Do not invent one. `execution.scheduler` owns
-exactly one concern: `resource_allocation`. There is **no worker state machine**
-declared anywhere — do not create one.
-
-**Depth is safe, with one trap.** Every legal design measures 4 of 4. The only
-breaching designs are `scheduler → execution.durable` (already forbidden) and
-**`scheduler → evidence.*` combined with a surface root**, which measures 5.
-Record Phase 8 evidence **from the test tier**, as Phases 6 and 7 did — no
-context imports `evidence.audit` today.
-
-**Zero-denominator acceptance is now supported** (F-0040, repaired in `f98ae16`):
-a Phase 8 traceability record is `claims: []` with `ark_req_ids_closed: []`,
-valid because and only because the register assigns Phase 8 nothing. **No
-synthetic claim, no contract-id-as-requirement claim, no foreign-phase claim** —
-C6 refuses all three. Cumulative verified stays **80**. C-21's completion is
-evidenced through the report's `public_contracts`, `tests_executed` and
-`evidence_created`, not by pretending C-21 is an `ARK-REQ`. Note that C-15's
-`EvidenceInput` requires a register-validated `requirement_id`, so a C-21
-audit-chain record has no legal anchor — keep contract evidence in the report.
-
-**Both corrections owed in Package 1 are done.** `docs/contracts/worker.md` now
-exists and reconciles with the implementation in both directions. The Phase 8
-title is now the canonical **"Resource Scheduler + Worker Contracts"**, and the
-same control caught a second drift nobody was looking for — Phase 6 read
-*"Artifact / Evidence Plane"* against the matrix's *"Evidence Plane +
-Provenance + Artifact Store"*. Both corrected under **F-0041**, and
-`test_every_build_state_phase_title_matches_the_matrix` now reconciles every
-phase both documents name.
-
-**One budget fact changed in Package 1.** `kernel.contracts.errors` was at
-`max_fan_in_per_module` (15) and the scheduler would have been the sixteenth
-importer, so under ADR-0008 the abstract base layer — `ArkaliError`,
-`ContractViolation`, `GovernanceStateError`, `AuthoritativeSourceError` — moved
-to **`kernel.contracts.error_base`**, which `errors.py` re-exports. No call site
-changed and no GATE 8 exception was authored. A context that needs a base error
-type must now import `error_base`; `errors.py` is back at **15 of 15** and has
-no headroom. Note `kernel.contracts.state_machine` is also at **15 of 15**.
-
-**Watch the surfaces controls if the scheduler is ever composed there.**
-`jobs.py` bans the identifier *scheduler* and the import
-`arkali.execution.scheduler`, and `app.py` is at the 3-context ceiling — so a
-composition would need its own module, or the tripwire precedent applied.
-
-*(the derivation these facts came from is retained below)*
-
-Read, in this order, and derive rather than assume:
-
-- `REQUIREMENT_REGISTER.md` — every requirement whose **Phase column is 8**,
-  with its classification, owner and evidence keys. That set is the
-  denominator; nothing else is.
-- `CONTRACT_INVENTORY.md` — the **C-21** row: owner, kind, versioning,
-  compatibility and what verifies it.
-- `IMPLEMENTATION_DEPENDENCY_MATRIX.md` — Phase 8's prerequisites and whether
-  its Gate column is empty.
-- `ARCHITECTURE.md` §3 and `EXECUTION_AND_CAPABILITY.md` §3 — what
-  `execution.scheduler` actually owns. §3 already names worker classes and
-  declares that each worker states its class, concurrency limit, resource
-  profile, required TRUST tier, required isolation properties and heartbeat
-  interval. **Read it there; do not carry forward Phase 7's phrasing.**
-
-**Phase 7 told you only what scheduling is NOT.** Its controls assert the
-absence of admission, allocation, dispatch, priority, capacity, worker pools
-and owner selection from `execution.durable` and `surfaces.command`. That is a
-boundary, not a specification, and those controls must keep passing: Phase 8
-builds scheduling **in `execution.scheduler`**, not by relaxing them.
-
-What Phase 7 leaves ready: a recovered job waits in `RESUMING` for someone to
-pick it up; `begin_attempt` is the only way to start work and the canonical Job
-machine refuses it from anywhere illegal; execution ownership is persisted and a
-stale owner is refused. Phase 8 decides *who* runs a job. Phase 7 already
-decided *whether an execution is still alive*, and that split is enforced.
-
-**Two budget facts to carry in.** `max_orchestration_depth` is at **4 of 4** on
-`surfaces.command → execution.durable → control.policy → kernel.contracts`; a
-further hop on that chain breaches it and must be decomposed under ADR-0008,
-never excepted. `kernel.contracts.errors` fan-in is **14 of 15**.
-
-**Do not re-run `python scripts/run_phase_gate.py 7 8`.** Phase 7 carries an
-acceptance record, so a second run returns `AWAITING_RESCORING_AUTHORITY` — that
-is GOV-001 protecting an accepted phase, not a regression, and it is not a
-proof of anything about Phase 7.
-
-**Controls added in Phase 7 Package 4 that must not be weakened.** In
-`tests/structural/test_enqueue_surface_authority.py` and
-`tests/surfaces/test_command_jobs_api.py`: no route may call anything that
-drives execution — **the forbidden set is derived from `JobExecution` and
-`JobRecovery`**, so a method added to either is covered automatically; nothing
-in the surface may wait, poll, sleep or spawn; no provider or scheduling
-identifier may appear, checked as a **substring of every AST identifier
-including both halves of an alias**, because a word-boundary search cannot match
-`provider_completion` and an alias hid the original name (both found by
-mutation); no route may construct an engine, issue a query or assign a lifecycle
-state; idempotency may not be reimplemented at the surface; every route must
-take a policy decision and declare exactly one audience; the response contract
-must forbid extra fields and expose nothing executional. Behaviourally: after an
-enqueue the job must sit in the canonical initial state with **zero attempts and
-zero checkpoints**, and that must survive a full application restart.
-
-**Controls added in Phase 7 Packages 1–3 that must not be weakened.** All
-mutation-tested (12/12, then 14/14, then 14/14 with each catch verified to be
-the *intended* control), split across
-`tests/structural/test_durable_authority.py`,
-`test_durable_governed_operations.py` and `test_durable_recovery_authority.py`
-over `durable_reader.py`: the canonical machine is the only transition
-authority; no state literal or transition table is restated; the lifecycle
-column is assigned in exactly one method, derived as the one that calls
-`evaluate`; no engine is constructed *or imported*; no raw SQL; no Stable class
-named; **nothing schedules, admits, claims, leases, allocates or selects an
-owner** — Phase 8 owns that and the controls fail on the vocabulary; every
-method that operates on the session takes a policy decision; every service class
-holding a session consults the PEP; retry accounting is rows and no counter
-column may appear; the deadline stays an absolute instant. Also
-`TestSurfaceCoverageIsHonest::test_every_built_execution_package_enforces_and_the_rest_are_absent`
-— **Package 4 builds a new package under a surface context and must satisfy it.**
-
-Package 3 added, and these are the ones most easily weakened by a later package:
-
-- **`RESUMING` has one authority and one entry shape.** Derived over the whole
-  context: only `recovery.py` may request it, every use of the name must be a
-  transition target, and the Package 2 retry/timeout/cancel/dead-letter methods
-  must have no path to it. This *replaced* Package 2's single-file tripwire,
-  which was proven unable to fire before it was touched.
-- **The heartbeat term and the deadline term stay distinct (F-0036).** Any
-  function named for the heartbeat must read `heartbeat_at`, resolved one level
-  through private helpers; the timeout rule must read `deadline_at` and must not
-  read `heartbeat_at`. The old conflated name is banned.
-- **Recovery is not scheduling.** The sweep must not call `begin_attempt`, must
-  not re-decide the disposition Package 2 owns, and must not name `DEAD_LETTER`.
-- **Time is injected.** Exactly one wall-clock source in the context, identified
-  by the function that holds it; nothing sleeps, waits or polls.
-- **Column types are derived, not listed.** Every mapped column's type must come
-  from SQLAlchemy's generic namespace, and the mapped-record set is derived from
-  the module — a record added later cannot escape the check the way
-  `JobTypeRecord` escaped the hand-written list.
-
-**Controls added in Phase 6 that must not be weakened.** All mutation-tested:
-`test_artifact_authority.py` (one identity authority, no shadow chain, no second
-persistence authority, no Stable mutation path, contract/schema reconciliation,
-dependency direction), `test_evidence_authority.py` (sole chain writer, no
-artifact-identity minting in `evidence.audit`, no same-layer sibling import, no
-amend/delete escape, no stored verification flag, every column in the digest),
-and `TestAutogenerateTargetIsComplete` (F-0033 — `env.py` must declare and
-import every module that maps a table). `test_live_repository_uses_no_exempt_edge`
-is the F-0028 vacuity guard — if a later package makes it fail, change the
-design, not the control.
-
-**Re-running `python scripts/run_phase_gate.py 6 7` now returns
-`AWAITING_RESCORING_AUTHORITY`.** That is GOV-001 working, not a Phase 6
-regression. Verify Phase 6's acceptance through `GovernanceState` and the
-recorded report instead.
-
-Do not implement Phase 13 evidence-graph computation, coverage or verdicts
-(C-16), new Acceptance Engine functionality, provider runtime, Capability Graph
-activation, the Recovery Supervisor, Stable Core promotion or release/SBOM.
+**Three budget facts to carry in.** `max_orchestration_depth` is at **4 of 4**
+on `surfaces.command → execution.durable → control.policy → kernel.contracts`;
+a further hop on that chain breaches it and must be decomposed under ADR-0008,
+never excepted. `kernel.contracts.errors` **and** `kernel.contracts.state_machine`
+are both at **15 of 15** fan-in, so a context needing a base error type must
+import `kernel.contracts.error_base`. The `shadow_registry` gate is live and is
+specifically about the provider registry Phase 9 builds — read it before
+designing, not after it fires.
 
 ## 10. New-session bootstrap protocol
 
@@ -636,7 +461,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: d3a0a9b13785f748b1ac823d927138c9c06e1596
+head: bb845d8f8153b724c4baf9939061ae90405279a8
 branch: main
 working_tree_clean: true
 
@@ -653,11 +478,12 @@ verified_by_phase:
   "5": 7
   "6": 3
   "7": 5
+  "8": 0
 cumulative_verified: 80
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7"]
-unlocked_phase: "8"
-next_exact_action_phase: "8"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8"]
+unlocked_phase: "9"
+next_exact_action_phase: "9"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
