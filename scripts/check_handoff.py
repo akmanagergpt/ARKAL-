@@ -226,9 +226,11 @@ def validate(repo: pathlib.Path, handoff_text: str,
     # Imported here rather than at module scope: `scripts/` reaches sys.path
     # above, after the import block this file's linting requires to be first.
     from handoff_architecture import check_architecture
+    from handoff_findings import check_findings
 
     check_narrative(repo, handoff_text, report)
     check_architecture(repo, handoff_text, report)
+    check_findings(repo, handoff_text, report)
 
     # the session prompt must exist and must not leak secrets
     prompt = session_prompt if session_prompt is not None else SESSION_PROMPT
