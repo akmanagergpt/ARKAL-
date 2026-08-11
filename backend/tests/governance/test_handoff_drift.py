@@ -5,11 +5,16 @@ isolated temporary Git repository. No accepted repository state is modified.
 
 A validator that cannot reject a false claim is not evidence, so each control
 asserts that a specific corruption is detected by name.
+
+The two halves F-0047 added live beside this module rather than in it, because
+it was at its 400 logical-line budget: `test_handoff_architecture_drift.py`
+covers the live architecture summary and `test_handoff_self_reference.py` covers
+the manifest's own commit references. All three share `handoff_harness.py`, so
+the validator is loaded in one place.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import pathlib
 import re
@@ -18,18 +23,12 @@ import subprocess
 import pytest
 
 from arkali.acceptance.governance_state import GovernanceState
-
-REPO = pathlib.Path(__file__).resolve().parents[3]
-VALIDATOR = REPO / "scripts" / "check_handoff.py"
-HANDOFF = REPO / "ARKALI_HANDOFF.md"
-
-
-def load_validator():
-    spec = importlib.util.spec_from_file_location("check_handoff", VALIDATOR)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+from tests.governance.handoff_harness import (
+    HANDOFF,
+    REPO,
+    drift_names,
+    load_validator,
+)
 
 
 @pytest.fixture(scope="module")
@@ -48,10 +47,6 @@ def mutate_claim(text: str, key: str, new_value: str) -> str:
     mutated, count = pattern.subn(rf"\1 {new_value}", text)
     assert count >= 1, f"claim {key!r} not found in the handoff"
     return mutated
-
-
-def drift_names(validator, text: str) -> list[str]:
-    return validator.validate(REPO, text).drift
 
 
 def truth(validator) -> dict:

@@ -31,7 +31,11 @@ HANDOFF = ROOT / "ARKALI_HANDOFF.md"
 SESSION_PROMPT = ROOT / "ARKALI_NEW_SESSION_PROMPT.txt"
 SCHEMA_VERSION = "ARKALI-HANDOFF-V1"
 
+# The sibling modules are loaded by path, not as a package: this file is run as
+# `scripts/check_handoff.py` and is also loaded by file location by the
+# governance controls, so neither `scripts` nor `backend` is importable by name.
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 
 def git(*args: str, repo: pathlib.Path | None = None) -> str:
@@ -219,7 +223,12 @@ def validate(repo: pathlib.Path, handoff_text: str,
     report.check("NEXT EXACT ACTION targets the unlocked phase",
                  next_phase, truth["unlocked_phase"])
 
+    # Imported here rather than at module scope: `scripts/` reaches sys.path
+    # above, after the import block this file's linting requires to be first.
+    from handoff_architecture import check_architecture
+
     check_narrative(repo, handoff_text, report)
+    check_architecture(repo, handoff_text, report)
 
     # the session prompt must exist and must not leak secrets
     prompt = session_prompt if session_prompt is not None else SESSION_PROMPT
@@ -244,16 +253,12 @@ _CURRENT_PHASE_HEADING = re.compile(
 _HEAD_MARKER = "HEAD at generation"
 #: A commit id cited in the accepted-commit-history ledger.
 _LEDGER_COMMIT = re.compile(r"^\|\s*\d+\s*\|\s*`([0-9a-f]{7,40})`\s*\|", re.M)
-
-
-def _section(text: str, heading_pattern: str) -> str:
-    """The body of one `## ` section, or "" when it is absent."""
-    match = re.search(heading_pattern, text, re.M)
-    if match is None:
-        return ""
-    rest = text[match.end():]
-    end = re.search(r"^## ", rest, re.M)
-    return rest[: end.start()] if end else rest
+#: The row number of a ledger row, paired with the commit it cites.
+_LEDGER_ROW = re.compile(r"^\|\s*(\d+)\s*\|\s*`([0-9a-f]{7,40})`\s*\|", re.M)
+#: The identity section, which may name the commit this revision was generated at.
+_IDENTITY_HEADING = r"^##\s*\d+\.\s*Project identity\s*$"
+#: A commit id written inline in backticks.
+_INLINE_SHA = re.compile(r"`([0-9a-f]{7,40})`")
 
 
 def check_narrative(repo: pathlib.Path, text: str, report: Report) -> None:
@@ -272,21 +277,42 @@ def check_narrative(repo: pathlib.Path, text: str, report: Report) -> None:
     git, so these controls follow the repository instead of expiring with it.
     """
     from arkali.acceptance.governance_state import GovernanceState
+    from handoff_markdown import section as _section
 
     state = GovernanceState.load(repo)
     current = state.current_work_phase()
 
+    recorded = str(parse_claims(text).get("head", ""))
+
     # -- exactly one generation marker, naming the recorded head ---------------
+    #
+    # Defect F-0047. The marker was only COUNTED, while §11 stated that a
+    # derived control also asserts it "names that same commit". It did not, and
+    # the marker was left on an older ledger row by a later refresh - so the
+    # manifest overstated its own validator. Counting and naming are now both
+    # asserted.
     markers = [line for line in text.splitlines() if _HEAD_MARKER in line]
     report.assert_true(
         "exactly one HEAD-at-generation marker",
         len(markers) == 1,
         f"found {len(markers)}",
     )
+    marked = [c for line in markers for c in _LEDGER_COMMIT.findall(line)]
+    report.assert_true(
+        "the HEAD-at-generation marker names the recorded head",
+        len(marked) == 1 and bool(recorded) and recorded.startswith(marked[0]),
+        f"marker names {marked}; recorded head is {recorded[:10]}",
+    )
 
-    # -- the ledger must be a set, and must reach the recorded head ------------
+    # -- the ledger must be a set, in order, and must reach the recorded head --
     ledger = _section(text, r"^##\s*\d+\.\s*Accepted commit history\s*$")
     cited = _LEDGER_COMMIT.findall(ledger)
+    numbered = [int(n) for n, _ in _LEDGER_ROW.findall(ledger)]
+    report.assert_true(
+        "the accepted-commit history is in ledger order",
+        numbered == sorted(numbered),
+        f"out of order at {[n for i, n in enumerate(numbered) if i and n < numbered[i - 1]]}",
+    )
     duplicated = sorted({c for c in cited if cited.count(c) > 1})
     report.assert_true(
         "no commit is cited twice in the accepted-commit history",
@@ -296,12 +322,25 @@ def check_narrative(repo: pathlib.Path, text: str, report: Report) -> None:
     # The ledger must reach the commit the handoff was GENERATED at, not the
     # live HEAD: a §12 refresh commit cannot cite its own sha, which is the same
     # reason `check_head` accepts a governed-clean ancestor.
-    recorded = str(parse_claims(text).get("head", ""))
     reachable = any(recorded.startswith(c) for c in cited if c)
     report.assert_true(
         "the accepted-commit history reaches the recorded head",
         reachable or not cited,
         f"recorded head {recorded[:10]} is absent from {len(cited)} ledger rows",
+    )
+
+    # -- the identity section may not carry a second, stale commit ------------
+    #
+    # Defect F-0047. §11's sha transcription was removed by F-0046 precisely
+    # because a hand-copied commit rots, but the identity table kept one and it
+    # was twelve commits stale. A commit named there must be the recorded head;
+    # naming none is compliant, which is how F-0046 left §11.
+    identity = _section(text, _IDENTITY_HEADING)
+    strays = [s for s in _INLINE_SHA.findall(identity) if not recorded.startswith(s)]
+    report.assert_true(
+        "the identity section names no commit other than the recorded head",
+        not strays,
+        f"{strays} disagree with the recorded head {recorded[:10]}",
     )
 
     # -- the current-phase section must describe the phase actually current ----
