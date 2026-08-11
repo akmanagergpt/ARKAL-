@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import pathlib
 import shutil
+from typing import get_origin
 
 import yaml
 
@@ -31,7 +32,9 @@ from arkali.control.capability.capability_graph import (
     CapabilityGraph,
     CapabilityQueryResult,
 )
-from arkali.control.capability.capability_node import CapabilityNode
+from arkali.control.capability.capability_node import CapabilityNode, ConfiguredState
+from arkali.control.capability.reference_authority import CapabilityReferenceAuthority
+from arkali.control.capability.reference_resolution import ReferenceResolvers
 from arkali.control.isolation.backend_probe import probe_all
 from arkali.control.isolation.isolation_contract import (
     BackendDescriptor,
@@ -39,6 +42,7 @@ from arkali.control.isolation.isolation_contract import (
 )
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.control.policy.pep import PolicyEnforcementPoint
+from arkali.control.specification.register_parser import RequirementRegister
 from arkali.execution.scheduler.admission import AdmissionRequest, AdmissionService
 from arkali.execution.scheduler.capability_admission import CapabilityAdmission
 from arkali.execution.scheduler.isolation_admission import IsolationAdmission
@@ -98,6 +102,127 @@ class ResolverSpy:
             reason=self.reason,
             authoritative_source="test-only resolver",
         )
+
+
+def binding() -> CapabilityReferenceAuthority:
+    """The canonical reference -> authority binding, parsed at call time."""
+    return CapabilityReferenceAuthority.load(REPO)
+
+
+class DeclaredSet:
+    """A composition-root resolver over an explicitly declared identifier set.
+
+    This is where a resolver BELONGS in a test: `control.capability` takes its
+    authorities by injection, so supplying them here exercises the shipping graph
+    rather than substituting for it. It records every question, because proving
+    an answer is not cached needs evidence the authority was re-asked.
+    """
+
+    def __init__(self, *known: str) -> None:
+        self.known = set(known)
+        self.asked: list[str] = []
+
+    def resolves(self, reference: str) -> bool:
+        self.asked.append(reference)
+        return reference in self.known
+
+
+class RegisterAuthority:
+    """The REAL `control.specification` authority, answering the same question."""
+
+    def __init__(self, register: RequirementRegister) -> None:
+        self._register = register
+        self.asked: list[str] = []
+
+    def resolves(self, reference: str) -> bool:
+        self.asked.append(reference)
+        return reference in self._register.all_ids()
+
+
+def _reference_for(
+    field: str, target_kind: str, capability_id: str, register: RequirementRegister
+) -> str:
+    """One identifier of the kind a declared field holds, scoped to its node.
+
+    Scoping matters: two nodes must not share references, or "an authority that
+    resolves node A's references" would silently resolve node B's too and the
+    unknown-reference cases would pass for the wrong reason.
+
+    The evidence-requirement field is given a REAL requirement id so that at
+    least one authority in every activated fixture is the canonical one rather
+    than a double; the rest are composition-root doubles over declared sets.
+    """
+    if target_kind == "ark_req_id":
+        return register.all_ids()[0]
+    stem = field.removesuffix("s").removesuffix("_ref")
+    return f"{stem}.{capability_id.replace('.', '_')}"
+
+
+def activated_node(
+    capability_id: str = CAPABILITY_ID,
+    tier: str = "TRUST-0",
+    *,
+    configured: bool = True,
+    prerequisites: tuple[str, ...] = (),
+) -> CapabilityNode:
+    """A node carrying one reference in every externally-owned field.
+
+    Built from the canonical binding, so a reference field added to the schema
+    is carried the day it is declared rather than when someone remembers.
+    """
+    register = RequirementRegister.load(REPO)
+    fields: dict[str, object] = {
+        "id": capability_id,
+        "version": 1,
+        "isolation_tier": tier,
+        "prerequisites": prerequisites,
+        "configured_state": (
+            ConfiguredState.CONFIGURED if configured else ConfiguredState.UNCONFIGURED
+        ),
+    }
+    for declared in binding().external():
+        annotation = CapabilityNode.model_fields[declared.field].annotation
+        reference = _reference_for(
+            declared.field, declared.target_kind, capability_id, register
+        )
+        fields[declared.field] = (
+            (reference,) if get_origin(annotation) is tuple else reference
+        )
+    return CapabilityNode(**fields)  # type: ignore[arg-type]
+
+
+def resolving_authorities(
+    *nodes: CapabilityNode,
+) -> tuple[ReferenceResolvers, dict[str, object]]:
+    """Authorities that resolve exactly the references the given nodes declare."""
+    declared = binding()
+    register = RequirementRegister.load(REPO)
+    resolvers: dict[str, object] = {}
+    for reference in declared.external():
+        held: set[str] = set()
+        for node in nodes:
+            value = getattr(node, reference.field)
+            held |= set(value) if isinstance(value, tuple) else {value}
+        resolvers[reference.authority] = (
+            RegisterAuthority(register)
+            if reference.target_kind == "ark_req_id"
+            else DeclaredSet(*sorted(h for h in held if h))
+        )
+    return ReferenceResolvers(declared, resolvers), resolvers  # type: ignore[arg-type]
+
+
+def activated_graph(
+    *nodes: CapabilityNode,
+    references: object = None,
+    current_phase: str = ACTIVATION_PHASE,
+) -> CapabilityGraph:
+    """The SHIPPING CapabilityGraph, at its activation phase, composed."""
+    return CapabilityGraph(
+        nodes,
+        activation_phase=ACTIVATION_PHASE,
+        current_phase=current_phase,
+        references=references,  # type: ignore[arg-type]
+    )
 
 
 def real_pep(root: pathlib.Path = REPO) -> PolicyEnforcementPoint:

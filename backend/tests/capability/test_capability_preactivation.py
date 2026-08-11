@@ -11,6 +11,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+
 from arkali.control.capability.capability_graph import CapabilityGraph
 from arkali.control.capability.capability_node import CapabilityNode, ConfiguredState
 from arkali.control.specification.register_parser import RequirementRegister
@@ -144,16 +145,32 @@ class TestPrematureActivationIsRejected:
         with pytest.raises(PrematureActivation):
             graph(activation_phase, pretended).activate()
 
-    def test_resolution_is_not_implemented_in_the_schema_phase(
+    def test_reaching_the_activation_phase_alone_invents_no_verdict(
         self, activation_phase: str
     ) -> None:
-        """Even at the activation phase, Phase 3 code refuses to invent a verdict.
+        """REPLACES the Phase 3 tripwire, with a strictly stronger obligation.
 
-        Phase 9B owns real resolution. Answering here would be a forward-phase
-        implementation wearing the current phase's name.
+        Until Phase 9B Package 2 this asserted that `can_perform` RAISED
+        `PrematureActivation` at the activation phase, because Phase 3 refused to
+        implement a forward phase. Package 2 is that phase, so the refusal is
+        gone — but the obligation it protected is not, and it is now larger: the
+        answer must be DERIVED FROM LIVE AUTHORITIES, never invented.
+
+        A graph standing at its activation phase with no reference authority
+        composed has nothing to derive from. It must therefore answer
+        `NOT_CONFIGURED` — the same determinate answer, for the same canonical
+        reason ADR-0003 gives before activation: no referenced authority can
+        answer. It must never answer affirmatively. See
+        `tests/capability/test_activated_query.py` for the full derivation
+        controls, and `tests/execution/test_activated_admission.py` for the same
+        obligation proven through the real `AdmissionService`.
         """
-        with pytest.raises(PrematureActivation):
-            graph(activation_phase, activation_phase).can_perform("build.compile")
+        result = graph(activation_phase, activation_phase).can_perform(
+            "build.compile"
+        )
+        assert result.state is HonestState.NOT_CONFIGURED
+        assert result.is_determinate
+        assert result.state is not HonestState.PASS
 
     def test_activation_state_is_derived_not_settable(
         self, schema_phase: str, activation_phase: str

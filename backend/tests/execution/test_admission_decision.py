@@ -19,10 +19,11 @@ import datetime as dt
 import pytest
 
 from arkali.control.capability.capability_graph import CapabilityGraph
+from arkali.control.isolation.isolation_contract import IsolationAuthority
 from arkali.control.isolation.isolation_errors import TrustTierViolation
 from arkali.control.policy.policy_errors import PolicyDenied
 from arkali.execution.scheduler.admission_result import AdmissionOutcome
-from arkali.execution.scheduler.capability_admission import CapabilityAdmission
+from arkali.execution.scheduler.capability_admission import CapabilityAdmission, resolves
 from arkali.execution.scheduler.errors import InvalidResourceAvailability
 from arkali.execution.scheduler.isolation_admission import IsolationAdmission
 from arkali.execution.scheduler.resource_admission import (
@@ -35,8 +36,8 @@ from arkali.kernel.contracts.capability_errors import (
     PrematureActivation,
 )
 from arkali.kernel.contracts.results import HonestState
-from arkali.control.isolation.isolation_contract import IsolationAuthority
 from tests.execution.scheduler_admission_harness import (
+    ACTIVATION_PHASE,
     CAPABILITY_ID,
     PROFILE,
     REPO,
@@ -98,11 +99,33 @@ class TestCapabilityCondition:
         assert not graph.is_activated
 
     def test_the_scheduler_cannot_force_a_configured_verdict(self) -> None:
-        """Setting current_phase to the activation phase does not yield a PASS."""
-        activated = real_graph(current_phase="9B")
+        """REPLACES the Phase 8 tripwire, with a strictly stronger obligation.
+
+        Until Phase 9B Package 2 this asserted that `can_perform` RAISED
+        `PrematureActivation` once `current_phase` was set to the activation
+        phase, because resolution was not implemented. Package 2 implements it,
+        so the raise is gone. The obligation is unchanged and now reaches
+        further: choosing a phase must not be able to manufacture a capability
+        success, and it still cannot — a graph at its activation phase with no
+        reference authority composed has nothing to resolve against, so it
+        answers `NOT_CONFIGURED` and admission still refuses.
+
+        The activated path is proven end to end through the real
+        `AdmissionService` in `tests/execution/test_activated_admission.py`.
+        """
+        activated = real_graph(current_phase=ACTIVATION_PHASE)
         assert activated.is_activated
+        result = CapabilityAdmission(activated).evaluate(CAPABILITY_ID)
+        assert result.state is HonestState.NOT_CONFIGURED
+        assert not resolves(result), "a chosen phase must not satisfy condition (a)"
+
+    def test_activation_remains_a_derived_phase_fact(self) -> None:
+        """No stored flag, so the scheduler cannot switch one on."""
+        activated = real_graph(current_phase=ACTIVATION_PHASE)
         with pytest.raises(PrematureActivation):
-            CapabilityAdmission(activated).evaluate(CAPABILITY_ID)
+            activated.activate()
+        with pytest.raises(AttributeError):
+            activated.is_activated = True  # type: ignore[misc]
 
     def test_the_resolver_is_injected_with_no_default(self) -> None:
         with pytest.raises(TypeError):

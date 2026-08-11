@@ -18,10 +18,14 @@ from typing import Final
 
 import pytest
 import yaml
+
 from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.architecture.gates.authority_gates import ShadowRegistryGate
 from arkali.control.architecture.gates.base import GateContext
-from arkali.control.capability.capability_graph import CapabilityGraph
+from arkali.control.capability.capability_graph import (
+    CapabilityGraph,
+    CapabilityQueryResult,
+)
 from arkali.control.capability.capability_node import CapabilityNode
 from arkali.control.capability.reference_authority import (
     AUTHORITY_MAP_RELPATH,
@@ -214,6 +218,54 @@ class TestThereIsExactlyOneCapabilityAuthority:
             SCHEMA_BLOCK_MARKER in read(path) for path in modules(owner)
         ), "the owner derives no binding; this control would be vacuous"
 
+    def test_only_the_owner_composes_a_capability_verdict(self) -> None:
+        """Package 2 makes a verdict constructible. Only its owner may build one.
+
+        `execution.scheduler` returns the authority's own result unchanged; a
+        module that CONSTRUCTED a `CapabilityQueryResult` would be answering the
+        capability question itself, which is a second authority for the concern
+        `AUTHORITY_MAP.yaml` gives to exactly one owner.
+        """
+        owner = context_root(owner_context())
+        verdict = CapabilityQueryResult.__name__
+        building = []
+        for path in modules(PACKAGE):
+            if owner in path.parents:
+                continue
+            for node in ast.walk(tree_of(path)):
+                if isinstance(node, ast.Call) and _named(node.func) == verdict:
+                    building.append(path.relative_to(PACKAGE).as_posix())
+        assert not building, (
+            f"these shipping modules construct a {verdict}: {sorted(set(building))}"
+        )
+        assert any(
+            _named(node.func) == verdict
+            for path in modules(owner)
+            for node in ast.walk(tree_of(path))
+            if isinstance(node, ast.Call)
+        ), "the owner constructs no verdict; this control would be vacuous"
+
+    def test_the_owner_declares_no_isolation_or_policy_vocabulary(self) -> None:
+        """The activated query must not usurp another authority's verdict.
+
+        Isolation satisfiability is `control.isolation` plus admission condition
+        (b); a policy decision is the PDP's. Resolving a reference asks whether
+        an identifier exists, never what it decides.
+        """
+        raw = authority_map_raw()
+        isolation = raw["isolation"]  # type: ignore[index]
+        canonical = set(isolation["properties"]) | set(isolation["tier_requirements"])  # type: ignore[index,call-overload]
+        canonical |= {"AUTO", "ASK_USER", "DENY"}
+        assert canonical, "no vocabulary derived; this control would be vacuous"
+        for path in modules(context_root(owner_context())):
+            declared = {
+                node.id if isinstance(node, ast.Name) else node.attr
+                for node in ast.walk(tree_of(path))
+                if isinstance(node, (ast.Name, ast.Attribute))
+            }
+            leaked = sorted(declared & canonical)
+            assert not leaked, f"{path.name} names {leaked}"
+
     def test_the_owner_declares_no_state_machine(self) -> None:
         """The canonical machine count stays 12; activation adds none."""
         for path in modules(context_root(owner_context())):
@@ -273,6 +325,12 @@ class TestNoProviderStateAndNoCache:
                         )
 
 
+def _named(func: ast.expr) -> str:
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return func.id if isinstance(func, ast.Name) else ""
+
+
 def _calls_resolution(value: ast.expr) -> bool:
     for node in ast.walk(value):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
@@ -288,6 +346,89 @@ def _outlives_the_call(target: ast.expr) -> bool:
         and isinstance(target.value, ast.Name)
         and target.value.id == "self"
     )
+
+
+#: The two designed pre-activation tripwires Phase 9B Package 2 retired, and the
+#: permanent control that replaced each. These are named rather than derived
+#: because they are two specific historical artifacts; nothing derives "the test
+#: that used to assert PrematureActivation". The control below is what stops a
+#: replacement from being quietly emptied after the tripwire was removed.
+TRIPWIRE_REPLACEMENTS: Final[tuple[tuple[str, str], ...]] = (
+    (
+        "backend/tests/capability/test_capability_preactivation.py",
+        "test_reaching_the_activation_phase_alone_invents_no_verdict",
+    ),
+    (
+        "backend/tests/execution/test_admission_decision.py",
+        "test_the_scheduler_cannot_force_a_configured_verdict",
+    ),
+)
+
+
+class TestRetiredTripwiresStillHaveTheirObligation:
+    """A tripwire may be replaced. Its obligation may not be dropped.
+
+    `TRIPWIRE_REPLACEMENTS` is data in the SAME file as this control, so an edit
+    that shrinks the tuple would silently narrow what gets checked rather than
+    failing anything - the tuple is asserted against its own known length first,
+    closing that hole before any entry is examined.
+    """
+
+    def test_the_replacement_set_itself_was_not_narrowed(self) -> None:
+        """Phase 9B Package 2 replaced exactly two designed tripwires. Not fewer."""
+        assert len(TRIPWIRE_REPLACEMENTS) == 2, (
+            f"expected exactly 2 tripwire replacements, found "
+            f"{len(TRIPWIRE_REPLACEMENTS)}: {TRIPWIRE_REPLACEMENTS}"
+        )
+
+    def test_each_replacement_exists_and_asserts_the_obligation(self) -> None:
+        for relative, name in TRIPWIRE_REPLACEMENTS:
+            path = REPO / relative
+            assert path.is_file(), f"{relative} is gone"
+            found = [
+                node
+                for node in ast.walk(tree_of(path))
+                if isinstance(node, ast.FunctionDef) and node.name == name
+            ]
+            assert len(found) == 1, f"{relative}::{name} is missing or duplicated"
+            asserted = [
+                ast.unparse(node)
+                for node in ast.walk(found[0])
+                if isinstance(node, ast.Assert)
+            ]
+            assert asserted, f"{relative}::{name} asserts nothing"
+            assert any("NOT_CONFIGURED" in text for text in asserted), (
+                f"{relative}::{name} no longer asserts that reaching the "
+                "activation phase alone yields NOT_CONFIGURED; the retired "
+                "tripwire's obligation has been dropped"
+            )
+
+    def test_no_replacement_still_expects_the_retired_refusal(self) -> None:
+        """The obligation moved; it did not simply keep the old assertion.
+
+        The docstring is exempted deliberately: explaining what a replacement
+        superseded is documentation, and only the executable BODY deciding the
+        test's outcome is the subject here.
+        """
+        for relative, name in TRIPWIRE_REPLACEMENTS:
+            found = next(
+                node
+                for node in ast.walk(tree_of(REPO / relative))
+                if isinstance(node, ast.FunctionDef) and node.name == name
+            )
+            body = [
+                stmt for stmt in found.body
+                if not (
+                    isinstance(stmt, ast.Expr)
+                    and isinstance(stmt.value, ast.Constant)
+                    and isinstance(stmt.value.value, str)
+                )
+            ]
+            assert body, f"{relative}::{name} has no executable body"
+            rendered = "\n".join(ast.unparse(stmt) for stmt in body)
+            assert "PrematureActivation" not in rendered, (
+                f"{relative}::{name} still expects the retired refusal"
+            )
 
 
 class TestPreActivationStateIsPreserved:
@@ -306,14 +447,25 @@ class TestPreActivationStateIsPreserved:
         assert result.state is HonestState.NOT_CONFIGURED
         assert result.is_determinate
 
-    def test_the_query_still_refuses_to_invent_a_verdict_at_activation(self) -> None:
-        """Composing a verdict is Package 2. Until then, refusal is honest."""
-        with pytest.raises(PrematureActivation):
-            self._graph("9B").can_perform("build.compile")
+    def test_an_uncomposed_graph_at_the_activation_phase_invents_no_verdict(
+        self,
+    ) -> None:
+        """REPLACES this module's own Package 1 tripwire, strengthened.
 
-    def test_explicit_activation_is_still_refused(self) -> None:
-        with pytest.raises(PrematureActivation):
-            self._graph("9B").activate()
+        Package 1 asserted `PrematureActivation` here because no verdict existed
+        to compose. Package 2 composes one, so the obligation moves rather than
+        disappearing: the phase alone must never produce an affirmative answer,
+        because a graph with no composed authority has nothing to derive from.
+        """
+        result = self._graph("9B").can_perform("build.compile")
+        assert result.state is HonestState.NOT_CONFIGURED
+        assert result.state is not HonestState.PASS
+
+    def test_explicit_activation_is_still_refused_at_every_phase(self) -> None:
+        """There is no flag to set, so the operation refuses at 9B too."""
+        for phase in ("8", "9B"):
+            with pytest.raises(PrematureActivation):
+                self._graph(phase).activate()
 
     def test_activation_state_remains_a_derived_phase_fact(self) -> None:
         graph = self._graph("8")
