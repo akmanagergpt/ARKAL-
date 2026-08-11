@@ -8,7 +8,7 @@ All fields above are the `CONTRACT_INVENTORY.md` row for C-11, not a restatement
 Where this document and the code or the canonical set disagree, they win and this
 document is the defect.
 
-## 0. Scope of this revision — Phase 9 Atomic Package 1
+## 0. Scope of this revision — Phase 9 Atomic Packages 1 and 2
 
 Package 1 delivers the **record**: what the Provider/Model Registry is the sole
 authority for, and the validation that makes a record truthful.
@@ -97,10 +97,37 @@ the registry, at query time.
 `ARK-REQ-0053`, no component may store, cache, mirror, default or re-derive these
 values; all consumers resolve them from the Registry at query time.
 
-Package 1 establishes the authority side of that rule. **Source-level enforcement
-across the consumers is a later Phase 9 package** — today the `shadow_registry`
-gate validates the *declaration* (owner, consumer set, copying and caching flags)
-rather than consumer source, and that gap is stated here rather than papered over.
+Package 1 established the authority side of that rule. **Package 2 closed the
+consumer side.** The gap this section previously recorded — that `shadow_registry`
+validated the *declaration* rather than consumer source — was first reproduced:
+nine real violations were written into real consumer packages and every one
+passed the untouched gate. The gate now has two halves under one id, because
+`AUTHORITY_MAP.yaml` declares the gate set and a canonical document is not edited
+to accommodate an implementation.
+
+The source half walks every module under each declared consumer's declared module
+root and refuses, by AST rather than by text:
+
+| Refused | Because |
+|---|---|
+| a class field, attribute, module-level name, function or defaulted parameter whose tokens carry the owner's own token **and** every token of an owned concern | storing, defaulting or re-deriving an owned value |
+| the same shape reached through a `Field(alias=...)`, a dict key or any identifier-shaped keyword string | renaming a concern does not un-own it |
+| a bare concern name declared inside a provider-shaped class | dropping the qualifier does not drop the concern |
+| a provider-qualified name carrying an operation the map marks not permitted | `copying_permitted` and `caching_permitted` are `false` |
+| a provider-shaped value assigned to `self.<attr>` | a value kept beyond the query that produced it is a copy |
+| a consumer with no module on disk, or a run that scanned nothing | ADR-0001: a detector returning zero without demonstrated detection is FAIL |
+
+**Permitted, and proven permitted:** opaque `provider_ref`/`provider_refs`
+holdings (ADR-0003); resolving from the registry into a **local**, which is how a
+consumer uses a query result; any concern word that does not also carry the
+owner's token, so `worker_health` is somebody else's word; and prose — comments,
+docstrings and positional message strings are never subjects, so documentation
+describing a previous state cannot trip the gate.
+
+Scope is derived at call time, so a module added to a consumer tomorrow is
+scanned, and a context added to or removed from `reference_only_consumers` moves
+the rule rather than expiring it. **No requirement is discharged by this package;
+`ARK-REQ-0053` is discharged only at phase acceptance.**
 
 ## 4. Boundary — what this contract is not the authority for
 
@@ -135,8 +162,8 @@ because this registry is not a second transition authority.
 
 ## 6. What later Phase 9 packages add
 
-Source-level enforcement of `ARK-REQ-0053` across the five reference-only
-consumers; the `ARK-REQ-0219` never-fabricate control owned by
-`acceptance.engine` with its provenance and security evidence; and final
-integration, traceability carrying three real claims, the C-17 report and the
-machine gate — only if earned.
+Source-level enforcement of `ARK-REQ-0053` is **done** (Package 2, §3). What
+remains: the `ARK-REQ-0219` never-fabricate control owned by `acceptance.engine`
+with its provenance and security evidence; and final integration, traceability
+carrying three real claims, the C-17 report and the machine gate — only if
+earned.
