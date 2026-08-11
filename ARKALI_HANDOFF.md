@@ -129,14 +129,15 @@ repository, the repository wins.
 | Phase 6 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE` on the **first** submission (`docs/acceptance/phase_6_report.json`, `phase_6_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (the change set touched `acceptance.engine`, `control.architecture` and `evidence.audit`, so `select_profile` required security review, adversarial review and full regression — all executed at exit 0), RESCORING NOT_APPLICABLE, HUMAN_GATE NOT_APPLICABLE. Three atomic packages: C-14 artifact descriptor + provenance (`evidence.artifact`), C-15 append-only evidence integrity chain (`evidence.audit`, Protected Core), and the composed Evidence Plane evidence. Migrations `0003` and `0004`. **3/3 requirements discharged** |
 | Phase 7 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_7_report.json`, `phase_7_traceability.json`). C1–C6 PASS, PROTECTED_CORE **COMPLETE** (member `control.architecture`, from Package 1's kernel-error decomposition; security review 188, adversarial review 538, full regression 1614, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Five atomic packages delivering C-19 and the `ARK-REQ-0027` enqueue surface; migrations `0005`–`0007`. **5/5 requirements discharged** — four MANDATORY plus `ARK-REQ-0060`, the first CONDITIONAL requirement any phase has discharged |
 | Phase 8 | **MACHINE-ACCEPTED (SUPERSEDING, under GOV-001 `RSA-002`)** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, with RESCORING PASS. **The FIRST submission was accepted on an inaccurate record** (F-0045, HIGH): it reported two validator runs at exit 0 that returned 11 pass / 1 fail at `bb845d8`, and with the true codes would have been PHASE_BLOCKED on C3/C5. The authority refused to downgrade the finding or leave that acceptance standing; the defective revision is retained as `phase_8_report_rev1_defective.json` and the superseding report was genuinely re-executed record by record. F-0045 closed **with HIGH intact**. Three atomic packages delivering C-21. **Zero-denominator phase — 0/0 requirements, `claims: []`, cumulative verified unchanged at 80.** Production admission returns `CAPABILITY_NOT_CONFIGURED` until Phase 9B |
-| Phase 9 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_9_report.json`, `phase_9_traceability.json`). C1–C6 PASS, **EXTERNAL_RESULT PASS** over 14 declared runs, PROTECTED_CORE **COMPLETE** (members `acceptance.engine` and `control.architecture`, derived over the whole candidate), PREREQ 3/3, FINDINGS PASS, HUMAN_GATE NOT_APPLICABLE. **3/3 requirements discharged.** Four atomic packages delivering C-11. Provider + Model Runtime (C-11). **Packages 1, 2 and 3 of 4 complete.** Package 1: `docs/contracts/provider_record.md`, `provider_authority` (the seven owned concerns and five reference-only consumers parsed at call time, never transcribed) and `provider_record` (the C-11 record). Package 3: `ARK-REQ-0219` is enforced in the acceptance path under human ruling **D-023** — a recorded run **declares** its external-provider class on one new C-17 field, and a declared external result is refused while no canonical verifiable binding exists, which is the state today; all nine accepted reports stay byte-identical and claim nothing. Package 2: `ARK-REQ-0053` is now enforced in **consumer source** — the `shadow_registry` gate walks every module under each declared consumer's declared module root and refuses stored, cached, mirrored, defaulted, aliased or locally re-derived owned concerns by AST, while permitting opaque `provider_ref` holdings and registry results resolved into a local. The Phase 3 `ProviderHealth` machine is reused, not duplicated — count stays 12. C-11 is `INT`, so no table and no migration. Denominator is **3** (`ARK-REQ-0052`, `0053`, `0219`) and **none is discharged yet**, so cumulative verified stays 80. Capability activation remains Phase 9B |
+| Phase 9 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_9_report.json`, `phase_9_traceability.json`). C1–C6 PASS, **EXTERNAL_RESULT PASS** over 14 declared runs, PROTECTED_CORE **COMPLETE** (members `acceptance.engine` and `control.architecture`, derived over the whole candidate), PREREQ 3/3, FINDINGS PASS, HUMAN_GATE NOT_APPLICABLE. **3/3 requirements discharged** — `ARK-REQ-0052`, `ARK-REQ-0053`, `ARK-REQ-0219`, all MANDATORY — taking cumulative verified 80 → **83**. **All four atomic packages are complete**, and the phase's own accepted evidence is the authority for what each delivered: Package 1 the C-11 record and its parsed authority, Package 2 `ARK-REQ-0053` enforced in consumer source, Package 3 `ARK-REQ-0219` enforced in the acceptance path under human ruling **D-023**, Package 4 the composed integration, traceability, report and the single gate run. The Phase 3 `ProviderHealth` machine is reused, not duplicated — count stays 12. C-11 is `INT`, so no table and no migration. **No external provider was contacted and no external-provider result exists**; the positive external path stays closed because the canonical set defines no verifiable binding, and none was invented. Capability activation remains Phase 9B |
+| Phase 9B | **UNLOCKED — NOT_STARTED** ← current work. Capability Graph Activation. `GovernanceState.current_work_phase()` returns `9B`. Prerequisites **3, 4, 6 and 9** are all MACHINE-ACCEPTED, which is why the dependency machine permits it. Denominator is **3** — `ARK-REQ-0046`, `ARK-REQ-0047`, `ARK-REQ-0048`, none discharged — so cumulative verified stays 83 until 9B is accepted. Nothing of 9B has begun |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
 | Cumulative verified | **83** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + **3 Phase 9**), reconciled by check C6 against each phase's traceability record. Of the 83, **82 are MANDATORY**: Phase 7's `ARK-REQ-0060` is still the one CONDITIONAL discharged, and all three Phase 9 requirements are MANDATORY. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | the latest recorded finding is **F-0047** — **MEDIUM**, **CLOSED** — and every finding through **F-0047** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
+| Recorded findings | the latest recorded finding is **F-0048** — **MEDIUM**, **CLOSED** — and every finding through **F-0048** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **104** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Package 1 took this from 100 to 102 (`control.registry.provider → kernel.contracts` via `error_base`); Package 3 took it to 104, `acceptance.engine → control.registry.provider` and `acceptance.engine → control.specification`, both downward and legal. `acceptance.engine` public surface is **40 of 40** — at its ceiling, which is why `ARK-REQ-0219`'s vocabulary, derivation and check are reached through one public name. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is now re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived. Phase 8 Package 2's 466-line scheduler authority test was decomposed under ADR-0008; no GATE 8 exception was requested |
@@ -385,7 +386,9 @@ time (ADR-0001).
 
 **Every acceptance report from here on owes an `external_result` declaration on
 every recorded run.** The obligation is derived from the register's Phase column
-for `ARK-REQ-0219`, so it applies to 9B and beyond; a defaulted field is refused.
+for the never-fabricate requirement Phase 9 discharged — **D-023 in
+`DECISION_LOG.md` names it** — so it applies to 9B and every later phase; a
+defaulted field is refused.
 Read **D-023** in `DECISION_LOG.md`: it records what the canonical set does *not*
 define — no external-provider-result object, no request or response identity, no
 timestamp binding, no verification flag — and that none of it was invented. Do
@@ -414,35 +417,41 @@ ad-hoc extras are exactly what masked F-0042, F-0043 and F-0044 for three
 phases. There is still **no Python lockfile**; do not create one.
 
 **Derive the scope from repository authority before writing anything.** Read
-`REQUIREMENT_REGISTER.md` for the rows whose Phase column is 9,
-`CONTRACT_INVENTORY.md` for C-11's row,
+`REQUIREMENT_REGISTER.md` for the rows whose Phase column is 9B,
+`CONTRACT_INVENTORY.md` for C-13's row,
 `IMPLEMENTATION_DEPENDENCY_MATRIX.md` for prerequisites and any human gate, and
-`ARCHITECTURE.md` §3 for what `control.registry.provider` owns.
+`ARCHITECTURE.md` §3 for what `control.capability` owns.
 
-**Phase 9 has a NON-ZERO denominator — three requirements.** `ARK-REQ-0052`,
-`ARK-REQ-0053` and `ARK-REQ-0219`. Phase 8's `claims: []` was legal *because*
-its denominator was empty; Phase 9's record must carry real claims, and C6
-refuses an empty record against a non-empty denominator just as hard as it
-refuses the reverse.
+**Phase 9B has a NON-ZERO denominator — three requirements.** `ARK-REQ-0046`,
+`ARK-REQ-0047` and `ARK-REQ-0048`. They are **not** Phase 9's, which are
+discharged and closed; derive them with `RequirementRegister.for_phase("9B")`
+rather than carrying anything over. Phase 8's `claims: []` was legal *because*
+its denominator was empty; 9B's record must carry real claims, and C6 refuses an
+empty record against a non-empty denominator just as hard as it refuses the
+reverse.
 
-**What Phase 8 leaves ready, and what it deliberately did not build.**
-`AdmissionService.evaluate` answers `EXECUTION_AND_CAPABILITY.md` §4 for one
-request and refuses every one with `CAPABILITY_NOT_CONFIGURED` until Phase 9B
-activates the Capability Graph. `provider` is one of the seven canonical worker
-*classes* — a vocabulary entry only. **No provider runtime exists**, and a
-control separates the canonical worker class from provider execution authority,
-so building the runtime must not be mistaken for widening C-21. ADR-0001 keeps
-health, cost, availability and fallback in `control.registry.provider` alone;
-the Capability Graph holds `provider_refs` and resolves them at query time.
+**What Phase 9 leaves ready, and what it deliberately did not build.**
+`control.registry.provider` holds the C-11 record and its parsed authority, and
+both provider invariants are enforced: no reference-only consumer may store,
+cache, mirror, default, alias or locally re-derive an owned concern, and no
+acceptance package can turn an absent, local or simulated result into an
+external-provider claim. **No provider runtime, no network call and no
+external-provider result exists.** `AdmissionService.evaluate` answers
+`EXECUTION_AND_CAPABILITY.md` §4 for one request and refuses every one with
+`CAPABILITY_NOT_CONFIGURED` until 9B activates the graph. ADR-0001 keeps health,
+cost, availability and fallback in `control.registry.provider` alone; the
+Capability Graph holds `provider_refs` and resolves them at query time.
 
 **Three budget facts to carry in.** `max_orchestration_depth` is at **4 of 4**
 on `surfaces.command → execution.durable → control.policy → kernel.contracts`;
 a further hop on that chain breaches it and must be decomposed under ADR-0008,
 never excepted. `kernel.contracts.errors` **and** `kernel.contracts.state_machine`
 are both at **15 of 15** fan-in, so a context needing a base error type must
-import `kernel.contracts.error_base`. The `shadow_registry` gate is live and is
-specifically about the provider registry Phase 9 builds — read it before
-designing, not after it fires.
+import `kernel.contracts.error_base`. `acceptance.engine` is at **40 of 40**
+public surface, so anything 9B adds there must be reached through an existing
+name. The `shadow_registry` gate now reads **consumer source**, and
+`control.capability` is one of the five declared reference-only consumers — read
+it before designing 9B, not after it fires.
 
 ## 10. New-session bootstrap protocol
 

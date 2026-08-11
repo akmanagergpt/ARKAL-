@@ -227,10 +227,12 @@ def validate(repo: pathlib.Path, handoff_text: str,
     # above, after the import block this file's linting requires to be first.
     from handoff_architecture import check_architecture
     from handoff_findings import check_findings
+    from handoff_transition import check_transition
 
     check_narrative(repo, handoff_text, report)
     check_architecture(repo, handoff_text, report)
     check_findings(repo, handoff_text, report)
+    check_transition(repo, handoff_text, report)
 
     # the session prompt must exist and must not leak secrets
     prompt = session_prompt if session_prompt is not None else SESSION_PROMPT
