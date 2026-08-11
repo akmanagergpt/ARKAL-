@@ -1,0 +1,172 @@
+{
+  "phase_id": "9",
+  "objective": "Deliver C-11, the Provider/Model record, and the two invariants that govern it, in four atomic packages. Package 1: the registry authority and the C-11 record - the seven owned concerns and the five reference-only consumers parsed from AUTHORITY_MAP.yaml at call time and appearing nowhere in code, with the Phase 3 ProviderHealth machine reused so the canonical count stays 12. Package 2: ARK-REQ-0053 made enforceable in CONSUMER SOURCE - the shadow_registry gate gained a source half that walks every module under each declared consumer's declared module root and refuses stored, cached, mirrored, defaulted, aliased or locally re-derived owned concerns by AST; the gap docs/contracts/provider_record.md section 3 had recorded was reproduced first, with nine real violations passing the untouched gate and all nine now failing it. Package 3: ARK-REQ-0219 enforced in the acceptance path under the human implementation ruling D-023 - a recorded run DECLARES its external-provider class and a declared external result is refused while no canonical verifiable binding exists, which is the state today. Package 4: this composed integration and its evidence. C-11 is INT, so Phase 9 delivers no table and no migration. NO EXTERNAL PROVIDER WAS CONTACTED AT ANY POINT AND NO EXTERNAL-PROVIDER RESULT EXISTS: ARK-REQ-0219 is earned by preventing fabrication, not by producing a provider result.",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0052",
+    "ARK-REQ-0053",
+    "ARK-REQ-0219"
+  ],
+  "files_created": [
+    "backend/arkali/acceptance/external_result.py",
+    "backend/arkali/control/architecture/gates/provider_source.py",
+    "backend/tests/governance/handoff_harness.py",
+    "backend/tests/governance/test_external_provider_result.py",
+    "backend/tests/governance/test_external_result_acceptance_path.py",
+    "backend/tests/governance/test_handoff_architecture_drift.py",
+    "backend/tests/governance/test_handoff_finding_summary.py",
+    "backend/tests/governance/test_handoff_self_reference.py",
+    "backend/tests/registry/test_phase_9_journey.py",
+    "backend/tests/structural/provider_consumer_harness.py",
+    "backend/tests/structural/test_reference_only_consumers.py",
+    "backend/tests/structural/test_reference_only_coverage.py",
+    "docs/acceptance/phase_9_report.json",
+    "docs/acceptance/phase_9_traceability.json",
+    "scripts/handoff_architecture.py",
+    "scripts/handoff_findings.py",
+    "scripts/handoff_markdown.py"
+  ],
+  "files_modified": [
+    "backend/arkali/acceptance/checker.py",
+    "backend/arkali/acceptance/phase_report.py",
+    "backend/arkali/control/architecture/gates/authority_gates.py",
+    "backend/tests/governance/test_handoff_drift.py",
+    "docs/build/BUILD_STATE.md",
+    "docs/build/DECISION_LOG.md",
+    "docs/build/OPEN_BLOCKERS.md",
+    "docs/contracts/provider_record.md",
+    "scripts/check_handoff.py"
+  ],
+  "public_contracts": [
+    "C-11 provider/model record - docs/contracts/provider_record.md",
+    "C-17 phase report - TestExecutionRecord.external_result, the declared external-provider classification added under D-023, defaulting to the non-claiming class so every accepted historical report stays valid and byte-identical while granting no external provenance"
+  ],
+  "migrations": [],
+  "state_machine_capability_changes": "NONE. The Phase 3 ProviderHealth machine is reused and not duplicated, so the canonical state-machine count stays 12; the record reads DEFINITION.states and declares no state and no transition. The Capability Graph is NOT activated - ADR-0003 places activation at Phase 9B - so every capability query still returns NOT_CONFIGURED and production admission still returns CAPABILITY_NOT_CONFIGURED, asserted in the composed journey against the shipping AdmissionService.",
+  "tests_executed": [
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend -q",
+      "exit_code": 0,
+      "passed": 1915,
+      "failed": 0,
+      "summary": "full regression. 1915 passed, 13 skipped, exit 0. The 13 skips are pre-existing honest NOT_CONFIGURED reports, unchanged by Phase 9.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/security -q",
+      "exit_code": 0,
+      "passed": 188,
+      "failed": 0,
+      "summary": "security review. 188 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/structural backend/tests/governance -q",
+      "exit_code": 0,
+      "passed": 699,
+      "failed": 0,
+      "summary": "adversarial review. 699 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/registry/test_phase_9_journey.py -q",
+      "exit_code": 0,
+      "passed": 11,
+      "failed": 0,
+      "summary": "Phase 9 composed integration journey. 11 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/structural/test_provider_authority.py backend/tests/registry/test_provider_record.py -q",
+      "exit_code": 0,
+      "passed": 54,
+      "failed": 0,
+      "summary": "ARK-REQ-0052 arch evidence. 54 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/structural/test_reference_only_consumers.py backend/tests/structural/test_reference_only_coverage.py -q",
+      "exit_code": 0,
+      "passed": 29,
+      "failed": 0,
+      "summary": "ARK-REQ-0053 arch evidence. 29 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/governance/test_external_provider_result.py -q",
+      "exit_code": 0,
+      "passed": 19,
+      "failed": 0,
+      "summary": "ARK-REQ-0219 prov evidence. 19 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe -m pytest backend/tests/governance/test_external_result_acceptance_path.py -q",
+      "exit_code": 0,
+      "passed": 6,
+      "failed": 0,
+      "summary": "ARK-REQ-0219 sec evidence. 6 passed, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "cd backend && .\\.venv\\Scripts\\python.exe -m mypy --ignore-missing-imports arkali",
+      "exit_code": 0,
+      "passed": 143,
+      "failed": 0,
+      "summary": "static types (strict). clean over 143 source files, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe scripts/check_repository_structure.py",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "summary": "repository structure. 12 pass, 0 fail, exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe scripts/check_repository_structure_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "repository structure negative control. , exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe scripts/check_phase_graph.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "phase graph. , exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe scripts/check_phase_graph_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "phase graph negative control. , exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": ".\\.venv\\Scripts\\python.exe scripts/check_phase0_deliverables.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "phase 0 deliverables. , exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    }
+  ],
+  "architecture_checks": "8 of 8 declared architecture gates PASS over 104 real cross-context edges, and all 9 numeric budgets are evaluated under ratified measurement contract 1.0.0 with no violation. max_orchestration_depth is 4 of 4 on surfaces.command -> execution.durable -> control.policy -> kernel.contracts. Two budgets fired during Phase 9 and both were answered by ADR-0008 decomposition, never by an exception: structure_gates.py was at 396 of 400 logical lines so the provider source scanner became a sibling module, and acceptance.engine stood at 39 of its 40 public-surface budget so the ARK-REQ-0219 vocabulary, derivation and check are reached through one public name. No GATE 8 exception was requested.",
+  "duplicate_shadow_check": "duplicate_canonical_authority PASS - every concern resolves to exactly one canonical owner across 39 concerns. shadow_registry PASS - the declaration half (owner, consumer set, copying and caching flags) plus the new source half, which scanned 15 consumer modules and found none storing, caching, mirroring, defaulting, aliasing or re-deriving an owned concern. duplicate_state_machine_authority PASS over 12 machines - no second provider-health authority was introduced.",
+  "security_findings": "No new finding. 0 BLOCKER and 0 HIGH are open; the latest recorded finding is F-0047, MEDIUM and CLOSED. The security review category ran at exit 0 over 188 tests. Two security-relevant properties are asserted rather than assumed: provider configuration cannot represent a raw secret, because it holds C-09 SecretReference handles and both free-form concerns are scanned for raw-secret shapes and refused; and the acceptance path cannot be made to accept a fabricated external-provider result, proven through the real PhaseGateChecker.",
+  "fake_success_scan": "CLEAN, and mechanically enforced for the provider case rather than asserted. No fake provider, fake health, fake metric or fake job exists. No network client is imported anywhere in Phase 9 source or evidence - asserted by AST over the composed journey. No external provider was contacted and no external-provider result is claimed: every recorded run above declares external_result = NO_EXTERNAL_RESULT, and a declared EXTERNAL_PROVIDER_RESULT would be refused by the acceptance path because no canonical verifiable binding exists. 53 mutations were injected across Packages 2 and 3 and all 53 were caught, each failing its intended control.",
+  "evidence_created": [
+    "EV-0066",
+    "EV-0067",
+    "EV-0068"
+  ],
+  "limitations": "STATED PLAINLY. (1) No verifiable external-provider binding exists in the canonical set - no provider-result object, request identity, response identity, timestamp binding or verification flag - and none was invented; D-023 records that, and the positive external path is therefore closed until a later canonical phase supplies one. (2) Three of the five declared reference-only consumers currently hold only a package __init__; the gate scans them and finds nothing to refuse rather than assuming compliance, and a module added to any of them tomorrow is scanned without an edit. (3) ARK-REQ-0219's enforcement covers the acceptance package; it does not and cannot cover a provider runtime that does not exist. (4) The Capability Graph is schema-only and production admission returns CAPABILITY_NOT_CONFIGURED; that is Phase 9B's to change. (5) Adjacent requirements are NOT claimed: ARK-REQ-0216 (Phase 2), 0218 (Phase 25), 0235 and 0319 (Phase 30), and 0364 (Phase 35) are outside this denominator. (6) THE ACCEPTANCE GUARD HAS NO PER-EVIDENCE-CONTENT GRANULARITY, proven mechanically rather than assumed: of 21 injected defective candidates, 17 were refused for their intended reason and three were ACCEPTED and are reported as accepted - a claim whose evidence prose describes a live provider run, and ARK-REQ-0219's claim with either its prov or its sec half removed, all pass check C6, because C6's contract requires a SATISFIED claim to NAME an implementation and an evidence source and cannot judge what the string says. This is the pre-existing limitation already recorded against Phase 6 (case D2) and is not introduced here; no control was added, because a repository-wide rule about evidence-string content would fail every accepted phase. The protection that does hold for this requirement is the DECLARED classification, which is structural: G08, G09, G11, G12 and G13 were each refused. A fourth case, SIMULATED_TEST_ONLY on a recorded run, was accepted and that is CORRECT rather than a gap - D-023 requires a test-only double to be permitted, and it claims nothing external.",
+  "blockers": "None. 0 BLOCKER and 0 HIGH findings are open, all three prerequisite phases (4, 6 and 8) are MACHINE-ACCEPTED, and phase 9 carries no human gate in IMPLEMENTATION_DEPENDENCY_MATRIX.md.",
+  "next_exact_action": "Await the machine verdict. If Phase 9 is accepted, the next phase is whichever the canonical dependency machine permits; do not begin it without authorization. Phase 9B (Capability Graph activation) remains unstarted and is what makes production admission able to succeed.",
+  "status": "PASS"
+}
