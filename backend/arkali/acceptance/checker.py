@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import pathlib
 
+from arkali.acceptance.external_result import ExternalProviderResultRule
 from arkali.acceptance.gate_verdict import GateVerdict, Verdict
 from arkali.acceptance.governance_state import GovernanceState
 from arkali.acceptance.phase_report import PhaseReport
@@ -204,7 +205,7 @@ class PhaseGateChecker:
         report. Evidence is real execution records, never a boolean.
         """
         owing_phase = self.register.get(PROFILE_REQUIREMENT).owning_phase
-        if not self._phase_owes_profile(report.phase_id, owing_phase):
+        if not ExternalProviderResultRule.phase_owes(report.phase_id, owing_phase):
             return CheckResult(
                 check_id="PROTECTED_CORE",
                 state=HonestState.NOT_APPLICABLE,
@@ -231,20 +232,19 @@ class PhaseGateChecker:
             )
         return _ok("PROTECTED_CORE", verdict.render(), selection.rationale)
 
-    @staticmethod
-    def _phase_owes_profile(phase_id: str, owing_phase: str) -> bool:
-        """Whether this phase is at or beyond the phase that owns the profile.
+    def check_external_result_integrity(self, report: PhaseReport) -> CheckResult:
+        """ARK-REQ-0219: no fabricated or simulated external-provider result.
 
-        NO SHADOW MODEL: the boundary is `ARK-REQ-0111`'s Phase column, not a
-        constant. A phase that ran before the obligation existed is not
-        retroactively in breach of it, and if governance ever moves the
-        requirement this check moves with it.
+        Thin by design. The subject and its authority live in
+        `external_result_check`, which `checker.py`'s 400 logical-line budget
+        required anyway; what belongs here is that the check is part of the one
+        acceptance path, so no other route to a verdict can skip it.
         """
-        def rank(value: str) -> tuple[int, str]:
-            digits = "".join(c for c in value if c.isdigit())
-            return (int(digits) if digits else 0, value)
-
-        return rank(phase_id) >= rank(owing_phase)
+        passed, summary, detail = ExternalProviderResultRule.evaluate(
+            self.repo_root, report, self.register
+        )
+        check = _ok if passed else _fail
+        return check("EXTERNAL_RESULT", summary, detail)
 
     def check_rescoring_authority(self, report: PhaseReport) -> CheckResult:
         """GOV-001: superseding an accepted verdict needs explicit authorization.
@@ -350,6 +350,7 @@ class PhaseGateChecker:
             gate_result,
             self.check_honest_state_integrity(report),
             self.check_discharge_integrity(report),
+            self.check_external_result_integrity(report),
             self.check_protected_core_profile(report),
             self.check_rescoring_authority(report),
             self.check_open_findings(),

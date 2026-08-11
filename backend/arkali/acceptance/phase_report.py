@@ -13,6 +13,7 @@ from typing import ClassVar, Final
 
 from pydantic import BaseModel, ConfigDict
 
+from arkali.acceptance.external_result import ExternalProviderResultRule
 from arkali.kernel.contracts.results import HonestState
 
 #: Canonical field order, used for stable rendering and C1 completeness.
@@ -54,6 +55,18 @@ class TestExecutionRecord(BaseModel):
     passed: int = 0
     failed: int = 0
     summary: str = ""
+    #: ARK-REQ-0219. What this run claims about an external provider, DECLARED
+    #: and never inferred from `command` or `summary`.
+    #:
+    #: The default is the non-claiming class, so every accepted historical report
+    #: stays valid and byte-identical while granting no external provenance -
+    #: silence can never read as a claim. It is not a substitute for declaring:
+    #: `external_result_check` distinguishes a supplied value from a default
+    #: through `model_fields_set`, and a report that owes a declaration and omits
+    #: one is refused.
+    external_result: ExternalProviderResultRule.Declared = (
+        ExternalProviderResultRule.Declared.NO_EXTERNAL_RESULT
+    )
 
 
 class PhaseReport(BaseModel):

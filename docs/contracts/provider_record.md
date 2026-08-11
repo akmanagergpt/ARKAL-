@@ -160,10 +160,21 @@ An illegal health **transition** is not in this table: it is refused by the
 canonical `ProviderHealth` machine and raises that machine's own typed error,
 because this registry is not a second transition authority.
 
-## 6. What later Phase 9 packages add
+## 6. `ARK-REQ-0219` and what remains
 
-Source-level enforcement of `ARK-REQ-0053` is **done** (Package 2, §3). What
-remains: the `ARK-REQ-0219` never-fabricate control owned by `acceptance.engine`
-with its provenance and security evidence; and final integration, traceability
-carrying three real claims, the C-17 report and the machine gate — only if
-earned.
+Source-level enforcement of `ARK-REQ-0053` is **done** (Package 2, §3).
+
+**Package 3 delivered the never-fabricate control**, owned by `acceptance.engine`
+and recorded as decision **D-023**. It does not live here — this contract is the
+registry's — but it bears on the registry in one way worth stating: the check
+asks the *contract inventory* whether this record is persisted, because a record
+declared `INT` holds no configured provider across a run, so Appendix A's
+`provider.registry.configured_real_count >= 1` is false by construction. That is
+why a declared external-provider result is refused today, and why the refusal
+lifts on its own if C-11's kind ever changes and a canonical request/response
+binding is defined. **No provider-result schema, request identity, response
+identity, timestamp or verification flag was invented** to close that gap, and
+nothing here contacts a provider.
+
+What remains: Package 4 — final integration, traceability carrying three real
+claims, the C-17 report and the machine gate — only if earned.
