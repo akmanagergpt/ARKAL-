@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `600ddac8a6d196fc0c2074916a69607fe36d5d67` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `d6a66498ff37848e40b64079f6a5f48a447ab818` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -137,11 +137,12 @@ repository, the repository wins.
 | Phase 9 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_9_report.json`, `phase_9_traceability.json`). C1–C6 PASS, **EXTERNAL_RESULT PASS** over 14 declared runs, PROTECTED_CORE **COMPLETE** (members `acceptance.engine` and `control.architecture`, derived over the whole candidate), PREREQ 3/3, FINDINGS PASS, HUMAN_GATE NOT_APPLICABLE. **3/3 requirements discharged** — `ARK-REQ-0052`, `ARK-REQ-0053`, `ARK-REQ-0219`, all MANDATORY — taking cumulative verified 80 → **83**. **All four atomic packages are complete**, and the phase's own accepted evidence is the authority for what each delivered: Package 1 the C-11 record and its parsed authority, Package 2 `ARK-REQ-0053` enforced in consumer source, Package 3 `ARK-REQ-0219` enforced in the acceptance path under human ruling **D-023**, Package 4 the composed integration, traceability, report and the single gate run. The Phase 3 `ProviderHealth` machine is reused, not duplicated — count stays 12. C-11 is `INT`, so no table and no migration. **No external provider was contacted and no external-provider result exists**; the positive external path stays closed because the canonical set defines no verifiable binding, and none was invented. Capability activation remains Phase 9B |
 | Phase 9B | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_9B_report.json`, `phase_9B_traceability.json`). C1–C6 PASS, **EXTERNAL_RESULT PASS** over all 14 recorded runs, PROTECTED_CORE PASS (no member touched — `control.capability` is not Protected Core — so the normal profile applies, derived over the whole three-package candidate), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 4/4, HUMAN_GATE NOT_APPLICABLE. **3/3 requirements discharged** — `ARK-REQ-0046`, `ARK-REQ-0047`, `ARK-REQ-0048`, all MANDATORY — taking cumulative verified 83 → **86**. Three atomic packages, and the phase's own accepted evidence is the authority for what each delivered: Package 1 query-time reference resolution with the binding parsed from the canonical `capability_node:` block, Package 2 the activated deterministic verdict whose `PASS`/`NOT_CONFIGURED` mapping was **derived** from §4's own wording and proven safe under the **unchanged** accepted Phase 8 predicate, Package 3 the composed journey plus the acceptance record — which changed no module under `backend/arkali/`. C-13 is `INT`, so no table and no migration; no state machine was added and the count stays 12. **8 mutations injected, 8 caught.** **The activation mechanism is proven end to end and production admission can now reach `ADMITTED` in principle — but no capability is declared configured with real production identities anywhere in this repository**: every affirmative composes composition-root doubles for the provider, policy and isolation authorities, the evidence-requirement authority being the real `RequirementRegister`. No provider was contacted and no external-provider result exists. **Phase 10 unlocked** |
 | Phase 10 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_10_report.json`, `phase_10_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 14 recorded runs, **PROTECTED_CORE COMPLETE** — derived over the whole four-package candidate because Package 3 changed Protected Core `control.policy`, with security review 205, adversarial review 695 and full regression 1764+348+48 all at exit 0 — RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. **5/5 requirements discharged** — `ARK-REQ-0050`, `0051`, `0054`, `0055`, `0231`, all MANDATORY — taking cumulative verified 86 → **91**. Four atomic packages: C-22 the bounded harness task, C-23 the context package and its provenance, the role/backend separation with the two agent prohibitions, and the composed journey plus the acceptance record. C-22 and C-23 are both `INT`, so no table and no migration; no state machine was added and the count stays 12. **No agent runtime, dispatcher or task executor exists** — a control over the shipping source asserts none is present — and no Context Compiler exists; C-23 is the compiler's output contract. **Phase 11 unlocked** |
-| Phase 11 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–3 delivered)** ← current work. Code Intelligence + Digital Twin (C-24). `GovernanceState.current_work_phase()` returns `11`. Its sole prerequisite, Phase 10, is MACHINE-ACCEPTED. Denominator is **2** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY, both owned by `engineering.codeintel`, neither discharged — so cumulative verified stays 91 until Phase 11 is accepted. **C-24 is the first `GRAPH` contract in this build**, with ADDITIVE compatibility rather than the `INT`/STRICT shape every contract so far has had. Packages 1–3 deliver the canonical vocabularies, deterministic graph store and complete Digital Twin composition; Package 4 still owes the composed journey, traceability, report and single gate run |
+| Phase 11 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_11_report.json`, `phase_11_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, PROTECTED_CORE PASS (no member touched), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **2/2 requirements discharged** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY — taking cumulative verified 91 → **93**. Four atomic packages deliver C-24: canonical graph/view vocabularies, the deterministic sourced graph store, complete Digital Twin composition, and the composed real-source journey plus acceptance record. The graph and twin remain derived and always refuse authoritative questions. **Phase 12 unlocked** |
+| Phase 12 | **UNLOCKED — NOT_STARTED** ← current work. Candidate Workspace + Semantic Assembly (C-25). `GovernanceState.current_work_phase()` returns `12`. Its sole prerequisite, Phase 11, is MACHINE-ACCEPTED. Denominator is **7** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY and none discharged — so cumulative verified stays 93 until Phase 12 is accepted. Nothing of Phase 12 is implemented or claimed |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **91** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + **5 Phase 10**), reconciled by check C6 against each phase's traceability record. Of the 91, **90 are MANDATORY**: Phase 7's `ARK-REQ-0060` is still the one CONDITIONAL discharged, and all five Phase 10 requirements are MANDATORY. Phase 8 adds none — its denominator is zero |
+| Cumulative verified | **93** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + **2 Phase 11**), reconciled by check C6 against each phase's traceability record. Of the 93, **92 are MANDATORY**: Phase 7's `ARK-REQ-0060` is still the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0048** — **MEDIUM**, **CLOSED** — and every finding through **F-0048** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
@@ -280,7 +281,10 @@ repository, the repository wins.
 | 118 | `0e8315d` | handoff manifest refreshed after Phase 11 Package 1 (§12 rule). The refresh **re-introduced the anti-vacuity defect fixed at `97a4092`** — rewriting §9 dropped the readable denominator sentence and `check_handoff.py` reported PASS anyway, because that control passes vacuously on an absent statement. Caught before committing by the mutation control and restored |
 | 119 | `e80547b` | **PHASE 11 PACKAGE 2** — the graph set and C-24's declared rebuild determinism, enforced as a **refusal** rather than a comparison a caller might skip. Determinism comes from normalisation (sets rendered sorted, files walked sorted), and a control changes a real file to prove it is not achieved by ignoring the input. The store is **derived and never an authority**: `resolve_authority` always refuses. The Python AST builder produces three of the six specified kinds and **refuses** the other three rather than returning them empty, because an empty graph is indistinguishable from 'nothing found'. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 91 |
 | 120 | `f901569` | handoff manifest refreshed after Phase 11 Package 2 (§12 rule) |
-| 121 | `600ddac` | **PHASE 11 PACKAGE 3** — the complete Digital Twin composition in canonical view order. Every specified view must appear exactly once and must either carry canonical derived-artifact addresses or explicitly declare why its owning source is absent; empty, duplicate, unknown and contradictory contributions are refused. The twin remains derived and always refuses authoritative questions. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 91 ← HEAD at generation |
+| 121 | `600ddac` | **PHASE 11 PACKAGE 3** — the complete Digital Twin composition in canonical view order. Every specified view must appear exactly once and must either carry canonical derived-artifact addresses or explicitly declare why its owning source is absent; empty, duplicate, unknown and contradictory contributions are refused. The twin remains derived and always refuses authoritative questions. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 91 |
+| 122 | `d090052` | handoff manifest refreshed after Phase 11 Package 3 (§12 rule) |
+| 123 | `e6d9ff1` | **PHASE 11 MACHINE ACCEPTANCE** — Code Intelligence + Digital Twin. The first gate submission returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED; **2/2 requirements discharged**, cumulative verified 91 → **93**; Phase 12 unlocked |
+| 124 | `d6a6649` | Phase 11 ledger row — `PHASE_HISTORY.md` records the machine acceptance as row 27. Committed separately from the acceptance and from this refresh ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -368,57 +372,50 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 11
+## 8. Current phase contract — Phase 12
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Code Intelligence + Digital Twin** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 11) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–3 delivered)**. `GovernanceState.current_work_phase()` returns `11`. Packages 1–3 delivered the canonical vocabularies, the graph store with C-24's rebuild determinism, and the complete Digital Twin composition; **no requirement is discharged and no phase gate has been run** |
-| Prerequisites | Phase **10** alone — MACHINE-ACCEPTED, which is why the dependency machine permits 11 and only 11 |
-| Contract IDs | **C-24** — the first **`GRAPH`** contract in this build, with **ADDITIVE** compatibility rather than the `INT`/STRICT shape every contract so far has had. Read `CONTRACT_INVENTORY.md` row 24 before designing |
+| Name | **Candidate Workspace + Semantic Assembly** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 12) |
+| Status | **UNLOCKED — NOT_STARTED**. `GovernanceState.current_work_phase()` returns `12`. Nothing of Phase 12 is implemented, no requirement is discharged and no phase gate has been run |
+| Prerequisites | Phase **11** alone — MACHINE-ACCEPTED, which is why the dependency machine permits 12 and only 12 |
+| Contract IDs | **C-25** — `ART` Candidate manifest + assembly report, STRICT compatibility, with eight assembly checks. Read `CONTRACT_INVENTORY.md` row 25 and `docs/contracts/candidate.md` before designing |
 | Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
-| ARK-REQ IDs | derive with `RequirementRegister.for_phase("11")` — **2** entries: `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY, both owned by `engineering.codeintel`. **Do not carry anything over from Phase 10** — its five are discharged |
-| What Phase 10 leaves ready | the bounded harness task (C-22) and the context package with its provenance and content address (C-23), the role/backend separation, and the two agent prohibitions enforced in `control.policy`. Governed vocabularies are parsed from canonical documents at call time and appear in no module as literals |
-| What Phase 10 deliberately did not build | **no agent runtime, dispatcher, scheduler or task executor**, and **no Context Compiler** — C-23 is the compiler's *output* contract. Do not read "Agent Runtime + Harness Engineering" as meaning a runtime exists |
-| Architecture hazard | `engineering.codeintel` is layer rank 4, so `allow_same_layer: false` forbids importing a sibling engineering context; use injected interfaces as `control.capability` and `engineering.agent` both did. A `GRAPH` contract is where a second store is easiest to introduce by accident — the `shadow_registry` gate now scans **24** consumer modules |
+| ARK-REQ IDs | derive with `RequirementRegister.for_phase("12")` — **7** MANDATORY entries: `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`. Ownership spans `engineering.candidate`, `lifecycle.release` and `control.policy`; discharge each from the context the register names. **Do not carry anything over from Phase 11** — its two are discharged |
+| What Phase 11 leaves ready | C-24's canonical graph/view vocabularies, sourced content-addressed graphs, deterministic rebuild refusal and complete Digital Twin composition. These are derived views, never authorities, and must not be rebuilt as a candidate-owned shadow store |
+| What Phase 11 deliberately did not build | no candidate workspace, manifest, assembly report or C-25 implementation. Unavailable graph adapters remain explicit absences rather than fabricated empty graphs |
+| Architecture hazard | Phase 12 spans three owners. `engineering.candidate` is layer rank 4 and may not import sibling engineering contexts because `allow_same_layer: false`; stable mutation policy remains owned by `control.policy` and promotion/revision authority by `lifecycle.release`. Compose through downward dependencies or injected interfaces without copying either authority |
 
-**Phase 11 is in progress, not accepted.** Its denominator is **2** and neither
-requirement is discharged. Phase 10 remains MACHINE-ACCEPTED.
+**Phase 12 is unlocked and not started.** Its denominator is **7** and none is
+discharged. Phase 11 remains MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Continue Phase 11 — Atomic Package 4: the composed journey, traceability, the
-C-17 report and ONE gate run.** Packages 1–3 are delivered and committed at
-`b3f0fd2`, `e80547b` and `600ddac`. Prove the graph vocabulary, deterministic
-Python graph builds and complete Digital Twin composition together through real
-repository mechanisms; derive the two-claim traceability record from
-`RequirementRegister.for_phase("11")`; produce the C-17 report; prove the
-acceptance guards before submission; and run the phase gate exactly once on the
-complete final candidate.
+**Begin Phase 12 — Atomic Package 1, scoped from repository authority.** Derive
+the smallest coherent first C-25 slice only after reading the seven Phase 12
+requirements, the C-25 inventory row and `docs/contracts/candidate.md`. Preserve
+the stable→candidate→verification→acceptance→promotion separation: Phase 12 may
+construct candidate artifacts but may not invent acceptance or promotion.
 
-**Phase 11 has a NON-ZERO denominator — two requirements.** `ARK-REQ-0066` and
-`ARK-REQ-0067`, both MANDATORY, both owned by `engineering.codeintel`, neither
-discharged. Derive them with `RequirementRegister.for_phase("11")` rather than
-carrying anything over from Phase 10, whose five are discharged and closed. C6
-refuses an empty record against a non-empty denominator just as hard as it
-refuses the reverse.
+**Phase 12 has a NON-ZERO denominator — seven requirements.** `ARK-REQ-0005`,
+`ARK-REQ-0023`, `ARK-REQ-0024`, `ARK-REQ-0025`, `ARK-REQ-0056`, `ARK-REQ-0058`
+and `ARK-REQ-0212` are all MANDATORY and none is discharged. Derive them with
+`RequirementRegister.for_phase("12")` rather than carrying over Phase 11's two
+discharged requirements. C6 refuses an empty record against this denominator.
 
-**What Packages 1–3 established, so it is not rebuilt.** The graph set and
-view set live only in `ARCHITECTURE.md` §11 and are parsed at call time; the
-count nine is nowhere in the shipping source; determinism comes from
-normalisation rather than caller discipline, and `assert_rebuild_matches` makes
-it a refusal; the store is derived and never an authority, and
-`resolve_authority` always refuses; every node and edge records its source; the
-Digital Twin composes every canonical view exactly once, backed or honestly
-declared absent. Reuse these authorities; add no second vocabulary or store.
+**What Phase 11 established, so it is not rebuilt.** C-24 provides canonical
+graph/view vocabularies, deterministic sourced graphs and the complete Digital
+Twin composition. All remain derived and refuse authoritative questions. Reuse
+those contracts where candidate assembly needs them; add no second vocabulary,
+graph store or Digital Twin authority.
 
 **Derive the scope from repository authority before writing anything.** Read
-`REQUIREMENT_REGISTER.md` for the rows whose Phase column is 11,
-`CONTRACT_INVENTORY.md` for the C-24 row,
-`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 11 for prerequisites and the (empty)
-Gate column, and `ARCHITECTURE.md` §3 for what `engineering.codeintel` owns.
+`REQUIREMENT_REGISTER.md` for the rows whose Phase column is 12,
+`CONTRACT_INVENTORY.md` for the C-25 row, `docs/contracts/candidate.md` for its
+contract, `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 12 for prerequisites and the
+(empty) Gate column, and `ARCHITECTURE.md` §3 for the three owning contexts.
 
 **Every recorded run owes an `external_result` declaration (D-023).** The
 obligation is derived from the register's Phase column for the requirement that
@@ -428,14 +425,15 @@ phase supplies a verifiable request/response binding; declare honest absence
 instead.
 
 **Read F-0045 before writing any report.** Re-run every recorded command against
-the exact candidate you are submitting, after the last file change, and never
-transcribe an earlier result.
+the exact candidate you eventually submit, after the last file change, and
+never transcribe an earlier result. Do not run the Phase 12 gate until its
+complete final candidate is ready.
 
-**Do not re-run the Phase 10 gate**, or Phase 9B's, or Phase 8's. A second run
+**Do not re-run the Phase 11 gate**, or any earlier accepted phase gate. A second run
 against an accepted phase returns `AWAITING_RESCORING_AUTHORITY` under GOV-001 —
 the rule working, not a fault.
 
-**What Phase 10 established that should be reused, not rebuilt.** Governed
+**What prior phases established that should be reused, not rebuilt.** Governed
 vocabularies live only in the canonical documents and are parsed at call time,
 failing closed on an absent section, an unparseable declaration or a vacuous one;
 anti-vacuity is proven *behaviourally* by feeding a parser declarations of
@@ -481,7 +479,7 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
-| Refresh reason | **PHASE 9B ATOMIC PACKAGE 2** — the activated deterministic query. `docs/build/BUILD_STATE.md` changed and NEXT EXACT ACTION moved from "Package 2, the activated query" to "Package 3, composition/traceability/report/gate", so the §12 refresh is mechanically required. **What changed here was re-derived, not edited to match a recollection**: `handoff_architecture.py` was re-run and cross-context edges stayed at **108** — Package 2 added no new cross-context edge, because `activated_query.py` is internal to `control.capability` and the admission-side change reused an existing import inside `execution.scheduler`. §3's Capability Graph row now records that `can_perform` composes a real verdict, not schema-plus-resolution; §8's status and body target Package 3; the ledger gained rows 100–101. **The verdict mapping is documented as derived, not chosen**: `EXECUTION_AND_CAPABILITY.md` §4 pairs *resolving* with *not being* `NOT_CONFIGURED`, so every activated refusal is `NOT_CONFIGURED`, and `FAIL`/`UNSUPPORTED` are both refused — the former because the canonical set assigns it to no capability query and the **unchanged** accepted Phase 8 predicate (`state is not NOT_CONFIGURED`) would misread it as success, the latter because it is canonically another context's verdict. **No authority conflict was found and no accepted Phase 8 semantics were touched.** Both designed pre-activation tripwires (Phase 3's and Phase 8's) were replaced with strictly stronger permanent controls rather than deleted, proven through the real `AdmissionService` end to end: a fully resolved configured capability is now `ADMITTED`, and every refusal shape — missing resolver, refusing authority, unresolved or unknown reference, unconfigured node, unresolved prerequisite — still stops it. Nothing is cached at any layer; `shadow_registry` now scans **18** consumer modules, up from 17. **18 mutations injected, 18 caught**, every file restored from recorded bytes with sha256 re-verified; three were initially missed and each was chased down — two were defective mutations (a cache check added with nothing ever populating it) rewritten to actually cache and re-caught, and one was a genuine control gap (a permanent tripwire-replacement list narrowable from inside the same file as the control that reads it) closed by asserting the list's own length before reading any entry. Profile derived **NORMAL** by `select_profile` from the changed paths — `control.capability` and `execution.scheduler` are both `protected_core: false`; the battery ran in full regardless. **No requirement discharged, cumulative verified stays 83, no phase gate was run, Phase 9B is not accepted and Package 3 is not started** |
+| Refresh reason | **PHASE 11 MACHINE ACCEPTANCE** — the first submission returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, and the separate history commit recorded that verdict. `BUILD_STATE.md`, `PHASE_HISTORY.md` and NEXT EXACT ACTION changed, so §12 requires this distinct refresh. Repository-derived state now records Phase 11 accepted, its two MANDATORY requirements discharged, cumulative verified **93**, and Phase 12 unlocked with a seven-requirement denominator. The ledger gained rows 122–124; no accepted evidence or implementation is changed by this refresh |
 | Previously refreshed for | **PHASE 9B ATOMIC PACKAGE 1** — activated C-13's resolution rule. `BUILD_STATE.md` changed and NEXT EXACT ACTION moved from "begin Phase 9B" to "Package 2, the activated query", so the §12 refresh is mechanically required. **What changed in this manifest was re-derived, not edited to match a recollection:** the live architecture summary moved from **104** to **108** cross-context edges because `handoff_architecture.py` runs the canonical `GateRunner` and reads the number back out of the results it produced, and every one of the four new edges is `control.capability → kernel.contracts` — rank 1 to rank 0, the only direction this context has. **No same-layer edge was added and none could be**: `allow_same_layer: false`, `control.capability` has no declared sibling edge, and the four authorities it must reach (`control.policy`, `control.specification`, `control.registry.provider`, `control.isolation`) are all its own rank, so resolution goes through a `Protocol` declared in the context and a derived control fails if any of them ever stops being the same rank. The reference→authority binding is **parsed** from the canonical `capability_node:` block's own `# -> <context>` annotations, so no field, target kind or authority is written anywhere in code. A resolver may be asked only `resolves(reference) -> bool`, so no value crosses the boundary and the `shadow_registry` source gate — now scanning **17** consumer modules, up from 15 — passes. `PASS` is reachable only through a live authority's affirmative answer; a missing resolver is `NOT_CONFIGURED`, a refusing one `FAIL`, and resolution with no composed authority **refuses** rather than returning an empty tuple that would read as "everything resolved". Nothing is cached, proven by changing an authority's answer between two calls rather than by calling twice. **The Phase 3 schema is reused and `can_perform` is unchanged**, so production stays honestly `NOT_CONFIGURED`, Phase 8 admission still refuses with `CAPABILITY_NOT_CONFIGURED`, and the two designed tripwires in the Phase 3 and Phase 8 suites are still green and untouched — Package 2 owns them and must replace them with stronger live controls. **The verdict for an unresolved external reference is deliberately left underived**: the canonical set does not state it, `isolation.on_unsatisfiable` is that authority's data for the isolation condition and not a general rule, and Package 1 recorded the gap in `docs/contracts/capability_node.md` §9 rather than inventing capability semantics — the D-023 precedent. Structure check 10 fired on the token "stub" in two new docstrings and **the evidence changed, not the check**. **15 mutations injected, 15 caught** by their intended control, every file restored from recorded bytes with sha256 re-verified; one was initially missed and proved to be a defective mutation rather than a control gap — it read a memo it never wrote, so it was a semantic no-op, and rewritten as a real cache it was caught by the call-counting control. Profile derived **NORMAL** by `select_profile` from the changed paths with no unresolved path; the battery ran in full regardless. **No requirement discharged, cumulative verified stays 83, no phase gate was run, Phase 9B is not accepted and Package 2 is not started** |
 | Previously refreshed for | **HANDOFF_DRIFT REPAIR (F-0048)** — a read-only inspection found this document internally inconsistent while `check_handoff.py` reported PASS, for the third time and by the same scoping habit. The §12 refresh after Phase 9's acceptance **prepended** the acceptance sentence and rewrote only the **opening** of §9, leaving the previous state's tail in both: §3's Phase 9 row asserted `MACHINE-ACCEPTED` and `3/3 requirements discharged` and then, in the same cell, "Packages 1, 2 and 3 of 4 complete", "none is discharged yet" and "cumulative verified stays 80"; and the tail of §9 still told the reader to derive **Phase 9's** register rows, **C-11's** inventory row and **Phase 9's** three requirement ids — inside the live brief for **Phase 9B**, whose denominator is `ARK-REQ-0046`, `0047`, `0048`. That residue would have sent the next implementer back into an accepted phase's closed scope. **Every prior control was scoped to the claim block or to the current-phase section**, and the "NEXT EXACT ACTION targets the unlocked phase" control validates the YAML claim rather than the body — so the rewritten opening passed and the tail was never read. `scripts/handoff_transition.py` adds **eight derived controls** over the per-phase rows and the whole brief; **anti-vacuity was earned** — the first draft was defeated by its own battery, because deleting the accepted phase's row removed the thing to be judged, so every phase whose accepted record discharges anything must now have a live row. Nothing is hard-coded: no phase, requirement, contract, count or package total, asserted against the module's own source. **Package completion is not parsed from prose** — the row points at the phase's accepted evidence and the control refuses only a *partial* claim. **9 mutations injected, 9 caught** (eight manifest-side, one record-side), each restored with sha256 verification; 10 permanent controls added. The F-0048 record and the live latest-finding summary are updated **together**, so the F-0047 finding-summary control passes rather than being staled by its own repair. **Phase 9's report and traceability are byte-identical, no phase was re-scored, no gate was run, and Phase 9B was not started** |
 | Previously refreshed for | **PHASE 9 MACHINE ACCEPTANCE** — Package 4: the composed integration journey, the three-claim traceability record, the C-17 report, the acceptance-guard proof and **one** gate run returning `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission. C1–C6 PASS; **EXTERNAL_RESULT PASS** over 14 recorded runs each declaring `NO_EXTERNAL_RESULT` explicitly rather than relying on the compatibility default; PROTECTED_CORE **COMPLETE** — the profile was derived over the **whole Phase 9 candidate** rather than Package 4's new files, giving members `acceptance.engine` **and** `control.architecture`, with security review 188, adversarial review 699 and full regression **1915** all at exit 0; RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ **3/3**; HUMAN_GATE NOT_APPLICABLE; 8 gates over **104** edges and 9 budgets. **3/3 requirements discharged — `ARK-REQ-0052`, `0053`, `0219`; cumulative verified 80 → 83**, all three MANDATORY so MANDATORY verified 79 → 82. **NO EXTERNAL PROVIDER WAS CONTACTED AND NO EXTERNAL-PROVIDER RESULT EXISTS**: `ARK-REQ-0219` is earned by preventing fabrication, and the positive path is closed by derivation because the canonical set defines no verifiable binding — D-023 records that, and none was invented. **F-0045 discipline followed**: the candidate was frozen, every recorded command executed against it, the report generated from those results, then every command **re-run with both artifacts present** and an independent pass proving the re-run changed no recorded result; two traceability counts that disagreed with the real per-file totals were corrected before submission. **21 defective candidates injected: 17 refused for their intended reason and 4 honestly recorded as accepted** — three expose check C6's pre-existing lack of per-evidence-content granularity (the Phase 6 case-D2 limitation, written into the report's limitations) and one, a `SIMULATED_TEST_ONLY` run, is correct under D-023; one case initially read as a fail-open and was chased down to a malformed CRLF injection, not a defect. Both artifacts digest-verified after every case. **Phase 9B unlocked and not started; Phase 8 was not re-scored and its gate was not run** |
@@ -555,7 +553,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 600ddac8a6d196fc0c2074916a69607fe36d5d67
+head: d6a66498ff37848e40b64079f6a5f48a447ab818
 branch: main
 working_tree_clean: true
 
@@ -576,11 +574,12 @@ verified_by_phase:
   "9": 3
   "9B": 3
   "10": 5
-cumulative_verified: 91
+  "11": 2
+cumulative_verified: 93
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10"]
-unlocked_phase: "11"
-next_exact_action_phase: "11"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11"]
+unlocked_phase: "12"
+next_exact_action_phase: "12"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
