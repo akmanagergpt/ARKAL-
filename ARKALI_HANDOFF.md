@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `7c53272dca92c3b46c06569c5863b06e6a856eda` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `eca77ca35759d1bb15d46477d463cccaa5e5bbd2` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -146,7 +146,7 @@ repository, the repository wins.
 | Recorded findings | the latest recorded finding is **F-0048** — **MEDIUM**, **CLOSED** — and every finding through **F-0048** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over **108** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 9 Package 1 took this from 100 to 102 (`control.registry.provider → kernel.contracts` via `error_base`); Package 3 took it to 104, `acceptance.engine → control.registry.provider` and `acceptance.engine → control.specification`, both downward and legal. **Phase 9B Package 1 took it to 108**, entirely `control.capability → kernel.contracts` — rank 1 to rank 0, the only direction this context has — and added **no** same-layer edge, because `allow_same_layer: false` forbids one and the referenced authorities are reached by injected interface instead. `acceptance.engine` public surface is **40 of 40** — at its ceiling, which is why `ARK-REQ-0219`'s vocabulary, derivation and check are reached through one public name. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is now re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived. Phase 8 Package 2's 466-line scheduler authority test was decomposed under ADR-0008; no GATE 8 exception was requested |
+| Architecture violations | **0** (8 gates PASS over **110** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). **Phase 10 Package 1 took this from 108 to 110**, both `engineering.agent → kernel.contracts` — rank 4 to rank 0 — and it added **no** same-layer edge, because `allow_same_layer: false` forbids one. **A budget was hit and respected rather than excepted**: the harness error taxonomy was first written into `kernel.contracts` and the gate REFUSED it at public surface **42 of 40**, so it was decomposed into `engineering.agent` under ADR-0008 and imports the abstract base from `kernel.contracts.error_base`, adding no edge to `errors.py`. `acceptance.engine` public surface is **40 of 40** — at its ceiling. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
 | Evidence Plane | **storage and integrity only.** C-14 artifact identity/provenance and C-15 append-only chain exist and are accepted. The evidence **graph**, coverage and verdicts (C-16) are **Phase 13** and are not implemented, not computed and not claimed. No Phase 6 capability is reachable from any execution surface |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema, reference resolution and the activated verdict (Phase 9B Packages 1–2)**. `can_perform` now genuinely answers "Can I perform this?" once activated — `PASS` requires every external `*_ref` to resolve through its owning authority (injected `Protocol`) and the node to declare `CONFIGURED`, composed transitively over `prerequisites`; any other case is `NOT_CONFIGURED`, never `FAIL`, which the canonical set assigns to no capability query and which the unchanged Phase 8 predicate would misread as success. Proven through the real `AdmissionService`, not just the graph. Pre-activation is byte-identical to Phase 3: `NOT_CONFIGURED`, no authority consulted. Nothing is cached at any layer. ADR-0003's split still holds. **No requirement discharged; that is Package 3** |
@@ -262,7 +262,10 @@ repository, the repository wins.
 | 101 | `4af3af0` | **PHASE 9B PACKAGE 2** — the activated deterministic query. `can_perform` composes Package 1's per-reference resolutions, `configured_state` and transitive `prerequisites` into one determinate `CapabilityQueryResult`. **The verdict mapping was derived, not chosen, from `EXECUTION_AND_CAPABILITY.md` §4's own wording** — "resolves other than `NOT_CONFIGURED`" pairs *resolving* with *not being* `NOT_CONFIGURED`, so every refusal is `NOT_CONFIGURED` and never `FAIL`, which the canonical set assigns to no capability query and which the **unchanged** accepted Phase 8 predicate would misread as condition (a) satisfied. `UNSUPPORTED` is likewise refused as canonically another context's verdict. **No authority conflict was found; no accepted Phase 8 semantics were changed, narrowed or hidden in a test expectation.** Fields with no canonical evaluation rule — `runtime_requirements`, `platform_support`, `fallback_refs` (selection, not validation) — are not evaluated; `isolation_tier` satisfiability stays with `control.isolation` and admission condition (b). **Both designed pre-activation tripwires were replaced with strictly stronger permanent controls**, never deleted or weakened, and a new control reads both replacements' source and refuses if either drops the obligation. **Proven through the real `AdmissionService`**, not the graph alone: a fully resolved configured capability is `ADMITTED` — the first time production admission can succeed at all — while every refusal shape still stops it. Nothing is cached at any layer; `shadow_registry` scans 18 consumer modules, up from 17. **18 mutations injected, 18 caught**; three initially missed — two defective (a cache check with nothing populating it) rewritten and re-caught, one a real control gap (a tripwire-replacement list narrowable in the same file as the control reading it) closed by asserting the list's own length first. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 83 |
 | 102 | `28245e8` | handoff manifest refreshed after Phase 9B Package 2 (§12 rule) |
 | 103 | `970314e` | **PHASE 9B MACHINE ACCEPTANCE** — Capability Graph Activation. `run_phase_gate.py 9B 10` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the **first** submission. C1–C6 PASS; EXTERNAL_RESULT PASS over all 14 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile, derived over the whole three-package candidate); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 4/4; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 108 edges with all 9 budgets. Package 3 added the composed journey, the three-claim traceability record, the C-17 report and the completed C-13 contract document, and **changed no module under `backend/arkali/`**. **8 mutations injected, 8 caught**, every file restored with sha256 re-verified. **3/3 requirements discharged** — `ARK-REQ-0046`, `ARK-REQ-0047`, `ARK-REQ-0048` — cumulative verified 83 → **86**. The Phase 10 row was added in the same commit, because marking 9B accepted without it left `current_work_phase()` returning `None` and 9 governance controls red. **Phase 10 unlocked** |
-| 104 | `7c53272` | Phase 9B ledger row — `PHASE_HISTORY.md` records the machine acceptance as row 25. Committed separately from the acceptance because history is never rewritten, and separately from this refresh because a refresh commit may not touch a governed path ← HEAD at generation |
+| 104 | `7c53272` | Phase 9B ledger row — `PHASE_HISTORY.md` records the machine acceptance as row 25. Committed separately from the acceptance because history is never rewritten, and separately from this refresh because a refresh commit may not touch a governed path |
+| 105 | `d053f2e` | handoff manifest refreshed after Phase 9B machine acceptance (§12 rule) |
+| 106 | `97a4092` | **ANTI-VACUITY REPAIR** — the refresh stated Phase 10's denominator in a form `check_handoff.py` could not parse, so that control passed VACUOUSLY while the mutation control `test_a_wrong_denominator_in_the_brief_is_detected` correctly refused it. Restated in the readable form; validator PASS and transition controls 10/10 |
+| 107 | `eca77ca` | **PHASE 10 PACKAGE 1** — C-22, the bounded harness task. The eight canonical elements are parsed from BOTH canonical documents and reconciled positionally, never written down; boundedness is structural (required fields, no defaults, `extra="forbid"`), so an unbounded task cannot be constructed. The error taxonomy was decomposed into `engineering.agent` under ADR-0008 after the gate refused it in `kernel.contracts` at public surface 42 of 40. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 86 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -357,7 +360,7 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Agent Runtime + Harness Engineering** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 10) |
-| Status | **UNLOCKED — NOT_STARTED**. `GovernanceState.current_work_phase()` returns `10`. Nothing of this phase is implemented and no capability of it is claimed |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Package 1 delivered)**. `GovernanceState.current_work_phase()` returns `10`. Package 1 delivered C-22; **no requirement is discharged and no phase gate has been run** |
 | Prerequisites | Phases **9 and 9B** — both MACHINE-ACCEPTED, which is why the dependency machine permits 10 and only 10 |
 | Contract IDs | **C-22** and **C-23**. Read `CONTRACT_INVENTORY.md` for their rows before designing |
 | Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
@@ -372,8 +375,35 @@ Its denominator is **5** and none of the five is discharged.
 
 ## 9. Next exact action
 
-**Begin Phase 10 — Agent Runtime + Harness Engineering (C-22, C-23).** Phase 10
-is unlocked and not started. Derive the requirement set with
+**Continue Phase 10 — Atomic Package 2: C-23, the context package and its
+provenance (`ARK-REQ-0055`).** Package 1 is delivered and committed at
+`eca77ca`: C-22 exists, the eight canonical harness elements are parsed from
+both canonical documents rather than written down, and an unbounded task cannot
+be constructed. Package 2 must deliver the Context Compiler's output contract —
+only relevant context is sent, and **context provenance is recorded**.
+`CONTRACT_INVENTORY.md` row 23 assigns its verification as the **no-secret
+assertion**, so a context package must be structurally incapable of carrying a
+raw secret; `control.security`'s C-09 `SecretReference` handle and the C-11
+raw-secret shape scan are the two precedents to reuse rather than reinvent.
+C-22 currently carries a context package as a bare reference, and Package 2 is
+where that reference resolves.
+
+**What Package 1 already established, so it is not rebuilt.** The element list
+and its count live only in the canonical documents; reconciliation between the
+Master Specification and the Build Protocol is positional and fails closed on
+any disagreement in count or order; boundedness is enforced by required fields
+with no defaults plus `extra="forbid"`, and `reconcile_with_authority` refuses a
+model that has drifted from the documents in either direction. Reuse all of it.
+Do not add a second element list, a second task model or an alias table.
+
+**Two requirements remain unaddressed after Package 2**, and neither is
+`engineering.agent`'s alone: `ARK-REQ-0050` (agents are roles, providers are
+backends — evidence `arch`) and `ARK-REQ-0051` (agents cannot mutate canonical
+requirements or self-accept output), which the register owns to
+**`control.policy`** with evidence `sec, prop`. Do not discharge 0051 from this
+context.
+
+Derive the requirement set with
 `RequirementRegister.for_phase("10")` rather than assuming anything carries over:
 it returns **five** MANDATORY entries — `ARK-REQ-0050`, `ARK-REQ-0051`,
 `ARK-REQ-0054`, `ARK-REQ-0055` and `ARK-REQ-0231`. **Phase 10 has a NON-ZERO
@@ -512,7 +542,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 7c53272dca92c3b46c06569c5863b06e6a856eda
+head: eca77ca35759d1bb15d46477d463cccaa5e5bbd2
 branch: main
 working_tree_clean: true
 
