@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `1408132c32c0b0c815633c32368fc7da381d1a32` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `b3f0fd2e517228534ab4271a59b8479c0e0edfce` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -147,7 +147,7 @@ repository, the repository wins.
 | Recorded findings | the latest recorded finding is **F-0048** — **MEDIUM**, **CLOSED** — and every finding through **F-0048** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over **114** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 10 took this from 108 to 114 across three packages, every added edge downward: `engineering.agent → kernel.contracts`, `engineering.agent → control.policy` (the C-09 no-secret guard and the `ARK-REQ-0051` authority, both **called rather than copied**, which is why the edges exist at all) and **Package 3's `engineering.agent → control.policy` role delegation**. **No same-layer edge was added**, because `allow_same_layer: false` forbids one. **A budget was hit and respected rather than excepted** at Package 1: the harness error taxonomy was first written into `kernel.contracts` and the gate REFUSED it at public surface **42 of 40**, so it was decomposed into `engineering.agent` under ADR-0008. `control.policy` public surface is now **31 of 40**. `acceptance.engine` public surface is **40 of 40** — at its ceiling. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
+| Architecture violations | **0** (8 gates PASS over **116** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 10 took this from 108 to 114 across four packages; **Phase 11 Package 1 took it to 116**, both `engineering.codeintel → kernel.contracts` — rank 4 to rank 0. **No same-layer edge was added**, because `allow_same_layer: false` forbids one, and none of Phase 10's or Phase 11's edges is horizontal. Two of Phase 10's edges exist precisely because a canonical guard is **called rather than copied** — the C-09 no-secret guard and the `ARK-REQ-0051` authority — and an extra downward edge is the correct price for not creating a second authority. **A budget was hit and respected rather than excepted** in Phase 10: an error taxonomy written into `kernel.contracts` was REFUSED by this gate at public surface **42 of 40** and decomposed under ADR-0008; Phase 11 followed the same placement without needing to be told. `control.policy` public surface is **31 of 40**. `acceptance.engine` public surface is **40 of 40** — at its ceiling. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `surfaces.command → execution.durable → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
 | Evidence Plane | **storage and integrity only.** C-14 artifact identity/provenance and C-15 append-only chain exist and are accepted. The evidence **graph**, coverage and verdicts (C-16) are **Phase 13** and are not implemented, not computed and not claimed. No Phase 6 capability is reachable from any execution surface |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema, reference resolution and the activated verdict (Phase 9B Packages 1–2)**. `can_perform` now genuinely answers "Can I perform this?" once activated — `PASS` requires every external `*_ref` to resolve through its owning authority (injected `Protocol`) and the node to declare `CONFIGURED`, composed transitively over `prerequisites`; any other case is `NOT_CONFIGURED`, never `FAIL`, which the canonical set assigns to no capability query and which the unchanged Phase 8 predicate would misread as success. Proven through the real `AdmissionService`, not just the graph. Pre-activation is byte-identical to Phase 3: `NOT_CONFIGURED`, no authority consulted. Nothing is cached at any layer. ADR-0003's split still holds. **No requirement discharged; that is Package 3** |
@@ -274,7 +274,9 @@ repository, the repository wins.
 | 112 | `f360a87` | **PHASE 10 PACKAGE 3** — `ARK-REQ-0050` and `ARK-REQ-0051`. The role/backend separation is structural: `AgentRole` has no field that could hold an owned provider concern, proven against the map's own owned-concern list. The two prohibitions live in **`control.policy`**, which the register owns them to, and the agent context **delegates** rather than judging itself; both are derived from `stable_mutation`, and the candidate-vs-acceptance stage separation is *checked* rather than assumed. **No operation class was added** — that would change a Protected-Core-owned contract behind HUMAN GATE 2. `prop` evidence is exhaustive over the closed governed vocabularies, not sampled, because `hypothesis` is NOT_CONFIGURED and no package was installed to satisfy an evidence key. **Not a phase acceptance**: no requirement discharged, no gate run, cumulative verified stays 86 |
 | 113 | `1a29e78` | handoff manifest refreshed after Phase 10 Package 3 (§12 rule) |
 | 114 | `b968c9c` | **PHASE 10 MACHINE ACCEPTANCE** — Agent Runtime + Harness Engineering. `run_phase_gate.py 10` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the **first** submission. C1–C6 PASS; EXTERNAL_RESULT PASS over 14 runs; **PROTECTED_CORE COMPLETE** — derived over the whole four-package candidate because Package 3 changed Protected Core `control.policy`, with security review 205, adversarial review 695 and full regression 1764+348+48 all at exit 0; RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 2/2; HUMAN_GATE NOT_APPLICABLE; 8 gates over 114 edges. **5/5 requirements discharged**, cumulative verified 86 → **91**. The Phase 11 row was added in the same commit, because marking a phase accepted without its successor's row leaves `current_work_phase()` returning `None`. **Phase 11 unlocked** |
-| 115 | `1408132` | Phase 10 ledger row — `PHASE_HISTORY.md` records the machine acceptance as row 26. Committed separately from the acceptance because history is never rewritten, and separately from this refresh because a refresh commit may not touch a governed path ← HEAD at generation |
+| 115 | `1408132` | Phase 10 ledger row — `PHASE_HISTORY.md` records the machine acceptance as row 26. Committed separately from the acceptance because history is never rewritten, and separately from this refresh because a refresh commit may not touch a governed path |
+| 116 | `d54d946` | handoff manifest refreshed after Phase 10 machine acceptance (§12 rule) |
+| 117 | `b3f0fd2` | **PHASE 11 PACKAGE 1** — the canonical graph set and Digital Twin view set. Both `ARK-REQ-0066` and `ARK-REQ-0067` are phrased as references to a specification rather than as lists, so the lists are parsed from `ARCHITECTURE.md` §11 at call time and appear in no module: **6** graph kinds and **9** twin views. The number nine is nowhere in the shipping source, and a cross-document control requires the register's stated count and the architecture's list to agree, taking the number **from the register** so a canonical set that grows to ten moves the test instead of expiring it. **Not a phase acceptance**: no graph is built, no requirement discharged, no gate run, cumulative verified stays 91 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -369,7 +371,7 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Code Intelligence + Digital Twin** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 11) |
-| Status | **UNLOCKED — NOT_STARTED**. `GovernanceState.current_work_phase()` returns `11`. Nothing of this phase is implemented and no capability of it is claimed |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Package 1 delivered)**. `GovernanceState.current_work_phase()` returns `11`. Package 1 delivered the canonical graph set and view set; **no graph is built, no requirement is discharged and no phase gate has been run** |
 | Prerequisites | Phase **10** alone — MACHINE-ACCEPTED, which is why the dependency machine permits 11 and only 11 |
 | Contract IDs | **C-24** — the first **`GRAPH`** contract in this build, with **ADDITIVE** compatibility rather than the `INT`/STRICT shape every contract so far has had. Read `CONTRACT_INVENTORY.md` row 24 before designing |
 | Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
@@ -383,21 +385,45 @@ is **2** and neither requirement is discharged.
 
 ## 9. Next exact action
 
-**Begin Phase 11 — Code Intelligence + Digital Twin (C-24).** Phase 11 is
-unlocked and not started. Derive the requirement set with
-`RequirementRegister.for_phase("11")` rather than assuming anything carries over:
-it returns **two** MANDATORY entries, `ARK-REQ-0066` and `ARK-REQ-0067`, both
-owned by `engineering.codeintel`. **Phase 11 has a NON-ZERO denominator — two
-requirements.** C6 refuses an empty record against a non-empty denominator just
-as hard as it refuses the reverse.
+**Continue Phase 11 — Atomic Package 2: the graph set itself (`ARK-REQ-0066`,
+evidence `unit, integ`).** Package 1 is delivered and committed at `b3f0fd2`:
+the canonical graph set and Digital Twin view set are parsed from
+`ARCHITECTURE.md` §11 and appear in no module. Package 2 must build the graphs
+§11 specifies — symbol, import, dependency, route, model and frontend-contract —
+for Python via native AST.
 
-**C-24 is the first `GRAPH` contract this build has delivered.**
-`CONTRACT_INVENTORY.md` row 24 declares its kind as `GRAPH` with **ADDITIVE**
-compatibility, unlike every `INT`/STRICT contract so far — so it owes a real
-graph structure rather than an interface, and ADDITIVE means a later revision
-may add but not remove. Read that row and `MS §Code Intelligence and Digital
-Twin` before designing, and note that a graph contract is where a second store
-of somebody else's concern is easiest to introduce by accident.
+**C-24's declared verification is REBUILD DETERMINISM.**
+`CONTRACT_INVENTORY.md` row 24 names it as this contract's evidence
+responsibility, so rebuilding from identical source must produce an identical
+graph. `NonDeterministicRebuild` (`ARK-ERR-0102`) already exists for the refusal
+and `kernel.contracts.content_address` is the canonical way to address a
+rebuild — reuse it rather than hashing by hand, as C-23 already does.
+
+**The twin is a DERIVED store and never an authority.** `ARCHITECTURE.md` §11
+says so directly: it "is a **derived** store — never an authority — and is
+rebuildable from source plus the owning authorities."
+`DerivedStoreTreatedAsAuthority` (`ARK-ERR-0101`) exists for that refusal. A
+`GRAPH` contract is where a second store of somebody else's concern is easiest to
+introduce by accident, and the `shadow_registry` gate scans **24** consumer
+modules.
+
+**Then Package 3:** the Digital Twin composing the nine views (`ARK-REQ-0067`,
+evidence `integ`). **Then Package 4:** the composed journey, traceability, the
+C-17 report and **one** gate run.
+
+**Phase 11 has a NON-ZERO denominator — two requirements.** `ARK-REQ-0066` and
+`ARK-REQ-0067`, both MANDATORY, both owned by `engineering.codeintel`, neither
+discharged. Derive them with `RequirementRegister.for_phase("11")` rather than
+carrying anything over from Phase 10, whose five are discharged and closed. C6
+refuses an empty record against a non-empty denominator just as hard as it
+refuses the reverse.
+
+**What Package 1 established, so it is not rebuilt.** The graph set and the view
+set live only in `ARCHITECTURE.md` §11 and are parsed at call time; the count
+nine is nowhere in the shipping source; the presentation suffix (`view`,
+`graph`) is not part of an identity; the two vocabularies are distinct even
+where they read alike; and every fail-closed and anti-vacuity case is already
+covered. Reuse `GraphVocabulary`; do not add a second list.
 
 **Derive the scope from repository authority before writing anything.** Read
 `REQUIREMENT_REGISTER.md` for the rows whose Phase column is 11,
@@ -540,7 +566,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 1408132c32c0b0c815633c32368fc7da381d1a32
+head: b3f0fd2e517228534ab4271a59b8479c0e0edfce
 branch: main
 working_tree_clean: true
 
