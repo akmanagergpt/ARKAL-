@@ -1,0 +1,20 @@
+{
+  "phase_id": "11",
+  "note": "Derived from RequirementRegister.for_phase(\"11\"): exactly ARK-REQ-0066 and ARK-REQ-0067, both MANDATORY and both owned by engineering.codeintel. C-24 is GRAPH with ADDITIVE compatibility. No requirement from accepted Phase 10 is carried forward. No Tree-sitter, route, model, frontend-contract, runtime or deployment adapter is claimed; unavailable twin views are explicitly absent rather than represented by empty fabricated graphs.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0066",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/engineering/codeintel/graph_vocabulary.py parses the specified graph set from ARCHITECTURE.md section 11. code_graph.py provides the sourced, derived, content-addressed graph and a refusing rebuild-determinism assertion. python_builder.py uses native AST over real Python source, reports exactly the kinds it builds, and refuses every specified kind for which it has no adapter. docs/contracts/code_graph.md describes C-24 without becoming authority.",
+      "evidence": "unit: backend/tests/engineering/test_graph_vocabulary.py and test_code_graph.py prove the parsed vocabulary, fail-closed boundaries, sourced graph facts, canonical addressing, order-independent rebuild determinism, changed-input sensitivity and derived-store refusal. integ: backend/tests/engineering/test_phase_11_journey.py builds nonempty graphs from the real engineering.codeintel source, rebuilds each through a fresh builder and requires every address to match. Executed by phase_11_report.json.",
+      "note": "Both register evidence keys, unit and integ, are supplied. The specified set is maintained as a closed canonical vocabulary; only the Python-syntax-derived subset has an implemented builder, and every remaining kind is refused rather than falsely returned empty."
+    },
+    {
+      "req_id": "ARK-REQ-0067",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/engineering/codeintel/digital_twin.py composes every view parsed from ARCHITECTURE.md exactly once and in canonical order. Each TwinView must carry sources and exactly one of canonical artifact addresses or an explicit absence reason. Missing, duplicate, unknown, empty and ambiguous contributions are refused, and the twin can never answer as an authority.",
+      "evidence": "integ: backend/tests/engineering/test_digital_twin.py proves complete composition, canonical order, vocabulary-sized behaviour, honest absence, refusal boundaries and derived-store status. backend/tests/engineering/test_phase_11_journey.py supplies the real rebuilt graph addresses to the code view and explicitly declares every not-yet-composed view absent, then proves the resulting view set equals the canonical set. Executed by phase_11_report.json.",
+      "note": "The register's integ evidence key is supplied. Complete composition means every specified view is accounted for, not that every later adapter already exists; absence is first-class and empty fabricated coverage is impossible."
+    }
+  ]
+}
