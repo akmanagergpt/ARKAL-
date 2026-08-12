@@ -72,3 +72,22 @@ class HumanGateNotRecorded(SecurityError):
     """An action requiring a human gate has no recorded decision."""
 
     code = "ARK-ERR-0041"
+
+
+class CanonicalRequirementMutation(SecurityError):
+    """An actor barred from mutating stable state tried to change a canonical
+    requirement. Distinct from `ProtectedCoreMutation`: that guards Protected
+    Core *code*, this guards the governed *requirement* set, and a control must
+    be able to assert which boundary refused (F-0017)."""
+
+    code = "ARK-ERR-0095"
+
+
+class SelfAcceptance(SecurityError):
+    """The actor that produced an output tried to declare it accepted.
+
+    `stable_mutation.required_path` separates candidate production from
+    acceptance; collapsing them is the failure `ARK-REQ-0051` names.
+    """
+
+    code = "ARK-ERR-0096"
