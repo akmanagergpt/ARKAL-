@@ -14,11 +14,53 @@ an authority and may never be read as one. Where it disagrees with
 
 ---
 
-## 0. Scope of this revision — Phase 9B Atomic Package 1
+## 0. Scope of this revision — Phase 9B complete (Packages 1–3)
 
 Phase 3 delivered the **schema** half of C-13 under `ARK-REQ-0045` and
-`ARK-REQ-0049`. Phase 9B delivers the **activation** half. This revision records
-Package 1 of that phase and **no more**.
+`ARK-REQ-0049`. Phase 9B delivers the **activation** half, in three atomic
+packages. This revision records all three; the Package 1 scope note below is
+retained verbatim as the record of what that package alone delivered.
+
+**Delivered by Package 2 — the activated verdict**
+
+- `CapabilityGraph.can_perform` composes Package 1's per-reference resolutions,
+  the node's own `configured_state` and its graph-owned `prerequisites`
+  (transitively, cycle-checked) into one determinate `CapabilityQueryResult`.
+- The negative state is `NOT_CONFIGURED` and is **derived, not chosen**:
+  `EXECUTION_AND_CAPABILITY.md` §4 pairs *resolving* with *not being*
+  `NOT_CONFIGURED`. `FAIL` is assigned to no capability query by the canonical
+  set and would be misread as success by the unchanged accepted Phase 8
+  predicate; `UNSUPPORTED` is canonically another context's verdict. See
+  `activated_query.py` for the full derivation.
+- Proven through the real `AdmissionService`: a fully resolved configured
+  capability reaches `ADMITTED`, the first time production admission can succeed
+  at all. Pre-activation behaviour is byte-for-byte unchanged.
+
+**Delivered by Package 3 — composition and acceptance**
+
+- The composed integration evidence
+  (`backend/tests/capability/test_phase_9b_journey.py`): the eight-step journey
+  from governed activation phase, through pre-activation silence, the parsed
+  binding, query-time resolution, determinism without caching, reference-never-
+  copy, transitive prerequisites, to a real admission decision.
+- `docs/acceptance/phase_9B_traceability.json` and
+  `docs/acceptance/phase_9B_report.json`, and the single phase gate run.
+- **No module under `backend/arkali/` was changed by Package 3.** The contract
+  this document describes is the one Packages 1 and 2 built.
+
+**What activation still does not mean.** No provider runtime, no network or
+socket access, no live health, no cost metering, no fallback selection and no
+external-provider result exists (D-023). Every affirmative in the evidence
+composes composition-root doubles for `control.registry.provider`,
+`control.policy` and `control.isolation` — the evidence-requirement authority is
+the real `RequirementRegister` — because no provider runtime exists and none may
+be fabricated. **No production capability has been declared configured with real
+identities anywhere in this repository.** The *mechanism* is proven; a configured
+production capability is not claimed.
+
+---
+
+### Retained: scope note as written at Package 1
 
 **Delivered by Package 1**
 

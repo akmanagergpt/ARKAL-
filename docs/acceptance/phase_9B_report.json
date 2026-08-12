@@ -1,0 +1,160 @@
+{
+  "phase_id": "9B",
+  "objective": "Activate the Capability Graph (activated C-13) in three atomic packages, so that `can_perform(capability_id)` genuinely answers \"Can I perform this?\" by resolving every external `*_ref` at query time against its owning authority, instead of returning the pre-activation `NOT_CONFIGURED`. Package 1 delivered the reference->authority binding, parsed from the canonical `capability_node:` block, and query-time resolution through injected `Protocol` interfaces. Package 2 delivered the composed verdict: every reference resolved, plus the node's own `configured_state`, plus its graph-owned `prerequisites` walked transitively, mapped onto `PASS`/`NOT_CONFIGURED` only. Package 3 delivers the composed integration journey, the traceability record, this report and the single gate run, and changes no module under `backend/arkali/`. ADR-0003 is the authority for the schema/activation split; ADR-0001 keeps health, cost, availability and fallback in `control.registry.provider` alone, so the graph holds references and resolves them rather than storing anything.",
+  "ark_req_ids_closed": ["ARK-REQ-0046", "ARK-REQ-0047", "ARK-REQ-0048"],
+  "files_created": [
+    "backend/arkali/control/capability/reference_authority.py",
+    "backend/arkali/control/capability/reference_resolution.py",
+    "backend/arkali/control/capability/activated_query.py",
+    "backend/tests/capability/test_reference_resolution.py",
+    "backend/tests/capability/test_activated_query.py",
+    "backend/tests/capability/test_phase_9b_journey.py",
+    "backend/tests/structural/test_capability_activation_boundaries.py",
+    "backend/tests/execution/test_activated_admission.py",
+    "docs/contracts/capability_node.md",
+    "docs/acceptance/phase_9B_traceability.json",
+    "docs/acceptance/phase_9B_report.json"
+  ],
+  "files_modified": [
+    "backend/arkali/control/capability/capability_graph.py",
+    "backend/tests/capability/test_capability_preactivation.py",
+    "backend/tests/execution/scheduler_admission_harness.py",
+    "backend/tests/execution/test_admission_decision.py",
+    "docs/build/BUILD_STATE.md"
+  ],
+  "public_contracts": ["C-13 capability node + query result (activated half; INT, semver, STRICT) - docs/contracts/capability_node.md"],
+  "migrations": [],
+  "state_machine_capability_changes": "NO STATE MACHINE WAS ADDED OR CHANGED. The canonical count stays 12, reconciled against STATE_MACHINES.md on every run by the live control, and a derived control asserts that `control.capability` declares no state machine of its own. THE CAPABILITY CHANGE IS THE PHASE: pre-activation every query returned `NOT_CONFIGURED` and consulted no authority; activated, `can_perform` resolves every declared external reference at query time through its owning authority, reads the node's own `configured_state`, and walks `prerequisites` transitively, producing `PASS` when all of that holds and `NOT_CONFIGURED` in every other case. `FAIL` and `UNSUPPORTED` are never produced: `FAIL` is assigned to no capability query by the canonical set and would be misread as condition (a) SATISFIED by the accepted and UNCHANGED Phase 8 predicate `state is not NOT_CONFIGURED`; `UNSUPPORTED` is canonically another context's verdict. Activation itself remains a derived phase fact - `activate()` always raises, at the activation phase as well as before it, because there is no flag anywhere to set.",
+  "tests_executed": [
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests --ignore=backend/tests/governance -q (repo root)",
+      "exit_code": 0,
+      "passed": 1639,
+      "failed": 0,
+      "summary": "full regression, part A of an exhaustive three-part partition of backend/tests. 1639 passed, 14 skipped, exit 0. THE PARTITION IS PROVEN, NOT ASSERTED: `pytest backend --collect-only` collects 2049 tests and parts A+B+C collect 1653+348+48 = 2049 exactly, so the three runs cover the suite exhaustively and disjointly. The suite was partitioned rather than run as one command because two governance drift modules alone take 301s and the whole suite exceeds this environment's per-invocation execution ceiling; no test is excluded, reordered or deselected. The 14 skips are pre-existing honest NOT_CONFIGURED/NOT_APPLICABLE reports, unchanged by this phase.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/governance --ignore=backend/tests/governance/test_handoff_architecture_drift.py --ignore=backend/tests/governance/test_handoff_drift.py -q (repo root)",
+      "exit_code": 0,
+      "passed": 348,
+      "failed": 0,
+      "summary": "full regression, part B of the exhaustive partition. 348 passed, exit 0. Includes the acceptance-path controls this phase's record is judged by: false-discharge, zero-denominator shape, phase-status parsing, protected-core profile, rescoring authorization and the external-provider-result path.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/governance/test_handoff_architecture_drift.py backend/tests/governance/test_handoff_drift.py -q (repo root)",
+      "exit_code": 0,
+      "passed": 48,
+      "failed": 0,
+      "summary": "full regression, part C of the exhaustive partition. 48 passed, exit 0, 301s. The F-0047 and F-0048 drift batteries, which re-run the handoff validator CLI against mutated documents; these are why the suite is partitioned.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/capability/test_phase_9b_journey.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 15,
+      "failed": 0,
+      "summary": "the Package 3 composed journey: the activation phase read from the register rather than a constant; a pre-activation graph handed fully resolving authorities that must consult none of them; the binding parsed from the canonical block with every authority reconciled against AUTHORITY_MAP.yaml; PASS reached only after every declared authority was actually asked; determinism and the no-cache rule proven together; the resolver question shown incapable of carrying a value, with the live shadow_registry gate run over the real repository; transitive prerequisites and a cycle that fails closed; and a real AdmissionService decision, ADMITTED when everything resolves and CAPABILITY_NOT_CONFIGURED for every refusal shape.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/capability -q (backend/)",
+      "exit_code": 0,
+      "passed": 121,
+      "failed": 0,
+      "summary": "the whole capability context: C-13 schema (34), pre-activation behaviour (15), query-time reference resolution (32), the activated verdict (25) and the composed journey (15).",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/structural/test_capability_activation_boundaries.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0,
+      "summary": "the `arch` evidence ARK-REQ-0047 and ARK-REQ-0048 owe: resolution must be injected because the same-layer import is forbidden and the policy exemption is not leaned on; exactly one capability authority exists; no module retains a resolution outcome; the owner declares no provider lookup, no isolation or policy vocabulary and no state machine; the live shadow_registry gate passes over this context; the two replaced pre-activation tripwires still carry their obligation and the replacement set was not narrowed; and pre-activation state is preserved.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/execution/test_activated_admission.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 17,
+      "failed": 0,
+      "summary": "the activated capability observed through the REAL AdmissionService, CapabilityAdmission, WorkerContract, IsolationAdmission, ResourceAdmission and a real PEP over a real PDP. Proves the safety property the unchanged Phase 8 predicate depends on: the activated graph produces no negative state other than NOT_CONFIGURED, so no unresolved capability can be read as condition (a) satisfied.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/governance/test_zero_denominator_shape.py tests/governance/test_false_discharge.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "summary": "the two controls that judge this phase's own record: the claim-shape rule (8 tests, including the live control asserting every accepted phase's traceability record still satisfies it - which now includes phase_9B_traceability.json) and the C6 false-discharge guard (23 tests). 8 passed and 23 passed, run together and separately, both exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m mypy --ignore-missing-imports arkali (backend/)",
+      "exit_code": 0,
+      "passed": 146,
+      "failed": 0,
+      "summary": "strict type check, clean over 146 source files. `python_version = 3.13`, `strict = true`, `disallow_untyped_defs = true`. The new journey module was additionally checked on its own and is clean.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure.py",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "summary": "12 pass, 0 fail. Includes check 12, runtime constructs confined to their canonical authority over 146 shipping modules, resolved from ARCHITECTURE.md against AUTHORITY_MAP.yaml across tracked and untracked files.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "NEGATIVE CONTROL PASS - the structure check is generic, derives runtime-construct authority from the canonical documents, accepts each construct only in its own authority, sees untracked files, survives rename/move and fails closed on unresolvable authority or ownership. Proves the positive run above is not vacuous.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph.py",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "summary": "PASS 10/10 - phase graph executable and deadlock-free, parsed from the authoritative documents rather than hard-coded.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "NEGATIVE CONTROL PASS - the HG1-05 deadlock is injected into an in-memory copy of the authoritative matrix and the same validator rejects it; the repository matrix was verified unmodified afterwards.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase0_deliverables.py",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "summary": "PASS - Phase 0A 16/16 and Phase 0B 11/11, counts derived from the canonical Build Protocol lists rather than entered by hand.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    }
+  ],
+  "architecture_checks": "8 of 8 declared architecture gates PASS over 108 real cross-context edges, and all 9 numeric budgets are evaluated under ratified measurement contract 1.0.0 with no violation. Run through the shipping GateRunner over the real repository: architecture_budget_violation PASS (all 9 numeric budgets, no violation), duplicate_canonical_authority PASS (every concern resolves to exactly one canonical owner across 39 concerns), duplicate_lifecycle_authority PASS (14 lifecycles, one authority each), duplicate_state_machine_authority PASS (12 state machines, one authority each), forbidden_cycles PASS (the context graph over 108 edges is acyclic), forbidden_dependency_direction PASS (all 108 cross-context edges respect layer direction), protected_core_boundary_violation PASS (7 protected-core contexts declared and present), shadow_registry PASS (provider fields have a single store; 18 consumer modules scanned by SOURCE and none stores, caches, mirrors, defaults, aliases or locally re-derives an owned concern). The edge count is UNCHANGED from Phase 9B Package 2's 108 because Package 3 adds no module under backend/arkali/ and therefore no import. The three ceiling budgets carried in are still at their ceilings and were not pushed: max_orchestration_depth 4 of 4, kernel.contracts.errors and kernel.contracts.state_machine both 15 of 15 fan-in, acceptance.engine public surface 40 of 40 - this phase added no public name to acceptance.engine.",
+  "duplicate_shadow_check": "duplicate_canonical_authority PASS - every concern resolves to exactly one canonical owner across 39 concerns, and capability_availability_answer resolves to control.capability alone. shadow_registry PASS over 18 consumer modules read as SOURCE: control.capability is one of the five declared reference-only consumers, so a capability node or query that stored, cached, mirrored, defaulted, aliased or locally re-derived provider health, cost, availability, configuration, identity, model identity or fallback would fail this gate. Structurally there is nothing to store: CapabilityNode carries provider_refs and no health, availability, cost or fallback_configuration field and is extra=\"forbid\"; the whole question a resolver may be asked is `resolves(reference) -> bool`, so a referenced VALUE never crosses the boundary at all. A derived control additionally proves no second capability node model or graph class exists anywhere in the repository, and that only the owner parses the canonical schema block or composes a capability verdict.",
+  "security_findings": "No new finding. 0 BLOCKER and 0 HIGH are open - `GovernanceState.open_stopping_findings` returns empty over the canonical record. The latest recorded finding is F-0048, MEDIUM and CLOSED, and every finding through F-0048 is closed. This phase introduces no execution surface, no network path, no credential use, no secret handling and no persistence: C-13 is INT, so there is no table, no migration and no ORM construct. The activated query is pure - it asks injected authorities a boolean question and retains nothing - and the one free-form node field (runtime_requirements) is already guarded by validate_no_shadow_registry, which takes the provider-owned field names from AUTHORITY_MAP.yaml rather than hard-coding them. The change set is NORMAL by select_profile over the phase's real created and modified paths across all three packages: control.capability is not a Protected Core member and no path was unresolvable, so no security-review or adversarial-review category is owed and none is claimed as having been performed.",
+  "fake_success_scan": "CLEAN, and mechanically enforced rather than asserted. PASS is reachable only through a live authority's affirmative answer: a missing resolver yields NOT_CONFIGURED and a refusing resolver yields FAIL at the per-reference level, and there is no branch in which an unasked, absent or unsupplied authority contributes an affirmative. resolve_references REFUSES when no authorities are composed at all rather than returning an empty tuple, because an empty answer is indistinguishable from \"everything resolved\" - the stubbed/defaulted/assumed value MS §Capability Graph forbids. At the activation phase with no authority composed, can_perform still answers NOT_CONFIGURED rather than inventing a verdict. Nothing is cached at any layer, proven by changing an authority's answer between two calls through the real service. THE ANTI-VACUITY EVIDENCE IS A REAL BATTERY: 8 mutations were injected one at a time into the real shipping modules, each run against the control meant to catch it, and 8 of 8 were CAUGHT with 0 missed - a pre-activation answer leaking an affirmative, prerequisites left unwalked, a genuine memoisation cache on resolution, a node's own configured_state ignored, a missing authority resolving anyway, a refusal reported as FAIL instead of NOT_CONFIGURED, the canonical binding going vacuous, and activate() becoming a settable operation. Every mutated file was restored from its recorded bytes and its sha256 re-verified between cases, and `git status` confirms no source file was left modified. No provider was contacted, no socket opened, no result simulated and no external-provider result exists anywhere in this phase.",
+  "evidence_created": [
+    "backend/tests/capability/test_phase_9b_journey.py - the Phase 9B composed journey in eight steps plus a four-control class asserting the journey claims nothing it did not do, including an AST check that the module imports no network package and a check that the denominator is exactly the register's 9B set.",
+    "backend/tests/capability/test_activated_query.py - 25 controls over the activated verdict: the affirmative is earned and never defaulted, every negative is NOT_CONFIGURED and never FAIL, prerequisites are transitive and graph-owned, a cycle fails closed, a fallback never rescues an unresolved capability, and a changed authority answer changes the next query.",
+    "backend/tests/capability/test_reference_resolution.py - 32 controls over query-time resolution against injected authorities.",
+    "backend/tests/structural/test_capability_activation_boundaries.py - 21 derived architecture controls: injection forced by the layer rule, exactly one capability authority, no retained resolution outcome, no provider lookup, no foreign vocabulary, no state machine, the live shadow_registry gate, the retired-tripwire obligation and preserved pre-activation state.",
+    "backend/tests/execution/test_activated_admission.py - 17 controls proving the same verdict through the shipping AdmissionService, including that no negative graph outcome can become ADMITTED under the unchanged Phase 8 predicate.",
+    "docs/contracts/capability_node.md - the C-13 contract document, extended from a Package-1-only record to the complete Phase 9B record, with the Package 1 scope note retained verbatim rather than rewritten.",
+    "docs/acceptance/phase_9B_traceability.json - three real claims against a denominator of three, each naming an implementation and an evidence source; reconcile_discharge returns no violations against the register.",
+    "Mutation battery, Phase 9B Package 3 - 8 mutations injected into the real shipping modules, 8 caught, 0 missed, every file restored with sha256 re-verified. Run outside the repository and not committed; recorded here and in BUILD_STATE.md as this package's anti-vacuity evidence."
+  ],
+  "limitations": "STATED PLAINLY. (1) THE MECHANISM IS PROVEN; A CONFIGURED PRODUCTION CAPABILITY IS NOT. Production admission can now reach ADMITTED in principle, and that was proven through the shipping AdmissionService rather than asserted - but every affirmative composes composition-root doubles standing in for control.registry.provider, control.policy and control.isolation, because no provider runtime exists and none may be fabricated. The evidence-requirement authority is the real RequirementRegister, so at least one authority in every activated fixture is canonical rather than a double. No capability is declared configured with real production identities anywhere in this repository, and no composition root ships that would do so. (2) No verifiable external-provider binding exists in the canonical set and none was invented; D-023 records that, every recorded run above declares NO_EXTERNAL_RESULT explicitly, and the positive external path stays closed until a later canonical phase supplies one. (3) Fields with no canonical evaluation rule are deliberately not evaluated: runtime_requirements and platform_support carry no declared authority, and fallback_refs are validated as references but never consulted for the verdict, because fallback SELECTION has no canonical semantics here. isolation_tier satisfiability remains control.isolation's and admission condition (b)'s, not this query's. (4) The evidence graph, coverage and verdicts (C-16) remain Phase 13 and are neither computed nor claimed. (5) OBSERVED, NOT REPAIRED, AND OUTSIDE THIS PHASE'S SCOPE: the accepted docs/acceptance/phase_9_report.json declares evidence_created as EV-0066, EV-0067 and EV-0068, but docs/acceptance/EVIDENCE_INDEX.md ends at EV-0065, so those three identifiers resolve to no index row. Phase 8's accepted report shows the field is legitimately free-form prose, so no canonical rule is on its face violated and no finding is opened here; this phase therefore follows the Phase 8 form and declares its evidence by artifact name rather than minting index positions. Repairing another phase's accepted record is not Phase 9B's to do and is left for a human decision. (6) OBSERVED, NOT CLAIMED AS PASS: `ruff check` under the project's own configuration reports 377 pre-existing findings across the repository, dominated by F811 on pytest fixture parameters - a known linter false-positive pattern for the pytest idiom - with ZERO findings in any file this phase created or modified. No accepted phase report records a ruff run, so none is recorded here and no ruff PASS is claimed; the observation is stated rather than suppressed. (7) The full suite was executed as an exhaustive three-part partition rather than one command, because this environment's per-invocation execution ceiling is shorter than the suite's runtime. The partition is proven by collection count (1653+348+48 = 2049 = the full collection), not asserted, and nothing is excluded, deselected or reordered.",
+  "blockers": "None. 0 BLOCKER and 0 HIGH findings are open; all four prerequisite phases (3, 4, 6 and 9) are MACHINE-ACCEPTED, which is why the dependency machine permits 9B and only 9B; the matrix Gate column for 9B is empty, so no human gate applies and the next human gate remains GATE 2 at Phase 23. Phase 9B carries no prior acceptance record, so no GOV-001 re-scoring authorization is required or claimed.",
+  "next_exact_action": "Await the machine verdict. If Phase 9B is accepted, cumulative verified moves 83 -> 86 and the canonical dependency machine unlocks Phase 10 (Agent Runtime + Harness Engineering, C-22 and C-23), whose prerequisites are exactly Phases 9 and 9B. Perform the mandatory section-12 handoff refresh as a SEPARATE commit immediately after the acceptance commit, re-deriving section 3 from the gate mechanism rather than transcribing it (F-0047), and carrying the accepted phase row without leaving transition residue in either the phase table or the continuation brief (F-0048). Do not re-run the Phase 9B gate afterwards: like Phases 2, 3 and 8, a second run on an accepted phase returns AWAITING_RESCORING_AUTHORITY, which is the GOV-001 rule working rather than a fault.",
+  "status": "PASS"
+}
