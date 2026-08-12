@@ -53,6 +53,7 @@ import yaml
 
 from arkali.control.policy.policy_errors import (
     CanonicalRequirementMutation,
+    DirectStableMutationError,
     MalformedPolicyState,
     SelfAcceptance,
 )
@@ -65,16 +66,25 @@ _CANDIDATE_STAGE: Final[str] = "candidate"
 _ACCEPTANCE_STAGE: Final[str] = "acceptance"
 
 
+def _normalised_set(values: object) -> frozenset[str]:
+    """Normalise one authority-map actor collection without inventing entries."""
+    if not isinstance(values, list):
+        return frozenset()
+    return frozenset(str(actor).strip().lower() for actor in values if str(actor).strip())
+
+
 class AgentAuthority:
     """What an agent actor may not do. Construct with `load`."""
 
     def __init__(
         self,
         barred_actors: frozenset[str],
+        direct_mutation_permitted_by: frozenset[str],
         required_path: tuple[str, ...],
         source: str,
     ) -> None:
         self._barred = barred_actors
+        self._direct_mutation_permitted_by = direct_mutation_permitted_by
         self._required_path = required_path
         self.source = source
 
@@ -83,28 +93,27 @@ class AgentAuthority:
         path = repo_root / AUTHORITY_MAP_RELPATH
         if not path.is_file():
             raise MalformedPolicyState(
-                "authority map not found; refusing to invent the agent "
-                "prohibitions",
+                "authority map not found; refusing to invent the agent prohibitions",
                 source=str(path),
             )
         raw: Any = yaml.safe_load(path.read_text(encoding="utf-8"))
         mutation = (raw or {}).get("stable_mutation") or {}
-        barred = frozenset(
-            str(actor).strip().lower()
-            for actor in (mutation.get("prohibited_actors") or [])
-            if str(actor).strip()
-        )
+        barred = _normalised_set(mutation.get("prohibited_actors"))
         required_path = tuple(
             str(stage).strip().lower()
             for stage in (mutation.get("required_path") or [])
             if str(stage).strip()
         )
-        cls._validate(barred, required_path, str(path))
-        return cls(barred, required_path, str(path))
+        permitted = _normalised_set(mutation.get("direct_mutation_permitted_by"))
+        cls._validate(barred, permitted, required_path, str(path))
+        return cls(barred, permitted, required_path, str(path))
 
     @staticmethod
     def _validate(
-        barred: frozenset[str], required_path: tuple[str, ...], source: str
+        barred: frozenset[str],
+        direct_mutation_permitted_by: frozenset[str],
+        required_path: tuple[str, ...],
+        source: str,
     ) -> None:
         """Fail closed, and never vacuously.
 
@@ -119,10 +128,13 @@ class AgentAuthority:
                 "with no subject would pass vacuously",
                 source=source,
             )
+        if barred & direct_mutation_permitted_by:
+            raise MalformedPolicyState(
+                "an actor cannot be both prohibited from and permitted direct stable mutation",
+                source=source,
+            )
         missing = [
-            stage
-            for stage in (_CANDIDATE_STAGE, _ACCEPTANCE_STAGE)
-            if stage not in required_path
+            stage for stage in (_CANDIDATE_STAGE, _ACCEPTANCE_STAGE) if stage not in required_path
         ]
         if missing:
             raise MalformedPolicyState(
@@ -139,6 +151,22 @@ class AgentAuthority:
 
     def is_barred(self, actor: str) -> bool:
         return actor.strip().lower() in self._barred
+
+    def assert_may_directly_mutate_stable(self, actor: str) -> None:
+        """Refuse every actor not canonically granted direct Stable mutation.
+
+        The live authority deliberately grants nobody. This is broader than
+        ``is_barred``: an invented actor label must not become an escape hatch.
+        The rollback exception is a separate governed operation and is never a
+        direct-write permission.
+        """
+        normalised = actor.strip().lower()
+        if not normalised or normalised not in self._direct_mutation_permitted_by:
+            raise DirectStableMutationError(
+                f"{actor!r} may not directly mutate stable state; the canonical "
+                "direct-mutation permission set does not contain this actor",
+                source=self.source,
+            )
 
     def assert_may_mutate_canonical_requirements(self, actor: str) -> None:
         """Refuse a barred actor changing the governed requirement set.

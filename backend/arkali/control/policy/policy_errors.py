@@ -91,3 +91,9 @@ class SelfAcceptance(SecurityError):
     """
 
     code = "ARK-ERR-0096"
+
+
+class DirectStableMutationError(SecurityError):
+    """An actor or mechanism attempted to bypass the candidate lifecycle."""
+
+    code = "ARK-ERR-0097"

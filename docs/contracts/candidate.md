@@ -6,12 +6,24 @@
 This is a derived description of the implemented contract. Canonical documents
 and executable repository controls remain authoritative.
 
-## Packages 2–3 scope
+## Packages 2–4 scope
 
 Package 2 delivers the candidate manifest and isolated-workspace foundation.
 Package 3 delivers the immutable assembly report and executes every consistency
 pair read from the canonical Semantic Candidate Assembly declaration. No
 requirement is discharged until Phase 12 acceptance.
+
+Package 4 enforces the separate Stable-path boundary from its owning contexts.
+`control.policy.AgentAuthority` derives both the direct-mutation permission set
+and prohibited actors from `AUTHORITY_MAP.yaml`: the live permission set is
+empty, so every actor and mechanism is refused, including an unknown label;
+`ROLLBACK_STABLE` remains a separate Recovery Supervisor operation rather than
+a direct-write permission. `lifecycle.release.StableCandidatePath` derives the
+required path from the same declaration and issues immutable receipts only for
+one-stage progression. Each receipt carries the complete traversed prefix, so
+skipping directly to an accepted or promotion stage is refused. This authority
+validates progression only: it performs no stable write and does not decide
+verification, acceptance, or rollback.
 
 `WorkspaceAuthority.allocate` creates one exclusive directory per workspace and
 copies the stable task snapshot into it. Reallocation is refused, all write paths
