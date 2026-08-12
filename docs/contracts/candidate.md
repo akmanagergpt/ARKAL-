@@ -6,11 +6,12 @@
 This is a derived description of the implemented contract. Canonical documents
 and executable repository controls remain authoritative.
 
-## Package 2 scope
+## Packages 2–3 scope
 
 Package 2 delivers the candidate manifest and isolated-workspace foundation.
-It does not deliver the assembly report or execute the eight semantic checks.
-No requirement is discharged until Phase 12 acceptance.
+Package 3 delivers the immutable assembly report and executes every consistency
+pair read from the canonical Semantic Candidate Assembly declaration. No
+requirement is discharged until Phase 12 acceptance.
 
 `WorkspaceAuthority.allocate` creates one exclusive directory per workspace and
 copies the stable task snapshot into it. Reallocation is refused, all write paths
@@ -26,5 +27,18 @@ artifact references. Component names are validated through
 deterministic JSON rendering is itself content-addressed as `manifest_ref`.
 
 The manifest deliberately contains no verification, acceptance, promotion or
-stable-revision verdict. Semantic assembly belongs to the next package;
-acceptance and promotion remain separate authorities and stages.
+stable-revision verdict.
+
+`SemanticAssembler` requires exactly one injected evaluator for every canonical
+pair and executes them in canonical order. Each evaluator independently reduces
+its left and right domain views to content-addressed semantic fingerprints. A
+pair is consistent only when those fingerprints match; the result and overall
+summary are derived and cannot be asserted by a caller. Missing, duplicate,
+unknown, invalid or errored evaluations refuse the whole report rather than
+fabricating an empty or successful check.
+
+`AssemblyReport` is frozen and STRICT-versioned at `1.0.0`, binds the candidate
+identity to the immutable manifest address, records all pair observations, and
+is itself deterministically content-addressed. `all_consistent` is an assembly
+fact only. The report carries no verification, acceptance, promotion or stable
+verdict; those remain separate authorities and later stages.

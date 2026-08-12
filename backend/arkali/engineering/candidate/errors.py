@@ -33,3 +33,9 @@ class InvalidCandidateManifestError(CandidateContractError):
     """A C-25 manifest is incomplete, ambiguous, or not canonically addressed."""
 
     code = "ARK-ERR-0107"
+
+
+class InvalidAssemblyReportError(CandidateContractError):
+    """A C-25 report is incomplete, ambiguous, or not manifest-bound."""
+
+    code = "ARK-ERR-0108"
