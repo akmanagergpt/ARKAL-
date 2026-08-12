@@ -21,3 +21,15 @@ class UnknownAssemblyCheckError(CandidateContractError):
     """A consistency pair outside canonical Semantic Assembly was requested."""
 
     code = "ARK-ERR-0105"
+
+
+class WorkspaceIsolationError(CandidateContractError):
+    """A workspace identity or path would cross an isolation boundary."""
+
+    code = "ARK-ERR-0106"
+
+
+class InvalidCandidateManifestError(CandidateContractError):
+    """A C-25 manifest is incomplete, ambiguous, or not canonically addressed."""
+
+    code = "ARK-ERR-0107"
