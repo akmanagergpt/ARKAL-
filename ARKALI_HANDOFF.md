@@ -376,9 +376,9 @@ Its denominator is **5** and none of the five is discharged.
 is unlocked and not started. Derive the requirement set with
 `RequirementRegister.for_phase("10")` rather than assuming anything carries over:
 it returns **five** MANDATORY entries — `ARK-REQ-0050`, `ARK-REQ-0051`,
-`ARK-REQ-0054`, `ARK-REQ-0055` and `ARK-REQ-0231`. **Phase 10's denominator is
-five**, and C6 refuses an empty record against a non-empty denominator just as
-hard as it refuses the reverse.
+`ARK-REQ-0054`, `ARK-REQ-0055` and `ARK-REQ-0231`. **Phase 10 has a NON-ZERO
+denominator — five requirements.** C6 refuses an empty record against a
+non-empty denominator just as hard as it refuses the reverse.
 
 **Derive the scope from repository authority before writing anything.** Read
 `REQUIREMENT_REGISTER.md` for the rows whose Phase column is 10,
