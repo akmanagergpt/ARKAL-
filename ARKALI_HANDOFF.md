@@ -403,6 +403,46 @@ binds to). Package 3 must deliver the two requirements neither contract covers:
 **Then Package 4:** the composed journey, traceability, the C-17 report and
 **one** gate run.
 
+**What a read-only investigation of Package 3 already established, verified
+against the repository — do not re-derive it, but do re-verify before relying on
+it.**
+
+1. **`engineering.agent` is ALREADY a declared reference-only consumer**
+   (`AUTHORITY_MAP.yaml` `provider_authority.reference_only_consumers`, alongside
+   `control.capability`, `execution.scheduler`, `engineering.localai` and
+   `surfaces.operations`). The live `shadow_registry` gate therefore already
+   reads this context's source, and `copying_permitted` and `caching_permitted`
+   are both false. `ARK-REQ-0050`'s architecture obligation is partly enforced by
+   a mechanism that already exists; Package 3 should prove and extend it, not
+   build a second one.
+2. **There is no operation class for mutating a canonical requirement, and one
+   must NOT be added.** The 14 governed classes are declared in
+   `AUTHORITY_MAP.yaml`, and `unmapped_action_resolution: DENY` means an
+   unmapped action is already denied — fail-closed by construction. Adding a
+   class would change C-05/C-07, which `CONTRACT_INVENTORY.md` records as owned
+   by Protected Core contexts and therefore **requires HUMAN GATE 2**. That gate
+   is not reached and must not be assumed.
+3. **`stable_mutation.prohibited_actors` already names `ai_agent`**, and
+   `acceptance.rescoring_authorization.forbidden_issuers` already derives from
+   it — "an implementing actor cannot authorize its own supersession". That is a
+   real existing mechanism, but it is **narrower than `ARK-REQ-0051`**: it lives
+   in `acceptance.engine` and governs GOV-001 re-scoring authorization, not the
+   general rule that an agent may not declare its own output accepted. The
+   requirement is therefore **not already discharged**, and the register owns it
+   to `control.policy`.
+4. **`control.policy` is Protected Core.** Any change to its code triggers the
+   stronger verification profile — security review, adversarial review and full
+   regression, each backed by a real execution record at exit 0, derived by
+   `select_profile` from the changed paths and never declared by the author.
+   Budget for that before starting. (Changing a Protected Core *contract* is the
+   separate HUMAN GATE 2 case in point 2.)
+5. **`prop` evidence needs a plan that does not assume `hypothesis`.** The
+   register assigns `ARK-REQ-0051` the evidence keys `sec, prop`, and §6 of this
+   manifest records `hypothesis` as **NOT_CONFIGURED** on this host. Do not
+   install it to satisfy an evidence key; either derive the property evidence
+   from exhaustive enumeration over the governed vocabularies, as the existing
+   security suite does, or report the limitation honestly.
+
 **What Packages 1 and 2 already established, so it is not rebuilt.** Governed
 vocabularies live only in the canonical documents and are parsed at call time —
 the harness elements from two documents reconciled positionally, the context
