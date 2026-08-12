@@ -1,0 +1,169 @@
+{
+  "phase_id": "10",
+  "objective": "Deliver Agent Runtime + Harness Engineering's two contracts and the two requirements that govern the actor performing the work, in four atomic packages. Package 1 delivered C-22, the bounded harness task: the canonical harness elements parsed from BOTH canonical documents and reconciled positionally, with boundedness enforced structurally so an unbounded task cannot be constructed. Package 2 delivered C-23, the context package: the admissible context kinds parsed from `MS §Context Compiler`, provenance required per item, the C-09 no-secret guard reused rather than reimplemented, and a `context_hash` the accepted C-14 provenance record binds to. Package 3 delivered ARK-REQ-0050's structural role/backend separation and ARK-REQ-0051's two prohibitions, the latter enforced in `control.policy` because the register owns it there. Package 4 delivers the composed journey, the traceability record, this report and the single gate run. `MS §Harness Engineering` states the objective in one line: the primitive is not \"send a prompt\", it is \"execute a bounded engineering task\".",
+  "ark_req_ids_closed": ["ARK-REQ-0050", "ARK-REQ-0051", "ARK-REQ-0054", "ARK-REQ-0055", "ARK-REQ-0231"],
+  "files_created": [
+    "backend/arkali/engineering/agent/harness_elements.py",
+    "backend/arkali/engineering/agent/harness_task.py",
+    "backend/arkali/engineering/agent/errors.py",
+    "backend/arkali/engineering/agent/context_kinds.py",
+    "backend/arkali/engineering/agent/context_package.py",
+    "backend/arkali/engineering/agent/agent_role.py",
+    "backend/arkali/control/policy/agent_authority.py",
+    "backend/tests/engineering/__init__.py",
+    "backend/tests/engineering/test_harness_elements.py",
+    "backend/tests/engineering/test_harness_task.py",
+    "backend/tests/engineering/test_context_kinds.py",
+    "backend/tests/engineering/test_context_package.py",
+    "backend/tests/engineering/test_phase_10_journey.py",
+    "backend/tests/security/test_agent_authority.py",
+    "backend/tests/structural/test_agent_role_separation.py",
+    "docs/contracts/harness_task.md",
+    "docs/contracts/context_package.md",
+    "docs/acceptance/phase_10_traceability.json",
+    "docs/acceptance/phase_10_report.json"
+  ],
+  "files_modified": [
+    "backend/arkali/control/policy/policy_errors.py",
+    "docs/build/BUILD_STATE.md"
+  ],
+  "public_contracts": [
+    "C-22 harness task specification (INT, semver, STRICT) - docs/contracts/harness_task.md",
+    "C-23 context package + provenance (INT, semver, STRICT) - docs/contracts/context_package.md"
+  ],
+  "migrations": [],
+  "state_machine_capability_changes": "NO STATE MACHINE WAS ADDED OR CHANGED. The canonical count stays 12, reconciled against STATE_MACHINES.md on every run by the live control. THE CAPABILITY CHANGE IS THE BOUNDED TASK ITSELF: before Phase 10 an engineering task had no expressible form; it now has exactly one, and that form cannot be constructed unbounded because every canonical harness element is a required field with no default under extra=\"forbid\". A context package likewise cannot carry a kind the canonical document does not admit, cannot carry an item without provenance, and cannot carry a raw secret. An agent role cannot hold provider state, and no actor - agent or otherwise - can accept its own output. WHAT DID NOT CHANGE: no agent runtime, dispatcher or task executor exists, and a control over the shipping source asserts none is present. Phase 10 delivers the contracts a bounded engineering task is made of and the prohibitions that govern the actor performing it; it does not deliver the runtime that would perform one.",
+  "tests_executed": [
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/security -q (repo root)",
+      "exit_code": 0,
+      "passed": 205,
+      "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - security review. 205 passed, 1 skipped, exit 0. The whole security suite over the real PDP, PEP, Protected Core boundary, Secret Vault boundary and Local-Only policy, including the 18 new controls for ARK-REQ-0051 in test_agent_authority.py. The single skip is a pre-existing honest NOT_CONFIGURED report, unchanged by this phase.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/structural backend/tests/governance --ignore=backend/tests/governance/test_handoff_architecture_drift.py --ignore=backend/tests/governance/test_handoff_drift.py -q (repo root)",
+      "exit_code": 0,
+      "passed": 695,
+      "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - adversarial review. 695 passed, exit 0, 368s. The derived architecture controls and the governance negative-control suites: every structural control over the real repository, the acceptance-path guards (false discharge, zero-denominator shape, phase-status parsing, protected-core profile, rescoring authorization, external-provider-result path), the architecture gates and the budget measurement contract. These are the suites written to REFUSE defective input rather than to confirm correct input, which is what makes them the adversarial tier. The two handoff drift batteries are excluded here only because they alone take 340s and are recorded separately as part C of the full regression; nothing is excluded from the regression itself.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests --ignore=backend/tests/governance -q (repo root)",
+      "exit_code": 0,
+      "passed": 1764,
+      "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - full regression, part A of an exhaustive three-part partition of backend/tests. 1764 passed, 14 skipped, exit 0. THE PARTITION IS PROVEN, NOT ASSERTED: `pytest backend --collect-only` collects 2174 tests and parts A+B+C collect 1778+348+48 = 2174 exactly, so the three runs cover the suite exhaustively and disjointly. The suite was partitioned rather than run as one command because two governance drift modules alone take 340s and the whole suite exceeds this environment's per-invocation execution ceiling; no test is excluded, reordered or deselected. The 14 skips are pre-existing honest NOT_CONFIGURED/NOT_APPLICABLE reports.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/governance --ignore=backend/tests/governance/test_handoff_architecture_drift.py --ignore=backend/tests/governance/test_handoff_drift.py -q (repo root)",
+      "exit_code": 0,
+      "passed": 348,
+      "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - full regression, part B of the exhaustive partition. 348 passed, exit 0. Includes every acceptance-path control this phase's own record is judged by.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/governance/test_handoff_architecture_drift.py backend/tests/governance/test_handoff_drift.py -q (repo root)",
+      "exit_code": 0,
+      "passed": 48,
+      "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - full regression, part C of the exhaustive partition. 48 passed, exit 0, 340s. The F-0047 and F-0048 drift batteries, which re-run the handoff validator CLI against mutated documents; these are why the suite is partitioned.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/engineering/test_phase_10_journey.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "summary": "the Package 4 composed journey in seven steps: the harness elements come from both canonical documents and reconcile; a task omitting ANY element cannot be constructed (parametrised over the model's own field list); the context package admits only canonical kinds and records provenance; no raw secret can reach it, via the real C-09 guard; the task and its context bind by canonical content address; a role holds references and never backend state, with the live shadow_registry gate run over the real repository; and the role's prohibitions are decided by control.policy, not by the role. Plus four controls asserting the journey claims nothing it did not do, including an AST check that it imports no network package and a source check that no agent runtime or dispatcher exists.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/engineering -q (backend/)",
+      "exit_code": 0,
+      "passed": 94,
+      "failed": 0,
+      "summary": "the whole engineering context: harness elements (17), the C-22 bounded task (27), context kinds (12), the C-23 context package (20) and the composed journey (18).",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m pytest tests/security/test_agent_authority.py tests/structural/test_agent_role_separation.py -q (backend/)",
+      "exit_code": 0,
+      "passed": 31,
+      "failed": 0,
+      "summary": "the `sec`, `prop` and `arch` evidence for ARK-REQ-0051 and ARK-REQ-0050: 18 policy controls including the exhaustive property enumeration over the closed governed vocabularies, and 13 architecture controls including the live shadow_registry gate over the real repository.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python -m mypy --ignore-missing-imports arkali (backend/)",
+      "exit_code": 0,
+      "passed": 153,
+      "failed": 0,
+      "summary": "strict type check, clean over 153 source files. `python_version = 3.13`, `strict = true`, `disallow_untyped_defs = true`.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure.py",
+      "exit_code": 0,
+      "passed": 12,
+      "failed": 0,
+      "summary": "12 pass, 0 fail. Includes check 12, runtime constructs confined to their canonical authority, resolved from ARCHITECTURE.md against AUTHORITY_MAP.yaml across tracked and untracked files.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "NEGATIVE CONTROL PASS - the structure check is generic, derives runtime-construct authority from the canonical documents, sees untracked files and fails closed on unresolvable ownership. Proves the positive run above is not vacuous.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph.py",
+      "exit_code": 0,
+      "passed": 10,
+      "failed": 0,
+      "summary": "PASS 10/10 - phase graph executable and deadlock-free, parsed from the authoritative documents rather than hard-coded.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph_negative.py",
+      "exit_code": 0,
+      "passed": 0,
+      "failed": 0,
+      "summary": "NEGATIVE CONTROL PASS - the HG1-05 deadlock is injected into an in-memory copy of the authoritative matrix and the same validator rejects it; the repository matrix was verified unmodified afterwards.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase0_deliverables.py",
+      "exit_code": 0,
+      "passed": 27,
+      "failed": 0,
+      "summary": "PASS - Phase 0A 16/16 and Phase 0B 11/11, counts derived from the canonical Build Protocol lists rather than entered by hand.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    }
+  ],
+  "architecture_checks": "8 of 8 declared architecture gates PASS over 114 real cross-context edges, and all 9 numeric budgets are evaluated under ratified measurement contract 1.0.0 with no violation. Run through the shipping GateRunner over the real repository: architecture_budget_violation PASS, duplicate_canonical_authority PASS (39 concerns, one owner each), duplicate_lifecycle_authority PASS (14 lifecycles), duplicate_state_machine_authority PASS (12 state machines), forbidden_cycles PASS (the graph over 114 edges is acyclic), forbidden_dependency_direction PASS (all 114 edges respect layer direction), protected_core_boundary_violation PASS (7 protected-core contexts), shadow_registry PASS (24 consumer modules scanned by SOURCE, none stores, caches, mirrors, defaults or re-derives an owned concern). Phase 10 took the edge count from 108 to 114 across three packages, every added edge DOWNWARD - engineering.agent to kernel.contracts and engineering.agent to control.policy - and no same-layer edge was added, because allow_same_layer is false. Two of those edges exist precisely because a canonical guard is CALLED rather than copied: the C-09 no-secret guard and the ARK-REQ-0051 authority. A BUDGET WAS HIT AND RESPECTED RATHER THAN EXCEPTED: the harness error taxonomy was first written into kernel.contracts and this gate REFUSED it at public surface 42 of 40, so it was decomposed into engineering.agent under ADR-0008 - an exception would have required HUMAN GATE 8 plus an ADR and may not be authored by the implementing actor. control.policy public surface is now 31 of 40. The three ceiling budgets are unchanged and were not pushed: acceptance.engine 40 of 40, kernel.contracts.errors and kernel.contracts.state_machine both 15 of 15 fan-in, max_orchestration_depth 4 of 4.",
+  "duplicate_shadow_check": "duplicate_canonical_authority PASS - every concern resolves to exactly one canonical owner across 39 concerns, and agent_task_bounding_and_context resolves to engineering.agent alone. shadow_registry PASS over 24 consumer modules read as SOURCE, up from 18 as this phase's modules entered the scan: engineering.agent is one of the five declared reference-only consumers with copying_permitted and caching_permitted both false, so a role or context package that stored, cached, mirrored, defaulted, aliased or locally re-derived provider health, cost, availability, configuration, identity, model identity or fallback would fail this gate. Structurally there is nothing to store: AgentRole carries provider_refs and has no field for any owned concern, proven by a control that reads the owned-concern list OUT OF THE MAP rather than naming concerns locally. A further control asserts no module in this context retains anything provider-derived. THERE IS ALSO NO SECOND AUTHORITY FOR ANYTHING ELSE THIS PHASE TOUCHED: the harness element list, the context kind vocabulary, the barred-actor list and the required path are all parsed from canonical documents at call time and appear in no module as literals; the raw-secret shape pattern is C-09's and is called, not copied; and no operation class was added.",
+  "security_findings": "No new finding. 0 BLOCKER and 0 HIGH are open - GovernanceState.open_stopping_findings returns empty over the canonical record - and the latest recorded finding is F-0048, MEDIUM and CLOSED. THE CANDIDATE CARRIES THE STRONGER VERIFICATION PROFILE: Package 3 changed control.policy, which is Protected Core, so select_profile derives PROTECTED_CORE over the whole four-package change set rather than over Package 4's files alone, which would have understated it. All three canonical categories were executed against this candidate at exit 0 and are recorded above: security review 205, adversarial review 695, full regression 1764 + 348 + 48. The security-relevant surface this phase adds is a policy decision and two contracts, not an execution path: nothing here writes a file, opens a socket, spawns a process, reads a secret or reaches a network. The one security-sensitive data path - a context package carrying strings toward a model - is guarded by the canonical C-09 assert_no_raw_secret, CALLED rather than copied, so no second authority for what a secret looks like exists. NO OPERATION CLASS WAS ADDED: unmapped_action_resolution is already DENY, and adding one would change a Protected-Core-owned contract that CONTRACT_INVENTORY.md puts behind HUMAN GATE 2, which this phase has not reached and did not assume; two controls assert the governed vocabulary is unchanged.",
+  "fake_success_scan": "CLEAN, and mechanically enforced rather than asserted. Every governed vocabulary this phase depends on is PARSED from a canonical document at call time and appears in no module as a literal - the harness elements (from two documents, reconciled positionally), the admissible context kinds, the barred actors and the canonical required path - and each parser FAILS CLOSED on an absent section, an unparseable declaration, a document disagreement, or a vacuous declaration with nothing to exclude. Anti-vacuity is proven BEHAVIOURALLY rather than by text scan: the element parser is fed declarations of four different sizes and the kind parser three, and the reported count must follow the document each time. A first draft used a literal search for the numeral 8 and was replaced, because it was brittle in both directions. Boundedness is structural, so there is no unbounded task that could exist and be missed. The prop evidence is EXHAUSTIVE over the closed governed vocabularies rather than sampled - hypothesis is NOT_CONFIGURED on this host and no package was installed to satisfy an evidence key. Two controls prove the rules DISCRIMINATE rather than refusing everything vacuously: an unbarred label is not refused by the mutation rule, and a distinct acceptor is permitted. One of this phase's own controls was found to be defective during development and was REPLACED rather than suppressed: a no-provider-store check flagged every dict with two literal string keys and caught C-23's deterministic JSON rendering, which is a serialisation and not a store. Two blind pytest.raises(Exception) asserts were likewise replaced with typed ones. No provider was contacted, no socket opened, no result simulated and no external-provider result exists anywhere in this phase.",
+  "evidence_created": [
+    "backend/tests/engineering/test_phase_10_journey.py - the Phase 10 composed journey in seven steps plus four controls asserting the journey claims nothing it did not do, including an AST check that it imports no network package and a source check that no agent runtime, dispatcher or executor exists in this context.",
+    "backend/tests/engineering/test_harness_elements.py - 17 controls over the canonical element parsing, positional reconciliation between two canonical documents, and every fail-closed and anti-vacuity case.",
+    "backend/tests/engineering/test_harness_task.py - 27 controls over C-22: the model reconciles with the documents in both directions and by order, omitting any element is refused, and empty-is-a-bound is distinguished from absent.",
+    "backend/tests/engineering/test_context_kinds.py - 12 controls over the admissible-kind vocabulary and its fail-closed cases.",
+    "backend/tests/engineering/test_context_package.py - 20 controls over C-23: only admissible kinds, provenance per item, the C-09 no-secret assertion including proof that the guard is not a local copy, and the content address that binds to C-14.",
+    "backend/tests/security/test_agent_authority.py - 18 controls supplying ARK-REQ-0051's sec and prop evidence, the property evidence exhaustive over the closed governed vocabularies.",
+    "backend/tests/structural/test_agent_role_separation.py - 13 derived architecture controls supplying ARK-REQ-0050's arch evidence, including the live shadow_registry gate over the real repository.",
+    "docs/contracts/harness_task.md and docs/contracts/context_package.md - the C-22 and C-23 contract documents.",
+    "docs/acceptance/phase_10_traceability.json - five real claims against a denominator of five, each naming an implementation and an evidence source; reconcile_discharge returns no violations against the register."
+  ],
+  "limitations": "STATED PLAINLY. (1) NO AGENT RUNTIME EXISTS. Phase 10 delivers the contracts a bounded engineering task is made of and the prohibitions that govern the actor performing it. Nothing here dispatches, executes, schedules or runs a task, and a control over the shipping source asserts no dispatcher or executor is present. Do not read \"Agent Runtime + Harness Engineering\" as meaning a runtime was built. (2) NO CONTEXT COMPILER EXISTS. C-23 is the compiler's OUTPUT contract; nothing in this phase selects context, reads a repository or ranks relevance. (3) ARK-REQ-0051 IS A POLICY DECISION, NOT A WRITE-PATH INTERCEPT. AgentAuthority answers whether an actor may mutate a canonical requirement or accept its own output; the file-write path that would consult it on every write is a later phase's, and this report does not claim one. The pre-existing acceptance-path mechanism (rescoring_authorization.forbidden_issuers) is narrower, lives in acceptance.engine and governs GOV-001 re-scoring only; it was not counted toward this discharge. (4) `prop` evidence is exhaustive over closed governed vocabularies, not property-based fuzzing: hypothesis is NOT_CONFIGURED on this host and no package was installed to satisfy an evidence key. Exhaustion over a closed vocabulary is a stronger result than sampling it, but it is not the same technique and is reported as what it is. (5) OBSERVED, NOT REPAIRED, AND OUTSIDE THIS PHASE'S SCOPE: the accepted phase_9_report.json declares evidence_created as EV-0066 to EV-0068 while EVIDENCE_INDEX.md ends at EV-0065, so those identifiers resolve to no index row. Phase 8's accepted report shows the field is legitimately free-form, so no canonical rule is on its face violated and no finding is opened; this phase follows the Phase 8 form and declares evidence by artifact name rather than minting index positions. (6) OBSERVED, NOT CLAIMED AS PASS: `ruff check` under the project configuration reports pre-existing findings across the repository, dominated by F811 on pytest fixture parameters - a known false-positive pattern for the pytest idiom - with only the repo-conventional N818 in files this phase created. No accepted phase report records a ruff run, so none is recorded here and no ruff PASS is claimed. (7) The full suite was executed as an exhaustive three-part partition rather than one command, because this environment's per-invocation execution ceiling is shorter than the suite's runtime. The partition is proven by collection count (1778+348+48 = 2174 = the full collection), not asserted, and nothing is excluded, deselected or reordered.",
+  "blockers": "None. 0 BLOCKER and 0 HIGH findings are open; both prerequisite phases (9 and 9B) are MACHINE-ACCEPTED, which is why the dependency machine permits 10; the matrix Gate column for 10 is empty, so no human gate applies and the next human gate remains GATE 2 at Phase 23. Phase 10 carries no prior acceptance record, so no GOV-001 re-scoring authorization is required or claimed.",
+  "next_exact_action": "Await the machine verdict. If Phase 10 is accepted, cumulative verified moves 86 -> 91 and the canonical dependency machine unlocks whichever phase or phases IMPLEMENTATION_DEPENDENCY_MATRIX.md now permits; derive that from the matrix rather than assuming it. Perform the mandatory section-12 handoff refresh as a SEPARATE commit immediately after the acceptance commit, re-deriving section 3 from the gate mechanism rather than transcribing it (F-0047), adding the newly unlocked phase's row so GovernanceState.current_work_phase() does not return None, and leaving no transition residue in either the phase table or the continuation brief (F-0048). Do not re-run the Phase 10 gate afterwards: like Phases 2, 3, 8, 9 and 9B, a second run on an accepted phase returns AWAITING_RESCORING_AUTHORITY, which is the GOV-001 rule working rather than a fault.",
+  "status": "PASS"
+}
