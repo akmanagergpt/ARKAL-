@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import re
 from collections.abc import Iterable
-from typing import Final, Protocol
+from typing import Final, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -59,6 +59,9 @@ class _EvidenceEdge(BaseModel):
 
     source: _EvidenceNode
     target: _EvidenceNode
+
+
+_T = TypeVar("_T", _EvidenceNode, _EvidenceEdge)
 
 
 class _EvidenceGraph(BaseModel):
@@ -152,7 +155,7 @@ def _record_nodes(
     )
 
 
-def _unique(values: Iterable[_EvidenceNode | _EvidenceEdge]) -> tuple:
+def _unique(values: Iterable[_T]) -> tuple[_T, ...]:
     return tuple(dict.fromkeys(values))
 
 
