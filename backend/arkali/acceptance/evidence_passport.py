@@ -1,8 +1,10 @@
 """Proof-of-Engineering Passport accounting over the C-16 projection.
 
-This module records no evidence and issues no acceptance verdict.  It preserves
-the identities already bound into each C-16 path and groups register-owned
-obligations by capability (the register's owning component).
+This module records no evidence.  It preserves the identities already bound
+into each C-16 path, groups register-owned obligations by capability (the
+register's owning component), and derives the C-16 capability verdict from that
+accounting.  Implementation evidence remains distinct from complete VERIFIED
+evidence; neither producer opinion nor a file-presence claim can issue PASS.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from pydantic import BaseModel, ConfigDict
 
 from arkali.acceptance.evidence_coverage import evidence_coverage
 from arkali.acceptance.evidence_graph import evidence_graph
+from arkali.control.policy.acceptance_boundary import AcceptanceBoundaryPolicy
 from arkali.control.specification.register_parser import RequirementRegister
 
 VDC_RELPATH = "docs/ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md"
@@ -95,6 +98,28 @@ class _Passport(BaseModel):
     @property
     def completion_fraction(self) -> tuple[int, int]:
         return self.requirement_numerator, self.requirement_denominator
+
+
+class _CapabilityVerdict(BaseModel):
+    """Evidence-derived result for one register-owned capability."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    capability: str
+    implemented: bool
+    verified: bool
+    requirement_numerator: int
+    requirement_denominator: int
+    missing_requirements: tuple[str, ...]
+    missing_evidence: tuple[str, ...]
+    required_human_gate: str | None
+
+    @property
+    def result(self) -> str:
+        if self.verified:
+            return "VERIFIED"
+        if self.implemented:
+            return "IMPLEMENTED_NOT_VERIFIED"
+        return "NOT_VERIFIED"
 
 
 def _read(path: pathlib.Path, description: str) -> str:
@@ -216,6 +241,113 @@ def _build(
     )
 
 
+def _capability_account(
+    passport: _Passport, capability: str
+) -> _CapabilityAccount:
+    matches = tuple(
+        account for account in passport.capabilities
+        if account.capability == capability
+    )
+    if len(matches) != 1:
+        raise evidence_graph.Refusal(
+            f"capability {capability!r} has no unique applicable Passport account",
+            source=REGISTER_RELPATH,
+        )
+    return matches[0]
+
+
+def _reconcile_requirement(requirement: _RequirementAccount) -> None:
+    derived_present = tuple(
+        kind for kind in requirement.required_evidence
+        if any(
+            binding.result == "PASS" and binding.evidence_kind == kind
+            for binding in requirement.bindings
+        )
+    )
+    derived_missing = tuple(
+        kind for kind in requirement.required_evidence
+        if kind not in derived_present
+    )
+    if (
+        requirement.present_evidence != derived_present
+        or requirement.missing_evidence != derived_missing
+    ):
+        raise evidence_graph.Refusal(
+            f"Passport account for {requirement.requirement_id} is not "
+            "reconciled to its bound C-16 evidence",
+            source="docs/contracts/evidence_graph.md Package 3",
+        )
+
+
+def _reconcile_account(
+    account: _CapabilityAccount,
+) -> tuple[int, tuple[str, ...], tuple[str, ...]]:
+    if account.requirement_denominator == 0:
+        raise evidence_graph.Refusal(
+            f"capability {account.capability!r} has a vacuous Passport denominator",
+            source=REGISTER_RELPATH,
+        )
+    for requirement in account.requirements:
+        _reconcile_requirement(requirement)
+    derived_numerator = sum(
+        requirement.evidence_complete for requirement in account.requirements
+    )
+    if (
+        account.requirement_denominator != len(account.requirements)
+        or account.requirement_numerator != derived_numerator
+    ):
+        raise evidence_graph.Refusal(
+            f"Passport totals for {account.capability!r} are not reconciled",
+            source="docs/contracts/evidence_graph.md Package 3",
+        )
+    missing_requirements = tuple(
+        requirement.requirement_id for requirement in account.requirements
+        if not requirement.evidence_complete
+    )
+    missing_evidence = tuple(
+        f"{requirement.requirement_id}:{kind}"
+        for requirement in account.requirements
+        for kind in requirement.missing_evidence
+    )
+    return derived_numerator, missing_requirements, missing_evidence
+
+
+def _verdict(
+    passport: _Passport,
+    capability: str,
+    repo_root: pathlib.Path,
+    required_human_gate: str | None,
+    recorded_human_gates: tuple[str, ...],
+) -> _CapabilityVerdict:
+    account = _capability_account(passport, capability)
+    derived_numerator, missing_requirements, missing_evidence = (
+        _reconcile_account(account)
+    )
+
+    # This call is mandatory even for an evidence-incomplete result: the
+    # Acceptance Engine may report non-verification, but it may never turn a
+    # machine result into a substitute for a required human decision.
+    AcceptanceBoundaryPolicy.load(repo_root).assert_machine_gate_boundary(
+        required_gate=required_human_gate,
+        recorded_human_gates=recorded_human_gates,
+    )
+    # "Implemented" is itself evidence-derived: at least one passing, fully
+    # bound C-16 path must exist.  It is intentionally insufficient for
+    # VERIFIED, which requires every applicable register obligation.
+    implemented = any(
+        requirement.bindings for requirement in account.requirements
+    )
+    verified = not missing_evidence and derived_numerator == len(account.requirements)
+    return _CapabilityVerdict(
+        capability=capability,
+        implemented=implemented,
+        verified=verified,
+        requirement_numerator=account.requirement_numerator,
+        requirement_denominator=account.requirement_denominator,
+        missing_requirements=missing_requirements,
+        missing_evidence=missing_evidence,
+        required_human_gate=required_human_gate,
+    )
 class _EvidencePassportAuthority:
     @staticmethod
     def vocabulary(repo_root: pathlib.Path) -> tuple[str, ...]:
@@ -228,6 +360,22 @@ class _EvidencePassportAuthority:
         recorded_state: Mapping[str, object],
     ) -> _Passport:
         return _build(graph, repo_root, recorded_state)
+
+    @staticmethod
+    def verdict(
+        passport: _Passport,
+        capability: str,
+        repo_root: pathlib.Path,
+        required_human_gate: str | None = None,
+        recorded_human_gates: tuple[str, ...] = (),
+    ) -> _CapabilityVerdict:
+        return _verdict(
+            passport,
+            capability,
+            pathlib.Path(repo_root),
+            required_human_gate,
+            recorded_human_gates,
+        )
 
 
 evidence_passport = _EvidencePassportAuthority()

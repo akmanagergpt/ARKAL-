@@ -62,3 +62,19 @@ non-PASS evidence remain explicit, and completion is the number of requirements
 whose evidence obligations are complete divided by the applicable register
 denominator. This is evidence accounting only: it persists nothing and issues
 no Acceptance Engine, phase, release or human-gate verdict.
+
+## Package 5 scope
+
+Package 5 adds the Acceptance Engine's per-capability verdict over the immutable
+Passport. An implementation claim is evidence-derived: at least one passing,
+fully bound C-16 path must exist. That fact remains strictly weaker than
+`VERIFIED`, which requires every applicable obligation owned by the Canonical
+Requirement Register to be present and passing. Missing mandatory evidence is
+reported by exact requirement and evidence-key identity and always produces a
+non-verified result.
+
+The verdict cannot accept producer opinion, create evidence, waive an
+obligation, or classify applicability. For every declared required HUMAN GATE
+it calls the policy-owned Package 4 boundary and refuses unless the gate is
+recorded. The result is a capability-verification projection only: it grants no
+release, Stable mutation, promotion, phase acceptance, or human-gate authority.
