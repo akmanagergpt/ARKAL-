@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `6813ec848efa5ab611590916af2303377fc1fd6a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `cf5f93386485e73893db077425f0ce02e9b179e6` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -138,7 +138,7 @@ repository, the repository wins.
 | Phase 9B | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_9B_report.json`, `phase_9B_traceability.json`). C1–C6 PASS, **EXTERNAL_RESULT PASS** over all 14 recorded runs, PROTECTED_CORE PASS (no member touched — `control.capability` is not Protected Core — so the normal profile applies, derived over the whole three-package candidate), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 4/4, HUMAN_GATE NOT_APPLICABLE. **3/3 requirements discharged** — `ARK-REQ-0046`, `ARK-REQ-0047`, `ARK-REQ-0048`, all MANDATORY — taking cumulative verified 83 → **86**. Three atomic packages, and the phase's own accepted evidence is the authority for what each delivered: Package 1 query-time reference resolution with the binding parsed from the canonical `capability_node:` block, Package 2 the activated deterministic verdict whose `PASS`/`NOT_CONFIGURED` mapping was **derived** from §4's own wording and proven safe under the **unchanged** accepted Phase 8 predicate, Package 3 the composed journey plus the acceptance record — which changed no module under `backend/arkali/`. C-13 is `INT`, so no table and no migration; no state machine was added and the count stays 12. **8 mutations injected, 8 caught.** **The activation mechanism is proven end to end and production admission can now reach `ADMITTED` in principle — but no capability is declared configured with real production identities anywhere in this repository**: every affirmative composes composition-root doubles for the provider, policy and isolation authorities, the evidence-requirement authority being the real `RequirementRegister`. No provider was contacted and no external-provider result exists. **Phase 10 unlocked** |
 | Phase 10 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_10_report.json`, `phase_10_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 14 recorded runs, **PROTECTED_CORE COMPLETE** — derived over the whole four-package candidate because Package 3 changed Protected Core `control.policy`, with security review 205, adversarial review 695 and full regression 1764+348+48 all at exit 0 — RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. **5/5 requirements discharged** — `ARK-REQ-0050`, `0051`, `0054`, `0055`, `0231`, all MANDATORY — taking cumulative verified 86 → **91**. Four atomic packages: C-22 the bounded harness task, C-23 the context package and its provenance, the role/backend separation with the two agent prohibitions, and the composed journey plus the acceptance record. C-22 and C-23 are both `INT`, so no table and no migration; no state machine was added and the count stays 12. **No agent runtime, dispatcher or task executor exists** — a control over the shipping source asserts none is present — and no Context Compiler exists; C-23 is the compiler's output contract. **Phase 11 unlocked** |
 | Phase 11 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_11_report.json`, `phase_11_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, PROTECTED_CORE PASS (no member touched), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **2/2 requirements discharged** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY — taking cumulative verified 91 → **93**. Four atomic packages deliver C-24: canonical graph/view vocabularies, the deterministic sourced graph store, complete Digital Twin composition, and the composed real-source journey plus acceptance record. The graph and twin remain derived and always refuse authoritative questions. **Phase 12 unlocked** |
-| Phase 12 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–4 delivered)** ← current work. Candidate Workspace + Semantic Assembly (C-25). `GovernanceState.current_work_phase()` returns `12`. Its sole prerequisite, Phase 11, is MACHINE-ACCEPTED. Denominator is **7** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY and none discharged — so cumulative verified stays 93 until Phase 12 is accepted. Packages 1–3 deliver the derived vocabularies, isolated candidate workspace, immutable content-addressed manifest and immutable assembly report with all canonical semantic checks. Package 4 enforces the authority-declared Stable path from `lifecycle.release` and refuses every direct Stable mutation through `control.policy`; it performs no stable write and claims no verification, acceptance or promotion |
+| Phase 12 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–5 delivered)** ← current work. Candidate Workspace + Semantic Assembly (C-25). `GovernanceState.current_work_phase()` returns `12`. Its sole prerequisite, Phase 11, is MACHINE-ACCEPTED. Denominator is **7** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY and none discharged — so cumulative verified stays 93 until Phase 12 is accepted. Packages 1–3 deliver the derived vocabularies, isolated candidate workspace, immutable content-addressed manifest and immutable assembly report with all canonical semantic checks. Package 4 enforces the authority-declared Stable path from `lifecycle.release` and refuses every direct Stable mutation through `control.policy`; it performs no stable write and claims no verification, acceptance or promotion. Package 5 composes the real-source journey and records all seven truthful claims in `phase_12_traceability.json`; no phase gate was run |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
@@ -289,7 +289,9 @@ repository, the repository wins.
 | 126 | `b59e366` | **PHASE 12 PACKAGE 1** — the canonical Product Plane component set and eight semantic assembly consistency pairs are parsed from the Master Specification at call time, fail closed on malformed, duplicate or vacuous declarations, and appear as no copied shipping-source list. No requirement is discharged, no phase gate was run, and cumulative verified stays 93 |
 | 127 | `6bad269` | **PHASE 12 PACKAGE 2** — the isolated candidate workspace copies the stable snapshot into one exclusive, path-confined writable root per agent task; the immutable STRICT C-25 manifest binds candidate, workspace, task and agent identities to content-addressed snapshot and canonical Product Plane component artifacts. It carries no verification, acceptance, promotion or stable verdict. No requirement is discharged, no phase gate was run, and cumulative verified stays 93 |
 | 128 | `1b8e186` | **PHASE 12 PACKAGE 3** — every canonical semantic assembly pair is executed in canonical order through an injected evaluator, whose two domain views reduce to content-addressed semantic fingerprints. Missing, duplicate, unknown, invalid or failed evaluations refuse the whole report; consistency and the overall summary are derived rather than caller-asserted. The immutable STRICT C-25 report binds the candidate and manifest and carries no verification, acceptance, promotion or stable verdict. No requirement is discharged, no phase gate was run, and cumulative verified stays 93 |
-| 129 | `6813ec8` | **PHASE 12 PACKAGE 4** — `lifecycle.release` derives and enforces every stage of the canonical Stable path through immutable prefix receipts, while `control.policy` derives the direct-mutation permission set and refuses every actor because the live set is empty. The boundary performs no stable write and claims no verification, acceptance, promotion or rollback. No requirement is discharged, no phase gate was run, and cumulative verified stays 93 ← HEAD at generation |
+| 129 | `6813ec8` | **PHASE 12 PACKAGE 4** — `lifecycle.release` derives and enforces every stage of the canonical Stable path through immutable prefix receipts, while `control.policy` derives the direct-mutation permission set and refuses every actor because the live set is empty. The boundary performs no stable write and claims no verification, acceptance, promotion or rollback. No requirement is discharged, no phase gate was run, and cumulative verified stays 93 |
+| 130 | `efbb950` | handoff manifest refreshed after Phase 12 Package 4 (§12 rule) |
+| 131 | `cf5f933` | **PHASE 12 PACKAGE 5** — composed real-source candidate journey and seven-claim traceability. The journey executes every canonical semantic check over real candidate bytes, preserves Stable byte-for-byte, and refuses a promotion skip. No phase gate was run and cumulative verified stays 93 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -384,13 +386,13 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Candidate Workspace + Semantic Assembly** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 12) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–4 delivered)**. `GovernanceState.current_work_phase()` returns `12`. Packages 1–3 delivered C-25's derived vocabularies, isolated workspace, immutable manifest and immutable assembly report; Package 4 delivered the separate Stable-path and direct-mutation boundary from its owning contexts. **No requirement is discharged and no phase gate has been run** |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–5 delivered)**. `GovernanceState.current_work_phase()` returns `12`. Packages 1–3 delivered C-25's derived vocabularies, isolated workspace, immutable manifest and immutable assembly report; Package 4 delivered the separate Stable-path and direct-mutation boundary from its owning contexts; Package 5 delivered the composed real-source journey and seven-claim traceability. **No requirement is discharged and no phase gate has been run** |
 | Prerequisites | Phase **11** alone — MACHINE-ACCEPTED, which is why the dependency machine permits 12 and only 12 |
 | Contract IDs | **C-25** — `ART` Candidate manifest + assembly report, STRICT compatibility, with eight assembly checks. Read `CONTRACT_INVENTORY.md` row 25 and `docs/contracts/candidate.md` before designing |
 | Human gate | none (matrix Gate column `—`); the next human gate is GATE 2 at Phase 23 |
 | ARK-REQ IDs | derive with `RequirementRegister.for_phase("12")` — **7** MANDATORY entries: `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`. Ownership spans `engineering.candidate`, `lifecycle.release` and `control.policy`; discharge each from the context the register names. **Do not carry anything over from Phase 11** — its two are discharged |
 | What Phase 11 leaves ready | C-24's canonical graph/view vocabularies, sourced content-addressed graphs, deterministic rebuild refusal and complete Digital Twin composition. These are derived views, never authorities, and must not be rebuilt as a candidate-owned shadow store |
-| What remains unbuilt | the final composed real-source journey, seven-claim traceability, C-17 report, acceptance-guard proof and the single permitted Phase 12 gate run. Packages 1–4 provide the implementation mechanisms; composition must not create sibling engineering imports, shadow authorities or a stable-write capability |
+| What remains unbuilt | the C-17 report, acceptance-guard proof and the single permitted Phase 12 gate run. Packages 1–5 provide the complete implementation, composed journey and seven-claim traceability; the final acceptance package must preserve those mechanisms and record commands re-run against the frozen candidate |
 | Architecture hazard | Phase 12 spans three owners. `engineering.candidate` is layer rank 4 and may not import sibling engineering contexts because `allow_same_layer: false`; stable mutation policy remains owned by `control.policy` and promotion/revision authority by `lifecycle.release`. Compose through downward dependencies or injected interfaces without copying either authority |
 
 **Phase 12 is in progress, not accepted.** Its denominator is **7** and none is
@@ -398,13 +400,13 @@ discharged. Phase 11 remains MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Continue Phase 12 — Atomic Package 5: final composition, seven-claim
-traceability, C-17 report and the ONE permitted phase-gate submission.** Packages
-1–4 now provide the complete candidate workspace, immutable manifest, semantic
-assembly report, canonical Stable-path progression and direct-mutation refusal.
-Compose a real-source journey across those existing mechanisms without adding a
-stable-write capability, a second authority, or any claim that assembly itself
-is verification, acceptance or promotion.
+**Continue Phase 12 — Atomic Package 6: C-17 report, acceptance-guard proof and
+the ONE permitted phase-gate submission.** Packages 1–5 now provide the complete
+candidate workspace, immutable manifest, semantic assembly report, canonical
+Stable-path progression, direct-mutation refusal, composed real-source journey
+and seven-claim traceability. Freeze that candidate, derive the verification
+profile over the whole Phase 12 change set, and re-run every command recorded in
+the report against the exact final candidate before the single gate submission.
 
 **Phase 12 has a NON-ZERO denominator — seven requirements.** `ARK-REQ-0005`,
 `ARK-REQ-0023`, `ARK-REQ-0024`, `ARK-REQ-0025`, `ARK-REQ-0056`, `ARK-REQ-0058`
@@ -423,11 +425,11 @@ graph store or Digital Twin authority.
 `CONTRACT_INVENTORY.md` for the C-25 row, `docs/contracts/candidate.md` for its
 contract, `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 12 for prerequisites and the
 (empty) Gate column, and `ARCHITECTURE.md` §3 for the three owning contexts.
-Preserve Packages 1–4 and their owned semantics; do not reopen them unless final
-composition exposes an unambiguous in-scope defect. The traceability record must
-carry all seven real claims, the report must record commands re-run against the
-frozen final candidate, and the Phase 12 gate may run exactly once only after the
-complete candidate and its acceptance-guard proof are ready.
+Preserve Packages 1–5 and their owned semantics; do not reopen them unless final
+verification exposes an unambiguous in-scope defect. The traceability record
+already carries all seven real claims. The report must record commands re-run
+against the frozen final candidate, and the Phase 12 gate may run exactly once
+only after the complete candidate and its acceptance-guard proof are ready.
 
 **Every recorded run owes an `external_result` declaration (D-023).** The
 obligation is derived from the register's Phase column for the requirement that
@@ -565,7 +567,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 6813ec848efa5ab611590916af2303377fc1fd6a
+head: cf5f93386485e73893db077425f0ce02e9b179e6
 branch: main
 working_tree_clean: true
 
