@@ -28,3 +28,20 @@ is deliberately not smuggled into this foundation.
 
 Package 1 computes no applicability, coverage or completion percentage, records
 no Proof-of-Engineering Passport, and issues no acceptance or release verdict.
+
+## Package 2 scope
+
+Package 2 adds a read-only coverage projection. The requirement denominator,
+classification, required evidence keys and conditional rules are loaded from
+the canonical register on every call. MANDATORY requirements are always
+applicable; an absent state value or rule expression that cannot be evaluated
+remains APPLICABLE. An unknown requirement identifier is a refusal, never a
+NOT_APPLICABLE classification.
+
+Requirement coverage counts only a graph-reachable `PASS` result. Required
+evidence coverage counts a register evidence key only when that exact key is a
+Test node on a passing path. No producer name, filename, prose or weaker result
+is interpreted as evidence. OPTIONAL and objectively false CONDITIONAL entries
+are excluded; all other registered MANDATORY and CONDITIONAL entries remain in
+the denominator. This projection records nothing, issues no capability or
+release verdict and does not create the Proof-of-Engineering Passport.

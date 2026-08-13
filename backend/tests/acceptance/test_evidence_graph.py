@@ -76,6 +76,7 @@ class TestDerivedGraph:
             "PASS",
         )
         assert len(graph.edges) == 5
+        assert graph.paths == (graph.nodes,)
         assert all(
             edge.source == graph.nodes[index]
             and edge.target == graph.nodes[index + 1]
@@ -137,3 +138,4 @@ class TestDerivedGraph:
             graph = evidence_graph.derive(opened.evidence, REPO)
         results = [node.reference for node in graph.nodes if node.kind == "Result"]
         assert results == ["PASS", "FAIL"]
+        assert len(graph.paths) == 2

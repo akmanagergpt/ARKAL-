@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import re
 from collections.abc import Iterable
-from typing import Final, Protocol, TypeVar
+from typing import Final, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
@@ -61,9 +61,6 @@ class _EvidenceEdge(BaseModel):
     target: _EvidenceNode
 
 
-_T = TypeVar("_T", _EvidenceNode, _EvidenceEdge)
-
-
 class _EvidenceGraph(BaseModel):
     """Immutable derived graph, bound to the verified C-15 chain head."""
 
@@ -73,6 +70,7 @@ class _EvidenceGraph(BaseModel):
     chain_head: str
     nodes: tuple[_EvidenceNode, ...]
     edges: tuple[_EvidenceEdge, ...]
+    paths: tuple[tuple[_EvidenceNode, ...], ...]
 
 
 class _ChainVerificationView(Protocol):
@@ -155,7 +153,7 @@ def _record_nodes(
     )
 
 
-def _unique(values: Iterable[_T]) -> tuple[_T, ...]:
+def _unique[T: (_EvidenceNode, _EvidenceEdge)](values: Iterable[T]) -> tuple[T, ...]:
     return tuple(dict.fromkeys(values))
 
 
@@ -185,6 +183,7 @@ def _derive_evidence_graph(
     kinds = _canonical_path(pathlib.Path(repo_root))
     node_stream: list[_EvidenceNode] = []
     edge_stream: list[_EvidenceEdge] = []
+    paths: list[tuple[_EvidenceNode, ...]] = []
     for record in chain.records():
         if record.requirement_id not in registered:
             raise _EvidenceGraphRefusal(
@@ -192,6 +191,7 @@ def _derive_evidence_graph(
                 source=register.source_path,
             )
         path_nodes = _record_nodes(record, kinds)
+        paths.append(path_nodes)
         node_stream.extend(path_nodes)
         edge_stream.extend(
             _EvidenceEdge(source=left, target=right)
@@ -201,6 +201,7 @@ def _derive_evidence_graph(
         chain_head=verification.head,
         nodes=_unique(node_stream),
         edges=_unique(edge_stream),
+        paths=tuple(paths),
     )
 
 
