@@ -1,6 +1,6 @@
 # BUILD STATE — ARKALI GENESIS v2
 
-**Current state:** **PHASE 12 MACHINE-ACCEPTED. PHASE 13 IN PROGRESS — ATOMIC PACKAGES 1 AND 2 DELIVERED, NOT ACCEPTED.**
+**Current state:** **PHASE 12 MACHINE-ACCEPTED. PHASE 13 IN PROGRESS — ATOMIC PACKAGES 1–3 DELIVERED, NOT ACCEPTED.**
 
 **Phase 12 is accepted.** `/home/lenovo/.venvs/arkali/bin/python scripts/run_phase_gate.py 12 13` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first submission.** C1–C6 PASS; **EXTERNAL_RESULT PASS** over all 13 recorded runs; **PROTECTED_CORE COMPLETE** — the whole six-package candidate changed `control.policy` and `lifecycle.release`, and the security review, adversarial review and full regression categories are all satisfied; RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1 (Phase 11); HUMAN_GATE NOT_APPLICABLE; all 8 architecture gates PASS over 125 edges with all 9 budgets. **7/7 requirements discharged** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY — taking cumulative verified 93 → **100** and MANDATORY verified 92 → **99**. The dependency machine now unlocks **Phase 13** (Acceptance Infrastructure + Evidence Graph, C-16 and the Acceptance Engine), whose prerequisites are Phases 6 and 12.
 
@@ -16,6 +16,17 @@ per immutable C-16 path, so shared Contract or Result nodes cannot leak a PASS
 between requirements. Only a reachable PASS counts, and an evidence key counts
 only when that exact register key is recorded as the Test node of a passing
 path. Package 2 records no Passport and issues no acceptance or release verdict.
+
+**Phase 13 Package 3 (Proof-of-Engineering Passport accounting).** The Passport
+parses its applicable nineteen-kind vocabulary from the frozen Verification and
+Delivery Contract and takes every concrete evidence obligation from the
+Canonical Requirement Register. It groups applicable requirements by the
+register's owning component, preserves the exact requirement, contract,
+artifact, test, content-addressed evidence-record and result identities from
+each passing C-16 path, and reports missing obligations explicitly. Completion
+is evidence-complete requirement coverage against the applicable register
+denominator, never a count of files. This package records nothing and issues no
+Acceptance Engine, phase, release or human-gate verdict.
 
 **Phase 11 is accepted.** `python scripts/run_phase_gate.py 11 12` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first submission.** C1–C6 PASS; **EXTERNAL_RESULT PASS** over all 12 recorded runs; **PROTECTED_CORE PASS** — no Protected Core member was touched, so the normal profile applies; RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1 (Phase 10); HUMAN_GATE NOT_APPLICABLE; all 8 architecture gates PASS over 118 edges with all 9 budgets. **2/2 requirements discharged** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY — taking cumulative verified 91 → **93**. The dependency machine now unlocks **Phase 12** (Candidate Workspace + Semantic Assembly, C-25), whose sole prerequisite is Phase 11.
 
@@ -289,7 +300,7 @@ Phase 5 is accepted and unchanged. Phase 6 was delivered in three atomic package
 | 10 | Agent Runtime + Harness Engineering | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission; `docs/acceptance/phase_10_report.json`, `phase_10_traceability.json`). C1–C6 PASS; **EXTERNAL_RESULT PASS** over all 14 recorded runs; **PROTECTED_CORE COMPLETE** — derived over the whole four-package candidate because Package 3 changed Protected Core `control.policy`; RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 2/2; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 114 edges and all 9 budgets. Four atomic packages: C-22 the bounded harness task, C-23 the context package and its provenance, `ARK-REQ-0050`/`0051`, and the composed journey plus the acceptance record. **5/5 requirements discharged**; cumulative verified 86 → **91**. C-22 and C-23 are both `INT`, so no table and no migration; no state machine was added and the count stays 12. **No agent runtime, dispatcher or task executor exists** — a control over the shipping source asserts none is present — and no Context Compiler exists; C-23 is the compiler's output contract. **Phase 11 unlocked.** |
 | 11 | Code Intelligence + Digital Twin | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission; `docs/acceptance/phase_11_report.json`, `phase_11_traceability.json`). C1–C6 PASS; EXTERNAL_RESULT PASS over all 12 recorded runs; PROTECTED_CORE PASS (no member touched); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 118 edges and all 9 budgets. Four atomic packages deliver C-24: canonical graph/view vocabularies, the deterministic sourced graph store and Python AST builder, complete honest Digital Twin composition, and the composed journey plus acceptance record. **2/2 requirements discharged** (`ARK-REQ-0066`, `ARK-REQ-0067`); cumulative verified 91 → **93**. No table, migration or state machine was added, no external provider was contacted, and unavailable adapters/views are refused or explicitly absent rather than fabricated. **Phase 12 unlocked.** |
 | 12 | Candidate Workspace + Semantic Assembly | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission; `docs/acceptance/phase_12_report.json`, `phase_12_traceability.json`). C1–C6 PASS; EXTERNAL_RESULT PASS over all 13 recorded runs; PROTECTED_CORE COMPLETE (`control.policy`, `lifecycle.release`); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 125 edges and all 9 budgets. Six atomic packages deliver C-25, the isolated candidate workspace, immutable content-addressed manifest and assembly report, all eight canonical semantic checks, the authority-owned Stable progression boundary, direct-Stable-mutation refusal, the composed journey, traceability and acceptance record. **7/7 requirements discharged**; cumulative verified 93 → **100**. No Stable write, verification, acceptance or promotion capability is claimed. **Phase 13 unlocked.** |
-| 13 | Acceptance Infrastructure + Evidence Graph | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1 and 2 delivered).** C-16 now supplies the immutable read-only graph foundation plus register-derived applicability, requirement coverage and required-evidence coverage. The phase denominator is **27**, derived with `RequirementRegister.for_phase("13")`; none is discharged and cumulative verified remains **100**. No Passport or verdict exists. |
+| 13 | Acceptance Infrastructure + Evidence Graph | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–3 delivered).** C-16 now supplies the immutable read-only graph foundation, register-derived applicability and coverage, and Proof-of-Engineering Passport evidence accounting grouped by the register-owned capability. The phase denominator is **27**, derived with `RequirementRegister.for_phase("13")`; none is discharged and cumulative verified remains **100**. No Acceptance Engine verdict exists. |
 | 14 … 37 | all subsequent phases | NOT_STARTED — reachable in canonical order; next human gate is GATE 2 at Phase 23 |
 
 ## What exists
@@ -359,7 +370,7 @@ recollection. Verify with `python scripts/check_handoff.py` (exit 0 required).
 
 ## Next exact action
 
-**Continue Phase 13 — Atomic Package 3: Proof-of-Engineering Passport evidence accounting over the delivered C-16 coverage projection.** Derive the Passport's applicable evidence vocabulary and per-capability obligations from canonical authority and the requirement register. Preserve exact evidence identities and provenance; do not infer an evidence kind from prose or producer opinion. Package 3 must not issue the Acceptance Engine verdict or implement the `control.policy` actor prohibitions reserved for later packages. No Phase 13 requirement is discharged until the complete phase candidate is accepted.
+**Continue Phase 13 — Atomic Package 4: implement the `control.policy` actor prohibitions assigned to Phase 13 by the requirement register.** Derive every prohibited action and actor boundary from canonical authority, preserve HUMAN GATE supremacy, and fail closed on agent-authored applicability or weakened acceptance. Package 4 must not issue the Acceptance Engine verdict, which remains reserved for a later package. No Phase 13 requirement is discharged until the complete phase candidate is accepted.
 
 **Do not re-run the Phase 12 gate.** A second run against an accepted phase requires GOV-001 re-scoring authority; the first submission is final.
 

@@ -45,3 +45,20 @@ is interpreted as evidence. OPTIONAL and objectively false CONDITIONAL entries
 are excluded; all other registered MANDATORY and CONDITIONAL entries remain in
 the denominator. This projection records nothing, issues no capability or
 release verdict and does not create the Proof-of-Engineering Passport.
+
+## Package 3 scope
+
+Package 3 adds the immutable Proof-of-Engineering Passport accounting view over
+that projection. Its applicable nineteen-kind vocabulary is parsed from the
+frozen Verification and Delivery Contract, while each concrete obligation is
+the exact evidence key on an applicable Canonical Requirement Register entry.
+Requirements are grouped by the register's owning component, which is the
+capability boundary; no producer chooses its own obligations.
+
+Every counted item retains the complete C-16 binding: requirement, contract,
+artifact, test/evidence kind, content-addressed evidence record and honest
+result. Only exact register keys on passing paths are present. Missing and
+non-PASS evidence remain explicit, and completion is the number of requirements
+whose evidence obligations are complete divided by the applicable register
+denominator. This is evidence accounting only: it persists nothing and issues
+no Acceptance Engine, phase, release or human-gate verdict.
