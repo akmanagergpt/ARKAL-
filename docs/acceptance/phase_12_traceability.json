@@ -1,0 +1,55 @@
+{
+  "phase_id": "12",
+  "note": "Derived from RequirementRegister.for_phase(\"12\"): seven MANDATORY requirements owned by engineering.candidate, lifecycle.release and control.policy. C-25 is ART with STRICT compatibility. Assembly is not verification, acceptance or promotion, and no stable-write capability is claimed.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0005",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/engineering/candidate/workspace.py, manifest.py and assembly.py implement Candidate Product and ARKALI Candidate Core primitives as isolated, immutable, content-addressed candidate artifacts without a Stable verdict.",
+      "evidence": "doc: docs/contracts/candidate.md defines C-25's implemented candidate contract. integ: backend/tests/engineering/test_phase_12_journey.py composes the real candidate mechanisms.",
+      "note": "The register's doc and integ evidence keys are supplied; no Stable designation is created."
+    },
+    {
+      "req_id": "ARK-REQ-0023",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/lifecycle/release/stable_path.py permits only authority-declared stage progression and performs no filesystem mutation; control.policy refuses direct Stable mutation for every actor lacking an explicit canonical permission.",
+      "evidence": "prop, mut, sec: backend/tests/security/test_stable_candidate_boundary.py exhausts governed actors, bypass shapes and path mutations; backend/tests/engineering/test_phase_12_journey.py proves the stable source remains byte-identical.",
+      "note": "All register evidence keys are supplied. Recovery rollback remains a separate governed operation."
+    },
+    {
+      "req_id": "ARK-REQ-0024",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/control/policy/agent_authority.py derives every prohibited actor and the empty direct-mutation permission set from AUTHORITY_MAP.yaml and refuses unknown labels as well as all declared mechanisms.",
+      "evidence": "sec, prop: backend/tests/security/test_stable_candidate_boundary.py enumerates the canonical prohibited set, casing/padding variants, an unknown actor, and mutated authority declarations.",
+      "note": "Both register evidence keys are supplied; the actor list is never copied into shipping source."
+    },
+    {
+      "req_id": "ARK-REQ-0025",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/lifecycle/release/stable_path.py parses stable-to-candidate-to-verification-to-acceptance-to-promotion from AUTHORITY_MAP.yaml and issues immutable receipts only for the next stage with the complete traversed prefix.",
+      "evidence": "prop, integ: backend/tests/security/test_stable_candidate_boundary.py refuses skip, reverse, repeat, unknown and fabricated-prefix paths; backend/tests/engineering/test_phase_12_journey.py composes the real candidate entry and refuses promotion skipping.",
+      "note": "Both register evidence keys are supplied; stage receipts are progression facts, not verdicts."
+    },
+    {
+      "req_id": "ARK-REQ-0056",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/engineering/candidate/workspace.py allocates exclusive per-agent workspace roots, copies the stable task snapshot, confines writes beneath the lease and refuses reallocation, traversal and symlink escape.",
+      "evidence": "integ, prop: backend/tests/engineering/test_candidate_workspace_manifest.py and test_phase_12_journey.py prove isolated copies, non-sharing, path confinement, stable-source preservation and real-source composition.",
+      "note": "Both register evidence keys are supplied."
+    },
+    {
+      "req_id": "ARK-REQ-0058",
+      "state": "SATISFIED",
+      "implementation": "backend/arkali/engineering/candidate/assembly_vocabulary.py parses all semantic consistency pairs from the Master Specification; assembly.py requires exactly one evaluator per pair, executes canonical order and derives immutable manifest-bound results.",
+      "evidence": "integ, contract: backend/tests/engineering/test_semantic_assembly.py proves complete execution, mismatch and adapter-failure semantics, anti-fabrication and immutable addressing; test_phase_12_journey.py executes the entire canonical set over real candidate bytes.",
+      "note": "Both register evidence keys are supplied; all_consistent remains an assembly fact only."
+    },
+    {
+      "req_id": "ARK-REQ-0212",
+      "state": "SATISFIED",
+      "implementation": "WorkspaceAuthority writes only to copied candidate snapshots, AgentAuthority refuses every direct Stable mutation, and StableCandidatePath provides only staged receipts without a write surface.",
+      "evidence": "prop, sec: backend/tests/engineering/test_candidate_workspace_manifest.py and backend/tests/security/test_stable_candidate_boundary.py prove stable bytes are unchanged and direct write authority is absent and refused.",
+      "note": "Both register evidence keys are supplied; AI-generated work never receives a Stable write path."
+    }
+  ]
+}
