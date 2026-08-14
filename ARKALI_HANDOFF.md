@@ -146,7 +146,7 @@ repository, the repository wins.
 | Cumulative verified | **100** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + **7 Phase 12**), reconciled by check C6 against each phase's traceability record. Of the 100, **99 are MANDATORY**: Phase 7's `ARK-REQ-0060` is still the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
-| Recorded findings | the latest recorded finding is **F-0048** — **MEDIUM**, **CLOSED** — and every finding through **F-0048** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, and **F-0047** closed the gap that let its live architecture and finding summaries drift from the mechanisms that produce them |
+| Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
 | Architecture violations | **0** (8 gates PASS over **131** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 10 took this from 108 to 114; Phase 11 took it to 118; Phase 12 took it to 125; Phase 13 Package 1 took it to 127, Package 2 took it to 129, Package 3 took it to 130, and **Package 5 took it to 131** by calling the policy authority rather than copying its decision. **No same-layer edge has been added by these phases**, because `allow_same_layer: false` forbids one. Two of Phase 10's edges exist precisely because a canonical guard is **called rather than copied** — the C-09 no-secret guard and the `ARK-REQ-0051` authority — and an extra downward edge is the correct price for not creating a second authority; Phases 11–13 likewise reuse their owning authorities rather than copying them. **A budget was hit and respected rather than excepted** in Phase 10: an error taxonomy written into `kernel.contracts` was REFUSED by this gate at public surface **42 of 40** and decomposed under ADR-0008; later phases followed the same placement without needing to be told. `control.policy` public surface is **31 of 40**. `acceptance.engine` public surface is **40 of 40** — at its ceiling. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `engineering.candidate → evidence.artifact → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
@@ -396,28 +396,28 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Acceptance Infrastructure + Evidence Graph** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 13) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–4 delivered)**. `GovernanceState.current_work_phase()` returns `13`. The graph foundation, register-derived applicability and coverage, Passport evidence accounting, and policy-owned actor boundaries are delivered; no requirement is discharged and no phase gate has run |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–5 delivered)**. `GovernanceState.current_work_phase()` returns `13`. The graph foundation, register-derived applicability and coverage, Passport evidence accounting, policy-owned actor boundaries and evidence-derived capability verdict are delivered; no requirement is discharged and no phase gate has run |
 | Prerequisites | Phases **6 and 12** — both MACHINE-ACCEPTED, which is why the dependency machine permits 13 and only 13 |
 | Contract IDs | **C-16** — STRICT `GRAPH` Evidence Graph edge (`REQ→…→Result`), owned by `acceptance.engine`, consumed by acceptance and coverage. The inventory names traceability tests as its verification responsibility |
 | Human gate | none (matrix Gate column `—`). C-16 is a Protected Core contract; implementing its already-defined contract triggers the stronger verification profile, while changing the contract itself remains governed separately |
 | ARK-REQ IDs | derive with `RequirementRegister.for_phase("13")` — **27** MANDATORY entries spanning `acceptance.engine` and `control.policy`. Do not carry Phase 12's seven discharged claims forward |
 | What Phase 12 leaves ready | C-25's isolated candidate workspace, immutable manifest and assembly report, canonical semantic checks and authority-owned Stable progression boundary. Assembly still makes no verification, acceptance or promotion decision |
-| What remains unbuilt | The Acceptance Engine verdict path. No Phase 13 verdict exists yet |
+| What remains unbuilt | Package 6's composed journey, traceability, exact-candidate report and single gate submission. No Phase 13 acceptance verdict exists yet |
 | Architecture hazard | `acceptance.engine` is layer rank 2 and is the sole authority allowed to read evidence for a verdict. Preserve the Phase 6 C-14/C-15 storage and integrity authorities; do not create a second evidence store, requirement denominator or applicability authority. `control.policy` owns the phase's actor prohibitions |
 
 **Phase 13 is in progress and not accepted.** Its denominator is **27** and none
-is discharged. Packages 1–4 are delivered; Phases 6 and 12 are MACHINE-ACCEPTED.
+is discharged. Packages 1–5 are delivered; Phases 6 and 12 are MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Continue Phase 13 — Atomic Package 5: implement the Acceptance Engine verdict
-over the delivered C-16 graph, register-derived coverage and Passport
-accounting.** A verdict must be derived from evidence rather than producer
-opinion, must keep IMPLEMENTED distinct from VERIFIED, must fail when any
-applicable mandatory evidence is missing, and must call the Package 4 policy
-boundary for any required HUMAN GATE rather than superseding it. Package 5 must
-not create release or Stable-promotion authority. No Phase 13 requirement is
-discharged until the complete phase candidate is accepted.
+**Continue Phase 13 — Atomic Package 6: compose the complete real-source C-16
+and Acceptance Engine journey, record the 27 register-derived traceability
+claims and exact-candidate C-17 evidence, then run the Phase 13 gate once only
+when every required verification category is complete.** The live denominator
+— 27 requirements. Derive the Protected Core profile over all Phase 13
+packages, preserve every accepted historical artifact, and do not create
+release or Stable-promotion authority. No Phase 13 requirement is discharged
+unless the single permitted phase gate accepts the complete candidate.
 
 **Do not re-run the Phase 12 gate**, or any earlier accepted phase gate. A second
 run against an accepted phase returns `AWAITING_RESCORING_AUTHORITY` under

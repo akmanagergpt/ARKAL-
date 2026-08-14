@@ -194,12 +194,18 @@ def check_next_action(
         f"{sorted({truth['foreign_ids'][r] for r in stale})}",
     )
 
-    # If the brief states a denominator, it must be the current phase's size.
+    # The brief must state its denominator.  Without anti-vacuity, deleting the
+    # claim also deletes the only value this reconciliation can judge.
     stated = re.search(
         r"denominator\s*[-—–:]*\s*(\w+)\s+requirements?", body, re.IGNORECASE
     )
     words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
              "seven": 7, "eight": 8, "nine": 9, "zero": 0}
+    report.assert_true(
+        "the live brief states a denominator",
+        stated is not None,
+        f"phase {current} has {len(denominator)} registered requirements",
+    )
     if stated:
         token = stated.group(1).lower()
         value = words.get(token, int(token) if token.isdigit() else None)
