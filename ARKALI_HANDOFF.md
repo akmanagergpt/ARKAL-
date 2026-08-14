@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `69c23349f48c8e7400212873de643f0961bfbf55` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `5c7fff4e363e96814ee309f7cd9c199a6caf1f7a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -139,11 +139,12 @@ repository, the repository wins.
 | Phase 10 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_10_report.json`, `phase_10_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 14 recorded runs, **PROTECTED_CORE COMPLETE** — derived over the whole four-package candidate because Package 3 changed Protected Core `control.policy`, with security review 205, adversarial review 695 and full regression 1764+348+48 all at exit 0 — RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. **5/5 requirements discharged** — `ARK-REQ-0050`, `0051`, `0054`, `0055`, `0231`, all MANDATORY — taking cumulative verified 86 → **91**. Four atomic packages: C-22 the bounded harness task, C-23 the context package and its provenance, the role/backend separation with the two agent prohibitions, and the composed journey plus the acceptance record. C-22 and C-23 are both `INT`, so no table and no migration; no state machine was added and the count stays 12. **No agent runtime, dispatcher or task executor exists** — a control over the shipping source asserts none is present — and no Context Compiler exists; C-23 is the compiler's output contract. **Phase 11 unlocked** |
 | Phase 11 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_11_report.json`, `phase_11_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, PROTECTED_CORE PASS (no member touched), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **2/2 requirements discharged** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY — taking cumulative verified 91 → **93**. Four atomic packages deliver C-24: canonical graph/view vocabularies, the deterministic sourced graph store, complete Digital Twin composition, and the composed real-source journey plus acceptance record. The graph and twin remain derived and always refuse authoritative questions. **Phase 12 unlocked** |
 | Phase 12 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_12_report.json`, `phase_12_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 13 recorded runs, **PROTECTED_CORE COMPLETE** over the whole six-package candidate (`control.policy`, `lifecycle.release`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **7/7 requirements discharged** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY — taking cumulative verified 93 → **100**. C-25 delivers the isolated candidate workspace, immutable content-addressed manifest and assembly report, all eight semantic checks, the authority-owned Stable progression boundary and direct-mutation refusal. No Stable write, verification, acceptance or promotion capability is claimed. **Phase 13 unlocked** |
-| Phase 13 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–5 delivered)** ← current work. Acceptance Infrastructure + Evidence Graph (C-16; Acceptance Engine). `GovernanceState.current_work_phase()` returns `13`. Its prerequisites, Phases 6 and 12, are MACHINE-ACCEPTED and the matrix Gate column is empty. Denominator is **27**, derived with `RequirementRegister.for_phase("13")`; none is discharged, so cumulative verified remains 100. Packages 1–5 deliver the immutable read-only C-16 graph foundation, register-derived applicability and coverage, Proof-of-Engineering Passport evidence accounting grouped by register-owned capability, policy-owned actor boundaries protecting applicability and acceptance, and the evidence-derived capability verdict. No phase acceptance verdict exists |
+| Phase 13 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_13_report.json`, `phase_13_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS, PROTECTED_CORE COMPLETE (`acceptance.engine`, `control.policy`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Six atomic packages deliver C-16 and the Acceptance Engine path. **27/27 requirements discharged**; cumulative verified 100 → **127**. No release, Stable-promotion or human-gate authority is claimed |
+| Phase 14 | **UNLOCKED — NOT STARTED** ← current work. Repair / Root Cause / Convergence (C-26). `GovernanceState.current_work_phase()` returns `14`. Phase 13 is MACHINE-ACCEPTED and the matrix Gate column is empty. Denominator is **7**, all MANDATORY, derived with `RequirementRegister.for_phase("14")` |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **100** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + **7 Phase 12**), reconciled by check C6 against each phase's traceability record. Of the 100, **99 are MANDATORY**: Phase 7's `ARK-REQ-0060` is still the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
+| Cumulative verified | **127** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + **27 Phase 13**), reconciled by check C6 against each phase's traceability record. Of the 127, **126 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
@@ -302,7 +303,9 @@ repository, the repository wins.
 | 138 | `ce600ff` | **PHASE 13 PACKAGE 3** — Proof-of-Engineering Passport evidence accounting derives its vocabulary from the frozen verification contract and its concrete obligations from the canonical register, groups requirements by register-owned capability, preserves complete passing C-16 bindings and reports missing obligations explicitly. No Acceptance Engine verdict exists, no requirement is discharged and cumulative verified stays 100 |
 | 139 | `885de26` | **PHASE 13 PACKAGE 4** — policy-owned actor boundaries derive prohibited actors and HUMAN GATE vocabulary from canonical authority, bar automated applicability authorship, NOT_APPLICABLE origination, waiver and acceptance weakening, and prevent machine verdicts from superseding required human gates. No Acceptance Engine verdict exists, no requirement is discharged and cumulative verified stays 100 |
 | 140 | `7c616d7` | **PHASE 13 PACKAGE 5** — the Acceptance Engine capability verdict is derived solely from immutable Passport accounting: a complete passing path establishes IMPLEMENTED, only complete evidence for every applicable obligation establishes VERIFIED, missing evidence remains explicit, and every required HUMAN GATE is checked through the policy authority. No phase acceptance, release or Stable-promotion authority exists; no requirement is discharged and cumulative verified stays 100 |
-| 141 | `69c2334` | **HANDOFF TRANSITION ANTI-VACUITY REPAIR (F-0049)** — the live Phase 13 brief now names Package 6 and its register-derived denominator, and the permanent transition control refuses a missing denominator claim ← HEAD at generation |
+| 141 | `69c2334` | **HANDOFF TRANSITION ANTI-VACUITY REPAIR (F-0049)** — the live Phase 13 brief now names Package 6 and its register-derived denominator, and the permanent transition control refuses a missing denominator claim |
+| 142 | `6f57db3` | **PHASE 13 PACKAGE 6** — composed real-source journey, 27-claim traceability, frozen C-17 report and the single permitted gate submission. The first and only submission returned `PHASE_ACCEPTED_BY_MACHINE`; 27/27 requirements discharged and cumulative verified 100 → 127 |
+| 143 | `5c7fff4` | **PHASE 13 ACCEPTANCE STATE** — `BUILD_STATE.md` and `PHASE_HISTORY.md` record machine acceptance and unlock Phase 14, whose sole prerequisite is Phase 13 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -390,37 +393,34 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 13
+## 8. Current phase contract — Phase 14
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Acceptance Infrastructure + Evidence Graph** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 13) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED (Atomic Packages 1–5 delivered)**. `GovernanceState.current_work_phase()` returns `13`. The graph foundation, register-derived applicability and coverage, Passport evidence accounting, policy-owned actor boundaries and evidence-derived capability verdict are delivered; no requirement is discharged and no phase gate has run |
-| Prerequisites | Phases **6 and 12** — both MACHINE-ACCEPTED, which is why the dependency machine permits 13 and only 13 |
-| Contract IDs | **C-16** — STRICT `GRAPH` Evidence Graph edge (`REQ→…→Result`), owned by `acceptance.engine`, consumed by acceptance and coverage. The inventory names traceability tests as its verification responsibility |
-| Human gate | none (matrix Gate column `—`). C-16 is a Protected Core contract; implementing its already-defined contract triggers the stronger verification profile, while changing the contract itself remains governed separately |
-| ARK-REQ IDs | derive with `RequirementRegister.for_phase("13")` — **27** MANDATORY entries spanning `acceptance.engine` and `control.policy`. Do not carry Phase 12's seven discharged claims forward |
-| What Phase 12 leaves ready | C-25's isolated candidate workspace, immutable manifest and assembly report, canonical semantic checks and authority-owned Stable progression boundary. Assembly still makes no verification, acceptance or promotion decision |
-| What remains unbuilt | Package 6's composed journey, traceability, exact-candidate report and single gate submission. No Phase 13 acceptance verdict exists yet |
-| Architecture hazard | `acceptance.engine` is layer rank 2 and is the sole authority allowed to read evidence for a verdict. Preserve the Phase 6 C-14/C-15 storage and integrity authorities; do not create a second evidence store, requirement denominator or applicability authority. `control.policy` owns the phase's actor prohibitions |
+| Name | **Repair / Root Cause / Convergence** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 14) |
+| Status | **UNLOCKED — NOT STARTED**. `GovernanceState.current_work_phase()` returns `14`; no Phase 14 package exists and no requirement is discharged |
+| Prerequisites | Phase **13** — MACHINE-ACCEPTED, which is why the dependency machine permits 14 and only 14 |
+| Contract IDs | **C-26** — STRICT `EVD` repair fingerprint + budget ledger, owned and produced by `engineering.repair`, consumed by acceptance and knowledge; verification responsibility is anti-loop property tests |
+| Human gate | none (matrix Gate column `—`) |
+| ARK-REQ IDs | derive with `RequirementRegister.for_phase("14")` — **7** MANDATORY entries: bounded repair loops, root-cause flow, fingerprints, six budget dimensions, failure protocol, anti-loop enforcement and candidate-lifecycle confinement |
+| What Phase 13 leaves ready | The accepted immutable C-16 evidence graph, register-derived applicability and coverage, Passport accounting, policy boundaries and evidence-derived capability verdict |
+| What remains unbuilt | C-26 and all Phase 14 implementation, tests, traceability and acceptance evidence |
+| Architecture hazard | `engineering.repair` must consume evidence without becoming an acceptance authority. Repair must remain inside the candidate lifecycle; `control.policy` owns that confinement. Do not add release or Stable-mutation authority |
 
-**Phase 13 is in progress and not accepted.** Its denominator is **27** and none
-is discharged. Packages 1–5 are delivered; Phases 6 and 12 are MACHINE-ACCEPTED.
+**Phase 14 is unlocked and not started.** Its denominator is **7** and none is
+discharged. Phase 13 is MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Continue Phase 13 — Atomic Package 6: compose the complete real-source C-16
-and Acceptance Engine journey, record the 27 register-derived traceability
-claims and exact-candidate C-17 evidence, then run the Phase 13 gate once only
-when every required verification category is complete.** The live denominator
-— 27 requirements. Derive the Protected Core profile over all Phase 13
-packages, preserve every accepted historical artifact, and do not create
-release or Stable-promotion authority. No Phase 13 requirement is discharged
-unless the single permitted phase gate accepts the complete candidate.
+**Begin Phase 14 — Repair / Root Cause / Convergence (C-26).** The live
+denominator — 7 requirements. Read those register rows and C-26's inventory row
+before implementation. Repair fingerprints and all six budget dimensions must
+be bounded, evidence-driven and enforced inside the candidate lifecycle; reuse
+Phase 13's accepted evidence and policy authorities rather than copying them.
 
-**Do not re-run the Phase 12 gate**, or any earlier accepted phase gate. A second
+**Do not re-run the Phase 13 gate**, or any earlier accepted phase gate. A second
 run against an accepted phase returns `AWAITING_RESCORING_AUTHORITY` under
 GOV-001 — the rule working, not a fault.
 
@@ -544,9 +544,9 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 69c23349f48c8e7400212873de643f0961bfbf55
+head: 5c7fff4e363e96814ee309f7cd9c199a6caf1f7a
 branch: main
-working_tree_clean: false
+working_tree_clean: true
 
 requirements_total: 313
 requirements_mandatory: 303
@@ -567,11 +567,12 @@ verified_by_phase:
   "10": 5
   "11": 2
   "12": 7
-cumulative_verified: 100
+  "13": 27
+cumulative_verified: 127
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12"]
-unlocked_phase: "13"
-next_exact_action_phase: "13"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13"]
+unlocked_phase: "14"
+next_exact_action_phase: "14"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
