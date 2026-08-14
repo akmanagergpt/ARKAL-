@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `7c616d7d67ded7fc7fbe77055d622b613f963603` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `69c23349f48c8e7400212873de643f0961bfbf55` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -301,7 +301,8 @@ repository, the repository wins.
 | 137 | `bb4b3ba` | **PHASE 13 PACKAGE 2** — register-derived applicability, requirement coverage and exact required-evidence coverage over immutable C-16 paths. Unevaluable rules remain applicable and unregistered claims fail; no Passport or verdict exists, no requirement is discharged and cumulative verified stays 100 |
 | 138 | `ce600ff` | **PHASE 13 PACKAGE 3** — Proof-of-Engineering Passport evidence accounting derives its vocabulary from the frozen verification contract and its concrete obligations from the canonical register, groups requirements by register-owned capability, preserves complete passing C-16 bindings and reports missing obligations explicitly. No Acceptance Engine verdict exists, no requirement is discharged and cumulative verified stays 100 |
 | 139 | `885de26` | **PHASE 13 PACKAGE 4** — policy-owned actor boundaries derive prohibited actors and HUMAN GATE vocabulary from canonical authority, bar automated applicability authorship, NOT_APPLICABLE origination, waiver and acceptance weakening, and prevent machine verdicts from superseding required human gates. No Acceptance Engine verdict exists, no requirement is discharged and cumulative verified stays 100 |
-| 140 | `7c616d7` | **PHASE 13 PACKAGE 5** — the Acceptance Engine capability verdict is derived solely from immutable Passport accounting: a complete passing path establishes IMPLEMENTED, only complete evidence for every applicable obligation establishes VERIFIED, missing evidence remains explicit, and every required HUMAN GATE is checked through the policy authority. No phase acceptance, release or Stable-promotion authority exists; no requirement is discharged and cumulative verified stays 100 ← HEAD at generation |
+| 140 | `7c616d7` | **PHASE 13 PACKAGE 5** — the Acceptance Engine capability verdict is derived solely from immutable Passport accounting: a complete passing path establishes IMPLEMENTED, only complete evidence for every applicable obligation establishes VERIFIED, missing evidence remains explicit, and every required HUMAN GATE is checked through the policy authority. No phase acceptance, release or Stable-promotion authority exists; no requirement is discharged and cumulative verified stays 100 |
+| 141 | `69c2334` | **HANDOFF TRANSITION ANTI-VACUITY REPAIR (F-0049)** — the live Phase 13 brief now names Package 6 and its register-derived denominator, and the permanent transition control refuses a missing denominator claim ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -543,9 +544,9 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 7c616d7d67ded7fc7fbe77055d622b613f963603
+head: 69c23349f48c8e7400212873de643f0961bfbf55
 branch: main
-working_tree_clean: true
+working_tree_clean: false
 
 requirements_total: 313
 requirements_mandatory: 303
