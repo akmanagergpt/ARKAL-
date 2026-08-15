@@ -44,10 +44,27 @@ def handoff_text() -> str:
 
 
 @pytest.fixture(scope="module")
-def truth() -> dict:
+def transition_module() -> types.ModuleType:
     load_validator()  # puts scripts/ and backend/ on sys.path
-    module = load_module(REPO / "scripts" / "handoff_transition.py")
-    return module.transition_truth(REPO)
+    return load_module(REPO / "scripts" / "handoff_transition.py")
+
+
+@pytest.fixture(scope="module")
+def truth(transition_module: types.ModuleType) -> dict:
+    return transition_module.transition_truth(REPO)
+
+
+def current_state_section(text: str, transition: types.ModuleType) -> str:
+    """The live current-state section, fetched through the validator's own scope.
+
+    Unscoped, `re.search` over the whole document finds §4/§11's historical
+    "cumulative verified stays N" rows before it ever reaches §3's live one -
+    the same scoping mistake F-0048 already fixed in the validator itself.
+    """
+    markdown = load_module(REPO / "scripts" / "handoff_markdown.py")
+    body = markdown.section(text, transition.CURRENT_STATE_HEADING)
+    assert body.strip(), "the current-state section could not be located"
+    return body
 
 
 def discharging_phase(truth: dict) -> tuple[str, tuple[str, ...]]:
@@ -111,13 +128,20 @@ class TestAnAcceptedPhaseRowMustCompleteItsTransition:
                    for d in drift_names(validator, mutated))
 
     def test_a_cumulative_total_below_the_accepted_records_is_detected(
-        self, validator: types.ModuleType, handoff_text: str, truth: dict
+        self, validator: types.ModuleType, handoff_text: str, truth: dict,
+        transition_module: types.ModuleType,
     ) -> None:
         derivable = sum(len(ids) for ids in truth["discharged"].values())
         assert derivable > 0
-        stated = re.search(r"cumulative verified\s+(?:stays|is|remains)\s+(\d+)",
-                           handoff_text, re.IGNORECASE)
-        assert stated is not None, "the live summary states no cumulative total"
+        # Scoped to §3, exactly as `check_accepted_rows` reads it - not the
+        # whole document, where a bare `re.search` would land on a historical
+        # §4/§11 row instead of the live statement this control must mutate.
+        section_text = current_state_section(handoff_text, transition_module)
+        stated = re.search(
+            r"cumulative verified\s+(?:stays|is|remains)\s+\*{0,2}(\d+)\*{0,2}",
+            section_text, re.IGNORECASE,
+        )
+        assert stated is not None, "the live current-state section states no cumulative total"
         mutated = replace_once(handoff_text, stated.group(0),
                                f"cumulative verified stays {derivable - 1}")
         assert any("is not below the accepted records" in d
