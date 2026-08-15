@@ -43,12 +43,68 @@ structural property of the fingerprint history, never a classification of
 strategy escalates instead of looping", and is the anti-loop property C-26's
 own inventory row names as this contract's verification responsibility.
 
+## Failure-protocol stage vocabulary — CANONICAL_AMBIGUITY
+
+`failure_protocol.py` parses both pipelines the canonical set declares for
+`ARK-REQ-0086` (`MS §Root-Cause and Convergence Engine`) and `ARK-REQ-0238`
+(`BP §Failure protocol`):
+
+```
+MS (9 stages): Reproduce -> Observe -> Evidence -> Hypotheses -> Experiment
+               -> Root Cause -> Minimal Repair -> Targeted Acceptance
+               -> Regression
+BP (11 stages): Reproduce -> Evidence -> Classify -> Hypotheses -> Experiment
+               -> Root Cause -> Minimal Change -> Candidate -> Targeted Tests
+               -> Regression -> Accept/Reject
+```
+
+Reconciled with the identical algorithm `harness_elements.py` established for
+this exact shape of problem (`ARK-REQ-0054`/`ARK-REQ-0231`, Phase 10): the two
+declarations must agree in stage count, and at each position one name must be
+a word-wise abbreviation of the other. **They do not reconcile.** The counts
+differ (9 against 11), and the two mismatched segments are not abbreviation
+pairs:
+
+- Positions 2–3: MS declares `Observe`, `Evidence`; BP declares `Evidence`,
+  `Classify`. Neither MS name shares a word root with the BP name at the same
+  position (`Observe`/`Evidence` at position 2; `Evidence`/`Classify` at
+  position 3) — this is not a wording variance, it is two different pairs of
+  words.
+- Positions 8–11 (BP numbering): MS names one stage, `Targeted Acceptance`;
+  BP names `Candidate`, `Targeted Tests`, `...`, `Accept/Reject` — BP declares
+  two explicit stages (`Candidate`, `Accept/Reject`) that MS's text does not
+  name at all, at any position.
+
+`Reproduce`, `Hypotheses`, `Experiment`, `Root Cause` and `Regression` are the
+only stages identical in both documents.
+
+**Neither document is preferred.** The register assigns `ARK-REQ-0086` to MS
+and `ARK-REQ-0238` to BP with equal MANDATORY weight, and this contract's own
+precedent (`harness_elements.py`) refuses to invent a mapping neither
+document's text actually states — doing so here (e.g. deciding `Observe`
+means the same thing as `Classify`) would be the alias-table defect (F-0013
+wearing a different hat) that precedent's docstring names explicitly.
+
+**This is CANONICAL_AMBIGUITY, not a defect in this module.**
+`FailureProtocolVocabulary.stages()` is proven (by
+`test_failure_protocol.py::TestTheRealDocumentsGenuinelyDoNotReconcile`) to
+raise `AuthoritativeSourceError` against the live documents, naming both
+counts. The minimal governance decision this needs, from whoever holds
+authority to interpret canonical text (not the implementing actor): either
+(a) rule which document's stage vocabulary governs the operational, machine-
+enforced pipeline (`MS`'s 9-stage summary or `BP`'s 11-stage procedure), or
+(b) amend one canonical document so the two texts genuinely reconcile under
+the established algorithm. Until that ruling exists, no root-cause pipeline
+orchestrator can be built against a single derived stage list without
+inventing content neither document states.
+
 ## Deliberate boundary
 
-This contract provides the C-26 evidence and anti-loop refusal only. It does
-not run the root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`), alter a
-candidate, choose which strategy to attempt next, decide what "escalate"
-means beyond refusing a repeat, discharge any Phase 14 requirement, or run
-the Phase 14 gate. Deterministic repair transformers and `control.policy`
-enforcement (`ARK-REQ-0240`) remain subsequent Phase 14 packages; Golden
-Repair remains Phase 30.
+This contract provides the C-26 evidence contract, the anti-loop refusal, and
+the failure-protocol vocabulary parser's proof of the MS/BP ambiguity above.
+It does not run the root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`) —
+blocked on the ambiguity above — alter a candidate, choose which strategy to
+attempt next, decide what "escalate" means beyond refusing a repeat,
+discharge any Phase 14 requirement, or run the Phase 14 gate. Deterministic
+repair transformers and `control.policy` enforcement (`ARK-REQ-0240`) remain
+subsequent Phase 14 packages; Golden Repair remains Phase 30.
