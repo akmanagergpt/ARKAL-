@@ -1,0 +1,18 @@
+{
+  "packets": [
+    {
+      "id": "phase-14-package-1",
+      "prompt": "Implement only the next canonical Phase 14 atomic package after repository-truth inspection.",
+      "tests": [["/home/lenovo/.venvs/arkali/bin/python", "-m", "pytest", "backend/tests/engineering", "-q"]],
+      "full_regressions": [],
+      "gate": null,
+      "human_gate": false,
+      "local_editable_paths": [
+        "backend/arkali/engineering/repair/contracts.py",
+        "backend/arkali/engineering/repair/errors.py",
+        "backend/tests/engineering/test_repair_contracts.py",
+        "docs/contracts/repair.md"
+      ]
+    }
+  ]
+}

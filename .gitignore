@@ -183,6 +183,7 @@ src-tauri/WixTools/
 *.db-journal
 *.db-wal
 *.db-shm
+.arkali-automation/
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
