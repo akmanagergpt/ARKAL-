@@ -211,3 +211,49 @@ class TestTheControlsAreDerived:
         assert truth["current"] is not None
         assert truth["accepted"], "no accepted phase was derived"
         assert truth["discharged"], "no accepted discharge was derived"
+
+
+_NOT_CONTRADICTED = (
+    "the current-phase section is not contradicted by ledger rows or the "
+    "live summary"
+)
+
+
+class TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence:
+    """The exact defect this class exists to catch: BUILD_STATE.md's phase-
+    status row for the current work phase never advanced past UNLOCKED / NOT
+    STARTED across three committed packages, and §8 mirrored that stale cell -
+    so the pre-existing "declared state agrees with itself" check passed while
+    both sides were wrong. These controls cross-check the current-phase
+    section against two INDEPENDENT repository-derived sources instead: the
+    accepted-commit-history ledger and the live "Current verified state"
+    summary. Nothing here names a phase, a package count or a contract id."""
+
+    def test_the_live_current_phase_section_is_not_contradicted(
+        self, validator: types.ModuleType, handoff_text: str,
+    ) -> None:
+        """The real answer, over the real document."""
+        assert _NOT_CONTRADICTED not in drift_names(validator, handoff_text)
+
+    def test_a_not_started_claim_against_ledger_evidence_is_detected(
+        self, validator: types.ModuleType, handoff_text: str,
+    ) -> None:
+        mutated = replace_once(
+            handoff_text,
+            "**UNLOCKED — IN PROGRESS, NOT ACCEPTED.**",
+            "**UNLOCKED — NOT STARTED.**",
+        )
+        assert _NOT_CONTRADICTED in drift_names(validator, mutated)
+
+    def test_a_no_package_exists_claim_against_ledger_evidence_is_detected(
+        self, validator: types.ModuleType, handoff_text: str,
+    ) -> None:
+        mutated = replace_once(
+            handoff_text,
+            "Packages 1–3 are committed (evidence contract, anti-loop "
+            "refusal, failure-protocol vocabulary parser); root-cause "
+            "pipeline continuation is stopped on `CANONICAL_AMBIGUITY`; no "
+            "requirement is discharged",
+            "no Phase 14 package exists and no requirement is discharged",
+        )
+        assert _NOT_CONTRADICTED in drift_names(validator, mutated)

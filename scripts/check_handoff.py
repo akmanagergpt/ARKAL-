@@ -379,6 +379,54 @@ def check_narrative(repo: pathlib.Path, text: str, report: Report) -> None:
             str(contradicted),
         )
 
+    # -- the current phase may not claim no progress against its own evidence --
+    #
+    # WHY THIS EXISTS. The declared-state check above only confirms the
+    # current-phase section agrees with BUILD_STATE.md's OWN status cell for
+    # that phase - if the cell itself never advanced past UNLOCKED / NOT
+    # STARTED while packages landed and were documented elsewhere in this same
+    # manifest, both sides "agree" while both are stale (exactly what happened
+    # after Phase 14 Package 3: BUILD_STATE.md's phase-status row and this
+    # section both still said NOT STARTED while §4 and §3 both documented three
+    # committed packages). This control cross-checks against a THIRD,
+    # independent, repository-derived source: the accepted-commit-history
+    # ledger, whose rows already name their phase by the `PHASE <n> ...`
+    # convention used for every phase in this repository, and the live
+    # "Current verified state" summary's own per-phase row. Neither the current
+    # phase number nor any package name is hard-coded; `current` is derived
+    # from `GovernanceState`, exactly as the checks above it are.
+    if heading is not None and current is not None:
+        ledger_text = _section(text, r"^##\s*\d+\.\s*Accepted commit history\s*$")
+        live_summary = _section(text, r"^##\s*\d+\.\s*Current verified state\s*$")
+        section_body = _section(text, _CURRENT_PHASE_HEADING.pattern)
+        has_ledger_rows = bool(
+            re.search(rf"PHASE\s+{re.escape(current)}\b", ledger_text, re.I)
+        )
+        phase_row = re.search(
+            rf"^\|\s*Phase\s*{re.escape(current)}\s*\|(?P<cell>[^\n]*)\|",
+            live_summary, re.M,
+        )
+        live_says_in_progress = bool(
+            phase_row and re.search(r"\bIN\s+PROGRESS\b", phase_row.group("cell"), re.I)
+        )
+        claims_not_started = bool(re.search(r"\bNOT[ _-]STARTED\b", section_body, re.I))
+        claims_no_package = bool(re.search(
+            r"\bno\b[^.\n]{0,40}\bpackage\b[^.\n]{0,30}\bexists?\b",
+            section_body, re.I,
+        ))
+        report.assert_true(
+            "the current-phase section is not contradicted by ledger rows or "
+            "the live summary",
+            not (
+                (has_ledger_rows or live_says_in_progress)
+                and (claims_not_started or claims_no_package)
+            ),
+            f"phase {current}: ledger_rows={has_ledger_rows} "
+            f"live_in_progress={live_says_in_progress} "
+            f"claims_not_started={claims_not_started} "
+            f"claims_no_package={claims_no_package}",
+        )
+
     # -- the canonical interpreter must not be reported absent while satisfied -
     required = _required_python(repo)
     running = ".".join(str(p) for p in sys.version_info[:2])

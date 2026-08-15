@@ -405,17 +405,20 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Repair / Root Cause / Convergence** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 14) |
-| Status | **UNLOCKED — NOT STARTED**. `GovernanceState.current_work_phase()` returns `14`; no Phase 14 package exists and no requirement is discharged |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `14`. Packages 1–3 are committed (evidence contract, anti-loop refusal, failure-protocol vocabulary parser); root-cause pipeline continuation is stopped on `CANONICAL_AMBIGUITY`; no requirement is discharged |
 | Prerequisites | Phase **13** — MACHINE-ACCEPTED, which is why the dependency machine permits 14 and only 14 |
 | Contract IDs | **C-26** — STRICT `EVD` repair fingerprint + budget ledger, owned and produced by `engineering.repair`, consumed by acceptance and knowledge; verification responsibility is anti-loop property tests |
 | Human gate | none (matrix Gate column `—`) |
 | ARK-REQ IDs | derive with `RequirementRegister.for_phase("14")` — **7** MANDATORY entries: bounded repair loops, root-cause flow, fingerprints, six budget dimensions, failure protocol, anti-loop enforcement and candidate-lifecycle confinement |
 | What Phase 13 leaves ready | The accepted immutable C-16 evidence graph, register-derived applicability and coverage, Passport accounting, policy boundaries and evidence-derived capability verdict |
-| What remains unbuilt | C-26 and all Phase 14 implementation, tests, traceability and acceptance evidence |
+| What Packages 1–3 built | `RepairFingerprint` and `RepairBudgetLedger` (C-26 evidence); `RepairBudgetLedger.record`'s repeated-strategy refusal (anti-loop); `failure_protocol.py`'s proof that MS's 9-stage and BP's 11-stage pipelines do not reconcile. None discharges a requirement |
+| What remains blocked or unbuilt | The root-cause pipeline itself (`ARK-REQ-0086`, `ARK-REQ-0238`) cannot proceed until `CANONICAL_AMBIGUITY` is resolved by governance ruling; `ARK-REQ-0240` (`control.policy` candidate-lifecycle confinement) is independently unbuilt and not blocked by the ambiguity; no traceability, report or acceptance evidence exists |
 | Architecture hazard | `engineering.repair` must consume evidence without becoming an acceptance authority. Repair must remain inside the candidate lifecycle; `control.policy` owns that confinement. Do not add release or Stable-mutation authority |
 
-**Phase 14 is unlocked and not started.** Its denominator is **7** and none is
-discharged. Phase 13 is MACHINE-ACCEPTED.
+**Phase 14 is unlocked, in progress and not accepted.** Its denominator is
+**7** and none is discharged. Packages 1–3 are committed; further root-cause
+pipeline work is stopped on `CANONICAL_AMBIGUITY` (see §9). Phase 13 is
+MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
