@@ -24,32 +24,31 @@ existing importer is unchanged and no call site was touched to make room. A
 re-export adds no public surface: the budget counts top-level definitions, not
 imported names.
 
+THIS MODULE HIT THE SAME CEILING, AND THE SAME ANSWER APPLIES A SECOND TIME.
+`engineering.repair` was the sixteenth context needing a base from here, so
+`ContractViolation` moved to `contract_violation_base.py` and `ArkaliError`
+moved to `error_root.py`, and this module imports both back and re-exports
+them - unchanged for all fifteen existing importers, for the identical reason
+the split above holds. A new consumer of only `ContractViolation` should
+import `contract_violation_base` directly, the way a new consumer of only
+`ArkaliError` should import `error_root` directly, so this module's own
+fan-in stops absorbing every future context.
+
 Rule, unchanged: no error type in this taxonomy may be caught and converted into
 a PASS.
 """
 
 from __future__ import annotations
 
+from arkali.kernel.contracts.contract_violation_base import ContractViolation
+from arkali.kernel.contracts.error_root import ArkaliError
 
-class ArkaliError(Exception):
-    """Base of the canonical error taxonomy."""
-
-    code: str = "ARK-ERR-0000"
-
-    def __init__(self, message: str, *, source: str = "") -> None:
-        super().__init__(message)
-        self.message = message
-        self.source = source
-
-    def __str__(self) -> str:
-        base = f"[{self.code}] {self.message}"
-        return f"{base} (source: {self.source})" if self.source else base
-
-
-class ContractViolation(ArkaliError):
-    """A value does not satisfy its declared contract."""
-
-    code = "ARK-ERR-0001"
+__all__ = [
+    "ArkaliError",
+    "AuthoritativeSourceError",
+    "ContractViolation",
+    "GovernanceStateError",
+]
 
 
 class GovernanceStateError(ArkaliError):
