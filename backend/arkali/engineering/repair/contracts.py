@@ -1,4 +1,4 @@
-"""C-26 immutable repair fingerprint and six-dimensional budget ledger."""
+"""C-26 immutable repair fingerprint, budget ledger and anti-loop refusal."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from arkali.engineering.repair.errors import (
     InvalidRepairFingerprintError,
     RepairBudgetExceededError,
+    RepeatedFailedStrategyError,
 )
 from arkali.kernel.contracts.content_address import address_of
 
@@ -80,7 +81,21 @@ class RepairConsumption(BaseModel):
 
 
 class RepairBudgetLedger(BaseModel):
-    """Immutable, evidence-driven accounting for one candidate repair loop."""
+    """Immutable, evidence-driven accounting for one candidate repair loop.
+
+    ANTI-LOOP, BY STRUCTURE NOT BY READING `outcome`. `outcome` is declared
+    free text (MS §Root-Cause names it as one of the six recorded fields, with
+    no canonical vocabulary of pass/fail states for a single attempt — unlike
+    the campaign-level `ESCALATED`/`BLOCKED` machines `STATE_MACHINES.md`
+    defines elsewhere). A ledger is scoped to one candidate's convergence
+    attempt on one defect, so a second fingerprint sharing its
+    (`failure_signature`, `root_cause_class`, `strategy`) with one already in
+    `fingerprints` is, by construction, a repeat of a strategy that did not
+    resolve the defect the first time - otherwise there would be no reason to
+    attempt it again in the same loop. `record` refuses that repeat directly,
+    which is `ARK-REQ-0087`'s "repeated failed strategy escalates" enforced as
+    a structural property rather than as text classification of `outcome`.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -114,6 +129,21 @@ class RepairBudgetLedger(BaseModel):
             if getattr(self.consumption, name) > getattr(self.budget, name)
         )
 
+    def repeats_failed_strategy(self, fingerprint: RepairFingerprint) -> bool:
+        """Whether this ledger already recorded the same strategy for the same
+        (failure, root cause) — the anti-loop identity `ARK-REQ-0087` and
+        `ARK-REQ-0239` name. `files`, `provider_model` and `outcome` do not
+        participate: a different file set or a different model attempting the
+        identical strategy on the identical failure is still the same
+        strategy repeating.
+        """
+        return any(
+            existing.failure_signature == fingerprint.failure_signature
+            and existing.root_cause_class == fingerprint.root_cause_class
+            and existing.strategy == fingerprint.strategy
+            for existing in self.fingerprints
+        )
+
     def record(
         self,
         fingerprint: RepairFingerprint,
@@ -124,7 +154,21 @@ class RepairBudgetLedger(BaseModel):
         touched_files: int,
         regression_delta: int,
     ) -> RepairBudgetLedger:
-        """Return a new ledger or refuse the attempt before it can overrun."""
+        """Return a new ledger, or refuse the attempt before it can overrun or
+        loop. Two refusals precede the budget math: an attempt whose
+        (`failure_signature`, `root_cause_class`, `strategy`) repeats one
+        already in `fingerprints` is `RepeatedFailedStrategyError`, never a
+        budget dimension, because looping is a structural defect the caller
+        must escalate rather than a ceiling it could raise.
+        """
+        if self.repeats_failed_strategy(fingerprint):
+            raise RepeatedFailedStrategyError(
+                "strategy "
+                f"{fingerprint.strategy!r} already attempted for "
+                f"failure {fingerprint.failure_signature!r} / "
+                f"root cause {fingerprint.root_cause_class!r}; "
+                "escalate instead of repeating it"
+            )
         current = self.consumption
         updated = RepairConsumption(
             attempts=current.attempts + 1,

@@ -21,3 +21,9 @@ class RepairBudgetExceededError(ContractViolation):
     """A repair attempt would exceed one or more declared dimensions."""
 
     code = "ARK-ERR-0110"
+
+
+class RepeatedFailedStrategyError(ContractViolation):
+    """The same strategy was already attempted for this failure and cause."""
+
+    code = "ARK-ERR-0111"

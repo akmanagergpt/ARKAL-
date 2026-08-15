@@ -13,6 +13,7 @@ from arkali.engineering.repair.contracts import (
 from arkali.engineering.repair.errors import (
     InvalidRepairFingerprintError,
     RepairBudgetExceededError,
+    RepeatedFailedStrategyError,
 )
 from arkali.evidence.artifact.content_address import is_address
 
@@ -125,15 +126,87 @@ class TestRepairBudgetLedger:
 
     def test_attempt_budget_is_enforced_by_recorded_fingerprints(self) -> None:
         first = ledger().record(
-            fingerprint(), ai_calls=0, elapsed_seconds=1,
+            fingerprint(strategy="strategy-a"), ai_calls=0, elapsed_seconds=1,
             cost=Decimal("0"), touched_files=1, regression_delta=0,
         )
         second = first.record(
-            fingerprint(outcome="failed"), ai_calls=0, elapsed_seconds=1,
+            fingerprint(strategy="strategy-b"), ai_calls=0, elapsed_seconds=1,
             cost=Decimal("0"), touched_files=1, regression_delta=0,
         )
         with pytest.raises(RepairBudgetExceededError, match="attempts"):
             second.record(
-                fingerprint(outcome="escalated"), ai_calls=0, elapsed_seconds=1,
+                fingerprint(strategy="strategy-c"), ai_calls=0, elapsed_seconds=1,
                 cost=Decimal("0"), touched_files=1, regression_delta=0,
             )
+
+
+class TestAntiLoopRefusal:
+    """C-26's declared verification responsibility: anti-loop property tests."""
+
+    def test_repeats_failed_strategy_is_true_only_when_all_three_key_fields_match(
+        self,
+    ) -> None:
+        base = fingerprint()
+        recorded = ledger().record(
+            base, ai_calls=0, elapsed_seconds=1,
+            cost=Decimal("0"), touched_files=1, regression_delta=0,
+        )
+        variants = {
+            "failure_signature": "pytest: a_different_test",
+            "root_cause_class": "different-cause",
+            "strategy": "a-different-strategy",
+        }
+        for field, other_value in variants.items():
+            distinct = fingerprint(**{field: other_value})
+            assert recorded.repeats_failed_strategy(distinct) is False
+        assert recorded.repeats_failed_strategy(fingerprint()) is True
+
+    @pytest.mark.parametrize(
+        "irrelevant_field",
+        ("files", "provider_model", "outcome"),
+    )
+    def test_files_provider_model_and_outcome_do_not_prevent_the_refusal(
+        self, irrelevant_field: str,
+    ) -> None:
+        overrides: dict[str, object] = {
+            "files": ("backend/other.py",),
+            "provider_model": "local/a-different-model",
+            "outcome": "a-different-outcome",
+        }
+        recorded = ledger().record(
+            fingerprint(), ai_calls=0, elapsed_seconds=1,
+            cost=Decimal("0"), touched_files=1, regression_delta=0,
+        )
+        repeat = fingerprint(**{irrelevant_field: overrides[irrelevant_field]})
+        assert recorded.repeats_failed_strategy(repeat) is True
+        with pytest.raises(RepeatedFailedStrategyError, match="minimal-contract-repair"):
+            recorded.record(
+                repeat, ai_calls=0, elapsed_seconds=1,
+                cost=Decimal("0"), touched_files=1, regression_delta=0,
+            )
+
+    def test_record_refuses_a_repeated_strategy_before_touching_the_budget(self) -> None:
+        recorded = ledger().record(
+            fingerprint(), ai_calls=0, elapsed_seconds=1,
+            cost=Decimal("0"), touched_files=1, regression_delta=0,
+        )
+        with pytest.raises(RepeatedFailedStrategyError) as excinfo:
+            recorded.record(
+                fingerprint(), ai_calls=0, elapsed_seconds=200,
+                cost=Decimal("99"), touched_files=99, regression_delta=99,
+            )
+        assert "minimal-contract-repair" in str(excinfo.value)
+        assert recorded.consumption.attempts == 1
+        assert recorded.fingerprints == (fingerprint(),)
+
+    def test_a_different_strategy_for_the_same_failure_is_permitted(self) -> None:
+        recorded = ledger().record(
+            fingerprint(), ai_calls=0, elapsed_seconds=1,
+            cost=Decimal("0"), touched_files=1, regression_delta=0,
+        )
+        escalated_strategy = recorded.record(
+            fingerprint(strategy="broader-contract-repair"), ai_calls=0,
+            elapsed_seconds=1, cost=Decimal("0"), touched_files=1,
+            regression_delta=0,
+        )
+        assert escalated_strategy.consumption.attempts == 2

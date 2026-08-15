@@ -27,11 +27,28 @@ an attempt. Recording returns a new immutable ledger and refuses any candidate
 that would cross a ceiling. Attempt accounting is reconciled with the number of
 recorded fingerprints, so an unaccounted repair cannot pass as evidence.
 
+## Anti-loop refusal
+
+A ledger is scoped to one candidate's convergence attempt on one defect. A
+fingerprint whose (failure signature, root-cause class, strategy) repeats one
+already recorded in the same ledger is refused by `record` before the budget
+is touched — by construction a repeat means the first attempt at that exact
+strategy did not resolve the defect, since otherwise the loop would not have
+reached a second attempt. `files`, `provider/model` and `outcome` do not
+participate in that identity: `outcome` is declared free text with no
+canonical pass/fail vocabulary for a single attempt (unlike the campaign-level
+`ESCALATED`/`BLOCKED` machines defined elsewhere), so the refusal is a
+structural property of the fingerprint history, never a classification of
+`outcome`'s text. This is `ARK-REQ-0087` and `ARK-REQ-0239`'s "repeated failed
+strategy escalates instead of looping", and is the anti-loop property C-26's
+own inventory row names as this contract's verification responsibility.
+
 ## Deliberate boundary
 
-This first atomic package provides the C-26 evidence contract only. It does not
-run the root-cause pipeline, alter a candidate, choose a repair strategy,
-escalate a repeated failed strategy, discharge any Phase 14 requirement, or run
+This contract provides the C-26 evidence and anti-loop refusal only. It does
+not run the root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`), alter a
+candidate, choose which strategy to attempt next, decide what "escalate"
+means beyond refusing a repeat, discharge any Phase 14 requirement, or run
 the Phase 14 gate. Deterministic repair transformers and `control.policy`
-enforcement remain subsequent Phase 14 packages; Golden Repair remains Phase
-30.
+enforcement (`ARK-REQ-0240`) remain subsequent Phase 14 packages; Golden
+Repair remains Phase 30.
