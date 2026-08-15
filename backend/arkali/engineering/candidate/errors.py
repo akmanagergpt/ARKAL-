@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.error_base import ContractViolation
+from arkali.kernel.contracts.contract_violation_base import ContractViolation
 
 
 class CandidateContractError(ContractViolation):

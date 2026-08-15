@@ -8,9 +8,10 @@ assumed: placing them there took `kernel.contracts` public surface to 42 against
 a `max_public_surface_per_context` budget of 40, and the architecture gate
 refused it. ADR-0008 makes decomposition the answer to a budget rather than an
 exception, and an exception would in any case require HUMAN GATE 8 plus an ADR
-and may not be authored by the implementing actor. The abstract base layer lives
-in `kernel.contracts.error_base` and is imported from there, so this context
-adds no edge to `errors.py`, which is at its own fan-in ceiling of 15.
+and may not be authored by the implementing actor. `ContractViolation` is
+imported from `kernel.contracts.contract_violation_base` (the PRE-PHASE-14
+decomposition of `error_base.py`, which needed the same repair `errors.py`
+got before it), so this context adds no edge to either hub module.
 
 Each failure mode is a distinct type so a negative control can assert the
 *reason* something was refused. A control asserting only that an exception was
@@ -27,7 +28,7 @@ Codes are allocated from 0092 upward; 0088-0091 belong to
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.error_base import ContractViolation
+from arkali.kernel.contracts.contract_violation_base import ContractViolation
 
 
 class HarnessError(ContractViolation):

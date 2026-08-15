@@ -5,9 +5,11 @@ Owner: `control.registry.provider`.
 WHY THESE ARE NOT IN `kernel.contracts.errors`. Same reason as the C-11, C-12,
 C-14, C-15, C-19 and C-21 taxonomies before them: that module sits at its
 `max_fan_in_per_module` budget of 15, and ADR-0008 makes decomposition the
-answer to a budget rather than an exception. The abstract base layer lives in
-`kernel.contracts.error_base` (F-0042's decomposition) and is imported from
-there, so this context adds no edge to `errors.py`.
+answer to a budget rather than an exception. `ContractViolation` is imported
+from `kernel.contracts.contract_violation_base` (the PRE-PHASE-14
+decomposition of `error_base.py`, which was itself absorbing every new
+context's edge and needed the same repair `errors.py` got before it), so
+this context adds no edge to either hub module.
 
 Each failure mode is a distinct type so a negative control can assert the
 *reason* something was refused. A control asserting only that an exception was
@@ -23,7 +25,7 @@ Codes are allocated from 0088 upward; 0081-0087 belong to `execution.scheduler`.
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.error_base import ContractViolation
+from arkali.kernel.contracts.contract_violation_base import ContractViolation
 
 
 class InvalidProviderIdentity(ContractViolation):

@@ -7,8 +7,10 @@ C-15, C-19, C-21 and C-22 taxonomies before them: `kernel.contracts.errors` is
 at its `max_fan_in_per_module` ceiling of 15 and the context's public surface has
 no room, which Phase 10 established by MEASUREMENT when the architecture gate
 refused a taxonomy placed there at 42 of 40. ADR-0008 makes decomposition the
-answer to a budget rather than an exception. The abstract base comes from
-`kernel.contracts.error_base`, so this context adds no edge to `errors.py`.
+answer to a budget rather than an exception. `ContractViolation` is imported
+from `kernel.contracts.contract_violation_base` (the PRE-PHASE-14
+decomposition of `error_base.py`, which needed the same repair `errors.py`
+got before it), so this context adds no edge to either hub module.
 
 Each failure mode is a distinct type so a negative control can assert the
 *reason* something was refused. A control asserting only that an exception was
@@ -25,7 +27,7 @@ Codes are allocated from 0097 upward; 0095-0096 belong to `control.policy`.
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.error_base import ContractViolation
+from arkali.kernel.contracts.contract_violation_base import ContractViolation
 
 
 class CodeIntelligenceError(ContractViolation):
