@@ -98,13 +98,56 @@ the established algorithm. Until that ruling exists, no root-cause pipeline
 orchestrator can be built against a single derived stage list without
 inventing content neither document states.
 
+## Deterministic-transformer confinement (`ARK-REQ-0240`, owned by `control.policy`)
+
+BP §Deterministic repair: "Mechanical, unambiguous fixes should use narrow,
+idempotent, tested, versioned deterministic transformers. Transformers
+execute inside the candidate lifecycle only; a transformer may never write to
+a Stable Core or Stable Product revision." The register assigns this
+requirement to `control.policy`, not `engineering.repair` — the same
+structural reason `ARK-REQ-0051` (Phase 10) is owned by `control.policy`
+rather than `engineering.agent`: a rule about what an actor may not do,
+enforced inside the actor it constrains, is enforced by the actor grading its
+own paper.
+
+**Not blocked by the pipeline ambiguity above.** `ARK-REQ-0240` is a
+self-contained actor-boundary rule with a single canonical source (BP
+§Deterministic repair); it does not depend on reconciling MS and BP's
+root-cause pipeline stage vocabularies.
+
+**Reused, not duplicated.** `AUTHORITY_MAP.yaml` `stable_mutation.
+prohibited_actors` already names `deterministic_transformer` — added for MS
+§Constitution 6 ("No actor or mechanism may directly mutate a Stable Core or
+Stable Product revision. This includes ... deterministic transformers ...")
+before Phase 14 existed — and `direct_mutation_permitted_by` is empty by
+design, so no actor may ever perform a direct Stable write. Confinement "to
+the candidate lifecycle" and refusal of "a direct Stable write" are the same
+rule stated two ways. `control.policy.agent_authority.AgentAuthority` —
+Phase 10, Protected Core, already accepted — already parses this exact
+section and already exposes `assert_may_directly_mutate_stable(actor)`,
+generic over the actor label despite its module name. `engineering.repair`'s
+new `DeterministicTransformer` (identity only — name and version, matching
+BP's "narrow, idempotent, tested, versioned"; no target path, no candidate
+reference, no Stable authority) delegates its own confinement check to that
+same authority via `assert_confined_to_candidate_lifecycle`, exactly as
+`AgentRole.assert_may_accept` delegates to it for `ARK-REQ-0051`. No second
+copy of `prohibited_actors`, `direct_mutation_permitted_by` or
+`required_path` exists anywhere in `engineering.repair`.
+
+**No transformer execution engine exists.** This package provides the
+confinement authority a future transformer-execution package must consult —
+not a working transformer that reads a defect, chooses a strategy, and
+writes a fix. `DeterministicTransformer` carries no target and cannot itself
+perform I/O; there is nothing here to run.
+
 ## Deliberate boundary
 
-This contract provides the C-26 evidence contract, the anti-loop refusal, and
-the failure-protocol vocabulary parser's proof of the MS/BP ambiguity above.
-It does not run the root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`) —
-blocked on the ambiguity above — alter a candidate, choose which strategy to
+This contract provides the C-26 evidence contract, the anti-loop refusal,
+the failure-protocol vocabulary parser's proof of the MS/BP ambiguity, and
+`ARK-REQ-0240`'s deterministic-transformer confinement authority. It does
+not run the root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`) — blocked
+on `CANONICAL_AMBIGUITY` — alter a candidate, choose which strategy to
 attempt next, decide what "escalate" means beyond refusing a repeat,
-discharge any Phase 14 requirement, or run the Phase 14 gate. Deterministic
-repair transformers and `control.policy` enforcement (`ARK-REQ-0240`) remain
-subsequent Phase 14 packages; Golden Repair remains Phase 30.
+execute a deterministic transformer against real content, discharge any
+Phase 14 requirement, or run the Phase 14 gate. Golden Repair remains
+Phase 30.

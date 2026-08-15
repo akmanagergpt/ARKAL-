@@ -235,25 +235,43 @@ class TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence:
         """The real answer, over the real document."""
         assert _NOT_CONTRADICTED not in drift_names(validator, handoff_text)
 
+    @staticmethod
+    def _mutate_current_phase_section(
+        validator: types.ModuleType, handoff_text: str, old: str, new: str,
+    ) -> str:
+        """Rewrite one claim WITHIN the current-phase section only.
+
+        `replace_once` rewrites the document's first occurrence of `old`,
+        which is not necessarily inside §8 — several phrases this section
+        uses (e.g. "no requirement is discharged") recur throughout the
+        historical §4 ledger, which precedes §8 in the document. Extracting
+        the section first (via the validator's OWN heading pattern, not a
+        second copy of it), mutating within it, and splicing it back keeps
+        the mutation anchored to the section under test regardless of how
+        many packages have since changed its wording.
+        """
+        from handoff_markdown import section as _section
+
+        body = _section(handoff_text, validator._CURRENT_PHASE_HEADING.pattern)
+        assert old in body, f"expected the current-phase section to render {old!r}"
+        mutated_body = body.replace(old, new, 1)
+        assert body in handoff_text
+        return handoff_text.replace(body, mutated_body, 1)
+
     def test_a_not_started_claim_against_ledger_evidence_is_detected(
         self, validator: types.ModuleType, handoff_text: str,
     ) -> None:
-        mutated = replace_once(
-            handoff_text,
-            "**UNLOCKED — IN PROGRESS, NOT ACCEPTED.**",
-            "**UNLOCKED — NOT STARTED.**",
+        mutated = self._mutate_current_phase_section(
+            validator, handoff_text, "IN PROGRESS, NOT ACCEPTED.", "NOT STARTED.",
         )
         assert _NOT_CONTRADICTED in drift_names(validator, mutated)
 
     def test_a_no_package_exists_claim_against_ledger_evidence_is_detected(
         self, validator: types.ModuleType, handoff_text: str,
     ) -> None:
-        mutated = replace_once(
-            handoff_text,
-            "Packages 1–3 are committed (evidence contract, anti-loop "
-            "refusal, failure-protocol vocabulary parser); root-cause "
-            "pipeline continuation is stopped on `CANONICAL_AMBIGUITY`; no "
-            "requirement is discharged",
+        mutated = self._mutate_current_phase_section(
+            validator, handoff_text,
+            "no requirement is discharged",
             "no Phase 14 package exists and no requirement is discharged",
         )
         assert _NOT_CONTRADICTED in drift_names(validator, mutated)
