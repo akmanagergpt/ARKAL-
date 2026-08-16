@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `c6b006aa0432682b984ba83b35732c2e90b495b2` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `d5d993588947270aac243029d14703fa4193f663` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -316,7 +316,8 @@ repository, the repository wins.
 | 150 | `c6b006a` | **PHASE 14 PACKAGE 4** — `ARK-REQ-0240` (`control.policy`-owned, independent of the Package 3 `CANONICAL_AMBIGUITY`). `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority`, the same shape used for the register's other actor-boundary requirement. No transformer execution engine exists — only the confinement authority. 11 new tests prove the actor label is canonical, the delegation actually refuses, and `engineering.repair` acquired no lifecycle/release/Stable/acceptance authority. 8 gates PASS over 135 edges; NORMAL profile (no Protected Core file modified). `ARK-REQ-0240` implemented and tested but not discharged — discharge happens only at phase acceptance. Full regression 2377 passed, 0 failed |
 | 151 | `be1deb4` | **D-024 RECORDED** — human governance ruling: BP's 11-stage Failure Protocol governs the executable Phase 14 pipeline; MS's 9-stage Root-Cause sequence remains conceptual and is never a competing state machine. No alias table invented; Package 3's mechanical proof of the original ambiguity preserved unamended. Recorded in `DECISION_LOG.md` using the D-023 pattern; no new governance mechanism introduced |
 | 152 | `c12761c` | **PHASE 14 PACKAGE 5** — the executable root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`). `RepairPipelinePath` advances a repair attempt exactly one D-024-governed BP stage at a time, refusing skip/reorder/repeat/unknown/forged stages; `STATE_MACHINES.md` still declares exactly 12 machines. `resolve_attempt` derives `Accept/Reject` from `AttemptEvidence`'s two measured facts, never a caller-declared status, and records it through the unchanged `RepairBudgetLedger`. A first draft's `resolve_attempt` hit `max_parameters_per_public_function` at 11 of 6; decomposed into `AttemptEvidence`/`AttemptMeasurement`, re-verified at 6 of 6, no exception requested. 19 unit + 8 composed-journey + 5 structural tests; 8 gates PASS; 854+ passed across engineering/structural/security |
-| 153 | `d657d26` | **PHASE 14 TRACEABILITY + REPORT** — `phase_14_traceability.json` (all 7 requirements SATISFIED) and `phase_14_report.json` (the composed C-17 report: 79 targeted + 232 security + 363 structural + 2409 full-regression tests, mypy strict clean over 175 modules, all repository/phase-graph/phase0 validators PASS, PROTECTED_CORE NORMAL, 0 open findings) — the frozen candidate submitted to the gate ← HEAD at generation |
+| 153 | `d657d26` | **PHASE 14 TRACEABILITY + REPORT** — `phase_14_traceability.json` (all 7 requirements SATISFIED) and `phase_14_report.json` (the composed C-17 report: 79 targeted + 232 security + 363 structural + 2409 full-regression tests, mypy strict clean over 175 modules, all repository/phase-graph/phase0 validators PASS, PROTECTED_CORE NORMAL, 0 open findings) — the frozen candidate submitted to the gate |
+| 154 | `d5d9935` | **PHASE 14 ACCEPTANCE STATE** — `run_phase_gate.py 14 15` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission. `BUILD_STATE.md` records machine acceptance; a new status row for the next canonical phase — split out of the former "15…37" catch-all row (`UNLOCKED — NOT STARTED`, zero-denominator, F-0040) — was added so `current_work_phase()` resolves rather than returning `None`. 7/7 requirements discharged, cumulative verified 127 → 134. The dependency machine now permits the next phase, whose sole prerequisite is the just-accepted one ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -596,7 +597,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: c6b006aa0432682b984ba83b35732c2e90b495b2
+head: d5d993588947270aac243029d14703fa4193f663
 branch: main
 working_tree_clean: true
 
