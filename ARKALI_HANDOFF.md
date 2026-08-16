@@ -143,7 +143,7 @@ repository, the repository wins.
 | Phase 14 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_14_report.json`, `phase_14_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. Five atomic packages deliver C-26: the repair-fingerprint and budget-ledger evidence contract; the anti-loop repeated-strategy refusal; the mechanical proof that MS's 9-stage Root-Cause sequence and BP's 11-stage Failure Protocol could not be reconciled without governance authority; `ARK-REQ-0240`'s deterministic-transformer candidate-lifecycle confinement, delegated to the existing Phase 10 `AgentAuthority`; and, after **D-024** (the human governance ruling naming BP's 11-stage sequence the single executable Phase 14 pipeline — MS's 9-stage sequence stays the conceptual description, never a competing state machine), the executable `RepairPipelinePath` composed with the unchanged Packages 1–4 mechanisms in a real-authority journey. **7/7 requirements discharged**, all MANDATORY; cumulative verified 127 → **134**. No deterministic-transformer execution engine exists; no state machine was added, count stays 12 |
 | Phase 15 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_15_report.json`, `phase_15_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1 (Phase 13), HUMAN_GATE NOT_APPLICABLE. The Phase 15 canonical gap (zero requirements, zero contract, zero bounded context) found by prior read-only research was closed under human governance ruling **D-025**: `control.specification` was extended (never a second architecture authority) and one new contract, `C-37`, introduced. One atomic package delivers the deterministic requirement/architecture blueprint engine — goal decomposition, content-addressed provenance, ambiguity/contradiction/underspecification/missing-acceptance-criteria detection recorded as unresolved governed questions rather than invented, closed-vocabulary classification, and architecture/capability mapping resolved live from `AuthorityMap.concerns`. **11/11 requirements discharged**, all MANDATORY; cumulative verified 134 → **145**. No product code generated, no acceptance verdict rendered — both structurally proven. **Phase 16 unlocked** |
 | Phase 16 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_16_report.json`, `phase_16_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 3/3 (Phases 12, 14, 15), HUMAN_GATE NOT_APPLICABLE. Two atomic packages compose the real existing authorities under human governance ruling **D-026**: `execution_routing.py` evaluates the exact eight-tier preference order (deterministic tool → verified knowledge → local model → stronger local reviewer → cloud provider → stronger cloud specialist → multi-reviewer → human governance), composing the real `CapabilityGraph`/`RepairBudgetLedger` and honestly resolving `NOT_CONFIGURED` for every tier whose owning authority is unbuilt or has no live runtime instance; `product_generation.py` deterministically scaffolds a real, importable, executable module from a fully-resolved C-37 blueprint, refusing any blueprint carrying an unresolved question. A real orchestration-depth violation (`engineering.candidate`'s chain was already 4 of 4) was answered by a structural `Protocol` rather than an import. **3/3 requirements discharged**, all MANDATORY; cumulative verified 145 → **148**. No AI provider contacted, no Golden Factory Acceptance claimed (Phase 30's own obligation). **Phase 17 unlocked** |
-| Phase 17 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Visual Workflow Studio. `GovernanceState.current_work_phase()` returns `17`. `RequirementRegister.for_phase("17")` returns **9** entries — `ARK-REQ-0062`–`0065`, `0328`–`0332`. Prerequisites Phases 7, 8 and 13 are all MACHINE-ACCEPTED. Packages 1 (C-20 graph domain model) and 2 (persistence/revision store — `WorkflowGraphStore`, PEP-enforced, immutable revisions, no executor, no surface yet) are committed; no requirement is discharged yet, so cumulative verified stays **148** until Phase 17 delivers evidence a requirement's owning evidence keys require |
+| Phase 17 | **UNLOCKED — IN PROGRESS, NOT ACCEPTED** ← current work. Visual Workflow Studio. `GovernanceState.current_work_phase()` returns `17`. `RequirementRegister.for_phase("17")` returns **9** entries — `ARK-REQ-0062`–`0065`, `0328`–`0332`. Prerequisites Phases 7, 8 and 13 are all MACHINE-ACCEPTED. Packages 1–4 are committed (C-20 graph domain model; persistence/revision store; the ADR-0004 derived execution plan; `control.policy`'s HUMAN APPROVAL enforced policy stop, ARK-REQ-0330) — no executor, no surface yet; no requirement is discharged yet, so cumulative verified stays **148** until Phase 17 delivers evidence a requirement's owning evidence keys require |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced |
@@ -429,7 +429,7 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Visual Workflow Studio** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 17) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `17`; Packages 1 (C-20 graph domain model) and 2 (persistence/revision store) are committed, no requirement is discharged yet — discharge needs integ/e2e evidence across the executor and the Studio surface too, not persistence tests alone |
+| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `17`; Packages 1–4 are committed (graph domain model, persistence, derived execution plan, `control.policy` approval gate), no requirement is discharged yet — discharge needs integ/e2e evidence across the executor and the Studio surface too |
 | Prerequisites | Phases **7**, **8** and **13** — all MACHINE-ACCEPTED, which is why the dependency machine permits 17 and only 17 |
 | Contract IDs | `C-20` (canonical workflow graph document), per `CONTRACT_INVENTORY.md` and the matrix `Produces` column |
 | Human gate | none (matrix Gate column `—`) |
@@ -437,7 +437,9 @@ Derived from authoritative artifacts, not from memory.
 | What Phase 16 leaves ready | The accepted deterministic execution-tier routing decision and real product-generation engine, composing `CapabilityGraph`, `RepairBudgetLedger` and the C-37 blueprint. Phase 16 built no execution engine and no workflow concept; Phase 17 is unrelated in subject matter (workflow graph execution, not the AI factory) |
 | What Package 1 delivered | `execution.workflow`'s `graph_vocabulary.py` (the 10 node kinds + 10 control constructs, parsed live from VDC §Workflow identity, never hard-coded), `graph_model.py` (`WorkflowNode`/`WorkflowEdge`/`WorkflowGraphDocument` value objects, content-addressed identity, graph-validity refusals, semver bump arithmetic) and `errors.py`. Pure domain model: no persistence, no executor, no HTTP surface |
 | What Package 2 delivered | `records.py` (`WorkflowRecord` + immutable `WorkflowRevisionRecord`, the `JobCheckpointRecord` before_update/before_delete refusal idiom), `graph_store.py` (`WorkflowGraphStore`, mirroring `JobStore`: every read/write goes through a real injected PEP with `READ_FILE`/`WRITE_WORKSPACE_FILE`; `revision_number` and `semver` are derived from stored rows, never supplied; `document_of` recomputes the content hash on every read and refuses a stored/recomputed mismatch), and Alembic migration `0008_workflow_graph`. `graph_model.py` gained `to_dict`/`from_dict` (round-trips through `build`, so a stored document is re-validated on every read). Closes the `execution.workflow`-is-unenforced gap Package 1 opened |
-| What remains unbuilt | The ADR-0004 derived execution plan, `control.policy`'s human-approval gate (ARK-REQ-0330), the executor (composing `execution.durable`), the `surfaces.command` HTTP surface, the Studio frontend, and the `acceptance.engine` coverage check (ARK-REQ-0331) |
+| What Package 3 delivered | `execution_plan.py`: `CompiledExecutionPlan.derive` (deterministic, hash-bound view of a `WorkflowGraphDocument`) and `require_fresh` (refuses `StaleDerivedRepresentation` the moment the bound hash no longer matches the current canonical revision — ADR-0004) |
+| What Package 4 delivered | `control.policy`'s `WorkflowApprovalGate` (ARK-REQ-0330): `assert_may_record` refuses any actor in `stable_mutation.prohibited_actors` (already names `workflow`); `is_enforced_approval` additionally refuses a non-`APPROVED` decision or one bound to a stale revision. Additive, no PDP/`policy_contract.py` change |
+| What remains unbuilt | The executor (composing `execution.durable`, the canonical `WorkflowExecution` machine, `CompiledExecutionPlan` and `WorkflowApprovalGate`), the `surfaces.command` HTTP surface, the Studio frontend, and the `acceptance.engine` coverage check (ARK-REQ-0331) |
 | Architecture hazard | None realised. `max_orchestration_depth` remains **4 of 4** on its unrelated path; Packages 1–2 added five new edges into `kernel.contracts`/`kernel.persistence`/`control.policy` (all legal lower-layer edges), none near a ceiling, no new sibling edge |
 
 **Phase 17 is unlocked and in progress.** Its denominator is **9** and it
@@ -452,52 +454,52 @@ and IN PROGRESS.** The live denominator — 9 requirements.
 session for Phase 17. It owns contract `C-20` (canonical workflow graph
 document) per `CONTRACT_INVENTORY.md`.
 
-**Package 1 (C-20 graph domain model) is committed** —
-`backend/arkali/execution/workflow/graph_vocabulary.py` (the 10 canonical
-node kinds + 10 control constructs, parsed live from
-`docs/ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md` §"Workflow
-Studio execution identity", never hard-coded), `graph_model.py`
-(`WorkflowNode`/`WorkflowEdge`/`WorkflowGraphDocument`, content-addressed via
-`kernel.contracts.content_address`, graph-validity refusals, semver bump
-arithmetic) and `errors.py`.
+**Packages 1–4 are committed.** Package 1: `graph_vocabulary.py` (10 node
+kinds + 10 control constructs, parsed live from the VDC), `graph_model.py`
+(`WorkflowNode`/`WorkflowEdge`/`WorkflowGraphDocument`, content-addressed,
+graph-validity refusals, semver bump), `errors.py`. Package 2: `records.py` +
+`graph_store.py` (`WorkflowGraphStore`, PEP-enforced reads/writes,
+`revision_number`/`semver` derived from stored rows, content hash recomputed
+and verified on every read), migration `0008_workflow_graph`. **Lesson
+recorded once, do not repeat**: Package 1 alone left `execution.workflow`
+with no PEP-taking call site, which correctly failed
+`test_every_built_execution_package_enforces_and_the_rest_are_absent`
+(`backend/tests/security/test_pep_and_bypass.py`) — always run the full test
+suite, not just the new package's own tests, before committing. Package 3:
+`execution_plan.py` (`CompiledExecutionPlan.derive`, hash-bound to
+`content_hash`; `require_fresh` refuses `StaleDerivedRepresentation` — ADR-0004
+— proven both as a pure property and against a real store across a second
+published revision). Package 4: `control.policy`'s `WorkflowApprovalGate`
+(ARK-REQ-0330) — `assert_may_record` refuses any actor in
+`stable_mutation.prohibited_actors` (already names `workflow`);
+`is_enforced_approval` refuses a non-`APPROVED` decision or one bound to a
+stale revision. Additive to control.policy, no PDP/`policy_contract.py`
+change, no new cross-context edge from either Package 3 or 4. No requirement
+is discharged yet: every ARK-REQ-0062 … 0065/0328 … 0332 evidence key needs
+`integ`/`e2e`/`prop`/`sec` evidence only the executor and surfaces can
+produce.
 
-**Package 2 (persistence and revision store) is committed** — `records.py`
-(`WorkflowRecord` + immutable `WorkflowRevisionRecord`), `graph_store.py`
-(`WorkflowGraphStore`: every read/write goes through a real injected PEP —
-`READ_FILE`/`WRITE_WORKSPACE_FILE` — `revision_number`/`semver` derived from
-stored rows never supplied, `document_of` recomputes the content hash on
-every read and refuses a stored/recomputed mismatch), Alembic migration
-`0008_workflow_graph`, and `graph_model.py`'s new `to_dict`/`from_dict`
-(round-trips through `build`, re-validating on every read). This closed a
-real gap Package 1 opened: `test_every_built_execution_package_enforces_and_the_rest_are_absent`
-(`backend/tests/security/test_pep_and_bypass.py`) correctly failed the
-moment `execution.workflow` held modules with no PEP-taking call site — the
-handoff refresh for Package 1 undercounted this; do not repeat that miss —
-run the full test suite, not just the new package's own tests, before
-committing. Still no derived/compiled execution plan, no `control.policy`
-human-approval gate, no executor, no HTTP surface, no frontend. No
-requirement is discharged yet: every ARK-REQ-0062 … 0065/0328 … 0332
-evidence key needs `integ`/`e2e`/`prop`/`sec` evidence persistence alone
-cannot produce.
-
-**NEXT EXACT ACTION is Package 3 — the ADR-0004 derived execution plan and
-hash-binding.** A `CompiledExecutionPlan` deterministically derived from a
-`WorkflowGraphDocument`, bound to its `content_hash`, refusing execution
-(`StaleDerivedRepresentation`, already declared in `errors.py`) when the
-bound hash no longer matches the canonical revision it was derived from —
-proving ARK-REQ-0064/0065/0332. Then Package 4 (`control.policy`'s new,
-additive human-approval gate for ARK-REQ-0330 — `control.policy` is
-Protected Core but its Stable-mutation-requires-HUMAN-GATE-2 restriction is
-`effective_from` Stable Core's first promoted revision, which has not
-happened; Phases 10/12/13 already extended `control.policy` with zero human
-gates, so this is ordinary work), Package 5 (the executor, composing
-`execution.durable` via the pre-declared `execution.workflow →
-execution.durable` sibling edge), Package 6 (the `surfaces.command`
-`workflow.py` router), Package 7 (the frontend Studio, `@xyflow/react` +
-`features/workflow/`), Package 8 (the `acceptance.engine` coverage check for
-ARK-REQ-0331), then traceability/C-17 report/gate. Full package plan and its
-canonical grounding are in the Package 1 commit message and this session's
-discovery report; re-derive rather than re-litigate it.
+**NEXT EXACT ACTION is Package 5 — the executor.** Composes, under
+`execution.workflow`: `WorkflowGraphStore` (latest/specific revision),
+`CompiledExecutionPlan.derive` + `require_fresh` (refuse before every
+dispatch), the canonical `WorkflowExecution` state machine (Phase 3,
+unchanged), `execution.durable`'s `JobStore`/`JobExecution` via the
+pre-declared `execution.workflow → execution.durable` sibling edge (each
+non-control-flow node dispatches as one durable job), and
+`control.policy.WorkflowApprovalGate` (populates
+`context["human_approval_recorded"]` only from a real verified approval,
+never a caller-supplied boolean). Must produce genuine execution evidence for
+all 10 node kinds and 10 control constructs (ARK-REQ-0329/0331) without
+building a second AI/provider invocation engine (out of `execution.workflow`'s
+authority — provider-touching kinds dispatch as durable jobs only) and
+without letting a RELEASE-kind node touch Stable directly (`workflow` is a
+named prohibited actor). Add `test_workflow_authority.py` mirroring
+`test_durable_authority.py`'s structural-boundary idiom. Then Package 6 (the
+`surfaces.command` `workflow.py` router), Package 7 (the frontend Studio,
+`@xyflow/react` + `features/workflow/`), Package 8 (the `acceptance.engine`
+coverage check for ARK-REQ-0331), then traceability/C-17 report/gate. Full
+package plan and its canonical grounding are in the Package 1 commit message
+and this session's discovery report; re-derive rather than re-litigate it.
 
 **How Phase 16 was resolved, for context (its own discharged requirements
 are not this section's subject).** Phase 16's actual three-entry denominator
