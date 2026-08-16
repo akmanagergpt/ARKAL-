@@ -140,11 +140,12 @@ repository, the repository wins.
 | Phase 11 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_11_report.json`, `phase_11_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, PROTECTED_CORE PASS (no member touched), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **2/2 requirements discharged** — `ARK-REQ-0066` and `ARK-REQ-0067`, both MANDATORY — taking cumulative verified 91 → **93**. Four atomic packages deliver C-24: canonical graph/view vocabularies, the deterministic sourced graph store, complete Digital Twin composition, and the composed real-source journey plus acceptance record. The graph and twin remain derived and always refuse authoritative questions. **Phase 12 unlocked** |
 | Phase 12 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_12_report.json`, `phase_12_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 13 recorded runs, **PROTECTED_CORE COMPLETE** over the whole six-package candidate (`control.policy`, `lifecycle.release`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **7/7 requirements discharged** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY — taking cumulative verified 93 → **100**. C-25 delivers the isolated candidate workspace, immutable content-addressed manifest and assembly report, all eight semantic checks, the authority-owned Stable progression boundary and direct-mutation refusal. No Stable write, verification, acceptance or promotion capability is claimed. **Phase 13 unlocked** |
 | Phase 13 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_13_report.json`, `phase_13_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS, PROTECTED_CORE COMPLETE (`acceptance.engine`, `control.policy`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Six atomic packages deliver C-16 and the Acceptance Engine path. **27/27 requirements discharged**; cumulative verified 100 → **127**. No release, Stable-promotion or human-gate authority is claimed |
-| Phase 14 | **IN PROGRESS, NOT ACCEPTED — root-cause pipeline work stopped on CANONICAL_AMBIGUITY** ← current work. Repair / Root Cause / Convergence (C-26). `GovernanceState.current_work_phase()` returns `14`. **Package 1**: the C-26 repair-fingerprint and six-dimension budget-ledger contract. **Package 2**: `RepairBudgetLedger.record` refuses an attempt whose (failure signature, root-cause class, strategy) repeats one already recorded — `RepeatedFailedStrategyError`, raised before the budget math runs — structural, never a classification of `outcome`. **Package 3**: `failure_protocol.py` parses both `ARK-REQ-0086`'s MS §Root-Cause (9 stages) and `ARK-REQ-0238`'s BP §Failure protocol (11 stages) and attempts the identical count-then-abbreviation reconciliation `harness_elements.py` established in Phase 10 — **proven, by a passing test against the live documents, to refuse**: the counts disagree (9 vs 11) and the mismatched stages share no word root. `Reproduce`, `Hypotheses`, `Experiment`, `Root Cause`, `Regression` are the only stages identical in both. No mapping was invented. `docs/contracts/repair.md` records the exact conflicting clauses and the minimal governance decision needed. **Package 4**: `ARK-REQ-0240` (`control.policy`-owned, independent of the pipeline ambiguity) — `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates to `control.policy`'s existing Phase 10 `AgentAuthority`, the same shape `ARK-REQ-0051` already uses; `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6. No transformer execution engine exists — only the confinement authority one must consult. Together the four packages run no root-cause pipeline, alter no candidate, choose no next strategy, execute no transformer against real content, and discharge nothing. No traceability record, no report, no phase gate run. Denominator is **7**, all MANDATORY, derived with `RequirementRegister.for_phase("14")`; cumulative verified stays **127** |
+| Phase 14 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_14_report.json`, `phase_14_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. Five atomic packages deliver C-26: the repair-fingerprint and budget-ledger evidence contract; the anti-loop repeated-strategy refusal; the mechanical proof that MS's 9-stage Root-Cause sequence and BP's 11-stage Failure Protocol could not be reconciled without governance authority; `ARK-REQ-0240`'s deterministic-transformer candidate-lifecycle confinement, delegated to the existing Phase 10 `AgentAuthority`; and, after **D-024** (the human governance ruling naming BP's 11-stage sequence the single executable Phase 14 pipeline — MS's 9-stage sequence stays the conceptual description, never a competing state machine), the executable `RepairPipelinePath` composed with the unchanged Packages 1–4 mechanisms in a real-authority journey. **7/7 requirements discharged**, all MANDATORY; cumulative verified 127 → **134**. No deterministic-transformer execution engine exists; no state machine was added, count stays 12 |
+| Phase 15 | **UNLOCKED — NOT STARTED** ← current work. Requirement + Architecture Intelligence. `GovernanceState.current_work_phase()` returns `15`. `RequirementRegister.for_phase("15")` returns **0** entries and `CONTRACT_INVENTORY.md` assigns it no contract row — one of the four canonical zero-denominator phases (8, 15, 33, 34) F-0040 already accounted for. Prerequisite Phase 13 is MACHINE-ACCEPTED |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **127** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + **27 Phase 13**), reconciled by check C6 against each phase's traceability record. Of the 127, **126 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
+| Cumulative verified | **134** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + **7 Phase 14**), reconciled by check C6 against each phase's traceability record. Of the 134, **133 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phases 8 and 15 add none — their denominators are zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
@@ -312,7 +313,10 @@ repository, the repository wins.
 | 147 | `636d88e` | **PRE-PHASE-14-PACKAGE-3 GOVERNANCE REPAIR** — row 144's own claim that `error_base.py` fell to fan-in 11 was wrong: only `engineering/repair/errors.py` had actually been redirected, leaving the true fan-in at 15. Surfaced honestly when `failure_protocol.py`'s new import re-hit 16; the four omitted redirects (`control/registry/provider/errors.py`, `engineering/agent/errors.py`, `engineering/candidate/errors.py`, `engineering/codeintel/errors.py`) are completed here. `error_base.py` now genuinely at fan-in 12 of 15. `DECISION_LOG.md` records the correction. No requirement discharged, no phase state changed, no phase gate run |
 | 148 | `58b2304` | **PHASE 14 PACKAGE 3** — `failure_protocol.py` parses `ARK-REQ-0086`'s MS §Root-Cause (9 stages) and `ARK-REQ-0238`'s BP §Failure protocol (11 stages) and attempts the Phase-10 harness-element reconciliation algorithm; proven, against the live documents, to refuse — counts disagree (9 vs 11), mismatched stages share no word root. No mapping invented. `docs/contracts/repair.md` records the exact conflicting clauses. **CANONICAL_AMBIGUITY**: `ARK-REQ-0086`/`ARK-REQ-0238` blocked pending a governance ruling. No requirement discharged, no phase gate run. Cumulative verified stays 127 |
 | 149 | `4845830` | **§8 ANTI-DRIFT REPAIR** — `BUILD_STATE.md`'s machine-parsed Phase 14 status row had never advanced past `UNLOCKED — NOT STARTED` across Packages 1–3, and §8 mirrored it; the existing declared-state check only confirmed §8 agreed with that same stale cell. Both corrected to `IN PROGRESS, NOT ACCEPTED`, Packages 1–3 committed, CANONICAL_AMBIGUITY noted. A new derived `check_handoff.py` control cross-checks the current-phase section against the accepted-commit-history ledger and the live summary's own per-phase row — two independent repository-derived sources, current phase never hard-coded — and three tests prove it silent on the corrected document and catching both the exact stale claims, verified against the pre-fix commit `8800daa`. No Phase 14 implementation changed, CANONICAL_AMBIGUITY not resolved, Packages 1–3 untouched. Full regression 2366 passed, 0 failed |
-| 150 | `c6b006a` | **PHASE 14 PACKAGE 4** — `ARK-REQ-0240` (`control.policy`-owned, independent of the Package 3 `CANONICAL_AMBIGUITY`). `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority`, the same shape used for the register's other actor-boundary requirement. No transformer execution engine exists — only the confinement authority. 11 new tests prove the actor label is canonical, the delegation actually refuses, and `engineering.repair` acquired no lifecycle/release/Stable/acceptance authority. 8 gates PASS over 135 edges; NORMAL profile (no Protected Core file modified). `ARK-REQ-0240` implemented and tested but not discharged — discharge happens only at phase acceptance. Full regression 2377 passed, 0 failed ← HEAD at generation |
+| 150 | `c6b006a` | **PHASE 14 PACKAGE 4** — `ARK-REQ-0240` (`control.policy`-owned, independent of the Package 3 `CANONICAL_AMBIGUITY`). `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority`, the same shape used for the register's other actor-boundary requirement. No transformer execution engine exists — only the confinement authority. 11 new tests prove the actor label is canonical, the delegation actually refuses, and `engineering.repair` acquired no lifecycle/release/Stable/acceptance authority. 8 gates PASS over 135 edges; NORMAL profile (no Protected Core file modified). `ARK-REQ-0240` implemented and tested but not discharged — discharge happens only at phase acceptance. Full regression 2377 passed, 0 failed |
+| 151 | `be1deb4` | **D-024 RECORDED** — human governance ruling: BP's 11-stage Failure Protocol governs the executable Phase 14 pipeline; MS's 9-stage Root-Cause sequence remains conceptual and is never a competing state machine. No alias table invented; Package 3's mechanical proof of the original ambiguity preserved unamended. Recorded in `DECISION_LOG.md` using the D-023 pattern; no new governance mechanism introduced |
+| 152 | `c12761c` | **PHASE 14 PACKAGE 5** — the executable root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`). `RepairPipelinePath` advances a repair attempt exactly one D-024-governed BP stage at a time, refusing skip/reorder/repeat/unknown/forged stages; `STATE_MACHINES.md` still declares exactly 12 machines. `resolve_attempt` derives `Accept/Reject` from `AttemptEvidence`'s two measured facts, never a caller-declared status, and records it through the unchanged `RepairBudgetLedger`. A first draft's `resolve_attempt` hit `max_parameters_per_public_function` at 11 of 6; decomposed into `AttemptEvidence`/`AttemptMeasurement`, re-verified at 6 of 6, no exception requested. 19 unit + 8 composed-journey + 5 structural tests; 8 gates PASS; 854+ passed across engineering/structural/security |
+| 153 | `d657d26` | **PHASE 14 TRACEABILITY + REPORT** — `phase_14_traceability.json` (all 7 requirements SATISFIED) and `phase_14_report.json` (the composed C-17 report: 79 targeted + 232 security + 363 structural + 2409 full-regression tests, mypy strict clean over 175 modules, all repository/phase-graph/phase0 validators PASS, PROTECTED_CORE NORMAL, 0 open findings) — the frozen candidate submitted to the gate ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -400,97 +404,63 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 14
+## 8. Current phase contract — Phase 15
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Repair / Root Cause / Convergence** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 14) |
-| Status | **UNLOCKED — IN PROGRESS, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `14`. Packages 1–4 are committed (evidence contract, anti-loop refusal, failure-protocol vocabulary parser, `ARK-REQ-0240` confinement authority); root-cause pipeline continuation is stopped on `CANONICAL_AMBIGUITY`; no requirement is discharged |
-| Prerequisites | Phase **13** — MACHINE-ACCEPTED, which is why the dependency machine permits 14 and only 14 |
-| Contract IDs | **C-26** — STRICT `EVD` repair fingerprint + budget ledger, owned and produced by `engineering.repair`, consumed by acceptance and knowledge; verification responsibility is anti-loop property tests |
+| Name | **Requirement + Architecture Intelligence** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15) |
+| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `15`; no Phase 15 package exists and no requirement is discharged |
+| Prerequisites | Phase **13** — MACHINE-ACCEPTED, which is why the dependency machine permits 15 and only 15 |
+| Contract IDs | none — `CONTRACT_INVENTORY.md` assigns Phase 15 no contract row |
 | Human gate | none (matrix Gate column `—`) |
-| ARK-REQ IDs | derive with `RequirementRegister.for_phase("14")` — **7** MANDATORY entries: bounded repair loops, root-cause flow, fingerprints, six budget dimensions, failure protocol, anti-loop enforcement and candidate-lifecycle confinement |
-| What Phase 13 leaves ready | The accepted immutable C-16 evidence graph, register-derived applicability and coverage, Passport accounting, policy boundaries and evidence-derived capability verdict |
-| What Packages 1–4 built | `RepairFingerprint` and `RepairBudgetLedger` (C-26 evidence); `RepairBudgetLedger.record`'s repeated-strategy refusal (anti-loop); `failure_protocol.py`'s proof that MS's 9-stage and BP's 11-stage pipelines do not reconcile; `deterministic_transformer.py`'s `DeterministicTransformer.assert_confined_to_candidate_lifecycle`, delegating `ARK-REQ-0240` to `control.policy`'s existing `AgentAuthority` (Phase 10). None discharges a requirement |
-| What remains blocked or unbuilt | The root-cause pipeline itself (`ARK-REQ-0086`, `ARK-REQ-0238`) cannot proceed until `CANONICAL_AMBIGUITY` is resolved by governance ruling; no transformer execution engine exists — Package 4 built only the confinement authority one must consult; no traceability, report or acceptance evidence exists |
-| Architecture hazard | `engineering.repair` must consume evidence without becoming an acceptance authority. Repair must remain inside the candidate lifecycle; `control.policy` owns that confinement. Do not add release or Stable-mutation authority |
+| ARK-REQ IDs | `RequirementRegister.for_phase("15")` returns **0** entries — a zero-denominator phase, one of four the canonical set declares (8, 15, 33, 34; F-0040) |
+| What Phase 14 leaves ready | The accepted C-26 evidence contract, anti-loop refusal, the D-024-governed executable failure-protocol pipeline and `ARK-REQ-0240`'s deterministic-transformer confinement authority |
+| What remains unbuilt | Everything — Phase 15 has not started. A zero-denominator phase still owes a real candidate, a `claims: []` traceability record and one gate submission (the Phase 8 precedent), not an assumed pass |
+| Architecture hazard | None identified yet — Phase 15 has not been read in detail. Do not assume its shape from this row; read `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15 and any canonical section naming "Requirement + Architecture Intelligence" before implementing |
 
-**Phase 14 is unlocked, in progress and not accepted.** Its denominator is
-**7** and none is discharged. Packages 1–4 are committed; further root-cause
-pipeline work is stopped on `CANONICAL_AMBIGUITY` (see §9). Phase 13 is
-MACHINE-ACCEPTED.
+**Phase 15 is unlocked and not started.** Its denominator is **0** and it
+owns no contract. Phase 14 is MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Root-cause pipeline work (`ARK-REQ-0086`/`ARK-REQ-0238`) is stopped on
-`CANONICAL_AMBIGUITY`; `ARK-REQ-0240` is now built and independently
-unblocked.** Packages 1–4 (C-26 evidence contract, anti-loop refusal,
-failure-protocol vocabulary parser, deterministic-transformer confinement)
-are complete and committed; `docs/contracts/repair.md` records all four.
-None discharges anything — discharge happens only at phase acceptance. The
-live denominator — 7 requirements (`ARK-REQ-0029`, `0086`, `0087`, `0088`,
-`0238`, `0239`, `0240`).
+**Phase 14 is MACHINE-ACCEPTED. Phase 15 (Requirement + Architecture
+Intelligence) is unlocked and not started.** The live denominator — 0
+requirements. `RequirementRegister.for_phase("15")` returns **0** entries
+and `CONTRACT_INVENTORY.md` assigns it no contract row — a zero-denominator
+phase, one of four the canonical set declares (8, 15, 33, 34; F-0040). A
+zero denominator does not mean no work and does not mean an assumed pass:
+Phase 8's precedent still owed a real candidate, a `claims: []`
+traceability record and one genuine gate submission. Read
+`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15 and any canonical section
+naming "Requirement + Architecture Intelligence" before forming a plan —
+this handoff has not yet done that reading and states no opinion on what
+Phase 15 requires beyond its zero requirement-register denominator.
 
-**`ARK-REQ-0240` (Package 4).** BP §Deterministic repair's "transformers
-execute inside the candidate lifecycle only" is `AUTHORITY_MAP.yaml`
-`stable_mutation.prohibited_actors`'s `deterministic_transformer` entry,
-already declared for MS §Constitution 6 before this phase existed; since
-`direct_mutation_permitted_by` is empty by design, confinement to candidate
-and refusal of a direct Stable write are the same rule.
-`engineering.repair.deterministic_transformer.DeterministicTransformer`
-(identity only — name, version) delegates that refusal to `control.policy`'s
-existing `AgentAuthority` (Phase 10, Protected Core), the same shape
-`AgentRole` already uses for its own actor-boundary requirement. No
-transformer execution engine exists; this is the confinement authority one
-must consult. 11 tests in
-`backend/tests/structural/test_deterministic_transformer_confinement.py`
-prove the actor label is genuinely canonical, the delegation actually
-refuses, and `engineering.repair` acquired no lifecycle, release, Stable or
-acceptance authority.
+**How Phase 14 was resolved, for context (its own discharged requirements
+are not this section's subject).** Root-cause pipeline work was blocked on
+`CANONICAL_AMBIGUITY` after Package 3 mechanically proved MS's 9-stage
+Root-Cause sequence and BP's 11-stage Failure Protocol could not be
+reconciled under the Phase-10 harness-element algorithm (counts disagree,
+9 vs 11; the mismatched stages share no word root). **D-024**
+(`docs/build/DECISION_LOG.md`) then resolved it prospectively by human
+governance ruling: BP's 11-stage sequence is the single executable Phase 14
+pipeline authority; MS's 9-stage sequence remains the conceptual
+description and was never implemented as a competing state machine
+(`STATE_MACHINES.md` still declares exactly 12). No positional alias table
+was invented, and Package 3's original mechanical proof of the ambiguity
+remains preserved unamended as the honest historical record. Package 5 then
+built the executable pipeline path under that ruling, composed with the
+unchanged Packages 1–4 mechanisms (evidence contract, anti-loop refusal,
+the deterministic-transformer confinement authority) in a real-authority
+journey, and the Phase 14 gate returned `PHASE_ACCEPTED_BY_MACHINE` on the
+first and only
+submission.
 
-**The blocking ambiguity, proven mechanically, not guessed at.** MS
-§Root-Cause states Reproduce→Observe→Evidence→Hypotheses→Experiment→Root
-Cause→Minimal Repair→Targeted Acceptance→Regression (9 stages, `ARK-REQ-0086`);
-BP §Failure protocol states Reproduce→Evidence→Classify→Hypotheses→
-Experiment→Root Cause→Minimal Change→Candidate→Targeted Tests→Regression→
-Accept/Reject (11 stages, `ARK-REQ-0238`). `failure_protocol.py` attempts the
-identical count-then-abbreviation reconciliation `harness_elements.py`
-established in Phase 10 for this exact shape of problem, and
-`test_failure_protocol.py::TestTheRealDocumentsGenuinelyDoNotReconcile`
-proves — against the live documents, not a fixture — that it refuses: the
-counts disagree (9 vs 11), and `Observe`/`Evidence` (MS) share no word root
-with `Evidence`/`Classify` (BP) at the same positions, while BP names two
-explicit stages (`Candidate`, `Accept/Reject`) MS's text never names at all.
-`Reproduce`, `Hypotheses`, `Experiment`, `Root Cause` and `Regression` are the
-only stages identical in both. **No mapping was invented** — doing so would
-be the alias-table defect (F-0013 wearing a different hat)
-`harness_elements.py`'s own docstring warns against, and neither document may
-be preferred (`ARK-REQ-0086` cites MS by name; `ARK-REQ-0238` cites BP by
-name, both MANDATORY).
-
-**The minimal governance decision this needs**, from whoever holds authority
-to interpret canonical text — not the implementing actor: either (a) rule
-which document's stage vocabulary governs the operational, machine-enforced
-pipeline, or (b) amend one canonical document so the two texts genuinely
-reconcile under the established algorithm. This is the D-023 shape (Phase 9
-Package 3 stopped at Stage 1 and reported an ambiguity rather than inventing
-a resolution). Until that ruling exists, no root-cause pipeline orchestrator
-can be built for `ARK-REQ-0086`/`ARK-REQ-0238` without inventing content
-neither document states.
-
-**`ARK-REQ-0240` is built (Package 4, above).** `ARK-REQ-0088`'s
-six-dimension budget **enforcement** is substantially covered by Package 1's
-ledger. Reuse Phase 13's accepted evidence and policy authorities rather than
-copying them. **What remains for Phase 14 acceptance**: the root-cause
-pipeline itself, blocked on `CANONICAL_AMBIGUITY` above — there is no other
-open, unblocked Phase 14 work this handoff is aware of.
-
-
-**Do not re-run the Phase 13 gate**, or any earlier accepted phase gate. A second
-run against an accepted phase returns `AWAITING_RESCORING_AUTHORITY` under
-GOV-001 — the rule working, not a fault.
+**Do not re-run the Phase 14 gate, the Phase 13 gate, or any earlier accepted
+phase gate.** A second run against an accepted phase returns
+`AWAITING_RESCORING_AUTHORITY` under GOV-001 — the rule working, not a fault.
 
 **What prior phases established that should be reused, not rebuilt.** Governed
 vocabularies live only in the canonical documents and are parsed at call time,
@@ -546,7 +516,8 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
-| Refresh reason | **PHASE 14 PACKAGE 4 — `ARK-REQ-0240`** — `control.policy`-owned, independent of Package 3's `CANONICAL_AMBIGUITY`. `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6, before Phase 14 existed; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority` — reused, not duplicated, the same shape the register's other actor-boundary requirement already uses. No transformer execution engine exists; this package built only the confinement authority a future one must consult. 11 new tests prove the actor label is genuinely canonical (derived from the live authority map), the delegation actually refuses (negative control: repair cannot escape the candidate lifecycle), and `engineering.repair` imports no lifecycle/acceptance/registry authority, defines no promote/rollback/stable-write operation, and carries no second copy of the prohibited-actor list. Two mutation tests in `test_handoff_transition.py` were hardened to anchor within the extracted current-phase section rather than exact prose, since package-count changes would otherwise keep breaking them. `BUILD_STATE.md` changed, so the §12 refresh is mechanically required. Live architecture is re-derived at **135** cross-context edges (`engineering.repair` → `control.policy.agent_authority`, rank 4 calling rank 1, `agent_authority.py` fan-in rises from 1 to 2). Classified **NORMAL** by `select_profile` — no Protected Core file was modified, only called into. **`ARK-REQ-0240` is implemented and tested but not discharged** — discharge happens only at phase acceptance, which this package does not run; `ARK-REQ-0086`/`ARK-REQ-0238` remain blocked on `CANONICAL_AMBIGUITY`, unattempted. Full regression: 2377 passed, 0 failed. Cumulative verified remains **127**, Phase 14 is IN PROGRESS and no phase gate was run |
+| Refresh reason | **PHASE 14 MACHINE ACCEPTANCE** — Package 5 delivered the executable root-cause pipeline (`RepairPipelinePath`, D-024-governed) composed with the unchanged Packages 1–4 mechanisms; the traceability record and C-17 report were composed and frozen; `run_phase_gate.py 14 15` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission.** C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 135 edges. **7/7 requirements discharged**, all MANDATORY, taking cumulative verified 127 → **134**. `GovernanceState.current_work_phase()` now returns **15** (Requirement + Architecture Intelligence, a zero-denominator phase per F-0040) — adding its status row was mechanically required, the same reason Phase 9B's and Phase 11's own rows were added in their unlocking commits, or `current_work_phase()` returns `None` and every governance control reddens. §8 and §9 are rewritten for Phase 15; §3's Phase 14 row states its acceptance; the live architecture summary is unchanged at 135 edges. No Phase 15 implementation was begun |
+| Previously refreshed for | **PHASE 14 PACKAGE 4 — `ARK-REQ-0240`** — `control.policy`-owned, independent of Package 3's `CANONICAL_AMBIGUITY`. `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6, before Phase 14 existed; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority` — reused, not duplicated, the same shape the register's other actor-boundary requirement already uses. No transformer execution engine exists; this package built only the confinement authority a future one must consult. 11 new tests prove the actor label is genuinely canonical (derived from the live authority map), the delegation actually refuses (negative control: repair cannot escape the candidate lifecycle), and `engineering.repair` imports no lifecycle/acceptance/registry authority, defines no promote/rollback/stable-write operation, and carries no second copy of the prohibited-actor list. Two mutation tests in `test_handoff_transition.py` were hardened to anchor within the extracted current-phase section rather than exact prose, since package-count changes would otherwise keep breaking them. `BUILD_STATE.md` changed, so the §12 refresh is mechanically required. Live architecture is re-derived at **135** cross-context edges (`engineering.repair` → `control.policy.agent_authority`, rank 4 calling rank 1, `agent_authority.py` fan-in rises from 1 to 2). Classified **NORMAL** by `select_profile` — no Protected Core file was modified, only called into. **`ARK-REQ-0240` is implemented and tested but not discharged** — discharge happens only at phase acceptance, which this package does not run; `ARK-REQ-0086`/`ARK-REQ-0238` remain blocked on `CANONICAL_AMBIGUITY`, unattempted. Full regression: 2377 passed, 0 failed. Cumulative verified remains **127**, Phase 14 is IN PROGRESS and no phase gate was run |
 | Previously refreshed for | **§8 ANTI-DRIFT REPAIR** — repository truth verification found `BUILD_STATE.md`'s machine-parsed Phase 14 status row (the "## Phase status" table `GovernanceState._parse_phases` actually reads) had never advanced past `UNLOCKED — NOT STARTED` across Packages 1–3; §8 mirrored the same stale cell it was already checked against, so the pre-existing "declared state agrees with itself" control passed while both sides were wrong. Both corrected to `UNLOCKED — IN PROGRESS, NOT ACCEPTED`, naming Packages 1–3 and the CANONICAL_AMBIGUITY stop. A new derived `check_handoff.py` control cross-checks the current-phase section against two independent repository-derived sources instead — the accepted-commit-history ledger (rows already name their phase by the `PHASE <n> ...` convention used for every phase) and the live "Current verified state" summary's own per-phase row — with the current phase number derived from `GovernanceState`, never hard-coded. Three new tests in `test_handoff_transition.py` prove it: silent against the corrected document, and catching both the exact stale claims when reproduced as mutations, verified directly against the pre-fix commit `8800daa`. `BUILD_STATE.md` changed, so the §12 refresh is mechanically required. **No Phase 14 implementation changed, CANONICAL_AMBIGUITY is not resolved, and Packages 1–3 are untouched.** Full regression: 2366 passed, 0 failed; all 8 architecture gates PASS (no module under `backend/arkali/` was touched) |
 | Previously refreshed for | **PHASE 14 PACKAGE 3 — PHASE 14 STOPS ON CANONICAL_AMBIGUITY** — two commits. First, a correction: the PRE-PHASE-14 repair's own claim of `error_base.py` fan-in 11 was never true (only one of five needed redirects had been done); the remaining four are completed and `error_base.py` genuinely reaches fan-in 12 of 15, recorded in `DECISION_LOG.md`. Second, **Package 3** delivers `failure_protocol.py`, which parses `ARK-REQ-0086`'s MS §Root-Cause (9 stages) and `ARK-REQ-0238`'s BP §Failure protocol (11 stages) and attempts the identical count-then-abbreviation reconciliation `harness_elements.py` established in Phase 10. **Proven, against the live documents, to refuse**: the counts disagree and the mismatched stages share no word root; `Reproduce`, `Hypotheses`, `Experiment`, `Root Cause`, `Regression` are the only stages identical in both. No mapping was invented. `docs/contracts/repair.md` records the exact conflicting clauses and the minimal governance decision required. `BUILD_STATE.md` changed and NEXT EXACT ACTION now reports the stop, so the §12 refresh is mechanically required. Live architecture is re-derived at **134** cross-context edges. No requirement is discharged, cumulative verified remains **127**, Phase 14 is IN PROGRESS and no phase gate was run |
 | Previously refreshed for | **PHASE 14 PACKAGE 2** — `RepairBudgetLedger.record` now refuses an attempt whose (failure signature, root-cause class, strategy) repeats one already recorded in the same ledger, raising the new `RepeatedFailedStrategyError` before the budget math runs — `ARK-REQ-0087`/`ARK-REQ-0239`'s anti-loop rule, enforced structurally rather than by classifying the free-text `outcome` field, and exactly the "anti-loop property tests" `CONTRACT_INVENTORY.md` row C-26 names as this contract's verification responsibility. `files`, `provider_model` and `outcome` do not participate in the repeat identity. `BUILD_STATE.md` changed and NEXT EXACT ACTION moved to Package 3, so the §12 refresh is mechanically required. Package 3 faces a real cross-document ambiguity recorded in §9: MS §Root-Cause's nine-stage pipeline and BP §Failure protocol's eleven-stage pipeline do not reconcile positionally the way the Phase 10 harness elements did, and neither may be preferred over the other. No requirement is discharged, cumulative verified remains **127**, Phase 14 is IN PROGRESS and no phase gate was run |
@@ -649,11 +620,12 @@ verified_by_phase:
   "11": 2
   "12": 7
   "13": 27
-cumulative_verified: 127
+  "14": 7
+cumulative_verified: 134
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13"]
-unlocked_phase: "14"
-next_exact_action_phase: "14"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14"]
+unlocked_phase: "15"
+next_exact_action_phase: "15"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
