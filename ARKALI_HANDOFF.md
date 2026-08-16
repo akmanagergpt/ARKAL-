@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `b702f5efa8ae50bce3941d9aa9c90295fb757825` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `034a300e0b3ef87f6dfd79c88aeb28ced9ee7068` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -141,17 +141,18 @@ repository, the repository wins.
 | Phase 12 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the **first** submission (`docs/acceptance/phase_12_report.json`, `phase_12_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 13 recorded runs, **PROTECTED_CORE COMPLETE** over the whole six-package candidate (`control.policy`, `lifecycle.release`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. **7/7 requirements discharged** — `ARK-REQ-0005`, `0023`, `0024`, `0025`, `0056`, `0058`, `0212`, all MANDATORY — taking cumulative verified 93 → **100**. C-25 delivers the isolated candidate workspace, immutable content-addressed manifest and assembly report, all eight semantic checks, the authority-owned Stable progression boundary and direct-mutation refusal. No Stable write, verification, acceptance or promotion capability is claimed. **Phase 13 unlocked** |
 | Phase 13 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_13_report.json`, `phase_13_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS, PROTECTED_CORE COMPLETE (`acceptance.engine`, `control.policy`), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 2/2, HUMAN_GATE NOT_APPLICABLE. Six atomic packages deliver C-16 and the Acceptance Engine path. **27/27 requirements discharged**; cumulative verified 100 → **127**. No release, Stable-promotion or human-gate authority is claimed |
 | Phase 14 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_14_report.json`, `phase_14_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1, HUMAN_GATE NOT_APPLICABLE. Five atomic packages deliver C-26: the repair-fingerprint and budget-ledger evidence contract; the anti-loop repeated-strategy refusal; the mechanical proof that MS's 9-stage Root-Cause sequence and BP's 11-stage Failure Protocol could not be reconciled without governance authority; `ARK-REQ-0240`'s deterministic-transformer candidate-lifecycle confinement, delegated to the existing Phase 10 `AgentAuthority`; and, after **D-024** (the human governance ruling naming BP's 11-stage sequence the single executable Phase 14 pipeline — MS's 9-stage sequence stays the conceptual description, never a competing state machine), the executable `RepairPipelinePath` composed with the unchanged Packages 1–4 mechanisms in a real-authority journey. **7/7 requirements discharged**, all MANDATORY; cumulative verified 127 → **134**. No deterministic-transformer execution engine exists; no state machine was added, count stays 12 |
-| Phase 15 | **UNLOCKED — NOT STARTED** ← current work. Requirement + Architecture Intelligence. `GovernanceState.current_work_phase()` returns `15`. `RequirementRegister.for_phase("15")` returns **0** entries and `CONTRACT_INVENTORY.md` assigns it no contract row — one of the four canonical zero-denominator phases (8, 15, 33, 34) F-0040 already accounted for. Prerequisite Phase 13 is MACHINE-ACCEPTED. No package exists yet and no requirement is discharged, so cumulative verified stays **134** until Phase 15 delivers something to discharge |
+| Phase 15 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_15_report.json`, `phase_15_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1 (Phase 13), HUMAN_GATE NOT_APPLICABLE. The Phase 15 canonical gap (zero requirements, zero contract, zero bounded context) found by prior read-only research was closed under human governance ruling **D-025**: `control.specification` was extended (never a second architecture authority) and one new contract, `C-37`, introduced. One atomic package delivers the deterministic requirement/architecture blueprint engine — goal decomposition, content-addressed provenance, ambiguity/contradiction/underspecification/missing-acceptance-criteria detection recorded as unresolved governed questions rather than invented, closed-vocabulary classification, and architecture/capability mapping resolved live from `AuthorityMap.concerns`. **11/11 requirements discharged**, all MANDATORY; cumulative verified 134 → **145**. No product code generated, no acceptance verdict rendered — both structurally proven. **Phase 16 unlocked** |
+| Phase 16 | **UNLOCKED — NOT STARTED** ← current work. AI Software Factory. `GovernanceState.current_work_phase()` returns `16`. `RequirementRegister.for_phase("16")` returns **3** entries — `ARK-REQ-0233` plus `ARK-REQ-0392`/`0393`, the latter two added under human governance ruling **D-026** for this phase's adaptive execution-routing composition and failover responsibilities. Prerequisites Phases 12, 14 and 15 are all MACHINE-ACCEPTED. No package exists yet and no requirement is discharged, so cumulative verified stays **145** until Phase 16 delivers something to discharge |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
-| Requirements | **313** total — 303 MANDATORY / 8 CONDITIONAL / 2 OPTIONAL |
-| Cumulative verified | **134** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + **7 Phase 14**), reconciled by check C6 against each phase's traceability record. Of the 134, **133 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phases 8 and 15 add none — their denominators are zero |
+| Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced |
+| Cumulative verified | **145** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + **11 Phase 15**), reconciled by check C6 against each phase's traceability record. Of the 145, **144 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
 | Phase-state parsing | **acceptance is declared, never inferred** (F-0034). `GovernanceState` reads the leading declared state of a status cell against a canonical vocabulary; only `ACCEPTED` and `MACHINE-ACCEPTED` grant acceptance, and unknown, empty or self-contradictory cells are refused. Explanatory prose has **zero** effect, so a phase row may be written for its readers. One rule, one place: consumers call `current_work_phase()` rather than restating it, and a control fails any module that classifies a phase by searching `status_text` |
 | Authority conflicts | **0** (39 concerns, one owner each) |
-| Architecture violations | **0** (8 gates PASS over **135** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 10 took this from 108 to 114; Phase 11 took it to 118; Phase 12 took it to 125; Phase 13 Package 1 took it to 127, Package 2 took it to 129, Package 3 took it to 130, Package 5 took it to 131, the **PRE-PHASE-14 fan-in repair took it to 133** — `engineering.repair`'s `contracts.py` and `errors.py` each add one edge into `kernel.contracts` (`content_address` and the error taxonomy) — **Phase 14 Package 3 took it to 134** via `failure_protocol.py`'s edge to `kernel.contracts.error_base`, and **Phase 14 Package 4 took it to 135** via `deterministic_transformer.py`'s edge to `control.policy.agent_authority` (rank 4 calling rank 1, permitted by `allow_lower_layer` and the `policy_callable_from_any_layer` exemption). `agent_authority.py`'s own fan-in rises from 1 to 2, still far under its 15 ceiling. **No same-layer edge has been added by these phases**, because `allow_same_layer: false` forbids one. Two of Phase 10's edges exist precisely because a canonical guard is **called rather than copied** — the C-09 no-secret guard and the `ARK-REQ-0051` authority — and an extra downward edge is the correct price for not creating a second authority; Phases 11–13 likewise reuse their owning authorities rather than copying them. **A budget was hit and respected rather than excepted** in Phase 10: an error taxonomy written into `kernel.contracts` was REFUSED by this gate at public surface **42 of 40** and decomposed under ADR-0008; later phases followed the same placement without needing to be told. `control.policy` public surface is **31 of 40**. `acceptance.engine` public surface is **40 of 40** — at its ceiling. **`kernel.contracts.error_base` hit fan-in 16 of 15 when `engineering.repair` became its sixteenth direct importer** — the PRE-PHASE-14 repair split it into `error_root.py` (root `ArkaliError`) and `contract_violation_base.py` (`ContractViolation`). **Correction (Phase 14 Package 3 pre-work):** the repair's own commit message claimed this left `error_base.py` at fan-in 11, but only `engineering/repair/errors.py` was actually redirected, leaving the true fan-in at 15 — four other `ContractViolation`-only importers were still pointed at `error_base.py`. This surfaced when `failure_protocol.py` needed a sixteenth-importer's worth of `AuthoritativeSourceError`; the four omitted redirects were completed at that point. Live: `error_base.py` fan-in **12 of 15**, `contract_violation_base.py` **6**, `error_root.py` **2**. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15**. **`max_orchestration_depth` is 4 of 4** — `engineering.candidate → evidence.artifact → control.policy → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
+| Architecture violations | **0** (8 gates PASS over **138** real cross-context edges; all **9** numeric budgets measured under ratified contract 1.0.0). Phase 10 took this from 108 to 114; Phase 11 took it to 118; Phase 12 took it to 125; Phase 13 Package 1 took it to 127, Package 2 took it to 129, Package 3 took it to 130, Package 5 took it to 131, the **PRE-PHASE-14 fan-in repair took it to 133** — `engineering.repair`'s `contracts.py` and `errors.py` each add one edge into `kernel.contracts` (`content_address` and the error taxonomy) — **Phase 14 Package 3 took it to 134** via `failure_protocol.py`'s edge to `kernel.contracts.error_base`, **Phase 14 Package 4 took it to 135** via `deterministic_transformer.py`'s edge to `control.policy.agent_authority`, and **Phase 15 took it to 138** via `blueprint_engine.py`'s edges into `control.architecture.authority_map`, `control.capability` reference and `kernel.contracts.content_address`. `agent_authority.py`'s own fan-in rises from 1 to 2, still far under its 15 ceiling. **One new same-layer edge was declared, not defaulted**: `blueprint_engine.py` composes `control.architecture.AuthorityMap` (both `control.specification` and `control.architecture` are layer `control`, rank 1), so `allow_same_layer: false` required an explicit sibling edge — added to `AUTHORITY_MAP.yaml`'s `allowed_sibling_edges` with its D-025 rationale, taking the declared count from 7 to 8, mechanically verified against the live map (`backend/tests/governance/test_dependency_rules.py`). Two of Phase 10's edges exist precisely because a canonical guard is **called rather than copied** — the C-09 no-secret guard and the `ARK-REQ-0051` authority — and an extra downward edge is the correct price for not creating a second authority; Phases 11–13 and 15 likewise reuse their owning authorities rather than copying them. **A budget was hit and respected rather than excepted** in Phase 10: an error taxonomy written into `kernel.contracts` was REFUSED by this gate at public surface **42 of 40** and decomposed under ADR-0008; later phases followed the same placement without needing to be told. **Phase 15 hit a second budget class**: `derive_blueprint`'s first draft measured cyclomatic complexity 14 against the ceiling of 12, and was decomposed into three named helpers along the per-statement seam, re-verified within budget. `control.policy` public surface is **31 of 40**. `acceptance.engine` public surface is **40 of 40** — at its ceiling. `error_base.py` fan-in **12 of 15**, `contract_violation_base.py` **7** (Phase 15's `blueprint_errors.py` is its seventh importer), `error_root.py` **2**. `kernel.contracts.errors` fan-in is **15 of 15** and `kernel.contracts.state_machine` fan-in is **15 of 15** — both untouched by Phase 15, which imports `contract_violation_base` directly rather than reopening either ceiling. `kernel.contracts.content_address` fan-in is **8**. **`max_orchestration_depth` is 4 of 4**, now on the path `acceptance.engine → control.specification → control.architecture → kernel.contracts` — at its ceiling. Every figure in this row is re-derived from the gate mechanism by `check_handoff.py` on each run (F-0047); the figures in §4 and §11 are historical records of past commits and are deliberately **not** re-derived |
 | Evidence Plane | C-14 artifact identity/provenance and C-15 append-only integrity are accepted. Phase 13 Packages 1–5 add the immutable read-only C-16 graph foundation, derive applicability and exact coverage from the canonical register, account for Proof-of-Engineering Passport obligations by register-owned capability while preserving complete evidence bindings, enforce policy-owned actor boundaries protecting applicability and acceptance, and derive the capability verdict solely from that immutable accounting. Superseded results remain preserved; a shared node cannot leak a PASS between paths. No phase acceptance or release verdict is claimed. No Phase 6 capability is reachable from any execution surface |
 | State machines | **12** implemented, one per declared authority, reconciled against `STATE_MACHINES.md` on every run |
 | Capability Graph | **schema, reference resolution and the activated verdict (Phase 9B Packages 1–2)**. `can_perform` now genuinely answers "Can I perform this?" once activated — `PASS` requires every external `*_ref` to resolve through its owning authority (injected `Protocol`) and the node to declare `CONFIGURED`, composed transitively over `prerequisites`; any other case is `NOT_CONFIGURED`, never `FAIL`, which the canonical set assigns to no capability query and which the unchanged Phase 8 predicate would misread as success. Proven through the real `AdmissionService`, not just the graph. Pre-activation is byte-identical to Phase 3: `NOT_CONFIGURED`, no authority consulted. Nothing is cached at any layer. ADR-0003's split still holds. **No requirement discharged; that is Package 3** |
@@ -318,7 +319,11 @@ repository, the repository wins.
 | 152 | `c12761c` | **PHASE 14 PACKAGE 5** — the executable root-cause pipeline (`ARK-REQ-0086`, `ARK-REQ-0238`). `RepairPipelinePath` advances a repair attempt exactly one D-024-governed BP stage at a time, refusing skip/reorder/repeat/unknown/forged stages; `STATE_MACHINES.md` still declares exactly 12 machines. `resolve_attempt` derives `Accept/Reject` from `AttemptEvidence`'s two measured facts, never a caller-declared status, and records it through the unchanged `RepairBudgetLedger`. A first draft's `resolve_attempt` hit `max_parameters_per_public_function` at 11 of 6; decomposed into `AttemptEvidence`/`AttemptMeasurement`, re-verified at 6 of 6, no exception requested. 19 unit + 8 composed-journey + 5 structural tests; 8 gates PASS; 854+ passed across engineering/structural/security |
 | 153 | `d657d26` | **PHASE 14 TRACEABILITY + REPORT** — `phase_14_traceability.json` (all 7 requirements SATISFIED) and `phase_14_report.json` (the composed C-17 report: 79 targeted + 232 security + 363 structural + 2409 full-regression tests, mypy strict clean over 175 modules, all repository/phase-graph/phase0 validators PASS, PROTECTED_CORE NORMAL, 0 open findings) — the frozen candidate submitted to the gate |
 | 154 | `d5d9935` | **PHASE 14 ACCEPTANCE STATE** — `run_phase_gate.py 14 15` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission. `BUILD_STATE.md` records machine acceptance; a new status row for the next canonical phase — split out of the former "15…37" catch-all row (`UNLOCKED — NOT STARTED`, zero-denominator, F-0040) — was added so `current_work_phase()` resolves rather than returning `None`. 7/7 requirements discharged, cumulative verified 127 → 134. The dependency machine now permits the next phase, whose sole prerequisite is the just-accepted one |
-| 155 | `b702f5e` | **GOVERNANCE TEST REPAIR** — final `backend/tests/governance` sanity run after Phase 14 acceptance found 3 failures, all caused by the §3/§8 rewording invalidating pre-existing test expectations written for the prior wording: one hard-coded regex anchor absent from the newly-current phase's arrow-style cumulative row (repaired by restoring the "cumulative verified stays N" phrase, present for every prior current-phase row, into it), and two mutation tests hard-coded §8's Phase-14-era prose, now rewritten to mutate the independent evidence sources the production check actually reads (the live summary's own current-phase row; the ledger's HEAD marker), derived through `truth["current"]` rather than named. `backend/tests/governance`: 407 passed (was 404 passed, 3 failed). No implementation, requirement or phase state changed ← HEAD at generation |
+| 155 | `b702f5e` | **GOVERNANCE TEST REPAIR** — final `backend/tests/governance` sanity run after Phase 14 acceptance found 3 failures, all caused by the §3/§8 rewording invalidating pre-existing test expectations written for the prior wording: one hard-coded regex anchor absent from the newly-current phase's arrow-style cumulative row (repaired by restoring the "cumulative verified stays N" phrase, present for every prior current-phase row, into it), and two mutation tests hard-coded §8's Phase-14-era prose, now rewritten to mutate the independent evidence sources the production check actually reads (the live summary's own current-phase row; the ledger's HEAD marker), derived through `truth["current"]` rather than named. `backend/tests/governance`: 407 passed (was 404 passed, 3 failed). No implementation, requirement or phase state changed |
+| 156 | `875b812` | **D-025 + D-026 RECORDED** — read-only research found Phase 15 a genuine canonical gap (zero requirements, zero contract, zero bounded context); D-025 rules it SHALL provide a deterministic requirement/architecture blueprint capability extending `control.specification`, introduces `C-37`, and adds 11 new canonical requirements (Register Block 8) giving Phase 15 a real denominator. D-026 records ARKALI's permanent adaptive execution-routing policy and maps each responsibility to its correctly-owning future phase (16, 18, 25) via 4 further new requirements, with no runtime routing behaviour implemented under this ruling. `AUTHORITY_MAP.yaml` gains one concern under the existing `control.specification` context (no new bounded context) and one declared sibling edge the composition genuinely requires. |
+| 157 | `50d7797` | **BLUEPRINT ENGINE DELIVERED** — the C-37 contract: deterministic goal decomposition, content-addressed provenance, ambiguity/contradiction/underspecification/missing-acceptance-criteria detection recorded as unresolved governed questions, closed-vocabulary classification, and architecture mapping resolved live from `AuthorityMap.concerns` with no owner table anywhere in the module. Deterministic Core, not Probabilistic Edge — no AI provider contacted. A real same-layer architecture violation and a real cyclomatic-complexity violation were each measured and answered by composition/decomposition, not excepted. 52 new tests; two real hardcoded-count controls updated to the new live register size. |
+| 158 | `f68e088` | **TRACEABILITY + C-17 REPORT** — all 11 requirements traced to implementation and evidence; the report records 11 real test/check runs, each declaring `NO_EXTERNAL_RESULT`. |
+| 159 | `034a300` | **PHASE 15 ACCEPTANCE STATE** — `run_phase_gate.py 15 16` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission. `BUILD_STATE.md` records machine acceptance; a new status row for the next canonical phase — split out of the former "16…37" catch-all row, which is not zero-denominator this time (D-026 gave it a real 3-entry denominator) — was added so `current_work_phase()` resolves rather than returning `None`. 11/11 requirements discharged, cumulative verified 134 → 145. The dependency machine now permits the next phase, whose last unmet prerequisite was the just-accepted one ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -406,61 +411,59 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 15
+## 8. Current phase contract — Phase 16
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Requirement + Architecture Intelligence** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15) |
-| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `15`; no Phase 15 package exists and no requirement is discharged |
-| Prerequisites | Phase **13** — MACHINE-ACCEPTED, which is why the dependency machine permits 15 and only 15 |
-| Contract IDs | none — `CONTRACT_INVENTORY.md` assigns Phase 15 no contract row |
+| Name | **AI Software Factory** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 16) |
+| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `16`; no Phase 16 package exists and no requirement is discharged |
+| Prerequisites | Phases **12**, **14** and **15** — all MACHINE-ACCEPTED, which is why the dependency machine permits 16 and only 16 |
+| Contract IDs | none in `CONTRACT_INVENTORY.md` — the matrix `Produces` column reads "full generation pipeline" (prose, not a `C-XX` id); composition of Phases 10–14's existing contracts (C-22/C-23 harness, C-25 candidate, C-26 repair) plus the new C-37 blueprint is the expected shape, not confirmed by any canonical text read yet |
 | Human gate | none (matrix Gate column `—`) |
-| ARK-REQ IDs | `RequirementRegister.for_phase("15")` returns **0** entries — a zero-denominator phase, one of four the canonical set declares (8, 15, 33, 34; F-0040) |
-| What Phase 14 leaves ready | The accepted C-26 evidence contract, anti-loop refusal, the D-024-governed executable failure-protocol pipeline and `ARK-REQ-0240`'s deterministic-transformer confinement authority |
-| What remains unbuilt | Everything — Phase 15 has not started. A zero-denominator phase still owes a real candidate, a `claims: []` traceability record and one gate submission (the Phase 8 precedent), not an assumed pass |
-| Architecture hazard | None identified yet — Phase 15 has not been read in detail. Do not assume its shape from this row; read `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15 and any canonical section naming "Requirement + Architecture Intelligence" before implementing |
+| ARK-REQ IDs | `RequirementRegister.for_phase("16")` returns **3** entries: `ARK-REQ-0233` (BP §Real program, pre-existing) plus `ARK-REQ-0392`/`0393` (D-026, this session — adaptive execution-routing composition and quota-safe failover) |
+| What Phase 15 leaves ready | The accepted C-37 requirement/architecture blueprint engine — deterministic goal decomposition, provenance, ambiguity/contradiction detection, acceptance-criteria derivation, and architecture/capability mapping composed live from `AuthorityMap.concerns`. Phase 15 generates no product code and renders no verdict; Phase 16 is where a blueprint would first be consumed |
+| What remains unbuilt | Everything — Phase 16 has not started. `engineering.factory` (pre-declared in `AUTHORITY_MAP.yaml`, concern `software_factory_pipeline`) has no implementation yet. D-026's adaptive-routing composition (`ARK-REQ-0392`/`0393`) is recorded but not built; no runtime routing behaviour exists anywhere in the repository |
+| Architecture hazard | None identified yet — Phase 16 has not been read in detail. Do not assume its shape from this row; read `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 16, `MASTER_SPECIFICATION.md`'s prose describing the factory composition, and D-026 (`DECISION_LOG.md`) for the routing responsibilities this phase specifically owns, before implementing |
 
-**Phase 15 is unlocked and not started.** Its denominator is **0** and it
-owns no contract. Phase 14 is MACHINE-ACCEPTED.
+**Phase 16 is unlocked and not started.** Its denominator is **3** and it
+owns no dedicated contract yet. Phase 15 is MACHINE-ACCEPTED.
 
 ## 9. Next exact action
 
-**Phase 14 is MACHINE-ACCEPTED. Phase 15 (Requirement + Architecture
-Intelligence) is unlocked and not started.** The live denominator — 0
-requirements. `RequirementRegister.for_phase("15")` returns **0** entries
-and `CONTRACT_INVENTORY.md` assigns it no contract row — a zero-denominator
-phase, one of four the canonical set declares (8, 15, 33, 34; F-0040). A
-zero denominator does not mean no work and does not mean an assumed pass:
-Phase 8's precedent still owed a real candidate, a `claims: []`
-traceability record and one genuine gate submission. Read
-`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 15 and any canonical section
-naming "Requirement + Architecture Intelligence" before forming a plan —
-this handoff has not yet done that reading and states no opinion on what
-Phase 15 requires beyond its zero requirement-register denominator.
+**Phase 15 is MACHINE-ACCEPTED. Phase 16 (AI Software Factory) is unlocked
+and not started.** The live denominator — 3 requirements.
+`RequirementRegister.for_phase("16")` returns `ARK-REQ-0233` (pre-existing)
+plus `ARK-REQ-0392`/`0393` (added this session under **D-026**). Phase 16
+owns no dedicated contract in `CONTRACT_INVENTORY.md`; the matrix's
+`Produces` column reads "full generation pipeline" in prose, and the
+expected shape — composition of Phases 10–14's existing contracts plus the
+new C-37 blueprint — is **not confirmed by any canonical text read yet**.
+Read `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 16, the relevant
+`MASTER_SPECIFICATION.md` prose, and D-026 (`DECISION_LOG.md`) before
+forming a plan — this handoff states no opinion on Phase 16's shape beyond
+its register denominator.
 
-**How Phase 14 was resolved, for context (its own discharged requirements
-are not this section's subject).** Root-cause pipeline work was blocked on
-`CANONICAL_AMBIGUITY` after Package 3 mechanically proved MS's 9-stage
-Root-Cause sequence and BP's 11-stage Failure Protocol could not be
-reconciled under the Phase-10 harness-element algorithm (counts disagree,
-9 vs 11; the mismatched stages share no word root). **D-024**
-(`docs/build/DECISION_LOG.md`) then resolved it prospectively by human
-governance ruling: BP's 11-stage sequence is the single executable Phase 14
-pipeline authority; MS's 9-stage sequence remains the conceptual
-description and was never implemented as a competing state machine
-(`STATE_MACHINES.md` still declares exactly 12). No positional alias table
-was invented, and Package 3's original mechanical proof of the ambiguity
-remains preserved unamended as the honest historical record. Package 5 then
-built the executable pipeline path under that ruling, composed with the
-unchanged Packages 1–4 mechanisms (evidence contract, anti-loop refusal,
-the deterministic-transformer confinement authority) in a real-authority
-journey, and the Phase 14 gate returned `PHASE_ACCEPTED_BY_MACHINE` on the
-first and only
-submission.
+**How Phase 15 was resolved, for context (its own discharged requirements
+are not this section's subject).** Read-only research found Phase 15 to be
+a genuine canonical gap — zero requirements, zero contract, zero bounded
+context, zero MS elaboration — reported rather than guessed at. **D-025**
+(`docs/build/DECISION_LOG.md`) then ruled, prospectively: Phase 15 SHALL
+provide a deterministic requirement/architecture blueprint capability,
+extending `control.specification` (never a second architecture authority)
+and introducing exactly one new contract, `C-37`, since no existing
+contract could carry a product blueprint without conflating it with `C-04`.
+Eleven new canonical requirements gave Phase 15 a real denominator. **D-026**,
+recorded alongside it, establishes ARKALI's permanent adaptive
+execution-routing policy and maps each responsibility to its correctly
+owning future phase (16, 18, 25) — none of it was built under Phase 15's
+scope. The one Phase 15 package then delivered the blueprint engine,
+composed with the unchanged control.architecture/control.capability
+authorities in a real-authority journey, and the Phase 15 gate returned
+`PHASE_ACCEPTED_BY_MACHINE` on the first and only submission.
 
-**Do not re-run the Phase 14 gate, the Phase 13 gate, or any earlier accepted
+**Do not re-run the Phase 15 gate, the Phase 14 gate, or any earlier accepted
 phase gate.** A second run against an accepted phase returns
 `AWAITING_RESCORING_AUTHORITY` under GOV-001 — the rule working, not a fault.
 
@@ -472,24 +475,29 @@ several sizes rather than by scanning source for a numeral. A canonical guard is
 **called, never copied** — an extra architecture edge is the correct price for
 not creating a second authority. A requirement is discharged from the context the
 register names as its owner, even when another context is the natural place to
-put the code.
+put the code. When two bounded contexts at the same layer must compose, a
+declared `allowed_sibling_edges` entry with a written rationale is the correct
+price — measured and requested before code is written, not defaulted to.
 
-**Budget facts to carry in.** `max_orchestration_depth` is at **4 of 4**;
-`kernel.contracts.errors` and `kernel.contracts.state_machine` are both at
-**15 of 15** fan-in — a context needing the full four-name taxonomy must
-import `kernel.contracts.error_base`, now at fan-in **12 of 15** after the
-PRE-PHASE-14 repair split it and Phase 14 Package 3 pre-work completed the
-four redirects the repair's own commit message had incorrectly claimed were
-already done (see `DECISION_LOG.md`), but a context needing **only**
-`ContractViolation` should import `kernel.contracts.contract_violation_base`
-directly (fan-in **6**), and one needing only the root `ArkaliError` should
-import `kernel.contracts.error_root` (fan-in **2**) — neither adds to
-`error_base`'s own count.
+**Budget facts to carry in.** `max_orchestration_depth` is at **4 of 4**, now
+on the path `acceptance.engine → control.specification → control.architecture
+→ kernel.contracts`; `kernel.contracts.errors` and `kernel.contracts.state_machine`
+are both at **15 of 15** fan-in — a context needing the full four-name taxonomy
+must import `kernel.contracts.error_base` (fan-in **12 of 15**), but a context
+needing **only** `ContractViolation` should import
+`kernel.contracts.contract_violation_base` directly (fan-in **7** — Phase 15's
+`blueprint_errors.py` is its seventh importer), and one needing only the root
+`ArkaliError` should import `kernel.contracts.error_root` (fan-in **2**) —
+neither adds to `error_base`'s own count. `kernel.contracts.content_address`
+(the content-addressing primitive `RequirementBlueprint`/`RepairFingerprint`/
+`ArtifactRecord` all share) is at fan-in **8**.
 `acceptance.engine` public surface is at **40 of 40**; `control.policy` is at
-**31 of 40**. Measure before adding and decompose under ADR-0008 — a budget
-was hit and respected this way in Phase 10 and again in the PRE-PHASE-14
-repair, and an exception would require HUMAN GATE 8 plus an ADR the
-implementing actor may not author.
+**31 of 40**. `max_cyclomatic_complexity_per_function` is **12** — Phase 15's
+`derive_blueprint` hit it at 14 on first draft and was decomposed along its
+per-statement seam. Measure before adding and decompose under ADR-0008 — a
+budget was hit and respected this way in Phase 10, the PRE-PHASE-14 repair,
+and twice in Phase 15, and an exception would require HUMAN GATE 8 plus an ADR
+the implementing actor may not author.
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15**. There is still **no Python lockfile**; do not create one.
@@ -518,7 +526,8 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
-| Refresh reason | **GOVERNANCE TEST REPAIR** — the final `backend/tests/governance` sanity run after Phase 14 acceptance found 3 failures, all residue of the §3/§8 rewording done for Phase 14 acceptance itself invalidating pre-existing test expectations anchored to the prior wording — the same fragility class the §8 anti-drift repair fixed twice already this phase. `test_a_cumulative_total_below_the_accepted_records_is_detected` required a "cumulative verified stays/is/remains N" phrase in §3, present for every prior CURRENT (not-yet-accepted) phase row but dropped when Phase 15's row was written arrow-only; restored, a genuine documentation gap and not merely a fixture. The two `TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence` mutation tests hard-coded §8's exact Phase-14-era prose ("IN PROGRESS, NOT ACCEPTED." / "no requirement is discharged") as anchors, absent verbatim now that §8 correctly describes Phase 15; rewritten to mutate the INDEPENDENT evidence sources the production `check_narrative` cross-check actually reads instead — the live summary's own current-phase row and the ledger's HEAD marker — deriving the current phase through `truth["current"]` rather than naming it, matching the pattern the sibling `discharging_phase`/`row_for` tests already established. `backend/tests/governance`: 407 passed (was 404 passed, 3 failed). **No implementation, requirement or phase state changed; Phase 14 remains MACHINE-ACCEPTED and Phase 15 remains UNLOCKED — NOT STARTED** |
+| Refresh reason | **PHASE 15 MACHINE ACCEPTANCE** — read-only research found Phase 15 a genuine canonical gap (zero requirements, zero contract, zero bounded context, zero MS elaboration), reported rather than guessed at. **D-025** (`docs/build/DECISION_LOG.md`) ruled it SHALL provide a deterministic requirement/architecture blueprint capability, extending `control.specification` (never a second architecture authority) and introducing exactly one new contract, `C-37`. **D-026**, recorded alongside it, establishes ARKALI's permanent adaptive execution-routing policy and maps each responsibility to its correctly-owning future phase (16, 18, 25) via four further new requirements, implementing none of it under this ruling. One atomic package delivered the blueprint engine — deterministic decomposition, provenance, ambiguity/contradiction detection, acceptance-criteria derivation, architecture mapping composed live from `AuthorityMap.concerns` — then the traceability record and C-17 report were composed and frozen; `run_phase_gate.py 15 16` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission.** C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 138 edges. **11/11 requirements discharged**, all MANDATORY, taking cumulative verified 134 → **145**. `GovernanceState.current_work_phase()` now returns **16** (AI Software Factory, denominator 3 after D-026) — adding its status row was mechanically required, the same reason Phase 9B/11/14's own rows were added in their unlocking commits. §8 and §9 are rewritten for the new current phase; §3's Phase 15 row states its acceptance; the live architecture summary is re-derived at 138 edges. No Phase 16 implementation was begun |
+| Previously refreshed for | **GOVERNANCE TEST REPAIR** — the final `backend/tests/governance` sanity run after Phase 14 acceptance found 3 failures, all residue of the §3/§8 rewording done for Phase 14 acceptance itself invalidating pre-existing test expectations anchored to the prior wording — the same fragility class the §8 anti-drift repair fixed twice already this phase. `test_a_cumulative_total_below_the_accepted_records_is_detected` required a "cumulative verified stays/is/remains N" phrase in §3, present for every prior CURRENT (not-yet-accepted) phase row but dropped when Phase 15's row was written arrow-only; restored, a genuine documentation gap and not merely a fixture. The two `TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence` mutation tests hard-coded §8's exact Phase-14-era prose ("IN PROGRESS, NOT ACCEPTED." / "no requirement is discharged") as anchors, absent verbatim now that §8 correctly describes Phase 15; rewritten to mutate the INDEPENDENT evidence sources the production `check_narrative` cross-check actually reads instead — the live summary's own current-phase row and the ledger's HEAD marker — deriving the current phase through `truth["current"]` rather than naming it, matching the pattern the sibling `discharging_phase`/`row_for` tests already established. `backend/tests/governance`: 407 passed (was 404 passed, 3 failed). **No implementation, requirement or phase state changed; Phase 14 remains MACHINE-ACCEPTED and Phase 15 remains UNLOCKED — NOT STARTED** |
 | Previously refreshed for | **PHASE 14 MACHINE ACCEPTANCE** — Package 5 delivered the executable root-cause pipeline (`RepairPipelinePath`, D-024-governed) composed with the unchanged Packages 1–4 mechanisms; the traceability record and C-17 report were composed and frozen; `run_phase_gate.py 14 15` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission.** C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 135 edges. **7/7 requirements discharged**, all MANDATORY, taking cumulative verified 127 → **134**. `GovernanceState.current_work_phase()` now returns **15** (Requirement + Architecture Intelligence, a zero-denominator phase per F-0040) — adding its status row was mechanically required, the same reason Phase 9B's and Phase 11's own rows were added in their unlocking commits, or `current_work_phase()` returns `None` and every governance control reddens. §8 and §9 are rewritten for Phase 15; §3's Phase 14 row states its acceptance; the live architecture summary is unchanged at 135 edges. No Phase 15 implementation was begun |
 | Previously refreshed for | **PHASE 14 PACKAGE 4 — `ARK-REQ-0240`** — `control.policy`-owned, independent of Package 3's `CANONICAL_AMBIGUITY`. `AUTHORITY_MAP.yaml` `stable_mutation.prohibited_actors` already named `deterministic_transformer` for MS §Constitution 6, before Phase 14 existed; `engineering.repair`'s new `DeterministicTransformer.assert_confined_to_candidate_lifecycle` delegates the refusal to `control.policy`'s existing Phase 10 `AgentAuthority` — reused, not duplicated, the same shape the register's other actor-boundary requirement already uses. No transformer execution engine exists; this package built only the confinement authority a future one must consult. 11 new tests prove the actor label is genuinely canonical (derived from the live authority map), the delegation actually refuses (negative control: repair cannot escape the candidate lifecycle), and `engineering.repair` imports no lifecycle/acceptance/registry authority, defines no promote/rollback/stable-write operation, and carries no second copy of the prohibited-actor list. Two mutation tests in `test_handoff_transition.py` were hardened to anchor within the extracted current-phase section rather than exact prose, since package-count changes would otherwise keep breaking them. `BUILD_STATE.md` changed, so the §12 refresh is mechanically required. Live architecture is re-derived at **135** cross-context edges (`engineering.repair` → `control.policy.agent_authority`, rank 4 calling rank 1, `agent_authority.py` fan-in rises from 1 to 2). Classified **NORMAL** by `select_profile` — no Protected Core file was modified, only called into. **`ARK-REQ-0240` is implemented and tested but not discharged** — discharge happens only at phase acceptance, which this package does not run; `ARK-REQ-0086`/`ARK-REQ-0238` remain blocked on `CANONICAL_AMBIGUITY`, unattempted. Full regression: 2377 passed, 0 failed. Cumulative verified remains **127**, Phase 14 is IN PROGRESS and no phase gate was run |
 | Previously refreshed for | **§8 ANTI-DRIFT REPAIR** — repository truth verification found `BUILD_STATE.md`'s machine-parsed Phase 14 status row (the "## Phase status" table `GovernanceState._parse_phases` actually reads) had never advanced past `UNLOCKED — NOT STARTED` across Packages 1–3; §8 mirrored the same stale cell it was already checked against, so the pre-existing "declared state agrees with itself" control passed while both sides were wrong. Both corrected to `UNLOCKED — IN PROGRESS, NOT ACCEPTED`, naming Packages 1–3 and the CANONICAL_AMBIGUITY stop. A new derived `check_handoff.py` control cross-checks the current-phase section against two independent repository-derived sources instead — the accepted-commit-history ledger (rows already name their phase by the `PHASE <n> ...` convention used for every phase) and the live "Current verified state" summary's own per-phase row — with the current phase number derived from `GovernanceState`, never hard-coded. Three new tests in `test_handoff_transition.py` prove it: silent against the corrected document, and catching both the exact stale claims when reproduced as mutations, verified directly against the pre-fix commit `8800daa`. `BUILD_STATE.md` changed, so the §12 refresh is mechanically required. **No Phase 14 implementation changed, CANONICAL_AMBIGUITY is not resolved, and Packages 1–3 are untouched.** Full regression: 2366 passed, 0 failed; all 8 architecture gates PASS (no module under `backend/arkali/` was touched) |
@@ -599,13 +608,13 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: b702f5efa8ae50bce3941d9aa9c90295fb757825
+head: 034a300e0b3ef87f6dfd79c88aeb28ced9ee7068
 branch: main
 working_tree_clean: true
 
-requirements_total: 313
-requirements_mandatory: 303
-requirements_conditional: 8
+requirements_total: 328
+requirements_mandatory: 317
+requirements_conditional: 9
 requirements_optional: 2
 
 verified_by_phase:
@@ -624,11 +633,12 @@ verified_by_phase:
   "12": 7
   "13": 27
   "14": 7
-cumulative_verified: 134
+  "15": 11
+cumulative_verified: 145
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14"]
-unlocked_phase: "15"
-next_exact_action_phase: "15"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15"]
+unlocked_phase: "16"
+next_exact_action_phase: "16"
 
 accepted_human_gates: ["HUMAN_GATE_1"]
 adr_accepted: 9
