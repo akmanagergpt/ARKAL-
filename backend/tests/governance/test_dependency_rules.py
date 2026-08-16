@@ -175,7 +175,9 @@ class TestNoNewSiblingEdgeWasIntroduced:
         assert {(e.source, e.target) for e in live_map.sibling_edges} == declared
         # 8th edge added under D-025: control.specification -> control.architecture,
         # composing the live concerns list rather than duplicating it (ARK-REQ-0386).
-        assert len(declared) == 8
+        # 9th edge added under D-026/Phase 16: engineering.factory ->
+        # engineering.repair, reusing the C-26 anti-loop ledger (ARK-REQ-0393).
+        assert len(declared) == 9
 
     def test_no_sibling_edge_targets_an_exempt_context(
         self, live_map: AuthorityMap
