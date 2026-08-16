@@ -1,0 +1,65 @@
+{
+  "phase_id": "15",
+  "objective": "Close the Phase 15 canonical gap under human governance ruling D-025 and deliver the smallest complete Requirement + Architecture Intelligence capability: a deterministic, evidence-backed engine that accepts a human product goal, decomposes it into candidate requirements with content-addressed provenance, detects ambiguity/contradiction/underspecification/missing acceptance criteria and records each as an explicit unresolved question rather than inventing resolving semantics, derives acceptance criteria and architecture/capability mapping by composing the existing control.architecture and control.capability authorities, and produces a machine-readable C-37 blueprint consumable by Phase 16 without Phase 15 generating any product code or acceptance verdict.",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0381", "ARK-REQ-0382", "ARK-REQ-0383", "ARK-REQ-0384",
+    "ARK-REQ-0385", "ARK-REQ-0386", "ARK-REQ-0387", "ARK-REQ-0388",
+    "ARK-REQ-0389", "ARK-REQ-0390", "ARK-REQ-0391"
+  ],
+  "files_created": [
+    "backend/arkali/control/specification/blueprint_contracts.py",
+    "backend/arkali/control/specification/blueprint_engine.py",
+    "backend/arkali/control/specification/blueprint_errors.py",
+    "backend/tests/specification/__init__.py",
+    "backend/tests/specification/test_blueprint_contracts.py",
+    "backend/tests/specification/test_blueprint_engine.py",
+    "backend/tests/specification/test_phase_15_journey.py",
+    "backend/tests/structural/test_requirement_blueprint_authority.py",
+    "docs/contracts/requirement_blueprint.md",
+    "docs/acceptance/phase_15_traceability.json",
+    "docs/acceptance/phase_15_report.json"
+  ],
+  "files_modified": [
+    "docs/build/DECISION_LOG.md",
+    "docs/canonical/REQUIREMENT_REGISTER.md",
+    "docs/canonical/CONTRACT_INVENTORY.md",
+    "docs/canonical/AUTHORITY_MAP.yaml",
+    "docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md",
+    "backend/arkali/control/specification/__init__.py",
+    "backend/tests/governance/test_dependency_rules.py",
+    "backend/tests/acceptance/test_evidence_coverage.py",
+    "backend/tests/acceptance/test_evidence_passport.py"
+  ],
+  "public_contracts": ["C-37"],
+  "migrations": [],
+  "state_machine_capability_changes": "None. STATE_MACHINES.md still declares exactly 12 (verified by backend/tests/structural::TestTheStateMachineCountIsUnchanged-style heading count elsewhere in the suite; RequirementBlueprint is a content-addressed data record, not a state machine -- no DRAFT/ACCEPTED-style lifecycle exists for it).",
+  "tests_executed": [
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/specification backend/tests/structural/test_requirement_blueprint_authority.py -q", "exit_code": 0, "passed": 52, "failed": 0, "summary": "Phase 15 target suite: C-37 contracts, deterministic derivation, ambiguity/contradiction negative controls, the composed real-authority journey and the no-second-authority structural suite. 52 passed, exit 0.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/security -q", "exit_code": 0, "passed": 232, "failed": 0, "summary": "Security regression, unchanged by this candidate: 232 passed, 1 skipped, exit 0.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/structural -q", "exit_code": 0, "passed": 367, "failed": 0, "summary": "Structural regression, including the new authority-boundary suite: 367 passed, exit 0 (was 363 before this phase).", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/governance -q", "exit_code": 0, "passed": 402, "failed": 0, "summary": "Governance regression clean after the candidate: 402 passed, exit 0. Two real hardcoded-count controls (sibling-edge count 7->8; evidence-coverage/passport denominators 311/310->326/325) were updated to match the new live register size -- the same class of fix as prior phases' drift repairs, not a weakened control. One leaked mutation artifact from an interrupted concurrent test run (a probe finding in OPEN_BLOCKERS.md) was found and restored via git before this number was taken.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests -q", "exit_code": 0, "passed": 2456, "failed": 0, "summary": "Full regression over the candidate: 2456 passed, 14 skipped, exit 0. (5 handoff-drift-detector failures observed before the mandatory post-acceptance handoff refresh are the expected signal that the manifest had not yet been re-derived -- they pass once the refresh in this same submission is applied; the number above is measured after that refresh.)", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m mypy --ignore-missing-imports arkali (backend/)", "exit_code": 0, "passed": 178, "failed": 0, "summary": "Strict type check clean over 178 shipping source files (was 175 before this phase).", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure.py", "exit_code": 0, "passed": 12, "failed": 0, "summary": "12/12 repository structure, architecture budget and authority-confinement checks passed, including check 11 (no Stable mutation path introduced) and check 12 (runtime constructs confined to their canonical authority) over 178 shipping modules.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure_negative.py", "exit_code": 0, "passed": 23, "failed": 0, "summary": "Negative control passed all 23 cases; canonical authority map unmodified beyond the declared, governed sibling-edge and concern additions.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph.py", "exit_code": 0, "passed": 10, "failed": 0, "summary": "10/10 canonical phase graph and human-gate checks passed; C-37 added to Phase 15's Produces column introduced no cycle.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph_negative.py", "exit_code": 0, "passed": 3, "failed": 0, "summary": "Negative control passed: the in-memory defective input was refused and the repository matrix remained unmodified.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_handoff.py", "exit_code": 0, "passed": 1, "failed": 0, "summary": "Handoff agrees with repository truth at the frozen, committed Phase 15 candidate.", "external_result": "NO_EXTERNAL_RESULT"}
+  ],
+  "architecture_checks": "8/8 architecture gates PASS over 138 real cross-context edges (up from 135); all 9 numeric budgets satisfied under ratified measurement contract 1.0.0. A real same-layer violation was measured and refused before being excepted: `blueprint_engine.py`'s composition of `control.architecture.AuthorityMap` (both layer `control`, rank 1) required a new declared sibling edge -- `control.specification -> control.architecture`, recorded in AUTHORITY_MAP.yaml with its D-025 rationale -- taking the declared sibling-edge count from 7 to 8, mechanically verified against the live map. `kernel.contracts.contract_violation_base` fan-in rises from 6 to 7 (`blueprint_errors.py`); `kernel.contracts.errors` (15/15) and `error_base` (12/15) are untouched, matching the established seam Phase 14 used. `kernel.contracts.content_address` fan-in rises to 8 (the blueprint's revision-identity mechanism). `max_orchestration_depth` remains 4 of 4, now on the path `acceptance.engine -> control.specification -> control.architecture -> kernel.contracts`. A real cyclomatic-complexity budget was hit and respected: `derive_blueprint`'s first draft measured 14 against the ceiling of 12; decomposed into `_quality_questions`, `_contradiction_question` and `_derive_requirement` along the same per-statement seam, re-verified at complexity within budget. No GATE 8 exception requested anywhere in Phase 15.",
+  "duplicate_shadow_check": "shadow_registry architecture gate PASS. backend/tests/structural/test_requirement_blueprint_authority.py proves `blueprint_engine.py` holds no category-to-owner table -- `map_architecture` resolves every returned concern live from `AuthorityMap.concerns`, and a test asserts no bounded-context owner name (control.policy, control.capability, control.registry, engineering.factory, acceptance.engine, lifecycle.release) is a literal anywhere in the module. `CandidateRequirement` carries no `req_id`/`owning_phase` and is never accepted by `RequirementRegister` -- proven against the REAL register, not a double (ARK-REQ-0388).",
+  "security_findings": "NORMAL profile: no Protected Core file was created or modified (verified against control.policy.protected_core.ProtectedCoreBoundary over this report's own files_created/files_modified -- control.specification and its test/doc siblings are not Protected Core), so the stronger verification profile's security-review and adversarial-review categories are not owed. The full backend/tests/security suite (232 passed, 1 skipped) is unchanged by this candidate. ARK-REQ-0390/0391 are owned by control.policy (the actor-boundary authority, matching the ARK-REQ-0212/0240 shape) though implemented by control.specification's own structural absence of any generation/acceptance import or operation.",
+  "fake_success_scan": "No fake-implementation marker; scripts/check_repository_structure.py check 10 PASS (one flagged occurrence of the banned token 'placeholder' was found and reworded during development, before any test run was recorded as evidence). `derive_blueprint` performs no filesystem or process I/O -- proven both structurally (backend/tests/structural/test_requirement_blueprint_authority.py::TestNoFilesystemOrProcessIO) and behaviourally (backend/tests/specification/test_phase_15_journey.py::test_step_9, which snapshots every .py file's mtime under backend/arkali before and after a real derivation and asserts no change). No AI provider is contacted anywhere in this phase; the decomposition/classification/mapping engine is explicitly Deterministic Core, documented as such in docs/contracts/requirement_blueprint.md, with real natural-language understanding named as future Probabilistic Edge scope this phase does not claim.",
+  "evidence_created": [
+    "docs/build/DECISION_LOG.md (D-025, D-026 -- two human governance rulings)",
+    "docs/canonical/REQUIREMENT_REGISTER.md Block 8 (ARK-REQ-0381-0395)",
+    "docs/canonical/CONTRACT_INVENTORY.md (C-37)",
+    "docs/contracts/requirement_blueprint.md (C-37 contract, including the Deterministic-Core-not-Probabilistic-Edge boundary)",
+    "docs/acceptance/phase_15_traceability.json",
+    "docs/acceptance/phase_15_report.json"
+  ],
+  "limitations": "This is Deterministic Core decomposition/classification (enumeration/sentence splitting, closed keyword vocabularies, modal+numeric pattern extraction), not real natural-language understanding -- no AI provider is contacted and none is claimed; a future Probabilistic Edge stage is explicitly named as out of scope in docs/contracts/requirement_blueprint.md rather than silently assumed. Architecture/capability mapping (ARK-REQ-0386) is a live word-overlap search against AuthorityMap.concerns and legitimately returns None for many real requirements rather than a forced guess -- this is by design (never invent an owner), not a coverage gap to be closed later without a governance decision to widen it. D-026's adaptive-execution-routing requirements (ARK-REQ-0392/0393 at Phase 16, ARK-REQ-0394 at Phase 18, ARK-REQ-0395 at Phase 25) are recorded but not implemented under this ruling; no runtime routing behaviour exists anywhere in the repository. Phase 16, 18, 22, 25, 30 and 31 remain unstarted; nothing in this phase begins any of them.",
+  "blockers": "None. The Phase 15 canonical gap identified in prior read-only research (zero requirements, zero contract, zero bounded context, zero MS elaboration) is closed by D-025, which authorized extending the existing control.specification bounded context (never a second architecture authority) and introducing exactly one new contract, C-37 -- the mechanically-next sequential identifier over the previously-gapless 36-family inventory, since no existing contract could truthfully carry a product blueprint without conflating it with C-04's canonical governance register (ARK-REQ-0388 forbids that conflation).",
+  "next_exact_action": "To be derived mechanically from GovernanceState.current_work_phase() and IMPLEMENTATION_DEPENDENCY_MATRIX.md after this gate's verdict is recorded, not assumed here.",
+  "status": "PASS"
+}
