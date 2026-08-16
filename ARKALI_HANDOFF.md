@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `f698d8ca25a5716fd3e7f8690bd2e2abbbedbaed` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `34f39f039a9ee487b34163406fe22c667825c28c` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -330,7 +330,11 @@ repository, the repository wins.
 | 162 | `217cb02` | **COMPOSED JOURNEY** — real `AuthorityMap`/`RequirementRegister`/`WorkspaceAuthority`/`RepairBudgetLedger`/blueprint engine composed end to end, including a simulated quota-exhaustion chaos case proving failover without false PASS and with task identity preserved. 7 new tests. |
 | 163 | `2043a18` | **SIBLING-EDGE COUNT FIX** — the anti-vacuity control catching unintentional architecture widening was updated 7 → 9 for the two edges Phases 15–16 legitimately declared. |
 | 164 | `f3b58d5` | **TRACEABILITY + C-17 REPORT** — all 3 requirements traced to implementation and evidence; the report records 11 real test/check runs, each declaring `NO_EXTERNAL_RESULT`. |
-| 165 | `f698d8c` | **ACCEPTANCE STATE** — `run_phase_gate.py 16 17` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission. `BUILD_STATE.md` records machine acceptance; a new status row for the next canonical phase — split out of the former catch-all row, a real 9-entry pre-existing denominator — was added so `current_work_phase()` resolves rather than returning `None`. 3/3 requirements discharged, cumulative verified 145 → 148 ← HEAD at generation |
+| 165 | `f698d8c` | **ACCEPTANCE STATE** — `run_phase_gate.py 16 17` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission. `BUILD_STATE.md` records machine acceptance; a new status row for the next canonical phase — split out of the former catch-all row, a real 9-entry pre-existing denominator — was added so `current_work_phase()` resolves rather than returning `None`. 3/3 requirements discharged, cumulative verified 145 → 148 |
+| 166 | `eb6b097` | **PHASE 17 PACKAGE 1** — C-20 graph domain model: `execution.workflow`'s `graph_vocabulary.py` (10 node kinds + 10 control constructs, parsed live from VDC §Workflow identity), `graph_model.py` (`WorkflowNode`/`WorkflowEdge`/`WorkflowGraphDocument`, content-addressed, graph-validity refusals, semver bump), `errors.py`. Pure domain model; no persistence, no executor, no surface. No requirement discharged. |
+| 167 | `be2c8bd` | **HANDOFF REFRESH** — live architecture summary re-derived for Package 1's two new edges (143 → 145; `error_base` 12→13, `content_address` 8→9). §3/§8/§9 updated for Phase 17 in-progress status. |
+| 168 | `e85ea2a` | **PHASE 17 PACKAGE 2** — C-20 persistence/revision store: `records.py` (`WorkflowRecord` + immutable `WorkflowRevisionRecord`), `graph_store.py` (`WorkflowGraphStore`, PEP-enforced, revision/semver derived from stored rows, content hash recomputed and verified on every read), migration `0008_workflow_graph`. Closed the `execution.workflow`-unenforced gap Package 1 opened. No requirement discharged. |
+| 169 | `34f39f0` | **HANDOFF + BUILD_STATE REFRESH** — live architecture summary re-derived for Package 2's three new edges (145 → 148). `BUILD_STATE.md`'s Current state and Phase 17 table row advanced to `UNLOCKED — IN PROGRESS, NOT ACCEPTED` (Packages 1–2 committed), following the Phase 10/11/13/14 mid-phase precedent; ARKALI_HANDOFF.md §3/§8 re-derived to match ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -668,7 +672,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: f698d8ca25a5716fd3e7f8690bd2e2abbbedbaed
+head: 34f39f039a9ee487b34163406fe22c667825c28c
 branch: main
 working_tree_clean: true
 
