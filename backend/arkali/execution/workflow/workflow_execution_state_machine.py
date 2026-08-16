@@ -15,6 +15,8 @@ guard makes that structural — without a recorded approval the transition raise
 
 from __future__ import annotations
 
+from typing import Final
+
 from arkali.kernel.contracts.state_machine import (
     GuardContext,
     StateMachine,
@@ -55,6 +57,28 @@ DEFINITION = StateMachineDefinition(
     forbidden=(),
     terminal=("SUCCEEDED", "FAILED", "CANCELLED"),
 )
+
+
+#: Named states, for modules that must select WHICH declared transition to
+#: ask for. They resolve through the definition above, so a state this
+#: machine stops declaring becomes a KeyError at import rather than a string
+#: that quietly reaches `evaluate` and is rejected at run time.
+#:
+#: These belong here and nowhere else - Package 5's executor needs to name a
+#: target to request a move; writing the literal in the requesting module
+#: would put a second copy of the vocabulary in this context, the same
+#: reason `execution.durable.job_state_machine` exports its own states this
+#: way. The requester imports the name; the relation stays here.
+_DECLARED: Final[dict[str, str]] = {state: state for state in DEFINITION.states}
+
+PENDING: Final[str] = _DECLARED["PENDING"]
+RUNNING: Final[str] = _DECLARED["RUNNING"]
+WAITING_SIGNAL: Final[str] = _DECLARED["WAITING_SIGNAL"]
+WAITING_APPROVAL: Final[str] = _DECLARED["WAITING_APPROVAL"]
+COMPENSATING: Final[str] = _DECLARED["COMPENSATING"]
+SUCCEEDED: Final[str] = _DECLARED["SUCCEEDED"]
+FAILED: Final[str] = _DECLARED["FAILED"]
+CANCELLED: Final[str] = _DECLARED["CANCELLED"]
 
 
 def human_approval_guard(context: GuardContext) -> bool:
