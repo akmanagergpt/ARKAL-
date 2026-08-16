@@ -1,0 +1,70 @@
+{
+  "phase_id": "14",
+  "objective": "Deliver C-26 Repair / Root Cause / Convergence in five atomic packages plus one human governance ruling: the repair-fingerprint and six-dimension budget-ledger evidence contract; the anti-loop repeated-strategy refusal; the failure-protocol vocabulary parser proving the MS/BP root-cause pipeline stage lists could not be mechanically reconciled (CANONICAL_AMBIGUITY); ARK-REQ-0240's control.policy-owned deterministic-transformer candidate-lifecycle confinement, delegated to the existing Phase 10 AgentAuthority; D-024, the human governance ruling resolving that ambiguity prospectively by naming BP's 11-stage Failure Protocol the single executable Phase 14 pipeline; and the executable pipeline itself, composed with the unchanged C-26 evidence and anti-loop mechanisms and this composed real-authority journey.",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0029",
+    "ARK-REQ-0086",
+    "ARK-REQ-0087",
+    "ARK-REQ-0088",
+    "ARK-REQ-0238",
+    "ARK-REQ-0239",
+    "ARK-REQ-0240"
+  ],
+  "files_created": [
+    "backend/arkali/engineering/repair/contracts.py",
+    "backend/arkali/engineering/repair/errors.py",
+    "backend/arkali/engineering/repair/failure_protocol.py",
+    "backend/arkali/engineering/repair/deterministic_transformer.py",
+    "backend/arkali/engineering/repair/pipeline.py",
+    "backend/arkali/kernel/contracts/contract_violation_base.py",
+    "backend/arkali/kernel/contracts/error_root.py",
+    "backend/tests/engineering/test_repair_contracts.py",
+    "backend/tests/engineering/test_failure_protocol.py",
+    "backend/tests/engineering/test_repair_pipeline.py",
+    "backend/tests/engineering/test_phase_14_journey.py",
+    "backend/tests/structural/test_deterministic_transformer_confinement.py",
+    "backend/tests/structural/test_repair_pipeline_authority.py",
+    "docs/contracts/repair.md",
+    "docs/acceptance/phase_14_traceability.json",
+    "docs/acceptance/phase_14_report.json"
+  ],
+  "files_modified": [
+    "backend/arkali/control/registry/provider/errors.py",
+    "backend/arkali/engineering/agent/errors.py",
+    "backend/arkali/engineering/candidate/errors.py",
+    "backend/arkali/engineering/codeintel/errors.py",
+    "backend/arkali/kernel/contracts/error_base.py",
+    "backend/tests/governance/test_handoff_transition.py",
+    "docs/build/DECISION_LOG.md"
+  ],
+  "public_contracts": ["C-26"],
+  "migrations": [],
+  "state_machine_capability_changes": "None. STATE_MACHINES.md still declares exactly 12 canonical machines (backend/tests/structural/test_repair_pipeline_authority.py::TestTheStateMachineCountIsUnchanged derives this from the document on every run). RepairPipelinePath is a receipted PATH mirroring lifecycle.release.stable_path.StableCandidatePath's shape for stable_mutation.required_path -- an ordered sequence with a receipt proving the complete traversed prefix -- not a state machine with arbitrary transition rules, and it could not literally reuse that class because engineering (rank 4) may not import lifecycle (rank 5) upward.",
+  "tests_executed": [
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/engineering/test_repair_contracts.py backend/tests/engineering/test_failure_protocol.py backend/tests/engineering/test_repair_pipeline.py backend/tests/engineering/test_phase_14_journey.py backend/tests/structural/test_deterministic_transformer_confinement.py backend/tests/structural/test_repair_pipeline_authority.py -q", "exit_code": 0, "passed": 79, "failed": 0, "summary": "Phase 14 target suite: C-26 contracts, anti-loop, failure-protocol vocabulary, deterministic-transformer confinement, the executable pipeline and the composed real-authority journey. 79 passed, exit 0 in 2.02s.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/security -q", "exit_code": 0, "passed": 232, "failed": 0, "summary": "Security regression, unchanged by this candidate: 232 passed, 1 skipped, exit 0 in 5.85s.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests/structural -q", "exit_code": 0, "passed": 363, "failed": 0, "summary": "Structural regression, including the two new authority-boundary suites: 363 passed, exit 0 in 35.77s.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m pytest backend/tests -q", "exit_code": 0, "passed": 2409, "failed": 0, "summary": "Full regression over the frozen five-package Phase 14 candidate: 2409 passed, 14 skipped, 3 warnings, exit 0 in 1082.28s.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python -m mypy --ignore-missing-imports arkali (backend/)", "exit_code": 0, "passed": 175, "failed": 0, "summary": "Strict type check clean over 175 shipping source files.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure.py", "exit_code": 0, "passed": 12, "failed": 0, "summary": "12/12 repository structure, architecture budget and authority-confinement checks passed, including check 11 (no Stable mutation path introduced) and check 12 (runtime constructs confined to canonical authority) over 175 shipping modules.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_repository_structure_negative.py", "exit_code": 0, "passed": 23, "failed": 0, "summary": "Negative control passed all 23 cases and verified the canonical authority map unmodified.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph.py", "exit_code": 0, "passed": 10, "failed": 0, "summary": "10/10 canonical phase graph and human-gate checks passed.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase_graph_negative.py", "exit_code": 0, "passed": 3, "failed": 0, "summary": "Negative control passed: the in-memory defective input was refused and the repository matrix remained unmodified.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_phase0_deliverables.py", "exit_code": 0, "passed": 27, "failed": 0, "summary": "Phase 0A 16/16 and Phase 0B 11/11 deliverables passed, derived from canonical protocol lists.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "/home/lenovo/.venvs/arkali/bin/python scripts/check_handoff.py", "exit_code": 0, "passed": 1, "failed": 0, "summary": "Handoff agrees with repository truth at the frozen, committed Phase 14 candidate.", "external_result": "NO_EXTERNAL_RESULT"}
+  ],
+  "architecture_checks": "8/8 architecture gates PASS over 135 real cross-context edges (unchanged by this package -- pipeline.py's new imports are all within engineering.repair, not cross-context); all 9 numeric budgets satisfied under ratified measurement contract 1.0.0. max_orchestration_depth remains 4 of 4 on its existing engineering.candidate -> evidence.artifact -> control.policy -> kernel.contracts path, untouched. kernel.contracts.error_base fan-in 12 of 15, contract_violation_base.py 6 of 15, error_root.py 2 of 15 (Package 3 pre-work correction); kernel.contracts.errors and kernel.contracts.state_machine both remain 15 of 15, untouched. A real budget was measured and respected during this phase: resolve_attempt's first draft carried 11 parameters against max_parameters_per_public_function (6); measured, decomposed into AttemptEvidence and AttemptMeasurement along the same seam RepairBudgetLedger.record already uses, re-verified at exactly 6. No GATE 8 exception requested at any point in Phase 14.",
+  "duplicate_shadow_check": "shadow_registry architecture gate PASS. backend/tests/structural/test_deterministic_transformer_confinement.py and test_repair_pipeline_authority.py prove engineering.repair holds no second copy of AUTHORITY_MAP.yaml's stable_mutation.prohibited_actors, direct_mutation_permitted_by or required_path, imports no lifecycle/acceptance/registry/candidate authority, and defines no promote/rollback/stable-write/accept-candidate operation. failure_protocol.py holds no copy of either canonical pipeline's stage list -- both are parsed from the documents at call time -- and RepairPipelinePath derives its 11 governed stages from FailureProtocolVocabulary.bp_stages() rather than writing them a second time.",
+  "security_findings": "NORMAL profile: no Protected Core file was created or modified across any of Phase 14's five packages (verified against control.policy.protected_core.ProtectedCoreBoundary over this report's own files_created/files_modified), so the stronger verification profile's security-review and adversarial-review categories are not owed -- see the PROTECTED_CORE check below. ARK-REQ-0240's confinement calls the existing, unmodified Phase 10 control.policy.agent_authority.AgentAuthority; it is never duplicated, weakened or re-scoped. The full backend/tests/security suite (232 passed, 1 skipped) is unchanged by this candidate.",
+  "fake_success_scan": "No fake-implementation marker; scripts/check_repository_structure.py check 10 PASS. No transformer execution engine exists and none is claimed: RepairPipelinePath and resolve_attempt perform no filesystem or process I/O (backend/tests/structural/test_repair_pipeline_authority.py::TestThePipelineImportsNoForeignAuthority::test_pipeline_py_performs_no_filesystem_or_process_io proves it), and DeterministicTransformer (Package 4) carries no target, path or Stable authority. Accept/Reject is derived from AttemptEvidence's two measured facts, never from a caller-declared status string, and a rejected attempt is still recorded against the budget rather than silently dropped.",
+  "evidence_created": [
+    "docs/build/DECISION_LOG.md (D-024, the human governance ruling)",
+    "docs/contracts/repair.md (C-26 contract, including the deterministic-transformer confinement and CANONICAL_AMBIGUITY sections)",
+    "docs/acceptance/phase_14_traceability.json",
+    "docs/acceptance/phase_14_report.json"
+  ],
+  "limitations": "No deterministic-transformer EXECUTION engine exists -- Package 4 and Package 5 together provide only the identity contract and the candidate-lifecycle confinement authority a future execution engine must consult; nothing here reads a real defect, chooses a strategy, or writes a fix. The pipeline's 'Candidate' stage is a receipted stage name, not a call into engineering.candidate's C-25 isolated workspace (a same-layer context this one may not import); no actual file write happens anywhere in this package. No Golden Repair benchmark exists (Phase 30, out of scope). No AI provider was contacted; every provider_model value in evidence is declared test data (e.g. 'local/qwen2.5-coder:14b'), never a live call. ROLLBACK_STABLE and WRITE_STABLE_FILE remain fixed DENY for every actor, unchanged since Phase 4/8; this phase adds no exception. MS's 9-stage Root-Cause sequence remains the conceptual description only, per D-024 -- it is parsed and compared (FailureProtocolVocabulary.ms_stages()) but never executed.",
+  "blockers": "None. The Package 3 CANONICAL_AMBIGUITY between MS's 9-stage Root-Cause sequence and BP's 11-stage Failure Protocol was resolved by D-024 (docs/build/DECISION_LOG.md), a human governance ruling naming BP's 11-stage sequence the single executable Phase 14 pipeline authority. Package 3's mechanical proof that the two documents could not be reconciled without governance authority (FailureProtocolVocabulary.stages() refusing against the live documents) is preserved unamended as the honest historical record of a real ambiguity that was correctly not guessed at.",
+  "next_exact_action": "To be derived mechanically from GovernanceState.current_work_phase() and IMPLEMENTATION_DEPENDENCY_MATRIX.md after this gate's verdict is recorded, not assumed here.",
+  "status": "PASS"
+}
