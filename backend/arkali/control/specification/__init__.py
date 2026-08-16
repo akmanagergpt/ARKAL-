@@ -2,6 +2,7 @@
 
 Canonical authority for:
   - requirement_identity_and_classification
+  - requirement_and_architecture_intelligence
 
 Protected Core: no.
 Implementation phase: 2.

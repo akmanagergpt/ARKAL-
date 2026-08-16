@@ -173,7 +173,9 @@ class TestNoNewSiblingEdgeWasIntroduced:
         )
         declared = {(e["from"], e["to"]) for e in raw["allowed_sibling_edges"]}
         assert {(e.source, e.target) for e in live_map.sibling_edges} == declared
-        assert len(declared) == 7
+        # 8th edge added under D-025: control.specification -> control.architecture,
+        # composing the live concerns list rather than duplicating it (ARK-REQ-0386).
+        assert len(declared) == 8
 
     def test_no_sibling_edge_targets_an_exempt_context(
         self, live_map: AuthorityMap

@@ -94,7 +94,8 @@ class TestGraphCoverage:
             coverage = evidence_coverage.compute(graph, REPO, {})
 
         rows = {row.requirement_id: row for row in coverage.requirements}
-        assert coverage.requirement_denominator == 311
+        # 328 registered - 2 OPTIONAL (D-025/D-026 added Block 8, ARK-REQ-0381-0395).
+        assert coverage.requirement_denominator == 326
         assert coverage.requirement_numerator == 1
         assert rows["ARK-REQ-0069"].required_evidence == ("integ", "prov")
         assert rows["ARK-REQ-0069"].present_evidence == ("integ", "prov")
@@ -120,4 +121,5 @@ class TestGraphCoverage:
             )
         ids = {row.requirement_id for row in coverage.requirements}
         assert "ARK-REQ-0060" not in ids
-        assert coverage.requirement_denominator == 310
+        # 326 (see above) - 1 for the removed false CONDITIONAL entry.
+        assert coverage.requirement_denominator == 325
