@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `a7337a5c385485437fa0a8f4287ee6dfdb3de022` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `2949f8afc966438ac1944dea8ed1b12817169209` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -342,8 +342,9 @@ repository, the repository wins.
 | 174 | `8565f76` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 5; Current state and the Phase 17 table row advanced to "Package 5 of an unspecified count complete"; live edges 148 → 156; `execution.workflow` public surface now 40 of 40; §9 re-derived, now pointing at Package 6 (the `surfaces.command` HTTP router) with its exact shape spelled out |
 | 175 | `87c4df7` | **GOVERNANCE TEST FIX** — Package 4's added sentence put a bare backtick-wrapped `kernel.contracts.errors` earlier in §3's row than the real fan-in claim, so `test_an_unresolvable_fan_in_subject_fails_closed`'s single-occurrence mutation rewrote the wrong sentence. Reworded without repeating the exact substring; no governed path touched. |
 | 176 | `ac21766` | **PHASE 17 PACKAGE 6** — `surfaces.command`'s C-20 HTTP API: `workflow.py` (8 routes, `BACKEND_ONLY`), `workflow_contracts.py`, `workflow_error_mapping.py` (class-name matched, not `isinstance`). Zero new `execution.workflow` import: structural `Protocol`s + composition-root-injected factories avoid extending the real four-hop `execution.workflow → execution.durable → control.policy → kernel.contracts` chain to five. `create_app`'s new `workflow_wiring` parameter defaults to `None`. 10 new integration tests via `TestClient`. No requirement discharged. |
-| 177 | `a7337a5` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 6; Current state and the Phase 17 table row advanced to "Package 6 of an unspecified count complete"; edges unchanged at 156; `surfaces.command` public surface now also 40 of 40; §9 re-derived, now pointing at Package 7 (the frontend) with the BACKEND_ONLY → BROWSER_SLICE same-commit requirement spelled out ← HEAD at generation |
+| 177 | `a7337a5` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 6; Current state and the Phase 17 table row advanced to "Package 6 of an unspecified count complete"; edges unchanged at 156; `surfaces.command` public surface now also 40 of 40; §9 re-derived, now pointing at Package 7 (the frontend) with the BACKEND_ONLY → BROWSER_SLICE same-commit requirement spelled out |
 | 178 | `9ff5030` | **PHASE 17 PACKAGE 7** — the frontend Visual Workflow Studio: `frontend/src/features/workflow/` (hand-rolled canvas, real pointer drag, real click-to-connect, no graph library), `useWorkflowStudio.ts`, the 10 published C-20 transport shapes in `contracts.ts`, the 8 routes/methods in `client.ts`, `workflow.py`'s routes flipped `BACKEND_ONLY` → `BROWSER_SLICE` in the same commit as the client wiring, `test_contract_drift.py`'s `surface_contract_names()` extended to `workflow_contracts.py`, `scripts/run_command_center.py`'s real `workflow_wiring`, and `workflow-studio.spec.ts` (5 real T10 Playwright tests: compose/drag/connect/publish, reload persistence, fresh-context persistence, execution pause + the ARK-REQ-0330 negative path (`ARK-ERR-0133`) + a real approval to `SUCCEEDED`). All 14 T10 specs pass. Zero new backend architecture-graph edges. No requirement discharged. |
+| 179 | `2949f8a` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 7; Current state and the Phase 17 table row advanced to "Package 7 of an unspecified count complete"; edges unchanged at 156; §9 re-derived, now pointing at Package 8 (the `acceptance.engine` coverage check for ARK-REQ-0331) with the public-surface-ceiling constraint and the anti-vacuity negative-control requirement spelled out ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -704,7 +705,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: a7337a5c385485437fa0a8f4287ee6dfdb3de022
+head: 2949f8afc966438ac1944dea8ed1b12817169209
 branch: main
 working_tree_clean: true
 
