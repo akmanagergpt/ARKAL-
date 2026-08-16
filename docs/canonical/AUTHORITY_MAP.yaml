@@ -37,6 +37,7 @@ allowed_sibling_edges:
   - {from: engineering.repair, to: engineering.candidate, reason: "repairs produce candidates"}
   - {from: lifecycle.evolution, to: lifecycle.release, reason: "promotion handoff"}
   - {from: lifecycle.recovery, to: lifecycle.release, reason: "reads stable revision pointer"}
+  - {from: control.specification, to: control.architecture, reason: "D-025: requirement/architecture intelligence composes the live authority map's concerns rather than duplicating them"}
 
 # ---------------------------------------------------------------------------
 # Architecture budgets. Numeric. Exception = HUMAN GATE 8 + ADR.
@@ -153,6 +154,7 @@ machine_autonomy:
 # ---------------------------------------------------------------------------
 concerns:
   - {concern: requirement_identity_and_classification, owner: control.specification}
+  - {concern: requirement_and_architecture_intelligence, owner: control.specification}
   - {concern: architecture_rules_and_budgets,          owner: control.architecture}
   - {concern: protected_core_membership,               owner: control.architecture, enforced_by: control.policy}
   - {concern: policy_decision,                         owner: control.policy}

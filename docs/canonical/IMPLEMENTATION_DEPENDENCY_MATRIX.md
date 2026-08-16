@@ -25,7 +25,7 @@ Legend — `GATE n` = human gate required to exit · `DENY` = policy-enforced pr
 | 12 | Candidate Workspace + Semantic Assembly | 11 | C-25 | — |
 | 13 | Acceptance Infrastructure + Evidence Graph | 6, 12 | C-16; Acceptance Engine | — |
 | 14 | Repair / Root Cause / Convergence | 13 | C-26 | — |
-| 15 | Requirement + Architecture Intelligence | 13 | — | — |
+| 15 | Requirement + Architecture Intelligence | 13 | C-37 | — |
 | 16 | AI Software Factory | 12, 14, 15 | full generation pipeline | — |
 | 17 | Visual Workflow Studio | 7, 8, 13 | C-20 | — |
 | 18 | Knowledge + Verified Components | 13 | C-28 | — |

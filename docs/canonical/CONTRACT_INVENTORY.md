@@ -60,8 +60,9 @@ Compatibility key: `STRICT` no breaking change without MAJOR + migration · `ADD
 | C-34 | Operations telemetry projection | `surfaces.operations` | owning authorities (read-only) | Command Center | HTTP | `docs/contracts/operations_api.md` | semver | ADDITIVE | `surfaces.operations` — no-fake-telemetry tests | 25 |
 | C-35 | Command Center HTTP API | `surfaces.command` | backend surfaces | React frontend, Tauri shell | HTTP | `docs/contracts/command_api.md` | semver | ADDITIVE | `surfaces.command` — E2E + drift tests | 5 onward |
 | C-36 | Product Evolution SDK contract | `lifecycle.evolution` | SDK | AI-native child products | INT | `docs/contracts/product_sdk.md` | semver | PINNED | `lifecycle.evolution` — child independence tests | 24 |
+| C-37 | Requirement + architecture blueprint | `control.specification` | requirement intelligence | `engineering.factory` (Phase 16, read-only), `control.architecture`/`control.capability` (referenced, not copied) | GRAPH | `docs/contracts/requirement_blueprint.md` | revision-hashed + semver | STRICT | `control.specification` — deterministic derivation + provenance tests | 15 |
 
-**36 contract families. 0 contracts with more than one owning context.**
+**37 contract families. 0 contracts with more than one owning context.**
 
 ## Protected Core contracts
 

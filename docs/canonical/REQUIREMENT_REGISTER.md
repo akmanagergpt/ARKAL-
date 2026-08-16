@@ -14,7 +14,7 @@
 7. Unwaived, unevaluable rules resolve to **APPLICABLE**.
 8. Exceptional waivers require HUMAN GATE 5, written justification, a waiver evidence artifact and an expiry condition.
 
-Source keys: **MS** = Master Specification · **BP** = Build Protocol · **VDC** = Verification & Delivery Contract.
+Source keys: **MS** = Master Specification · **BP** = Build Protocol · **VDC** = Verification & Delivery Contract · **D-0##** = human governance ruling recorded in `docs/build/DECISION_LOG.md`.
 Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integration · `sec`=security test · `e2e`=browser · `persist`=persistence · `chaos` · `mut`=mutation · `prop`=property · `prov`=provenance · `doc`=canonical document · `run`=real runtime · `human`=human gate record.
 
 ---
@@ -373,6 +373,32 @@ Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integ
 
 ---
 
+## Block 8 — Human governance rulings (ARK-REQ-0381 … 0395)
+
+Unlike Blocks 1–7, these entries are not sourced from MS/BP/VDC text. They repair a genuine canonical gap: Phase 15 (Requirement + Architecture Intelligence) and four D-026 routing responsibilities owned nothing in this register, `CONTRACT_INVENTORY.md` or `AUTHORITY_MAP.yaml` before D-025/D-026 (`docs/build/DECISION_LOG.md`), confirmed by read-only research before any entry here was written. IDs continue sequentially from the highest previously allocated (`ARK-REQ-0380`) rather than using either MS-block reserved gap (`0187–0199`, `0244–0299`), because those gaps are reserved for MS/BP-sourced content and using one here would misattribute source.
+
+| ID | Requirement | Source | Class | Phase | Owner | Evidence |
+|---|---|---|---|---|---|---|
+| ARK-REQ-0381 | Accepts a human product goal and deterministically normalizes/decomposes it into candidate requirements, repeatably for identical input and canonical state | D-025 | MANDATORY | 15 | control.specification | contract, integ, prop |
+| ARK-REQ-0382 | Provenance recorded from every derived candidate requirement back to its originating goal/source, content-addressed | D-025 | MANDATORY | 15 | control.specification | prov, integ |
+| ARK-REQ-0383 | Ambiguity, contradiction, underspecification and missing acceptance criteria are mechanically detected and recorded as explicit unresolved governed questions; unresolved semantics are never silently invented | D-025 | MANDATORY | 15 | control.specification | integ, prop |
+| ARK-REQ-0384 | Explicit acceptance criteria are produced for candidate requirements mechanically derivable from declared structure, and left unresolved otherwise | D-025 | MANDATORY | 15 | control.specification | contract, integ |
+| ARK-REQ-0385 | Candidate requirements are classified by category (functional/non-functional/security/data/integration/UI/operations) from a closed canonical vocabulary where derivable | D-025 | MANDATORY | 15 | control.specification | contract, unit |
+| ARK-REQ-0386 | Architecture constraints and capability/component ownership are derived by composing the existing `control.architecture` and `control.capability` authorities; no second architecture or ownership authority is created | D-025 | MANDATORY | 15 | control.specification | arch, integ |
+| ARK-REQ-0387 | A machine-readable product/requirement blueprint is produced, consumable by Phase 16 without Phase 15 executing any generation itself | D-025 | MANDATORY | 15 | control.specification | contract, integ |
+| ARK-REQ-0388 | User/product requirement records are structurally distinct from canonical `ARK-REQ` governance requirement records (`C-04`); neither conflates with or discharges the other | D-025 | MANDATORY | 15 | control.specification | arch, contract |
+| ARK-REQ-0389 | Blueprint revisions carry a stable identity and comparable content lineage so later user changes can be compared against prior blueprints | D-025 | MANDATORY | 15 | control.specification | contract, prov |
+| ARK-REQ-0390 | Phase 15 produces no executable product code; product/software generation remains Phase 16's sole responsibility | D-025 | MANDATORY | 15 | control.policy | arch, sec |
+| ARK-REQ-0391 | Phase 15 renders no acceptance verdict; `acceptance.engine` remains the sole acceptance authority over any blueprint or downstream candidate | D-025 | MANDATORY | 15 | control.policy | arch, sec, prop |
+| ARK-REQ-0392 | Adaptive execution routing composes the existing provider/capability/scheduler/agent/knowledge/repair authorities in the declared eight-tier preference order; no shadow copy of any composed authority's data is created | D-026 | MANDATORY | 16 | engineering.factory | arch, integ, prop |
+| ARK-REQ-0393 | Failover to another eligible worker on provider quota/capacity/auth/session unavailability preserves durable task state and never produces a false PASS; repeated use of one failing strategy is bounded by the existing repair-budget mechanism | D-026 | MANDATORY | 16 | engineering.factory | integ, prop, chaos |
+| ARK-REQ-0394 | Per-model, per-task-class empirical outcome statistics are recorded only from verified results; a model's self-reported performance claim is never treated as evidence | D-026 | MANDATORY | 18 | engineering.knowledge | integ, prov |
+| ARK-REQ-0395 | Operations telemetry additionally surfaces per-task latency and verified quality-outcome signals alongside the existing hardware/cost dimensions, sourced from real execution and verification results | D-026 | CONDITIONAL | 25 | surfaces.operations | integ, sec |
+
+`ARK-REQ-0392`/`0393`/`0394` are implementation obligations of phases not yet started (16, 18); recording them now does not begin that implementation. Two D-026 areas were audited and found already sufficient, so no new entry was added for them: Phase 22 (`engineering.localai`) already carries `ARK-REQ-0016`/`0129`/`0130` for hardware-aware, reference-not-copy local execution, and Phase 30/31 already require a real provider or local model (`ARK-REQ-0234`/`0235`) and a Direct-AI value comparison (`ARK-REQ-0362`) — both cover D-026's remaining claims without a further requirement.
+
+---
+
 ## Appendix A — CONDITIONAL applicability rules
 
 Every rule is objective and machine-evaluable from recorded system state. No rule may be authored, amended or reinterpreted by an implementing actor.
@@ -387,6 +413,7 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 | ARK-REQ-0356 | Per dimension: `hardware.probe.<dimension>_available == true` (GPU/VRAM) or `provider.registry.<id>.cost_reporting == true` (cost/token). Absence of a dimension is NOT_APPLICABLE only for that dimension |
 | ARK-REQ-0362 | `provider.registry.configured_real_count >= 1` AND `acceptance.golden_product_suite == PASS` |
 | ARK-REQ-0369 | `ecosystem.sbom_supported == true` for the target ecosystem (Python, Node and Rust all evaluate true) |
+| ARK-REQ-0395 | Per dimension: `knowledge.verified_outcome_count > 0` (quality) or `execution.probe.latency_available == true` (latency). Absence of a dimension is NOT_APPLICABLE only for that dimension |
 
 **OPTIONAL entries:** ARK-REQ-0167 (MCP adapters), ARK-REQ-0181 (air-gapped signed bundles). Optional entries do not contribute to mandatory coverage and never block release.
 
@@ -396,14 +423,14 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 
 | Metric | Value |
 |---|---|
-| Total registered requirements | **313 entries** (highest ID allocated: ARK-REQ-0380) |
-| MANDATORY | 303 |
-| CONDITIONAL | 8 |
+| Total registered requirements | **328 entries** (highest ID allocated: ARK-REQ-0395) |
+| MANDATORY | 317 |
+| CONDITIONAL | 9 |
 | OPTIONAL | 2 |
 | Duplicate IDs | 0 |
-| Entries with owner assigned | 313 (100%) |
-| Entries with evidence definition | 313 (100%) |
-| CONDITIONAL entries with objective rule in Appendix A | 8 (100%) |
+| Entries with owner assigned | 328 (100%) |
+| Entries with evidence definition | 328 (100%) |
+| CONDITIONAL entries with objective rule in Appendix A | 9 (100%) |
 | Orphan applicability rules (rule with no CONDITIONAL entry) | 0 |
 | Requirements verified | 0 — Phase 0 produces no implementation and claims no coverage |
 
