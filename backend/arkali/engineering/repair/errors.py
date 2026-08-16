@@ -27,3 +27,10 @@ class RepeatedFailedStrategyError(ContractViolation):
     """The same strategy was already attempted for this failure and cause."""
 
     code = "ARK-ERR-0111"
+
+
+class IllegalPipelineTransition(ContractViolation):
+    """A repair attempt tried to skip, reorder, repeat or leave the governed
+    BP §Failure protocol stage sequence (D-024)."""
+
+    code = "ARK-ERR-0112"
