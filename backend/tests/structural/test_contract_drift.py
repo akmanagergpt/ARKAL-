@@ -31,7 +31,7 @@ from pydantic import BaseModel
 
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.surfaces.command import contracts
+from arkali.surfaces.command import contracts, workflow_contracts
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
     BROWSER_SLICE,
@@ -54,12 +54,51 @@ CLIENT_TS: Final[pathlib.Path] = FRONTEND_SRC / "api" / "client.ts"
 _ENDPOINT = re.compile(r"method:\s*'(?P<method>\w+)',\s*path:\s*'(?P<path>[^']+)'")
 
 
+def _workflow_wiring(pdp: PolicyDecisionPoint):
+    """Build the C-20 composition-root wiring `create_app` accepts.
+
+    This test module lives outside `backend/arkali/` and outside the measured
+    architecture graph, exactly like `scripts/run_command_center.py` and
+    `tests/surfaces/test_command_workflow_api.py` - a direct import of
+    `execution.workflow` here composes the real objects without adding an edge
+    the architecture budget would ever see.
+    """
+    from arkali.control.policy.workflow_approval import WorkflowApprovalGate
+    from arkali.execution.workflow.executor import WorkflowExecutor
+    from arkali.execution.workflow.graph_model import WorkflowEdge, WorkflowGraphDocument, WorkflowNode
+    from arkali.execution.workflow.graph_store import WorkflowGraphStore
+    from arkali.execution.workflow.graph_vocabulary import GraphVocabulary
+
+    vocabulary = GraphVocabulary.load(REPO)
+    approval_gate = WorkflowApprovalGate.load(REPO)
+
+    def document_builder(workflow_id, nodes, edges):
+        return WorkflowGraphDocument.build(
+            vocabulary, workflow_id,
+            nodes=[WorkflowNode(**n) for n in nodes],
+            edges=[WorkflowEdge(**e) for e in edges],
+        )
+
+    def graph_store_factory(session):
+        from arkali.control.policy.pep import PolicyEnforcementPoint
+
+        return WorkflowGraphStore(
+            session, PolicyEnforcementPoint(pdp, "execution.workflow.graph_store"), vocabulary
+        )
+
+    def executor_factory(session):
+        return WorkflowExecutor(session, pdp, vocabulary, approval_gate)
+
+    return document_builder, graph_store_factory, executor_factory
+
+
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
     """A real application, so the contract is generated and never transcribed."""
     database = tmp_path_factory.mktemp("contract") / "drift.db"
     engine = create_persistence_engine(sqlite_url(database))
-    return create_app(engine, PolicyDecisionPoint.load(REPO))
+    pdp = PolicyDecisionPoint.load(REPO)
+    return create_app(engine, pdp, workflow_wiring=_workflow_wiring(pdp))
 
 
 def canonical(schema: dict[str, Any]) -> str:
@@ -123,12 +162,18 @@ def surface_contract_names() -> frozenset[str]:
     FastAPI publishes `HTTPValidationError` and `ValidationError` of its own.
     They are the framework's contract, not this surface's, and the frontend does
     not declare them.
+
+    Spans both `contracts.py` and `workflow_contracts.py` - the latter split
+    out in Package 6 purely for `max_public_symbols_per_module`, not because
+    its shapes belong to a different surface.
     """
+    modules = (contracts, workflow_contracts)
     return frozenset(
         name
-        for name, value in vars(contracts).items()
+        for module in modules
+        for name, value in vars(module).items()
         if isinstance(value, type) and issubclass(value, BaseModel)
-        and value.__module__ == contracts.__name__
+        and value.__module__ == module.__name__
     )
 
 
@@ -185,6 +230,16 @@ class TestTransportTypesMatchTheBackend:
             "HealthResponse",
             "LifecycleMachineResponse",
             "ErrorResponse",
+            "WorkflowNodeShape",
+            "WorkflowEdgeShape",
+            "PublishWorkflowRevisionRequest",
+            "WorkflowRevisionResponse",
+            "WorkflowRevisionDetailResponse",
+            "WorkflowRevisionListResponse",
+            "StartExecutionRequest",
+            "ApproveExecutionRequest",
+            "WorkflowNodeExecutionResponse",
+            "WorkflowExecutionDetailResponse",
         }
         assert exchanged <= declared
 

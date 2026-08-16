@@ -24,6 +24,8 @@ from __future__ import annotations
 import argparse
 import pathlib
 import sys
+from collections.abc import Callable
+from typing import Any
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
@@ -31,14 +33,58 @@ sys.path.insert(0, str(ROOT / "backend"))
 import uvicorn  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
 
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
+from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
+from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
+from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
+from arkali.execution.workflow.graph_model import (  # noqa: E402
+    WorkflowEdge,
+    WorkflowGraphDocument,
+    WorkflowNode,
+)
+from arkali.execution.workflow.graph_store import WorkflowGraphStore  # noqa: E402
+from arkali.execution.workflow.graph_vocabulary import GraphVocabulary  # noqa: E402
 from arkali.kernel.persistence.engine import (  # noqa: E402
     create_persistence_engine,
     sqlite_url,
 )
 from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
 from arkali.surfaces.command.app import create_app  # noqa: E402
+
+
+def _workflow_wiring(
+    pdp: PolicyDecisionPoint, repo_root: pathlib.Path
+) -> tuple[Callable[..., Any], Callable[..., Any], Callable[..., Any]]:
+    """The C-20 composition-root wiring, built once over the real vocabulary
+    and approval gate. This script lives outside `backend/arkali/` and outside
+    the measured architecture graph, so composing `execution.workflow`'s real
+    objects here - exactly as the backend integration tests already do - adds
+    no edge the architecture budget would ever see. See `workflow.py`'s module
+    docstring for why `surfaces.command` itself may not import them directly.
+    """
+    vocabulary = GraphVocabulary.load(repo_root)
+    approval_gate = WorkflowApprovalGate.load(repo_root)
+
+    def document_builder(
+        workflow_id: str, nodes: list[dict[str, Any]], edges: list[dict[str, Any]]
+    ) -> WorkflowGraphDocument:
+        return WorkflowGraphDocument.build(
+            vocabulary,
+            workflow_id,
+            nodes=[WorkflowNode(**n) for n in nodes],
+            edges=[WorkflowEdge(**e) for e in edges],
+        )
+
+    def graph_store_factory(session: Session) -> WorkflowGraphStore:
+        pep = PolicyEnforcementPoint(pdp, "execution.workflow.graph_store")
+        return WorkflowGraphStore(session, pep, vocabulary)
+
+    def executor_factory(session: Session) -> WorkflowExecutor:
+        return WorkflowExecutor(session, pdp, vocabulary, approval_gate)
+
+    return document_builder, graph_store_factory, executor_factory
 
 
 def migrate(database: pathlib.Path) -> None:
@@ -79,7 +125,8 @@ def main(argv: list[str]) -> int:
     migrate(database)
 
     engine = create_persistence_engine(sqlite_url(database))
-    app = create_app(engine, PolicyDecisionPoint.load(ROOT))
+    pdp = PolicyDecisionPoint.load(ROOT)
+    app = create_app(engine, pdp, workflow_wiring=_workflow_wiring(pdp, ROOT))
     print(f"command center on http://{args.host}:{args.port} over {database}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0

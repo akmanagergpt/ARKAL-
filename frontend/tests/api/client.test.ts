@@ -142,6 +142,14 @@ describe('ArkaliApiClient', () => {
       'GET /api/projects/{project_id}',
       'POST /api/projects/{project_id}/transitions',
       'POST /api/projects/{project_id}/revisions',
+      'POST /api/workflows/{workflow_id}/revisions',
+      'GET /api/workflows/{workflow_id}',
+      'GET /api/workflows/{workflow_id}/revisions',
+      'GET /api/workflows/{workflow_id}/revisions/{revision_number}',
+      'POST /api/workflows/{workflow_id}/executions',
+      'GET /api/workflows/{workflow_id}/executions/{execution_id}',
+      'POST /api/workflows/{workflow_id}/executions/{execution_id}/signal',
+      'POST /api/workflows/{workflow_id}/executions/{execution_id}/approve',
     ]);
   });
 });

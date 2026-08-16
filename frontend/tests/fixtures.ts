@@ -12,6 +12,8 @@ import type {
   LifecycleMachineResponse,
   ProjectDetailResponse,
   ProjectListResponse,
+  WorkflowExecutionDetailResponse,
+  WorkflowRevisionDetailResponse,
 } from '@/api/contracts';
 
 export const DRAFT_PROJECT: ProjectDetailResponse = {
@@ -104,3 +106,68 @@ export function stubFetch(routes: Record<string, Route | Route[]>): {
 export function refusal(code: string, message: string): { code: string; message: string } {
   return { code, message };
 }
+
+export const PUBLISHED_REVISION: WorkflowRevisionDetailResponse = {
+  workflow_id: 'wf-studio',
+  revision_number: 1,
+  semver: '1.0.0',
+  revision_hash: 'sha256:abc123',
+  created_at: '2026-08-09T09:00:00Z',
+  nodes: [
+    {
+      node_id: 'n-trigger',
+      kind: 'trigger',
+      control_construct: null,
+      label: 'Start',
+      parameters: {},
+      position_x: 80,
+      position_y: 80,
+    },
+    {
+      node_id: 'n-approval',
+      kind: 'logic',
+      control_construct: 'HUMAN APPROVAL',
+      label: 'HUMAN APPROVAL',
+      parameters: {},
+      position_x: 280,
+      position_y: 80,
+    },
+  ],
+  edges: [
+    {
+      edge_id: 'e-1',
+      source_node_id: 'n-trigger',
+      target_node_id: 'n-approval',
+      condition: null,
+    },
+  ],
+};
+
+export const WAITING_APPROVAL_EXECUTION: WorkflowExecutionDetailResponse = {
+  execution_id: 'exec-studio-1',
+  workflow_id: 'wf-studio',
+  revision_number: 1,
+  bound_revision_hash: 'sha256:abc123',
+  lifecycle_state: 'WAITING_APPROVAL',
+  pending_approval_node_id: 'n-approval',
+  created_at: '2026-08-09T09:01:00Z',
+  updated_at: '2026-08-09T09:01:00Z',
+  evidence: [
+    {
+      sequence: 1,
+      node_id: 'n-trigger',
+      kind: 'trigger',
+      control_construct: null,
+      revision_hash: 'sha256:abc123',
+      outcome: 'DISPATCHED',
+      job_id: 'exec-studio-1:n-trigger:1',
+      recorded_at: '2026-08-09T09:01:00Z',
+    },
+  ],
+};
+
+export const SUCCEEDED_EXECUTION: WorkflowExecutionDetailResponse = {
+  ...WAITING_APPROVAL_EXECUTION,
+  lifecycle_state: 'SUCCEEDED',
+  pending_approval_node_id: null,
+};

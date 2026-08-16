@@ -244,10 +244,13 @@ class TestExecutions:
         assert response.status_code == 403
 
 
-class TestNoRouteIsBrowserSlice:
-    def test_every_workflow_route_is_backend_only(self, app: FastAPI) -> None:
-        """Package 6 delivers no frontend; Package 7 flips the tag when it
-        does, in the same commit that wires the client."""
+class TestRouteAudienceIsBrowserSlice:
+    def test_every_workflow_route_is_browser_slice(self, app: FastAPI) -> None:
+        """Package 6 tagged these `backend-only` because no frontend called
+        them yet. Package 7's Studio UI calls every one of them through
+        `ArkaliApiClient`, added in the same commit as this flip -
+        `test_contract_drift.py` enforces that a `browser-slice` route is
+        never left uncalled and a `backend-only` route is never called."""
         schema = app.openapi()
         workflow_routes = {
             path: operations
@@ -257,6 +260,6 @@ class TestNoRouteIsBrowserSlice:
         assert workflow_routes, "no workflow route published; this control would be vacuous"
         for path, operations in workflow_routes.items():
             for method, operation in operations.items():
-                assert operation.get("tags") == ["backend-only"], (
-                    f"{method.upper()} {path} is not backend-only"
+                assert operation.get("tags") == ["browser-slice"], (
+                    f"{method.upper()} {path} is not browser-slice"
                 )

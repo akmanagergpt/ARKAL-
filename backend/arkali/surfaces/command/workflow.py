@@ -30,10 +30,11 @@ and `revision_hash` are always derived by the store, never trusted from the
 wire - the same discipline Phase 5's routes already apply to a Project's
 lifecycle state.
 
-BACKEND-ONLY UNTIL A FRONTEND CALLS IT. Package 7 wires the Studio UI to
-these routes and flips their audience tag to `BROWSER_SLICE` in the same
-commit that adds the TypeScript client entries - `test_contract_drift.py`
-requires every `BROWSER_SLICE` route to already be called, and none is yet.
+BROWSER_SLICE AS OF PACKAGE 7. The Studio UI (`frontend/src/features/workflow`)
+calls every route below through `ArkaliApiClient`, added in the same commit
+that flips this tag - `test_contract_drift.py` requires every `BROWSER_SLICE`
+route to already be called, and refuses a `BACKEND_ONLY` route the client
+calls, so the two edits are inseparable.
 """
 
 from __future__ import annotations
@@ -45,7 +46,7 @@ from typing import Any, Protocol
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from arkali.surfaces.command.contracts import BACKEND_ONLY
+from arkali.surfaces.command.contracts import BROWSER_SLICE
 from arkali.surfaces.command.workflow_contracts import (
     ApproveExecutionRequest,
     PublishWorkflowRevisionRequest,
@@ -202,7 +203,7 @@ def build_workflow_router(
 ) -> APIRouter:
     """The C-20 workflow routes, over collaborators the composition root
     supplies - never constructed here. See the module docstring for why."""
-    router = APIRouter(prefix="/api", tags=[BACKEND_ONLY])
+    router = APIRouter(prefix="/api", tags=[BROWSER_SLICE])
 
     @router.post(
         "/workflows/{workflow_id}/revisions",

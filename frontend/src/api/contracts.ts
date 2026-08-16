@@ -78,3 +78,95 @@ export interface ErrorResponse {
   code: string;
   message: string;
 }
+
+/**
+ * C-20 workflow graph shapes (Phase 17).
+ *
+ * `WorkflowNodeShape`/`WorkflowEdgeShape` are projected field-for-field from
+ * `execution.workflow.graph_model`'s value objects. `kind` and
+ * `control_construct` are plain strings here, never a union: the canonical
+ * vocabulary lives in `GraphVocabulary`, parsed from the VDC, and this file
+ * declaring a union would be a second, driftable copy of it. A graph the
+ * Studio composes is only ever validated by the backend's `publish` call —
+ * the same "offer it, let the backend refuse it" discipline the Project
+ * lifecycle picklist already uses.
+ */
+export interface WorkflowNodeShape {
+  node_id: string;
+  kind: string;
+  control_construct: string | null;
+  label: string;
+  parameters: Record<string, unknown>;
+  position_x: number;
+  position_y: number;
+}
+
+export interface WorkflowEdgeShape {
+  edge_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  condition: string | null;
+}
+
+export interface PublishWorkflowRevisionRequest {
+  nodes: WorkflowNodeShape[];
+  edges: WorkflowEdgeShape[];
+  semver_bump: string;
+}
+
+export interface WorkflowRevisionResponse {
+  workflow_id: string;
+  revision_number: number;
+  semver: string;
+  revision_hash: string;
+  created_at: string;
+}
+
+export interface WorkflowRevisionDetailResponse {
+  workflow_id: string;
+  revision_number: number;
+  semver: string;
+  revision_hash: string;
+  created_at: string;
+  nodes: WorkflowNodeShape[];
+  edges: WorkflowEdgeShape[];
+}
+
+export interface WorkflowRevisionListResponse {
+  revisions: WorkflowRevisionResponse[];
+}
+
+export interface StartExecutionRequest {
+  execution_id: string;
+  revision_number: number | null;
+}
+
+export interface ApproveExecutionRequest {
+  node_id: string;
+  actor: string;
+  decision: string;
+  approved_revision_hash: string;
+}
+
+export interface WorkflowNodeExecutionResponse {
+  sequence: number;
+  node_id: string;
+  kind: string;
+  control_construct: string | null;
+  revision_hash: string;
+  outcome: string;
+  job_id: string | null;
+  recorded_at: string;
+}
+
+export interface WorkflowExecutionDetailResponse {
+  execution_id: string;
+  workflow_id: string;
+  revision_number: number;
+  bound_revision_hash: string;
+  lifecycle_state: string;
+  pending_approval_node_id: string | null;
+  created_at: string;
+  updated_at: string;
+  evidence: WorkflowNodeExecutionResponse[];
+}

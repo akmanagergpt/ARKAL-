@@ -14,13 +14,19 @@
  */
 
 import type {
+  ApproveExecutionRequest,
   CreateProjectRequest,
   CreateRevisionRequest,
   HealthResponse,
   LifecycleMachineResponse,
   ProjectDetailResponse,
   ProjectListResponse,
+  PublishWorkflowRevisionRequest,
+  StartExecutionRequest,
   TransitionRequest,
+  WorkflowExecutionDetailResponse,
+  WorkflowRevisionDetailResponse,
+  WorkflowRevisionListResponse,
 } from './contracts';
 
 /**
@@ -38,6 +44,26 @@ export const ENDPOINTS = {
   getProject: { method: 'GET', path: '/api/projects/{project_id}' },
   transitionProject: { method: 'POST', path: '/api/projects/{project_id}/transitions' },
   createRevision: { method: 'POST', path: '/api/projects/{project_id}/revisions' },
+  publishWorkflowRevision: { method: 'POST', path: '/api/workflows/{workflow_id}/revisions' },
+  getLatestWorkflowRevision: { method: 'GET', path: '/api/workflows/{workflow_id}' },
+  listWorkflowRevisions: { method: 'GET', path: '/api/workflows/{workflow_id}/revisions' },
+  getWorkflowRevision: {
+    method: 'GET',
+    path: '/api/workflows/{workflow_id}/revisions/{revision_number}',
+  },
+  startWorkflowExecution: { method: 'POST', path: '/api/workflows/{workflow_id}/executions' },
+  getWorkflowExecution: {
+    method: 'GET',
+    path: '/api/workflows/{workflow_id}/executions/{execution_id}',
+  },
+  signalWorkflowExecution: {
+    method: 'POST',
+    path: '/api/workflows/{workflow_id}/executions/{execution_id}/signal',
+  },
+  approveWorkflowExecution: {
+    method: 'POST',
+    path: '/api/workflows/{workflow_id}/executions/{execution_id}/approve',
+  },
 } as const;
 
 /**
@@ -194,6 +220,90 @@ export class ArkaliApiClient {
   ): Promise<ProjectDetailResponse> {
     return this.request<ProjectDetailResponse>(ENDPOINTS.createRevision, {
       params: { project_id: projectId },
+      body,
+    });
+  }
+
+  /**
+   * Publish a declared graph as the next revision. `WorkflowGraphStore`
+   * derives the revision number and content hash; neither is sent here.
+   */
+  publishWorkflowRevision(
+    workflowId: string,
+    body: PublishWorkflowRevisionRequest,
+  ): Promise<WorkflowRevisionDetailResponse> {
+    return this.request<WorkflowRevisionDetailResponse>(ENDPOINTS.publishWorkflowRevision, {
+      params: { workflow_id: workflowId },
+      body,
+    });
+  }
+
+  getLatestWorkflowRevision(workflowId: string): Promise<WorkflowRevisionDetailResponse> {
+    return this.request<WorkflowRevisionDetailResponse>(ENDPOINTS.getLatestWorkflowRevision, {
+      params: { workflow_id: workflowId },
+    });
+  }
+
+  listWorkflowRevisions(workflowId: string): Promise<WorkflowRevisionListResponse> {
+    return this.request<WorkflowRevisionListResponse>(ENDPOINTS.listWorkflowRevisions, {
+      params: { workflow_id: workflowId },
+    });
+  }
+
+  getWorkflowRevision(
+    workflowId: string,
+    revisionNumber: number,
+  ): Promise<WorkflowRevisionDetailResponse> {
+    return this.request<WorkflowRevisionDetailResponse>(ENDPOINTS.getWorkflowRevision, {
+      params: { workflow_id: workflowId, revision_number: String(revisionNumber) },
+    });
+  }
+
+  /**
+   * Start an execution. The backend runs the frontier walk synchronously
+   * until it pauses (`WAITING_SIGNAL`/`WAITING_APPROVAL`) or reaches a
+   * terminal state, and returns that state plus the evidence so far.
+   */
+  startWorkflowExecution(
+    workflowId: string,
+    body: StartExecutionRequest,
+  ): Promise<WorkflowExecutionDetailResponse> {
+    return this.request<WorkflowExecutionDetailResponse>(ENDPOINTS.startWorkflowExecution, {
+      params: { workflow_id: workflowId },
+      body,
+    });
+  }
+
+  getWorkflowExecution(
+    workflowId: string,
+    executionId: string,
+  ): Promise<WorkflowExecutionDetailResponse> {
+    return this.request<WorkflowExecutionDetailResponse>(ENDPOINTS.getWorkflowExecution, {
+      params: { workflow_id: workflowId, execution_id: executionId },
+    });
+  }
+
+  signalWorkflowExecution(
+    workflowId: string,
+    executionId: string,
+  ): Promise<WorkflowExecutionDetailResponse> {
+    return this.request<WorkflowExecutionDetailResponse>(ENDPOINTS.signalWorkflowExecution, {
+      params: { workflow_id: workflowId, execution_id: executionId },
+    });
+  }
+
+  /**
+   * Record a HUMAN APPROVAL decision. Nothing here decides whether it
+   * counts: `control.policy.WorkflowApprovalGate` answers, and a stale or
+   * disallowed decision returns an `ApiRefusal` carrying its own reason.
+   */
+  approveWorkflowExecution(
+    workflowId: string,
+    executionId: string,
+    body: ApproveExecutionRequest,
+  ): Promise<WorkflowExecutionDetailResponse> {
+    return this.request<WorkflowExecutionDetailResponse>(ENDPOINTS.approveWorkflowExecution, {
+      params: { workflow_id: workflowId, execution_id: executionId },
       body,
     });
   }
