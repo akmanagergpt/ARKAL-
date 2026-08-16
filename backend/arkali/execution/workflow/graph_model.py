@@ -200,6 +200,37 @@ class WorkflowGraphDocument:
             )
         )
 
+    def to_dict(self) -> dict[str, Any]:
+        """A plain, JSON-serialisable rendering, for persistence.
+
+        Not the identity payload (`content_hash` computes that separately from
+        the normalised `rendering()` tuples); this is the full declared
+        content a store round-trips through `from_dict`.
+        """
+        return {
+            "workflow_id": self.workflow_id,
+            "nodes": [n.model_dump(mode="json") for n in self.nodes()],
+            "edges": [e.model_dump(mode="json") for e in self.edges()],
+        }
+
+    @classmethod
+    def from_dict(
+        cls, vocabulary: GraphVocabulary, data: dict[str, Any]
+    ) -> WorkflowGraphDocument:
+        """Rebuild and re-validate from a stored rendering.
+
+        Routes through `build`, so a persisted document is proven valid again
+        on every read rather than trusted because it was valid once - the
+        `WORKFLOW GRAPH IDENTITY` rule that identity is never taken on a
+        caller's (here, the database's) word.
+        """
+        return cls.build(
+            vocabulary,
+            str(data["workflow_id"]),
+            nodes=[WorkflowNode.model_validate(n) for n in data["nodes"]],
+            edges=[WorkflowEdge.model_validate(e) for e in data["edges"]],
+        )
+
     @property
     def content_hash(self) -> str:
         """The canonical content address of exactly this graph's declared

@@ -51,12 +51,14 @@ MAPPED_RECORD_MODULES = (
     "arkali.evidence.artifact.records",
     "arkali.evidence.audit.records",
     "arkali.execution.durable.records",
+    "arkali.execution.workflow.records",
 )
 
 import arkali.control.registry.project.records  # noqa: E402,F401
 import arkali.evidence.artifact.records  # noqa: E402,F401
 import arkali.evidence.audit.records  # noqa: E402,F401
 import arkali.execution.durable.records  # noqa: E402,F401
+import arkali.execution.workflow.records  # noqa: E402,F401
 
 target_metadata = PersistenceBase.metadata
 

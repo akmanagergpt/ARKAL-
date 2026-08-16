@@ -139,3 +139,39 @@ class NonDeterministicGraphRebuild(ContractViolation):
     produced a different address than the one it was constructed with."""
 
     code = "ARK-ERR-0128"
+
+
+class UnknownWorkflow(ContractViolation):
+    """No workflow is registered under a given workflow id."""
+
+    code = "ARK-ERR-0129"
+
+
+class UnknownWorkflowRevision(ContractViolation):
+    """No revision is registered under a given (workflow id, revision
+    number)."""
+
+    code = "ARK-ERR-0130"
+
+
+class ImmutableRevisionViolation(ContractViolation):
+    """A persisted revision was updated or deleted.
+
+    A restart, an executor and a reader all trust that a revision, once
+    persisted, reads back identically forever - the C-20 "revision-hashed"
+    half of its declared versioning is meaningless otherwise.
+    """
+
+    code = "ARK-ERR-0131"
+
+
+class RevisionIntegrityViolation(ContractViolation):
+    """A persisted revision's stored content hash does not match the hash
+    recomputed from its stored declared content.
+
+    Never trusted on read: `WorkflowGraphStore` recomputes the hash from the
+    stored nodes/edges every time and refuses a mismatch, rather than reading
+    the stored hash column as if it were self-certifying.
+    """
+
+    code = "ARK-ERR-0132"
