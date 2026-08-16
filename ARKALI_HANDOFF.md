@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `8565f76e9f87ac1bb8248f2f11508f5ab749cdc9` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `a7337a5c385485437fa0a8f4287ee6dfdb3de022` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -339,7 +339,10 @@ repository, the repository wins.
 | 171 | `100f759` | **PHASE 17 PACKAGE 4** — `control.policy`'s `WorkflowApprovalGate` (ARK-REQ-0330): `assert_may_record` refuses any canonical automated actor (already names `workflow`); `is_enforced_approval` refuses a non-`APPROVED` decision or a stale-revision approval. Additive, no PDP/`policy_contract.py` change, no new cross-context edge. No requirement discharged. |
 | 172 | `1c92837` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraphs for Packages 3–4; Current state and the Phase 17 table row advanced to "Package 4 of an unspecified count complete"; §9 re-derived and condensed, now pointing at Package 5 (the executor) with its exact composition spelled out |
 | 173 | `29c70b3` | **PHASE 17 PACKAGE 5** — the workflow executor: `executor.py`'s `WorkflowExecutor` composing the canonical `WorkflowExecution` machine, `WorkflowGraphStore`, `CompiledExecutionPlan.require_fresh`, `execution.durable`'s `JobExecution`/`JobStore` and `WorkflowApprovalGate`; `construct_dispatch.py` (all 10 control constructs behind one public `evaluate_construct`); `execution_records.py`; migration `0009_workflow_execution`; `test_workflow_authority.py`. 41 new tests. No requirement discharged. |
-| 174 | `8565f76` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 5; Current state and the Phase 17 table row advanced to "Package 5 of an unspecified count complete"; live edges 148 → 156; `execution.workflow` public surface now 40 of 40; §9 re-derived, now pointing at Package 6 (the `surfaces.command` HTTP router) with its exact shape spelled out ← HEAD at generation |
+| 174 | `8565f76` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 5; Current state and the Phase 17 table row advanced to "Package 5 of an unspecified count complete"; live edges 148 → 156; `execution.workflow` public surface now 40 of 40; §9 re-derived, now pointing at Package 6 (the `surfaces.command` HTTP router) with its exact shape spelled out |
+| 175 | `87c4df7` | **GOVERNANCE TEST FIX** — Package 4's added sentence put a bare backtick-wrapped `kernel.contracts.errors` earlier in §3's row than the real fan-in claim, so `test_an_unresolvable_fan_in_subject_fails_closed`'s single-occurrence mutation rewrote the wrong sentence. Reworded without repeating the exact substring; no governed path touched. |
+| 176 | `ac21766` | **PHASE 17 PACKAGE 6** — `surfaces.command`'s C-20 HTTP API: `workflow.py` (8 routes, `BACKEND_ONLY`), `workflow_contracts.py`, `workflow_error_mapping.py` (class-name matched, not `isinstance`). Zero new `execution.workflow` import: structural `Protocol`s + composition-root-injected factories avoid extending the real four-hop `execution.workflow → execution.durable → control.policy → kernel.contracts` chain to five. `create_app`'s new `workflow_wiring` parameter defaults to `None`. 10 new integration tests via `TestClient`. No requirement discharged. |
+| 177 | `a7337a5` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraph for Package 6; Current state and the Phase 17 table row advanced to "Package 6 of an unspecified count complete"; edges unchanged at 156; `surfaces.command` public surface now also 40 of 40; §9 re-derived, now pointing at Package 7 (the frontend) with the BACKEND_ONLY → BROWSER_SLICE same-commit requirement spelled out ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -695,7 +698,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 8565f76e9f87ac1bb8248f2f11508f5ab749cdc9
+head: a7337a5c385485437fa0a8f4287ee6dfdb3de022
 branch: main
 working_tree_clean: true
 
