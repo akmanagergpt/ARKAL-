@@ -38,6 +38,7 @@ allowed_sibling_edges:
   - {from: lifecycle.evolution, to: lifecycle.release, reason: "promotion handoff"}
   - {from: lifecycle.recovery, to: lifecycle.release, reason: "reads stable revision pointer"}
   - {from: control.specification, to: control.architecture, reason: "D-025: requirement/architecture intelligence composes the live authority map's concerns rather than duplicating them"}
+  - {from: engineering.factory, to: engineering.repair, reason: "D-026 / ARK-REQ-0393: failover reuses the existing C-26 anti-loop/budget mechanism rather than a second one"}
 
 # ---------------------------------------------------------------------------
 # Architecture budgets. Numeric. Exception = HUMAN GATE 8 + ADR.
