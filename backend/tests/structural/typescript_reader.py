@@ -38,6 +38,7 @@ _IMPORT = re.compile(
     re.MULTILINE,
 )
 _COMMENT_LINE = re.compile(r"^\s*(//|\*|/\*)")
+_STRING_ITEM = re.compile(r"'([^']*)'")
 
 
 def sources(root: pathlib.Path) -> list[pathlib.Path]:
@@ -96,6 +97,27 @@ def interfaces_of(path: pathlib.Path, *, strict: bool = True) -> dict[str, dict[
     if strict and not found:
         raise AssertionError(f"{path.name}: no exported interface was found")
     return found
+
+
+def string_array_of(path: pathlib.Path, name: str) -> tuple[str, ...]:
+    """The single-quoted string literals in `export const <name> = [...]`.
+
+    A third minimal construct alongside `interfaces_of`/`imports_of`, for
+    controls that compare a declared UI picklist against backend truth
+    (`ARK-REQ-0331`). Fails closed on an absent or empty declaration, so a
+    renamed constant is a refusal here rather than a silently vacuous control.
+    """
+    text = read(path)
+    match = re.search(
+        rf"export\s+const\s+{re.escape(name)}\b[^=]*=\s*\[(?P<body>[^\]]*)\]",
+        text,
+    )
+    if match is None:
+        raise AssertionError(f"{path.name}: no exported const array {name!r} was found")
+    items = tuple(_STRING_ITEM.findall(match.group("body")))
+    if not items:
+        raise AssertionError(f"{path.name}: {name!r} declares no string literal")
+    return items
 
 
 def imports_of(path: pathlib.Path) -> list[str]:
