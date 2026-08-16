@@ -235,43 +235,34 @@ class TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence:
         """The real answer, over the real document."""
         assert _NOT_CONTRADICTED not in drift_names(validator, handoff_text)
 
-    @staticmethod
-    def _mutate_current_phase_section(
-        validator: types.ModuleType, handoff_text: str, old: str, new: str,
-    ) -> str:
-        """Rewrite one claim WITHIN the current-phase section only.
-
-        `replace_once` rewrites the document's first occurrence of `old`,
-        which is not necessarily inside §8 — several phrases this section
-        uses (e.g. "no requirement is discharged") recur throughout the
-        historical §4 ledger, which precedes §8 in the document. Extracting
-        the section first (via the validator's OWN heading pattern, not a
-        second copy of it), mutating within it, and splicing it back keeps
-        the mutation anchored to the section under test regardless of how
-        many packages have since changed its wording.
-        """
-        from handoff_markdown import section as _section
-
-        body = _section(handoff_text, validator._CURRENT_PHASE_HEADING.pattern)
-        assert old in body, f"expected the current-phase section to render {old!r}"
-        mutated_body = body.replace(old, new, 1)
-        assert body in handoff_text
-        return handoff_text.replace(body, mutated_body, 1)
-
     def test_a_not_started_claim_against_ledger_evidence_is_detected(
-        self, validator: types.ModuleType, handoff_text: str,
+        self, validator: types.ModuleType, handoff_text: str, truth: dict,
     ) -> None:
-        mutated = self._mutate_current_phase_section(
-            validator, handoff_text, "IN PROGRESS, NOT ACCEPTED.", "NOT STARTED.",
-        )
+        """The current-phase section's own truthful NOT STARTED / no-package
+        claim (whatever the current phase happens to be) must be caught the
+        moment an INDEPENDENT source — here, the live summary's own row for
+        that phase — starts asserting progress. Injecting the contradiction
+        into the independent source, rather than hard-coding §8's prose (which
+        rewords itself every phase transition), keeps this test meaningful
+        across transitions instead of merely anchored to one snapshot of it.
+        """
+        current = truth["current"]
+        row = row_for(handoff_text, current)
+        # The production check reads "IN PROGRESS" from WITHIN the row's own
+        # cell (bounded by its closing "|"), not from trailing text appended
+        # past it - so the mutation must land before that last "|".
+        mutated_row = row[: row.rfind("|")] + "IN PROGRESS |"
+        mutated = replace_once(handoff_text, row, mutated_row)
         assert _NOT_CONTRADICTED in drift_names(validator, mutated)
 
     def test_a_no_package_exists_claim_against_ledger_evidence_is_detected(
-        self, validator: types.ModuleType, handoff_text: str,
+        self, validator: types.ModuleType, handoff_text: str, truth: dict,
     ) -> None:
-        mutated = self._mutate_current_phase_section(
-            validator, handoff_text,
-            "no requirement is discharged",
-            "no Phase 14 package exists and no requirement is discharged",
+        """Same contradiction, proven through the OTHER independent source:
+        the accepted-commit-history ledger naming the current phase."""
+        current = truth["current"]
+        anchor = "← HEAD at generation"
+        mutated = replace_once(
+            handoff_text, anchor, f"PHASE {current} package landed {anchor}",
         )
         assert _NOT_CONTRADICTED in drift_names(validator, mutated)
