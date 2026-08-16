@@ -97,3 +97,17 @@ class DirectStableMutationError(SecurityError):
     """An actor or mechanism attempted to bypass the candidate lifecycle."""
 
     code = "ARK-ERR-0097"
+
+
+class AutomatedActorCannotApprove(SecurityError):
+    """An automated actor attempted to record a HUMAN APPROVAL decision.
+
+    `stable_mutation.prohibited_actors` already names `workflow` (MS
+    §Constitution 6) - a workflow execution advancing its own
+    `WAITING_APPROVAL` state is exactly the actor this refuses. ARK-REQ-0330:
+    HUMAN APPROVAL is an enforced policy stop, resolved by the PDP side of
+    `control.policy`, never a decorative node a workflow path can satisfy
+    itself.
+    """
+
+    code = "ARK-ERR-0133"
