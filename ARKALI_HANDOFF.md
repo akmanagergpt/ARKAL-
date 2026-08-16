@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `34f39f039a9ee487b34163406fe22c667825c28c` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `1c9283774b35b20dc68413577495e0fee3637ed1` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -334,7 +334,10 @@ repository, the repository wins.
 | 166 | `eb6b097` | **PHASE 17 PACKAGE 1** — C-20 graph domain model: `execution.workflow`'s `graph_vocabulary.py` (10 node kinds + 10 control constructs, parsed live from VDC §Workflow identity), `graph_model.py` (`WorkflowNode`/`WorkflowEdge`/`WorkflowGraphDocument`, content-addressed, graph-validity refusals, semver bump), `errors.py`. Pure domain model; no persistence, no executor, no surface. No requirement discharged. |
 | 167 | `be2c8bd` | **HANDOFF REFRESH** — live architecture summary re-derived for Package 1's two new edges (143 → 145; `error_base` 12→13, `content_address` 8→9). §3/§8/§9 updated for Phase 17 in-progress status. |
 | 168 | `e85ea2a` | **PHASE 17 PACKAGE 2** — C-20 persistence/revision store: `records.py` (`WorkflowRecord` + immutable `WorkflowRevisionRecord`), `graph_store.py` (`WorkflowGraphStore`, PEP-enforced, revision/semver derived from stored rows, content hash recomputed and verified on every read), migration `0008_workflow_graph`. Closed the `execution.workflow`-unenforced gap Package 1 opened. No requirement discharged. |
-| 169 | `34f39f0` | **HANDOFF + BUILD_STATE REFRESH** — live architecture summary re-derived for Package 2's three new edges (145 → 148). `BUILD_STATE.md`'s Current state and Phase 17 table row advanced to `UNLOCKED — IN PROGRESS, NOT ACCEPTED` (Packages 1–2 committed), following the Phase 10/11/13/14 mid-phase precedent; ARKALI_HANDOFF.md §3/§8 re-derived to match ← HEAD at generation |
+| 169 | `34f39f0` | **HANDOFF + BUILD_STATE REFRESH** — live architecture summary re-derived for Package 2's three new edges (145 → 148). `BUILD_STATE.md`'s Current state and Phase 17 table row advanced to `UNLOCKED — IN PROGRESS, NOT ACCEPTED` (Packages 1–2 committed), following the Phase 10/11/13/14 mid-phase precedent; ARKALI_HANDOFF.md §3/§8 re-derived to match |
+| 170 | `35d54ab` | **PHASE 17 PACKAGE 3** — ADR-0004 derived execution plan: `execution_plan.py`'s `CompiledExecutionPlan.derive` (hash-bound to `content_hash`) and `require_fresh` (`StaleDerivedRepresentation` refusal), proven as a pure property and against a real published second revision. No new cross-context edge. No requirement discharged. |
+| 171 | `100f759` | **PHASE 17 PACKAGE 4** — `control.policy`'s `WorkflowApprovalGate` (ARK-REQ-0330): `assert_may_record` refuses any canonical automated actor (already names `workflow`); `is_enforced_approval` refuses a non-`APPROVED` decision or a stale-revision approval. Additive, no PDP/`policy_contract.py` change, no new cross-context edge. No requirement discharged. |
+| 172 | `1c92837` | **HANDOFF + BUILD_STATE REFRESH** — narrative paragraphs for Packages 3–4; Current state and the Phase 17 table row advanced to "Package 4 of an unspecified count complete"; §9 re-derived and condensed, now pointing at Package 5 (the executor) with its exact composition spelled out ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -674,7 +677,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 34f39f039a9ee487b34163406fe22c667825c28c
+head: 1c9283774b35b20dc68413577495e0fee3637ed1
 branch: main
 working_tree_clean: true
 
