@@ -39,6 +39,7 @@ from arkali.kernel.contracts.state_machine_errors import (
     UnknownState,
 )
 from arkali.surfaces.command.job_error_mapping import DURABLE_STATUS_BY_ERROR
+from arkali.surfaces.command.workflow_error_mapping import status_for_workflow_error
 
 #: The one base every mapped refusal derives from, re-exported so the
 #: application can register a handler for it WITHOUT importing
@@ -51,12 +52,18 @@ DOMAIN_ERROR_BASE: Final[type[Exception]] = ArkaliError
 #: Ordered most-specific first: `isinstance` is checked in this order, and
 #: several of these share a base class.
 #:
-#: The durable half is COMPOSED from a same-context sibling rather than written
-#: here, because this module already touches three bounded contexts and that is
-#: the whole budget. The two tables are disjoint - no durable error is a project
-#: error or a state-machine error - so appending cannot shadow an entry above.
-#: `PolicyDenied` stays first regardless, since a refusal by policy is never a
-#: client formatting problem.
+#: The durable half is COMPOSED from a same-context sibling rather than
+#: written here, because this module already touches three bounded contexts
+#: and that is the whole budget. The workflow half is matched by class NAME
+#: instead of `isinstance` (`workflow_error_mapping.status_for_workflow_error`)
+#: for a stronger reason than the budget: composing `execution.workflow` here
+#: would extend an already-four-hop chain to five and breach
+#: `max_orchestration_depth`, so `status_for` below checks this table first
+#: and falls back to the name-matched one. Both tables are disjoint - no
+#: durable or workflow error is a project error or a state-machine error - so
+#: appending cannot shadow an entry above. `PolicyDenied` stays first
+#: regardless, since a refusal by policy is never a client formatting
+#: problem.
 STATUS_BY_ERROR: Final[tuple[tuple[type[Exception], int], ...]] = (
     # A refusal by policy is never a client formatting problem.
     (PolicyDenied, 403),
@@ -82,7 +89,7 @@ def status_for(error: Exception) -> int | None:
     for error_type, status in STATUS_BY_ERROR:
         if isinstance(error, error_type):
             return status
-    return None
+    return status_for_workflow_error(error)
 
 
 def code_of(error: Exception) -> str:

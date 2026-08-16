@@ -62,6 +62,12 @@ from arkali.surfaces.command.error_mapping import (
     status_for,
 )
 from arkali.surfaces.command.jobs import build_jobs_router
+from arkali.surfaces.command.workflow import (
+    DocumentBuilder,
+    ExecutorFactory,
+    GraphStoreFactory,
+    build_workflow_router,
+)
 
 #: The actor this surface presents to the PDP.
 ACTOR: Final[str] = "surfaces.command"
@@ -101,6 +107,7 @@ def create_app(
     engine: Engine,
     pdp: PolicyDecisionPoint,
     clock: Callable[[], dt.datetime] | None = None,
+    workflow_wiring: tuple[DocumentBuilder, GraphStoreFactory, ExecutorFactory] | None = None,
 ) -> FastAPI:
     """Build the Command Center API over a real engine and a real PDP.
 
@@ -109,9 +116,16 @@ def create_app(
     the real policy authority.
 
     `clock` is optional and reaches only the durable-job routes, which pass it
-    to C-19. It is typed structurally - a callable returning a datetime - so
-    this module does not import `execution.durable` to name it: `app.py` is at
-    `max_contexts_touched_by_module` and a type import would put it over.
+    to C-19. `workflow_wiring` is `(document_builder, graph_store_factory,
+    executor_factory)` for the C-20 routes - see `workflow.py`'s module
+    docstring for why these are opaque callables rather than a concrete
+    `execution.workflow` type: `app.py` is at `max_contexts_touched_by_module`
+    and a type import from `execution.workflow` would put it over, and
+    composing `execution.workflow.executor` here directly would extend an
+    already-four-hop chain (`execution.workflow → execution.durable →
+    control.policy → kernel.contracts`) to five, breaching
+    `max_orchestration_depth`. `None` omits the workflow routes entirely, so
+    every existing caller of `create_app` is unaffected.
     """
     factory = create_session_factory(engine)
     pep = PolicyEnforcementPoint(pdp, SURFACE)
@@ -272,4 +286,16 @@ def create_app(
     # than two. They live there because this module already touches three
     # bounded contexts, which is the whole budget.
     app.include_router(build_jobs_router(session_scope, guard, refuse, pep, clock))
+    # The C-20 workflow routes are additive and optional at this composition
+    # root: a caller that supplies no wiring gets exactly the pre-Phase-17
+    # application, unchanged - no existing caller of `create_app` is required
+    # to know about `execution.workflow` to keep working.
+    if workflow_wiring is not None:
+        document_builder, graph_store_factory, executor_factory = workflow_wiring
+        app.include_router(
+            build_workflow_router(
+                session_scope, guard, refuse,
+                document_builder, graph_store_factory, executor_factory,
+            )
+        )
     return app

@@ -17,7 +17,6 @@ scalar the caller supplied or the registry recorded.
 from __future__ import annotations
 
 import datetime as dt
-
 from typing import Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -67,7 +66,7 @@ class TransportModel(BaseModel):
     @classmethod
     def _stamp_utc(cls, value: Any) -> Any:
         if isinstance(value, dt.datetime) and value.tzinfo is None:
-            return value.replace(tzinfo=dt.timezone.utc)
+            return value.replace(tzinfo=dt.UTC)
         return value
 
 
