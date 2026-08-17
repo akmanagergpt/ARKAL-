@@ -18,6 +18,19 @@ and independently restorable. The first is structural — `APPROVED_FOR_EXECUTIO
 is unreachable except through `STATICALLY_INSPECTED` — and is additionally
 guarded so the inspection must have actually completed, not merely been passed
 through.
+
+Phase 19 (C-29) adds the third guard below: `execution_approval_guard` on
+`APPROVED_FOR_EXECUTION -> WORKING_COPY_CREATED`, enforcing ARK-REQ-0116
+("TRUST-3 human approval before first execution") and ARK-REQ-0348 condition
+7 ("execution is DENY where the tier's required security properties cannot
+be established"). The guard itself only reads a boolean context fact, the
+identical shape `static_inspection_guard`/`tier_assignment_guard` already
+use; the fact is made trustworthy by `execution_gate.assert_execution_approved`,
+which the pipeline composing this machine must call and which raises before
+the fact can ever be set true on an unapproved or isolation-unsatisfiable
+attempt. Nothing here duplicates that authority — the guard cannot itself
+consult `control.policy` or `control.isolation` without creating a second,
+ungoverned path to the same decision.
 """
 
 from __future__ import annotations
@@ -71,11 +84,20 @@ def tier_assignment_guard(context: GuardContext) -> bool:
     return bool(assigner) and assigner != "implementing_actor"
 
 
+def execution_approval_guard(context: GuardContext) -> bool:
+    """ARK-REQ-0116 / condition 7: no working copy before TRUST-3 execution is
+    genuinely approved (human, non-stale) AND the tier's required isolation
+    properties are satisfiable. `execution_gate.assert_execution_approved`
+    raises before this fact may be set true on any other path."""
+    return bool(context.get("execution_approved", False))
+
+
 def build() -> StateMachine:
     return StateMachine(
         DEFINITION,
         {
             ("STATICALLY_INSPECTED", "TIER_ASSIGNED"): tier_assignment_guard,
             ("TIER_ASSIGNED", "APPROVED_FOR_EXECUTION"): static_inspection_guard,
+            ("APPROVED_FOR_EXECUTION", "WORKING_COPY_CREATED"): execution_approval_guard,
         },
     )

@@ -56,6 +56,9 @@ SATISFYING_CONTEXT: dict[tuple[str, str, str], dict[str, object]] = {
     ("ImportProject", "TIER_ASSIGNED", "APPROVED_FOR_EXECUTION"): {
         "static_inspection_complete": True
     },
+    ("ImportProject", "APPROVED_FOR_EXECUTION", "WORKING_COPY_CREATED"): {
+        "execution_approved": True
+    },
 }
 
 
