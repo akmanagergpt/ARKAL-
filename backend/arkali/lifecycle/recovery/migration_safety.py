@@ -142,7 +142,9 @@ class MigrationSafetySequence:
         finally:
             scratch_engine.dispose()
 
-        steps.append(step_apply(self._pep, self._approval, self._backend_root, target, request))
+        steps.append(
+            step_apply(self._pep, self._approval, self._backend_root, target, backup, request)
+        )
         if steps[-1].state is not MigrationStepState.PASS:
             return self._stopped(target, steps)
 

@@ -52,14 +52,24 @@ SEED_REVISION = "0002_project_registry"
 
 
 class FakeHumanGateSource:
-    """Structurally satisfies `HumanGateSource`. Not `GovernanceState`."""
+    """Structurally satisfies `HumanGateSource`. Not `GovernanceState`.
 
-    def __init__(self, accepted: frozenset[str] = frozenset()) -> None:
-        self._accepted = accepted
+    `grants=True` answers every `operation_grant` call affirmatively,
+    regardless of the exact target/revision identity presented - these tests
+    exercise the overall Apply-gating flow (a grant exists vs. it does not),
+    not fine-grained scope-precision; precise target/revision-mismatch
+    negative controls live in `tests/acceptance/test_human_gate_authorization.py`
+    and `TestOperationGrantScopePrecision` below.
+    """
 
-    @property
-    def accepted_human_gates(self) -> frozenset[str]:
-        return self._accepted
+    def __init__(self, grants: bool = False) -> None:
+        self._grants = grants
+
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str,
+        revision_identity: str,
+    ) -> bool:
+        return self._grants
 
 
 @pytest.fixture(scope="module")
@@ -258,7 +268,7 @@ class TestHumanGate6OnRealOrStableData:
     ) -> None:
         request = default_request(
             engine, database_path, tmp_path / "ws", targets_real_or_stable_data=True,
-            human_gates=FakeHumanGateSource(frozenset()),
+            human_gates=FakeHumanGateSource(grants=False),
         )
         result = sequence.run(request)
         apply_result = next(s for s in result.steps if s.step == STEP_APPLY)
@@ -272,7 +282,7 @@ class TestHumanGate6OnRealOrStableData:
     ) -> None:
         request = default_request(
             engine, database_path, tmp_path / "ws", targets_real_or_stable_data=True,
-            human_gates=FakeHumanGateSource(frozenset({"HUMAN_GATE_6"})),
+            human_gates=FakeHumanGateSource(grants=True),
         )
         result = sequence.run(request)
         apply_result = next(s for s in result.steps if s.step == STEP_APPLY)
@@ -285,7 +295,7 @@ class TestHumanGate6OnRealOrStableData:
     ) -> None:
         request = default_request(
             engine, database_path, tmp_path / "ws", targets_real_or_stable_data=False,
-            human_gates=FakeHumanGateSource(frozenset()),
+            human_gates=FakeHumanGateSource(grants=False),
         )
         result = sequence.run(request)
         apply_result = next(s for s in result.steps if s.step == STEP_APPLY)
@@ -312,3 +322,77 @@ class TestApplicationTestsCanStopTheSequence:
         assert applied_revision(engine) == SEED_REVISION
         apply_result = next(s for s in result.steps if s.step == STEP_APPLY)
         assert apply_result.state is MigrationStepState.BLOCKED
+
+
+class RecordingHumanGateSource:
+    """Records every `operation_grant` call; grants only an exact pre-set match.
+
+    Used only by `TestOperationGrantScopePrecision` below - a confused-deputy
+    proof the design audit flagged, not on the mission's own numbered list.
+    `step_apply` computes `target_identity`/`revision_identity` itself from
+    the real `BackupSet` and the resolved target revision; this test double
+    never supplies either, it only records what the sequence actually derived
+    and decides whether that matches a value chosen independently, in the test,
+    before the sequence ran.
+    """
+
+    def __init__(self, match: tuple[str, str, str, str] | None = None) -> None:
+        self._match = match
+        self.calls: list[tuple[str, str, str, str]] = []
+
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str,
+        revision_identity: str,
+    ) -> bool:
+        call = (gate_id, operation_class, target_identity, revision_identity)
+        self.calls.append(call)
+        return call == self._match
+
+
+class TestOperationGrantScopePrecision:
+    """Confused-deputy proof: a caller cannot spoof the target/revision a
+    grant is checked against, because `step_apply` derives both from real
+    facts (`BackupSet.manifest.digest`, the resolved target revision) rather
+    than accepting either as a field on `MigrationSafetyRequest`."""
+
+    def test_a_grant_for_a_different_revision_never_authorises_this_apply(
+        self, sequence: MigrationSafetySequence, recovery: RecoveryService,
+        engine: Engine, database_path: pathlib.Path, tmp_path: pathlib.Path,
+    ) -> None:
+        probe = recovery.create_backup(engine, tmp_path / "probe", "probe-wrong-rev")
+        wrong = RecordingHumanGateSource(
+            ("HUMAN_GATE_6", "APPLY_MIGRATION", probe.manifest.digest, "0001_persistence_base_schema")
+        )
+        request = default_request(
+            engine, database_path, tmp_path / "ws", targets_real_or_stable_data=True,
+            human_gates=wrong,
+        )
+        result = sequence.run(request)
+        assert result.applied is False
+        assert applied_revision(engine) == SEED_REVISION
+        # The sequence really did check against the real target revision, not
+        # the one this test tried to pre-authorise - proof the mismatch is why
+        # it was refused, not that the lookup never ran at all.
+        assert wrong.calls
+        assert wrong.calls[-1][3] == head_revision(BACKEND)
+        assert wrong.calls[-1][3] != "0001_persistence_base_schema"
+
+    def test_a_grant_matching_the_real_backup_digest_and_revision_authorises_apply(
+        self, sequence: MigrationSafetySequence, recovery: RecoveryService,
+        engine: Engine, database_path: pathlib.Path, tmp_path: pathlib.Path,
+    ) -> None:
+        target_revision = head_revision(BACKEND)
+        # Computed independently, before the sequence runs its own backup -
+        # proven identical for an unchanged source (SQLite's online backup API
+        # is deterministic over an unchanged database).
+        probe = recovery.create_backup(engine, tmp_path / "probe", "probe-exact")
+        exact = RecordingHumanGateSource(
+            ("HUMAN_GATE_6", "APPLY_MIGRATION", probe.manifest.digest, target_revision)
+        )
+        request = default_request(
+            engine, database_path, tmp_path / "ws", targets_real_or_stable_data=True,
+            human_gates=exact,
+        )
+        result = sequence.run(request)
+        assert result.applied is True
+        assert applied_revision(engine) == target_revision

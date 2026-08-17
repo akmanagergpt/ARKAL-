@@ -52,14 +52,23 @@ SEED_REVISION: Final[str] = "0002_project_registry"
 
 
 class FakeHumanGateSource:
-    """Structurally satisfies `HumanGateSource`, never `GovernanceState`."""
+    """Structurally satisfies `HumanGateSource`, never `GovernanceState`.
 
-    def __init__(self, accepted: frozenset[str] = frozenset()) -> None:
-        self._accepted = accepted
+    `grants=True` answers every `operation_grant` call affirmatively; the
+    journey's own conditions exercise the overall gating flow, not
+    fine-grained scope precision - see `tests/acceptance/
+    test_human_gate_authorization.py` for the target/revision-mismatch
+    negative controls.
+    """
 
-    @property
-    def accepted_human_gates(self) -> frozenset[str]:
-        return self._accepted
+    def __init__(self, grants: bool = False) -> None:
+        self._grants = grants
+
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str,
+        revision_identity: str,
+    ) -> bool:
+        return self._grants
 
 
 def test_step_1_the_real_register_denominator() -> None:
@@ -200,7 +209,7 @@ class TestTheComposedMigrationSafetyJourney:
         result = sequence.run(self._request(
             engine, database_path, tmp_path / "ws",
             targets_real_or_stable_data=True,
-            human_gates=FakeHumanGateSource(frozenset({"HUMAN_GATE_6"})),
+            human_gates=FakeHumanGateSource(grants=True),
         ))
         apply_result = next(s for s in result.steps if s.step == STEP_APPLY)
         assert apply_result.state is MigrationStepState.PASS

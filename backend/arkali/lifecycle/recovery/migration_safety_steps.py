@@ -215,18 +215,39 @@ def step_application_tests(
     )
 
 
-def step_apply(
-    pep: PolicyEnforcementPoint, approval_gate: WorkflowApprovalGate,
-    backend_root: pathlib.Path, target_revision: str, request: MigrationSafetyRequest,
-) -> MigrationStepResult:
-    policy_request = PolicyRequest(
+def _base_apply_request(request: MigrationSafetyRequest, recorded: tuple[str, ...]) -> PolicyRequest:
+    return PolicyRequest(
         operation_class=APPLY_OPERATION,
         trust_tier=TRUST_TIER,
         actor=ACTOR,
         targets_real_or_stable_data=request.targets_real_or_stable_data,
-        recorded_human_gates=tuple(sorted(request.human_gates.accepted_human_gates)),
+        recorded_human_gates=recorded,
     )
-    decision = pep.evaluate(policy_request)
+
+
+def step_apply(
+    pep: PolicyEnforcementPoint, approval_gate: WorkflowApprovalGate,
+    backend_root: pathlib.Path, target_revision: str, backup: BackupSet,
+    request: MigrationSafetyRequest,
+) -> MigrationStepResult:
+    """HUMAN_GATE_SCOPE_GAP remediation: `recorded_human_gates` is no longer a
+    flat "has this gate ever been granted anywhere" set. It is populated only
+    when `request.human_gates.operation_grant` finds a grant scoped to this
+    exact operation, target (the pre-migration backup's own content digest -
+    real, `kernel.persistence`-computed, never a caller-asserted label) and
+    revision. The gate name itself is learned from the PDP's own probe
+    decision (`required_human_gate`), never duplicated here, so this module
+    carries no second copy of which gate `APPLY_MIGRATION` requires.
+    """
+    probe = pep.evaluate(_base_apply_request(request, ()))
+    recorded: tuple[str, ...] = ()
+    if probe.required_human_gate is not None:
+        target_identity = backup.manifest.digest
+        if request.human_gates.operation_grant(
+            probe.required_human_gate, APPLY_OPERATION, target_identity, target_revision,
+        ):
+            recorded = (probe.required_human_gate,)
+    decision = pep.evaluate(_base_apply_request(request, recorded))
     if decision.decision is Decision.DENY:
         return MigrationStepResult(
             step=STEP_APPLY, state=MigrationStepState.BLOCKED,
@@ -235,12 +256,13 @@ def step_apply(
     if (
         request.targets_real_or_stable_data
         and decision.required_human_gate is not None
-        and decision.required_human_gate not in request.human_gates.accepted_human_gates
+        and decision.required_human_gate not in recorded
     ):
         return MigrationStepResult(
             step=STEP_APPLY, state=MigrationStepState.BLOCKED,
-            summary=f"{decision.required_human_gate} required and not recorded; "
-                    "APPLY to real or stable data is refused",
+            summary=f"{decision.required_human_gate} required and not recorded for "
+                    "this exact target and revision; APPLY to real or stable data "
+                    "is refused",
         )
     if not approval_gate.is_enforced_approval(
         decision=request.human_decision, actor=request.human_actor,

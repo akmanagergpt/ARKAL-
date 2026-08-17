@@ -47,15 +47,23 @@ STEPS: Final[tuple[str, ...]] = (
 
 @runtime_checkable
 class HumanGateSource(Protocol):
-    """The one fact the Apply step needs from governance state.
+    """Scoped human-gate lookup the Apply step needs from governance state.
 
-    `acceptance.engine.GovernanceState` satisfies this structurally - see
-    `migration_safety.py`'s module docstring for why this is a Protocol and
-    not an import.
+    HUMAN_GATE_SCOPE_GAP remediation. `acceptance.engine.GovernanceState`
+    satisfies this structurally through its own `operation_grant` method - see
+    `migration_safety.py`'s module docstring for why this is a `Protocol` and
+    not an import (that edge would extend `acceptance.engine`'s own already
+    4-of-4 orchestration-depth chain to 5). The Apply step supplies
+    `target_identity` and `revision_identity` computed from real facts (the
+    pre-migration backup's content digest, the resolved target revision) -
+    this method only asks whether a matching recorded grant exists; it never
+    receives or trusts a caller-asserted label as the security identity.
     """
 
-    @property
-    def accepted_human_gates(self) -> frozenset[str]: ...
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str,
+        revision_identity: str,
+    ) -> bool: ...
 
 
 class MigrationStepState(str, enum.Enum):
