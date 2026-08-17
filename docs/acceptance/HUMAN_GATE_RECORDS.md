@@ -71,6 +71,23 @@ Acceptance of Phase 0 does not close the following, which remain open and tracke
 
 ---
 
+## HGR-003 — HUMAN GATE 6: Phase 20 candidate (Database Migration Safety + Full Backup/Recovery)
+
+| Field | Value |
+|---|---|
+| **Gate** | HUMAN_GATE_6 — APPLY of a migration to real or stable data |
+| **Decision** | **ACCEPTED** |
+| **Scope of this decision** | Narrow — `PHASE_ACCEPTANCE` of the frozen Phase 20 candidate identified below only. This is **not** a `RUNTIME_OPERATION` grant; it does not by itself authorize any future `APPLY_MIGRATION` call. See the "Scope" rows below |
+| **Deciding authority** | human operator (canonical acceptance authority) |
+| **Candidate identity bound by this decision** | Candidate evidence commit `73a968f58215dcc35abe04aa9f2e0515b612b1e5`; evidence package digest `sha256:b94d28bb86e515e36f0106f3620d72ddcb672771f9e1ab7ee1ba8f2f1e202c2c` over `docs/acceptance/phase_20_report.json` + `phase_20_traceability.json` (`acceptance.rescoring_authorization.evidence_package_digest`, the identical binding mechanism GOV-001's RSA rows and HGR-002-SCOPED already use) |
+| **Basis of decision** | Independent mechanical re-verification, run fresh against HEAD `a6cb3f51eb5faf2f2e04c7676ab510ba6a26bf09` immediately before this record was written, all confirmed true: (1) HEAD/branch/clean tree as stated; (2) `check_handoff.py` → PASS, 0 drift; (3) `GovernanceState.current_work_phase()` → `20`; (4) `git diff 73a968f..HEAD -- docs/acceptance/phase_20_report.json docs/acceptance/phase_20_traceability.json` is empty — the frozen candidate's evidence is byte-identical to the commit named above; (5) `acceptance.rescoring_authorization.evidence_package_digest(repo, "20")` recomputes to the exact digest named above; (6) the complete governance suite (`pytest backend/tests/governance -q --ignore=test_local_automation.py`) returns 399 passed, 0 failed; (7) all 8 architecture gates PASS, 0 findings/violations, over 183 cross-context edges; (8) `GovernanceState.open_stopping_findings` is empty (0 open BLOCKER/HIGH); (9) `python scripts/run_phase_gate.py 20 21`, re-run fresh immediately before this record, returns verdict `AWAITING_HUMAN_GATE` with `HUMAN_GATE: HUMAN_GATE_6 required and not recorded for this exact evidence package` as the **only** non-PASS/non-NOT_APPLICABLE check — C1–C6, EXTERNAL_RESULT, PROTECTED_CORE (COMPLETE profile, all three categories satisfied), RESCORING (NOT_APPLICABLE, first submission), DATA_LOSS_RISK, FINDINGS and PREREQ (2/2) all PASS |
+| **Rationale** | The human acceptance authority reviewed the Phase 20 Database Migration Safety + Full Backup/Recovery candidate and its evidence package (`phase_20_report.json`, `phase_20_traceability.json`, `docs/contracts/migration_safety.md`) and grants `HUMAN_GATE_6` for phase acceptance of this exact, frozen candidate. The nine-step sequence (Impact, Backup, Dry Run, Integrity, Candidate Migration, Application Tests, Apply, Verify, Rollback Point) composes Phase 5's `RecoveryService`/`BackupRestore`, Phase 4's PDP and Phase 19's `WorkflowApprovalGate` unmodified; the data-loss-risk analyser is re-derived independently on every gate evaluation rather than trusted from a prior claim; `HUMAN_GATE_SCOPE_GAP` remediation (HGR's scoped tables below) is confirmed active, so this grant cannot leak to any other phase or to any runtime `APPLY_MIGRATION` operation |
+| **Scope — this grant authorizes** | `PHASE_ACCEPTANCE` evaluation of the Phase 20 candidate at the exact candidate commit and evidence-package digest named above, and nothing beyond that |
+| **Scope — this grant explicitly does NOT authorize** | A global `HUMAN_GATE_6` grant; authorization for Phase 21, Phase 22B or any other phase; authorization for a modified Phase 20 candidate (a changed evidence package has a different digest and is not covered); authorization for any real `APPLY_MIGRATION` operation against any migration target/revision — that requires its own `RUNTIME_OPERATION`-scoped grant bound to the exact target identity and revision identity, which this record does not create; standing permission to apply future migrations to real or Stable data; weakening, bypassing, broadening or reinterpreting any security boundary, PDP rule, or Protected Core policy |
+| **No runtime-operation grant created** | The operation-scope authorization table below (`gate + operation + target + revision`) is left exactly as it was — empty. This record adds only a `PHASE_ACCEPTANCE`-scope row |
+
+---
+
 ## GOV-001 — CANONICAL GOVERNANCE RULE: superseding re-acceptance
 
 | Field | Value |
@@ -262,13 +279,17 @@ identical binding `rescoring_authorization.py` already uses for GOV-001):
 | ID | GATE | PHASE | EVIDENCE PACKAGE | ISSUER | STATUS | BASIS |
 |---|---|---|---|---|---|---|
 | HGR-002-SCOPED | HUMAN_GATE_4 | 19 | sha256:6e41dd0dbb84df2403d6ebea98b6d2875871cd0806c5c6bb699d4cd0a457a727 | human operator | GRANTED | Mechanical restatement of HGR-002 above, unedited. Binds to phase 19's exact evidence-package digest only — a lookup for `(HUMAN_GATE_4, phase=21, *)` finds no matching row here, regardless of this grant, exactly as HGR-002's own scope section already stated in prose. |
+| HGR-003-SCOPED | HUMAN_GATE_6 | 20 | sha256:b94d28bb86e515e36f0106f3620d72ddcb672771f9e1ab7ee1ba8f2f1e202c2c | human operator | GRANTED | Mechanical restatement of HGR-003 above, unedited. Binds to phase 20's exact evidence-package digest only — a lookup for `(HUMAN_GATE_6, phase=21, *)`, `(HUMAN_GATE_6, phase=22B, *)`, or any other phase/digest pair finds no matching row here. This is a `PHASE_ACCEPTANCE`-scope grant only; it creates no `RUNTIME_OPERATION`-scope row and does not authorize any `APPLY_MIGRATION` call against any target/revision. |
 
 **Operation-scope authorizations** (`gate + operation class + target identity +
 revision identity`, for runtime operations such as `APPLY_MIGRATION` — see
 `docs/contracts/human_gate_authorization.md`). Empty: no operation-scoped
-grant has been recorded. `HUMAN_GATE_6` for the Phase 20 candidate remains
-**not recorded** — this remediation closes the scope defect, it does not
-grant the gate.
+grant has been recorded. `HGR-003` grants `HUMAN_GATE_6` for `PHASE_ACCEPTANCE`
+of the Phase 20 candidate only (row above); a real future `APPLY_MIGRATION`
+call against real or stable data still requires its own separate
+`RUNTIME_OPERATION`-scope grant bound to the exact target identity and
+revision identity resolved at call time — none exists, and none is created
+by HGR-003.
 
 | ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
 |---|---|---|---|---|---|---|---|
@@ -281,6 +302,6 @@ grant the gate.
 | HUMAN_GATE_3 | Generated-product promotion where approval-gated | not reached |
 | HUMAN_GATE_4 | Security boundary / sandbox tier / protected-core policy change | **GRANTED for the Phase 19 candidate only** — HGR-002, bound to HEAD `ef5cb3b`/digest `sha256:6e41dd0d...`. **Still "not reached" for Phase 21**, which also maps to this gate token; HGR-002 does not authorize it and its own known-gap note requires an independent human decision when Phase 21 is reached |
 | HUMAN_GATE_5 | Exceptional applicability waiver | not reached |
-| HUMAN_GATE_6 | APPLY of a migration to real or stable data | not reached |
+| HUMAN_GATE_6 | APPLY of a migration to real or stable data | **GRANTED for `PHASE_ACCEPTANCE` of the Phase 20 candidate only** — HGR-003, bound to candidate commit `73a968f`/digest `sha256:b94d28bb...202c2c`. **No `RUNTIME_OPERATION`-scope grant exists.** Any real future `APPLY_MIGRATION` against real or stable data still requires its own separate grant bound to the exact target/revision identity resolved at call time; HGR-003 does not authorize it |
 | HUMAN_GATE_7 | Final Production Release | not reached |
 | HUMAN_GATE_8 | Exception to a canonical architecture budget | not reached |
