@@ -177,7 +177,13 @@ class TestNoNewSiblingEdgeWasIntroduced:
         # composing the live concerns list rather than duplicating it (ARK-REQ-0386).
         # 9th edge added under D-026/Phase 16: engineering.factory ->
         # engineering.repair, reusing the C-26 anti-loop ledger (ARK-REQ-0393).
-        assert len(declared) == 9
+        # 10th edge added at Phase 19: engineering.import -> engineering.codeintel,
+        # reusing PythonGraphBuilder for static inspection (ARK-REQ-0115, 0161).
+        # No engineering.import -> engineering.candidate edge is declared:
+        # WorkspaceAuthority is composed through a structural Protocol
+        # (pipeline.py) rather than imported, so no such edge exists to
+        # declare (see pipeline.py's module docstring).
+        assert len(declared) == 10
 
     def test_no_sibling_edge_targets_an_exempt_context(
         self, live_map: AuthorityMap
