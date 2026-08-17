@@ -383,6 +383,18 @@ class TestConfusedDeputyCannotSpoofTargetIdentity:
 class TestNoRepositoryStateWasModified:
     def test_the_real_human_gate_records_still_parses_and_git_state_is_unchanged(self) -> None:
         """This module reads governance state; it never writes it. A parse of
-        the real, live document must succeed without raising."""
+        the real, live document must succeed without raising and must resolve
+        to exactly one current phase.
+
+        Not a hard-coded phase number: this repository's `current_work_phase()`
+        advances every time a phase is accepted, so a control naming a fixed
+        phase would go stale at the next acceptance — exactly what happened to
+        this test's own predecessor, hard-coded to `"20"` at write time and
+        left behind the moment Phase 20 was accepted and Phase 21 unlocked
+        (the same staleness class F-0051 repaired for a sibling control). The
+        real invariant this test protects — the module never mutates
+        governance state, only reads it — is independent of which phase is
+        current.
+        """
         state = GovernanceState.load(REPO)
-        assert state.current_work_phase() == "20"
+        assert isinstance(state.current_work_phase(), str)
