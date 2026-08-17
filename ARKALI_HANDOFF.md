@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `c3b51f8eff56f4dfc2235eb1e00b727bd125417a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `785720dcf7a2e78631370852c8fc43b593051acf` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -364,7 +364,8 @@ repository, the repository wins.
 | 193 | `2e3dfa8` | Advances the HEAD-at-generation marker past row 192 |
 | 194 | `ad7eb35` | Records, in `BUILD_STATE.md`, that the Sec 12 refresh's own removal of the literal string "NOT STARTED" from §8 silenced two pre-existing `test_handoff_transition.py` anti-vacuity mutation tests — the same non-blocking pattern already recorded for Phases 10, 11, 13, 14 and 17. No code, requirement or governance behavior changed |
 | 195 | `e59a43c` | **HGR-002 — HUMAN_GATE_4 GRANTED FOR THE PHASE 19 CANDIDATE ONLY.** Recorded by the human acceptance authority after independent mechanical re-verification of twelve stated conditions against HEAD `ef5cb3b` (evidence-package digest `sha256:6e41dd0d...`): clean tree, `check_handoff.py` PASS, current phase 19, candidate identity unchanged since the gate ran, sole blocker `HUMAN_GATE_4`, zero open findings, all 8 architecture gates PASS, `backend/arkali/control/` and `backend/arkali/acceptance/` both untouched by the whole candidate, no `AUTHORITY_MAP.yaml` change beyond one sibling edge, TRUST-3 fixed and non-reassignable by type, the execution gate genuinely denies unsatisfiable isolation and non-human approval. Explicitly scoped to this one candidate/digest; records a known gap that `HUMAN_GATE_4` is not phase-bound in `GovernanceState.accepted_human_gates` and will also mechanically satisfy Phase 21's future check, flagged so no session treats HGR-002 as covering it |
-| 196 | `c3b51f8` | **PHASE 19 ACCEPTANCE RECORDED.** `run_phase_gate.py 19 20` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, following HGR-002. **5/5 requirements discharged**, cumulative verified 161 → **166**. `BUILD_STATE.md`'s Phase 19 row flips to MACHINE-ACCEPTED; the newly-unlocked next phase (Database Migration Safety + Full Backup/Recovery, denominator 4) gets its own `UNLOCKED — NOT STARTED` row. `GovernanceState.current_work_phase()` now returns `20` ← HEAD at generation |
+| 196 | `c3b51f8` | **PHASE 19 ACCEPTANCE RECORDED.** `run_phase_gate.py 19 20` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, following HGR-002. **5/5 requirements discharged**, cumulative verified 161 → **166**. `BUILD_STATE.md`'s Phase 19 row flips to MACHINE-ACCEPTED; the newly-unlocked next phase (Database Migration Safety + Full Backup/Recovery, denominator 4) gets its own `UNLOCKED — NOT STARTED` row. `GovernanceState.current_work_phase()` now returns `20` |
+| 197 | `785720d` | **HANDOFF REFRESH (§12 rule) — PHASE 19 ACCEPTANCE.** Cumulative verified to 166, Section 3/8/9 rewritten for the new current phase (20), Section 4 ledger rows 195–196 added, Section 11 gains this refresh's own row; Section 9's prose adjusted to avoid naming Phase 19's own now-discharged requirement ids as bare tokens (the anti-vacuity continuation-subject control correctly flagged the first draft) ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -669,7 +670,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: c3b51f8eff56f4dfc2235eb1e00b727bd125417a
+head: 785720dcf7a2e78631370852c8fc43b593051acf
 branch: main
 working_tree_clean: true
 
