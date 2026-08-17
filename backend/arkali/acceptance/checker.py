@@ -15,15 +15,17 @@ from __future__ import annotations
 
 import pathlib
 
+from arkali.acceptance.discharge_shape import check_claim_shape
 from arkali.acceptance.external_result import ExternalProviderResultRule
 from arkali.acceptance.gate_verdict import GateVerdict, Verdict
+from arkali.acceptance.governance_gates import _evaluate_prerequisites, _human_gate_for
 from arkali.acceptance.governance_state import GovernanceState
+from arkali.acceptance.migration_release_check import _evaluate_migration_data_loss_risk
 from arkali.acceptance.phase_report import PhaseReport
 from arkali.acceptance.protected_core_check import (
     evaluate_report_profile,
     load_protected_core,
 )
-from arkali.acceptance.discharge_shape import check_claim_shape
 from arkali.acceptance.requirement_claim import TraceabilityRecord, reconcile_discharge
 from arkali.acceptance.rescoring_authorization import (
     evidence_package_digest,
@@ -283,6 +285,18 @@ class PhaseGateChecker:
             authorization.render(),
         )
 
+    def check_migration_data_loss_risk(self) -> CheckResult:
+        """ARK-REQ-0337: known data-loss risk blocks release.
+
+        Thin by design, same shape as `check_external_result_integrity`: the
+        detection lives in `migration_release_check.py`, kept separate so this
+        module's own touched-context and line budgets stay clear of
+        `kernel.persistence`.
+        """
+        passed, summary, detail = _evaluate_migration_data_loss_risk(self.repo_root)
+        check = _ok if passed else _fail
+        return check("DATA_LOSS_RISK", summary, detail)
+
     def check_open_findings(self) -> CheckResult:
         open_rows = self.state.open_stopping_findings
         if open_rows:
@@ -291,23 +305,12 @@ class PhaseGateChecker:
         return _ok("FINDINGS", "no open BLOCKER or HIGH finding")
 
     def check_prerequisites(self, phase_id: str) -> CheckResult:
-        prereqs = self.state.prerequisites_of(phase_id)
-        unmet = [
-            dep for dep in prereqs
-            if dep in self.state.phases and not self.state.phase(dep).is_accepted
-        ]
-        unknown = [dep for dep in prereqs if dep not in self.state.phases]
-        if unknown:
-            return _fail("PREREQ", "prerequisite phase has no status row",
-                         f"unknown={unknown}")
-        if unmet:
-            return _fail("PREREQ", "prerequisite phase is not accepted",
-                         f"unmet={unmet}")
-        return _ok("PREREQ", f"all {len(prereqs)} prerequisites accepted")
+        passed, summary, detail = _evaluate_prerequisites(self.state, phase_id)
+        return (_ok if passed else _fail)("PREREQ", summary, detail)
 
     def check_human_gate(self, phase_id: str) -> CheckResult:
         """A human gate is never self-accepted: only a recorded decision counts."""
-        required = self._human_gate_for(phase_id)
+        required = _human_gate_for(self.state, phase_id)
         if required is None:
             return CheckResult(
                 check_id="HUMAN_GATE",
@@ -324,20 +327,6 @@ class PhaseGateChecker:
             authoritative_source=_SPEC,
         )
 
-    def _human_gate_for(self, phase_id: str) -> str | None:
-        """Which gate this phase carries, read from authoritative state.
-
-        NO SHADOW MODEL: the mapping is parsed from the Gate column of
-        IMPLEMENTATION_DEPENDENCY_MATRIX.md. Phase 0A and 0B form one acceptance
-        package, so 0A and 0 inherit the gate the matrix records against 0B.
-        """
-        direct = self.state.phase_gates.get(phase_id)
-        if direct:
-            return direct
-        if phase_id in ("0", "0A"):
-            return self.state.phase_gates.get("0B")
-        return None
-
     # -- orchestration --------------------------------------------------------
 
     def _run_checks(self, report: PhaseReport) -> list[CheckResult]:
@@ -353,6 +342,7 @@ class PhaseGateChecker:
             self.check_external_result_integrity(report),
             self.check_protected_core_profile(report),
             self.check_rescoring_authority(report),
+            self.check_migration_data_loss_risk(),
             self.check_open_findings(),
             self.check_prerequisites(report.phase_id),
             self.check_human_gate(report.phase_id),
