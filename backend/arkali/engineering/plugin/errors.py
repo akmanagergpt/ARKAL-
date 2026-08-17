@@ -17,3 +17,11 @@ class PluginManifestVersionError(ContractViolation):
     semver)."""
 
     code = "ARK-ERR-0147"
+
+
+class PluginExecutionRefusedError(ContractViolation):
+    """A TRUST-4 plugin execution attempt lacked satisfiable isolation, a
+    genuine per-execution human approval, or was evaluated against the wrong
+    trust tier (ARK-REQ-0117: "TRUST-4 human approval per execution")."""
+
+    code = "ARK-ERR-0148"
