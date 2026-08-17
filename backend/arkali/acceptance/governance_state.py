@@ -29,6 +29,7 @@ from pydantic import BaseModel, ConfigDict
 
 from arkali.acceptance.findings import stopping_findings
 from arkali.acceptance.governance_source import refuse
+from arkali.acceptance.human_gate_authorization import _find_operation_gate_grant
 
 BUILD_STATE = "docs/build/BUILD_STATE.md"
 HUMAN_GATES = "docs/acceptance/HUMAN_GATE_RECORDS.md"
@@ -227,12 +228,34 @@ class GovernanceState:
         phase_gates: dict[str, str],
         accepted_human_gates: frozenset[str],
         open_stopping_findings: tuple[str, ...],
+        repo_root: pathlib.Path,
     ) -> None:
         self.phases = phases
         self.prerequisites = prerequisites
         self.phase_gates = phase_gates
         self.accepted_human_gates = accepted_human_gates
         self.open_stopping_findings = open_stopping_findings
+        self.repo_root = repo_root
+
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str,
+        revision_identity: str,
+    ) -> bool:
+        """Whether a scoped human-gate grant exists for this exact operation.
+
+        HUMAN_GATE_SCOPE_GAP remediation. Satisfies the `HumanGateSource`
+        `Protocol` `lifecycle.recovery`'s migration-safety Apply step composes
+        (`migration_safety_types.py`) - never an import in that direction,
+        since `acceptance.engine`'s own chain into `kernel.contracts` is
+        already 4 of 4. `target_identity` and `revision_identity` must already
+        be mechanically derived by the caller from real facts (a backup
+        content digest, a resolved migration revision); this method does not
+        trust them, it only asks whether a matching recorded grant exists.
+        """
+        return _find_operation_gate_grant(
+            self.repo_root, gate_id, operation_class, target_identity,
+            revision_identity,
+        ) is not None
 
     @classmethod
     def load(cls, repo_root: pathlib.Path) -> GovernanceState:
@@ -250,7 +273,7 @@ class GovernanceState:
             raise refuse(
                 "no phase-to-human-gate mapping parsed", source=DEPENDENCY_MATRIX
             )
-        return cls(phases, prereqs, phase_gates, gates, findings)
+        return cls(phases, prereqs, phase_gates, gates, findings, repo_root)
 
     @staticmethod
     def _parse_phase_gates(text: str) -> dict[str, str]:

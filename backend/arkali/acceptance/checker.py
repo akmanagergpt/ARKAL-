@@ -18,7 +18,11 @@ import pathlib
 from arkali.acceptance.discharge_shape import check_claim_shape
 from arkali.acceptance.external_result import ExternalProviderResultRule
 from arkali.acceptance.gate_verdict import GateVerdict, Verdict
-from arkali.acceptance.governance_gates import _evaluate_prerequisites, _human_gate_for
+from arkali.acceptance.governance_gates import (
+    _evaluate_human_gate,
+    _evaluate_prerequisites,
+    _human_gate_for,
+)
 from arkali.acceptance.governance_state import GovernanceState
 from arkali.acceptance.migration_release_check import _evaluate_migration_data_loss_risk
 from arkali.acceptance.phase_report import PhaseReport
@@ -309,7 +313,8 @@ class PhaseGateChecker:
         return (_ok if passed else _fail)("PREREQ", summary, detail)
 
     def check_human_gate(self, phase_id: str) -> CheckResult:
-        """A human gate is never self-accepted: only a recorded decision counts."""
+        """A human gate is never self-accepted: only a recorded, SCOPED decision
+        counts. HUMAN_GATE_SCOPE_GAP remediation: see `_evaluate_human_gate`."""
         required = _human_gate_for(self.state, phase_id)
         if required is None:
             return CheckResult(
@@ -318,12 +323,22 @@ class PhaseGateChecker:
                 summary=f"phase {phase_id} carries no human gate",
                 authoritative_source=_SPEC,
             )
-        if required in self.state.accepted_human_gates:
-            return _ok("HUMAN_GATE", f"{required} has a recorded acceptance")
+        try:
+            satisfied, summary = _evaluate_human_gate(
+                self.repo_root, self.state, phase_id, required
+            )
+        except AuthoritativeSourceError as exc:
+            return _blocked(
+                "HUMAN_GATE",
+                f"{required} required; evidence package identity cannot be computed",
+                str(exc),
+            )
+        if satisfied:
+            return _ok("HUMAN_GATE", summary)
         return CheckResult(
             check_id="HUMAN_GATE",
             state=HonestState.BLOCKED,
-            summary=f"{required} required and not recorded",
+            summary=summary,
             authoritative_source=_SPEC,
         )
 

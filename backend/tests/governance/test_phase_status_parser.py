@@ -239,7 +239,9 @@ class TestLiveRowsKeepTheirMeaning:
             "6": PhaseStatus.parse("6", "t", "**UNLOCKED — NOT_STARTED**"),
             "7": PhaseStatus.parse("7", "t", "**UNLOCKED — NOT_STARTED**"),
         }
-        ambiguous = GovernanceState(rows, {}, {"7": "HUMAN_GATE_2"}, frozenset(), ())
+        ambiguous = GovernanceState(
+            rows, {}, {"7": "HUMAN_GATE_2"}, frozenset(), (), pathlib.Path(".")
+        )
         assert ambiguous.current_work_phase() is None
 
     def test_every_prerequisite_of_an_accepted_phase_is_accepted(
