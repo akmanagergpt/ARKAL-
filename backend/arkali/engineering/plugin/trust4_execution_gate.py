@@ -31,8 +31,8 @@ import json
 
 from arkali.control.isolation.isolation_contract import IsolationResolution
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate
+from arkali.engineering.plugin.content_ref import address_of
 from arkali.engineering.plugin.errors import PluginExecutionRefusedError
-from arkali.kernel.contracts.content_address import address_of
 
 #: MS §Trust-Tiered Isolation: "internet-sourced executable content" -> TRUST-4.
 TRUST_TIER = "TRUST-4"

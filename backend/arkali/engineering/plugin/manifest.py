@@ -29,8 +29,8 @@ from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from arkali.engineering.plugin.content_ref import address_of
 from arkali.engineering.plugin.errors import PluginManifestVersionError
-from arkali.kernel.contracts.content_address import address_of
 
 CONTRACT_VERSION: Final[str] = "1.0.0"
 

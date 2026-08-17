@@ -140,6 +140,39 @@ class PolicyDecisionPoint:
             )
         return self.decide(request)
 
+    def decide_network_egress(
+        self,
+        *,
+        actor: str,
+        trust_tier: str,
+        local_only: bool,
+        target_is_loopback: bool | None = None,
+    ) -> str:
+        """`NETWORK_EXTERNAL`'s decision, as a plain string, for a caller
+        that cannot import `policy_contract.PolicyRequest` (fan-in ceiling
+        15 of 15 - see `decide_or_deny_unmapped`'s docstring for the sibling
+        constraint this method answers the same way: primitive facts in,
+        the `Decision` value out as `str`, so a structural `Protocol`
+        mirroring this exact signature needs no import of this module's own
+        types either).
+
+        `engineering.plugin`'s Research capability (ARK-REQ-0163) is this
+        method's first caller: MS's Local-Only rule marks `NETWORK_EXTERNAL`
+        `DENY in Local-Only` (`SECURITY_ARCHITECTURE.md` §2), and the
+        Verification and Delivery Contract names "research" as one of the
+        paths whose Local-Only DENY must be evidenced - this reuses the real
+        PDP rather than asserting the rule a second time.
+        """
+        return self.decide(
+            PolicyRequest(
+                operation_class="NETWORK_EXTERNAL",
+                trust_tier=trust_tier,
+                actor=actor,
+                local_only=local_only,
+                target_is_loopback=target_is_loopback,
+            )
+        ).decision.value
+
     # -- steps ---------------------------------------------------------------
 
     def _require_known_tier(self, request: PolicyRequest) -> None:
