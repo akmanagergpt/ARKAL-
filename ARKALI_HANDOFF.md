@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `09430a2d4e9ceed54e2fb073d35ad5a70a432572` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `2e7ef2b0b401fd3ff53cd5349bb0ea6f37e2e55d` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -358,7 +358,8 @@ repository, the repository wins.
 | 188 | `60c0f3f` | **PHASE 19 PACKAGE 4** — composed pipeline (ARK-REQ-0162, 0348 conditions 3–6). `pipeline.py`: `ImportPipeline` composes Packages 1–3 into the real `ImportProject` state-machine instance; `WorkspaceAuthority` reused through a structural `Protocol`, not a direct import, to avoid extending `engineering.candidate`'s already-4-of-4 orchestration chain. No `engineering.import → engineering.candidate` sibling edge declared. `test_dependency_rules.py` updated (10 declared edges). Not a phase acceptance; no requirement discharged |
 | 189 | `394f2e4` | **PHASE 19 PACKAGE 5** — composed journey, structural authority, C-29 contract doc. `test_phase_19_journey.py` (one test per VDC acceptance condition), `test_import_authority.py`, `docs/contracts/import.md`, `phase_19_traceability.json`. Not a phase acceptance; the gate had not yet been run |
 | 190 | `17a607b` | **PHASE 19 CANDIDATE — C-17 REPORT, REAL GATE RUN.** `docs/acceptance/phase_19_report.json` committed; `python scripts/run_phase_gate.py 19 20` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_4 required and not recorded" — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE normal profile, RESCORING NOT_APPLICABLE, FINDINGS, PREREQ 3/3, all 8 architecture gates over 169 edges). `HUMAN_GATE_RECORDS.md`'s "Outstanding gates" table lists `HUMAN_GATE_4` as "not reached"; only the human acceptance authority may record one. Cumulative verified stays **161**; Phase 19 remains UNLOCKED, NOT ACCEPTED |
-| 191 | `09430a2` | Corrects the full-regression passed count recorded in `phase_19_report.json` (2715 → 2723, re-read from the run's own final summary line rather than a truncated tail); no other field changed ← HEAD at generation |
+| 191 | `09430a2` | Corrects the full-regression passed count recorded in `phase_19_report.json` (2715 → 2723, re-read from the run's own final summary line rather than a truncated tail); no other field changed |
+| 192 | `2e7ef2b` | **HANDOFF + BUILD_STATE REFRESH (§12 rule)** — re-derived after the Phase 19 candidate and gate run: live architecture summary to 169 edges, Section 3/8/9 rewritten for `AWAITING_HUMAN_GATE`, Section 4 ledger rows 184–191 added, Section 11 gains this refresh's own row ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -669,7 +670,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 09430a2d4e9ceed54e2fb073d35ad5a70a432572
+head: 2e7ef2b0b401fd3ff53cd5349bb0ea6f37e2e55d
 branch: main
 working_tree_clean: true
 
