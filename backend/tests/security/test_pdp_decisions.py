@@ -279,3 +279,66 @@ class TestMalformedInputFailsClosed:
                 record = pdp.decide(request_for(name, tier))
                 assert record.decision in set(Decision)
                 assert record.reason
+
+
+class TestDecideOrDenyUnmappedNeverRaisesForAnUnmappableClass:
+    """ARK-REQ-0166: "Unmappable plugin action is DENY." `decide` itself is
+    unchanged (`TestMalformedInputFailsClosed` above still proves it raises);
+    this is the additive, total entry point a caller that cannot afford an
+    uncaught exception (a plugin action invocation) uses instead."""
+
+    def test_an_unmappable_class_resolves_rather_than_raises(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        record = pdp.decide_or_deny_unmapped(
+            request_for("INVENT_AN_OPERATION", "TRUST-0")
+        )
+        assert record.decision is Decision.DENY
+
+    def test_the_resolution_is_read_from_the_authority_map_not_hard_coded(
+        self, pdp: PolicyDecisionPoint, vocabulary: OperationClassVocabulary
+    ) -> None:
+        record = pdp.decide_or_deny_unmapped(
+            request_for("INVENT_AN_OPERATION", "TRUST-0")
+        )
+        assert record.decision is vocabulary.unmapped_resolution
+
+    def test_the_decision_is_a_real_audited_record_not_an_exception(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        record = pdp.decide_or_deny_unmapped(
+            request_for("NOT_A_REAL_CLASS", "TRUST-2")
+        )
+        assert record.operation_class == "NOT_A_REAL_CLASS"
+        assert record.trust_tier == "TRUST-2"
+        assert record.reason
+        assert "unmapped_action_resolution" in record.reason
+
+    def test_a_mappable_class_still_resolves_exactly_as_decide_would(
+        self, pdp: PolicyDecisionPoint, matrix: SecurityMatrix
+    ) -> None:
+        """The total variant must not silently diverge from `decide` for the
+        classes that DO map — only the unmappable path is new behaviour."""
+        for name in matrix.operation_classes():
+            for tier in matrix.tiers():
+                request = request_for(name, tier)
+                assert (
+                    pdp.decide_or_deny_unmapped(request).decision
+                    == pdp.decide(request).decision
+                )
+
+    def test_an_unknown_trust_tier_still_raises_even_when_unmapped(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        """The new leniency is scoped to the operation-class check only —
+        a genuinely malformed tier must still fail closed by raising."""
+        with pytest.raises(MalformedPolicyState):
+            pdp.decide_or_deny_unmapped(request_for("INVENT_AN_OPERATION", "NOT-A-TIER"))
+
+    def test_decide_itself_is_unmodified_and_still_raises(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        """This is the entry point most existing callers already use; it
+        must not have been quietly weakened by this addition."""
+        with pytest.raises(UnknownOperationClass):
+            pdp.decide(request_for("INVENT_AN_OPERATION", "TRUST-0"))

@@ -114,6 +114,32 @@ class PolicyDecisionPoint:
             why = f"{why}; requires {gate}, not recorded"
         return self._record(request, decision, rule.name, why, gate)
 
+    def decide_or_deny_unmapped(self, request: PolicyRequest) -> PolicyDecisionRecord:
+        """Like `decide`, but an unmappable `operation_class` resolves to a
+        recorded decision instead of raising (ARK-REQ-0166).
+
+        `SECURITY_ARCHITECTURE.md` §2: "Any action not mappable to a class
+        is DENY." `decide` deliberately raises for this case - this module's
+        own docstring: "an unresolvable *input* raises rather than resolving
+        to anything" - which suits a caller that can treat an exception as
+        the refusal. A caller that cannot afford to (a plugin action
+        invocation, where an uncaught exception would itself be the "crashes
+        core" failure ARK-REQ-0164 forbids) needs the refusal recorded and
+        audited like any other decision. `decide`'s own raising behaviour is
+        unchanged by this method; this is a second, additive entry point,
+        never a replacement, and the resolution is read from
+        `AUTHORITY_MAP.yaml`'s `unmapped_action_resolution`, never
+        hard-coded here.
+        """
+        if not self.vocabulary.contains(request.operation_class):
+            self._require_known_tier(request)
+            return self._record(
+                request, self.vocabulary.unmapped_resolution, request.operation_class,
+                "operation class maps to no canonical class; resolution taken "
+                "from AUTHORITY_MAP.yaml unmapped_action_resolution", None,
+            )
+        return self.decide(request)
+
     # -- steps ---------------------------------------------------------------
 
     def _require_known_tier(self, request: PolicyRequest) -> None:
