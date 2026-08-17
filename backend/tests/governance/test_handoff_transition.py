@@ -219,6 +219,36 @@ _NOT_CONTRADICTED = (
 )
 
 
+def _inject_after_current_phase_heading(
+    text: str, validator: types.ModuleType, marker: str,
+) -> str:
+    """Force `marker` into the current-phase section's own body, regardless
+    of what that section's real prose currently says.
+
+    F-0050. The two controls below used to append their contradiction only
+    to the INDEPENDENT source (the live-summary row or the ledger) and rely
+    on the current-phase section ALREADY containing "NOT STARTED" / "no
+    package exists" wording of its own for the other half of the production
+    check's AND. That assumption holds only while a phase's own section is
+    still honestly reporting no progress - it silently breaks the moment a
+    phase's whole candidate and gate run land before its first handoff
+    refresh (exactly Phase 20's real history: the live section jumps
+    straight to "candidate complete, gate run, AWAITING_HUMAN_GATE" and
+    never once states NOT STARTED), leaving the control permanently unable
+    to construct its own precondition and therefore never exercised. Forcing
+    the claim in directly - unconditionally, independent of whatever stage
+    the real phase happens to be at - is what keeps the mutation a live
+    behavioural probe under every lifecycle stage from NOT STARTED through
+    ACCEPTED, rather than a bet on the current phase's own honest wording.
+    """
+    heading = validator._CURRENT_PHASE_HEADING.search(text)
+    assert heading is not None, "no current-phase heading to inject after"
+    assert marker not in text, "marker already present; mutation would be vacuous"
+    injected = text[: heading.end()] + f"\n\n{marker}\n" + text[heading.end():]
+    assert marker in injected, "injection did not land"
+    return injected
+
+
 class TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence:
     """The exact defect this class exists to catch: BUILD_STATE.md's phase-
     status row for the current work phase never advanced past UNLOCKED / NOT
@@ -238,31 +268,54 @@ class TestCurrentPhaseSectionIsNotContradictedByItsOwnEvidence:
     def test_a_not_started_claim_against_ledger_evidence_is_detected(
         self, validator: types.ModuleType, handoff_text: str, truth: dict,
     ) -> None:
-        """The current-phase section's own truthful NOT STARTED / no-package
-        claim (whatever the current phase happens to be) must be caught the
+        """A current-phase section that claims NOT STARTED must be caught the
         moment an INDEPENDENT source — here, the live summary's own row for
-        that phase — starts asserting progress. Injecting the contradiction
-        into the independent source, rather than hard-coding §8's prose (which
-        rewords itself every phase transition), keeps this test meaningful
-        across transitions instead of merely anchored to one snapshot of it.
+        that phase — asserts progress. The NOT STARTED claim is forced into
+        the section directly (see `_inject_after_current_phase_heading`)
+        rather than assumed present in the section's real prose, so this
+        control stays meaningful regardless of which lifecycle stage the
+        real current phase's own honest wording happens to be at.
         """
         current = truth["current"]
+        # ANTI-VACUITY: the real, unmutated document is not already flagged,
+        # so the assertion below proves something about the mutation below,
+        # not a pre-existing condition.
+        assert _NOT_CONTRADICTED not in drift_names(validator, handoff_text)
+
+        injected = _inject_after_current_phase_heading(
+            handoff_text, validator, "STATUS-PROBE: NOT STARTED.",
+        )
+
         row = row_for(handoff_text, current)
         # The production check reads "IN PROGRESS" from WITHIN the row's own
         # cell (bounded by its closing "|"), not from trailing text appended
         # past it - so the mutation must land before that last "|".
         mutated_row = row[: row.rfind("|")] + "IN PROGRESS |"
-        mutated = replace_once(handoff_text, row, mutated_row)
-        assert _NOT_CONTRADICTED in drift_names(validator, mutated)
+        assert mutated_row != row, "the live-summary row mutation is a no-op"
+        combined = replace_once(injected, row, mutated_row)
+
+        assert _NOT_CONTRADICTED in drift_names(validator, combined)
 
     def test_a_no_package_exists_claim_against_ledger_evidence_is_detected(
         self, validator: types.ModuleType, handoff_text: str, truth: dict,
     ) -> None:
         """Same contradiction, proven through the OTHER independent source:
-        the accepted-commit-history ledger naming the current phase."""
+        the accepted-commit-history ledger naming the current phase. See
+        `test_a_not_started_claim_against_ledger_evidence_is_detected` and
+        `_inject_after_current_phase_heading` for why the current-phase
+        section's own "no package exists" claim is forced in directly rather
+        than assumed present."""
         current = truth["current"]
-        anchor = "← HEAD at generation"
-        mutated = replace_once(
-            handoff_text, anchor, f"PHASE {current} package landed {anchor}",
+        assert _NOT_CONTRADICTED not in drift_names(validator, handoff_text)
+
+        injected = _inject_after_current_phase_heading(
+            handoff_text, validator,
+            "STATUS-PROBE: no package exists for this phase.",
         )
-        assert _NOT_CONTRADICTED in drift_names(validator, mutated)
+
+        anchor = "← HEAD at generation"
+        assert anchor in handoff_text, "expected the handoff to render the HEAD marker"
+        mutated_anchor = f"PHASE {current} package landed {anchor}"
+        combined = replace_once(injected, anchor, mutated_anchor)
+
+        assert _NOT_CONTRADICTED in drift_names(validator, combined)
