@@ -13,10 +13,10 @@ import pathlib
 import re
 
 import pytest
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import inspect
 
+from alembic import command
 from arkali.kernel.persistence.base import ENTITY_CONTRACT_TABLE, PersistenceBase
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.kernel.persistence.migrations import (
@@ -28,6 +28,7 @@ from arkali.kernel.persistence.migrations import (
     declared_migrations,
     head_revision,
     is_forward_only,
+    run_upgrade,
 )
 from arkali.kernel.persistence.schema_contract import MigrationDirection
 
@@ -287,6 +288,41 @@ class TestMigrationRunsAgainstRealSqlite:
         finally:
             engine.dispose()
 
+class TestRunUpgradeMechanic:
+    """Phase 20: the production `run_upgrade` mechanic `lifecycle.recovery`'s
+    Apply step drives, proven against a real SQLite target - not a second
+    duplicate of `TestMigrationRunsAgainstRealSqlite`, but the same result
+    obtained through the shipped function rather than a test-local rebuild of
+    the Alembic Config."""
+
+    def test_run_upgrade_reaches_head_against_a_real_target(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        database_path = tmp_path / "run_upgrade.db"
+        run_upgrade(sqlite_url(database_path), BACKEND, "head")
+        engine = create_persistence_engine(sqlite_url(database_path))
+        try:
+            assert applied_revision(engine) == head_revision(BACKEND)
+            assert ENTITY_CONTRACT_TABLE in set(inspect(engine).get_table_names())
+        finally:
+            engine.dispose()
+
+    def test_run_upgrade_can_target_an_intermediate_revision(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        chain = declared_migrations(BACKEND)
+        assert len(chain) >= 2
+        first = chain[0].revision
+        database_path = tmp_path / "partial.db"
+        run_upgrade(sqlite_url(database_path), BACKEND, first)
+        engine = create_persistence_engine(sqlite_url(database_path))
+        try:
+            assert applied_revision(engine) == first
+        finally:
+            engine.dispose()
+
+
+class TestMigrationTargetRefusals:
     def test_migration_target_without_a_url_is_refused(
         self, tmp_path: pathlib.Path
     ) -> None:

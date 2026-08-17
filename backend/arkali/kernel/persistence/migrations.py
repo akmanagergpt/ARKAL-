@@ -16,8 +16,10 @@ HUMAN GATE 6 IS NOT ENFORCED HERE. `MigrationContract` carries
 is fixed to `HUMAN_GATE_6_ON_REAL_OR_STABLE_DATA` in the authority map. Both are
 policy decisions owned by `control.policy` at layer rank 1, unreachable from
 rank 0. The flag is carried and surfaced; the decision belongs to the call site.
-The nine-step migration safety sequence is ARK-REQ-0151 at Phase 20 and is not
-implemented here.
+The nine-step migration safety sequence is ARK-REQ-0151 at Phase 20, orchestrated
+by `lifecycle.recovery`; `run_upgrade` below is the real mechanic that
+orchestration drives for its Apply step - it decides nothing about whether to
+call it.
 """
 
 from __future__ import annotations
@@ -26,8 +28,10 @@ import ast
 import pathlib
 from typing import Final
 
+from alembic.config import Config
 from sqlalchemy import Engine, inspect, text
 
+from alembic import command
 from arkali.kernel.persistence.schema_contract import (
     MigrationContract,
     MigrationDirection,
@@ -144,6 +148,36 @@ def applied_revision(engine: Engine) -> str | None:
             text(f"SELECT version_num FROM {ALEMBIC_VERSION_TABLE}")  # noqa: S608
         ).scalars().all()
     return None if not result else str(result[0])
+
+
+def alembic_config(backend_root: pathlib.Path, database_url: str) -> Config:
+    """The one place an Alembic `Config` is built for a real run.
+
+    Mirrors `tests/persistence/test_migrations.py::alembic_config` exactly,
+    promoted here so `lifecycle.recovery`'s Apply step drives the same
+    construction the Phase 5 evidence already proved rather than a second one.
+    """
+    config = Config(str(backend_root / ALEMBIC_INI))
+    config.set_main_option("script_location", str(backend_root / "alembic"))
+    config.set_main_option("sqlalchemy.url", database_url)
+    return config
+
+
+def run_upgrade(
+    database_url: str, backend_root: pathlib.Path, revision: str = "head"
+) -> None:
+    """Apply the declared chain up to `revision` against a real target.
+
+    Takes a URL, not a live `Engine`: Alembic's own `env.py` builds its
+    connection through `create_persistence_engine` from this URL, so a second
+    engine over the same file is never opened concurrently with the one this
+    module might otherwise have constructed.
+
+    Whether this may be called at all is a `control.policy` decision made
+    before this function is reached; nothing here asks permission, and nothing
+    here decides what "real or stable data" means.
+    """
+    command.upgrade(alembic_config(backend_root, database_url), revision)
 
 
 def is_forward_only(chain: tuple[MigrationContract, ...]) -> bool:
