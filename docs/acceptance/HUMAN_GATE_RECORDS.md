@@ -242,6 +242,37 @@ F-0015 **CLOSED**. EXT-002 **CLOSED**. Phase 1 re-validated and machine-accepted
 
 ---
 
+## Scoped Human-Gate Authorizations (mechanical, HUMAN_GATE_SCOPE_GAP remediation)
+
+Append-only, machine-readable authorization tables. `acceptance.engine.human_gate_authorization`
+parses these two tables (never the prose HGR records above) to decide whether
+a specific phase-acceptance check or a specific runtime operation carries a
+scoped grant. Neither table edits or reinterprets HGR-001 or HGR-002 above,
+which remain the human-readable historical record of those two decisions;
+these rows restate the same, already-recorded decisions in the shape the
+checker actually reads, closing the gap HGR-002's own "KNOWN MECHANISM GAP"
+note first documented — a grant recorded here for one phase or one
+target/revision cannot satisfy a lookup for a different one, because `gate +
+phase + evidence digest` (phase table) and `gate + operation + target +
+revision` (operation table) are all required to match exactly.
+
+**Phase-scope authorizations** (`gate + phase + evidence-package digest`, the
+identical binding `rescoring_authorization.py` already uses for GOV-001):
+
+| ID | GATE | PHASE | EVIDENCE PACKAGE | ISSUER | STATUS | BASIS |
+|---|---|---|---|---|---|---|
+| HGR-002-SCOPED | HUMAN_GATE_4 | 19 | sha256:6e41dd0dbb84df2403d6ebea98b6d2875871cd0806c5c6bb699d4cd0a457a727 | human operator | GRANTED | Mechanical restatement of HGR-002 above, unedited. Binds to phase 19's exact evidence-package digest only — a lookup for `(HUMAN_GATE_4, phase=21, *)` finds no matching row here, regardless of this grant, exactly as HGR-002's own scope section already stated in prose. |
+
+**Operation-scope authorizations** (`gate + operation class + target identity +
+revision identity`, for runtime operations such as `APPLY_MIGRATION` — see
+`docs/contracts/human_gate_authorization.md`). Empty: no operation-scoped
+grant has been recorded. `HUMAN_GATE_6` for the Phase 20 candidate remains
+**not recorded** — this remediation closes the scope defect, it does not
+grant the gate.
+
+| ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
+|---|---|---|---|---|---|---|---|
+
 ## Outstanding gates
 
 | Gate | Purpose | Status |
