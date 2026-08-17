@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `baaec854c54b7ece49ddef6dc9496d68afe2994a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `707b6fcac595e5ecd003bbfa4c166fd1b7d13d7d` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -146,11 +146,12 @@ repository, the repository wins.
 | Phase 17 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first fully-corrected submission (`docs/acceptance/phase_17_report.json`, `phase_17_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, **PROTECTED_CORE COMPLETE** (member `control.policy`, via `workflow_approval.py`/`policy_errors.py` — security review 245, adversarial review 788, full regression 2610, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 3/3 (Phases 7, 8, 13), HUMAN_GATE NOT_APPLICABLE, 8 gates PASS over 156 edges and all 9 budgets. Eight atomic packages delivered C-20 (the canonical workflow graph document): the graph domain model, persistence/revision store, the ADR-0004 derived execution plan, `control.policy`'s HUMAN APPROVAL enforced policy stop, the executor (real evidence for all 10 node kinds and 10 control constructs), the `surfaces.command` HTTP API, the frontend Visual Workflow Studio (a hand-rolled canvas — real pointer drag, real click-to-connect, no graph-drawing library — proven by a real T10 Playwright journey through compose/publish/reload persistence/fresh-context persistence/execution pause/the ARK-REQ-0330 negative path (`ARK-ERR-0133`)/a real approval to `SUCCEEDED`), and the ARK-REQ-0331 coverage check (a structural cross-check, `test_contract_drift.py`'s own idiom, since `execution.workflow`, `surfaces.command` and `acceptance.engine` were all at their 40-of-40 public-surface ceiling). **9/9 requirements discharged**, all MANDATORY; cumulative verified 148 → **157**. No AI provider contacted. **Phase 18 unlocked** |
 | Phase 18 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission (`docs/acceptance/phase_18_report.json`, `phase_18_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 10 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1 (Phase 13), HUMAN_GATE NOT_APPLICABLE, 8 gates PASS over 159 edges and all 9 budgets. Knowledge + Verified Components (C-28), owned by `engineering.knowledge`. Four atomic packages delivered C-28: `EvidenceReference`/`SelfReportedClaim` (evidence-backed knowledge, excluding self-report by type) and `KnowledgeRecord`'s derived five-state validity lifecycle (Package 1, `ARK-REQ-0126`/`0127`); `ReusableComponentDescriptor` with mandatory test/security/compatibility metadata (Package 2, `ARK-REQ-0128`); `VerifiedOutcome`/`aggregate` per-model/per-task-class empirical statistics reusing the same evidence exclusion (Package 3, `ARK-REQ-0394`/D-026); the composed journey, `docs/contracts/knowledge.md`, structural authority proofs and the traceability/report for the gate (Package 4). C-28 is `INT` — no table, no migration, matching C-11/C-13. **4/4 requirements discharged**, all MANDATORY; cumulative verified 157 → **161**. No AI provider contacted. `execution_routing.py`'s `VERIFIED_KNOWLEDGE` tier remains `NOT_CONFIGURED` by deliberate deferral. **Phase 19 unlocked** |
 | Phase 19 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED (`docs/acceptance/phase_19_report.json`, `phase_19_traceability.json`). Import / Reverse Engineering / Rescue (C-29). C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile — confirmed by `git diff --stat` over `backend/arkali/control/` and `backend/arkali/acceptance/`, both empty across the whole candidate); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; **HUMAN_GATE: `HUMAN_GATE_4` recorded ACCEPTED** — `HGR-002` (`docs/acceptance/HUMAN_GATE_RECORDS.md`), granted by the human acceptance authority for this exact candidate (HEAD `ef5cb3b`, evidence-package digest `sha256:6e41dd0d...`) after independent mechanical re-verification of all twelve stated conditions; the record's own known-gap note states this grant does **not** cover Phase 21's separate `HUMAN_GATE_4` obligation, since `GovernanceState.accepted_human_gates` has no per-phase binding. All 8 architecture gates PASS over **169** edges. Five atomic packages deliver C-29 under `engineering.import` (descriptor/tier-assignment/rescue-mode contract; static inspection with a structural no-execution proof reusing `engineering.codeintel.PythonGraphBuilder`; the TRUST-3 execution gate composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified**; the composed pipeline reusing `engineering.candidate.workspace.WorkspaceAuthority` via a structural `Protocol`; the composed journey proving all seven VDC acceptance conditions). **5/5 requirements discharged**, all MANDATORY — `ARK-REQ-0115`, `0116`, `0161`, `0162`, `0348` — taking cumulative verified 161 → **166**. `docs/contracts/import.md` is the derived C-29 contract document. **Phase 20 unlocked** |
-| Phase 20 | **UNLOCKED — candidate complete, gate run, `AWAITING_HUMAN_GATE`, NOT ACCEPTED.** Database Migration Safety + Full Backup/Recovery. `GovernanceState.current_work_phase()` returns `20`. `RequirementRegister.for_phase("20")` returns **4** entries, all MANDATORY: `ARK-REQ-0151`/`0336` (owner `lifecycle.recovery`), `0152` (owner `control.policy`), `0337` (owner `acceptance.engine`). Prerequisites Phase 5 and Phase 6 are both MACHINE-ACCEPTED. Matrix Gate column is `GATE 6` on APPLY, resolved to `HUMAN_GATE_6` by `GovernanceState.phase_gates` — verified mechanically before any Phase 20 code was written. Three atomic packages deliver the nine-step VDC "Migration safety" sequence, completing C-03's deferred runtime half; `python scripts/run_phase_gate.py 20 21` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_6 required and not recorded" — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE **COMPLETE** — `acceptance.engine` touched, all three categories satisfied — RESCORING NOT_APPLICABLE, DATA_LOSS_RISK, FINDINGS, PREREQ 2/2, all 8 architecture gates over 183 edges). `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists `HUMAN_GATE_6` as "not reached" — only `HUMAN_GATE_1` and the narrowly-scoped `HUMAN_GATE_4` (Phase 19 candidate only) have ever been granted, and only the human acceptance authority may record one; this is a genuine stop condition, not a defect. **4/4 requirements claimed SATISFIED with named evidence** (`docs/acceptance/phase_20_traceability.json`, `phase_20_report.json`), **none discharged** — discharge happens only at phase acceptance. Cumulative verified stays **166** |
-| Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
+| Phase 20 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED (`docs/acceptance/phase_20_report.json`, `phase_20_traceability.json`). Database Migration Safety + Full Backup/Recovery. C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; **PROTECTED_CORE COMPLETE** (`acceptance.engine` touched by the new ARK-REQ-0337 check; security review 245, adversarial review 802, full regression 2762, all exit 0); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS (9 declared revisions, zero flagged); FINDINGS PASS; PREREQ 2/2 (Phases 5, 6); **HUMAN_GATE: `HUMAN_GATE_6` recorded ACCEPTED** — `HGR-003` (`docs/acceptance/HUMAN_GATE_RECORDS.md`), granted by the human acceptance authority for this exact candidate (evidence commit `73a968f`, evidence-package digest `sha256:b94d28bb...202c2c`) after independent mechanical re-verification of HEAD/branch/clean-tree, `check_handoff.py` PASS, `current_work_phase()` == `20`, evidence byte-identical to `73a968f`, the recomputed digest, the governance suite (399 passed, 0 failed), all 8 architecture gates (0 violations) and 0 open BLOCKER/HIGH; the record's own scope section states this grant does **not** cover any other phase or any real `APPLY_MIGRATION` runtime operation, which requires its own separate `RUNTIME_OPERATION`-scope grant; all 8 architecture gates PASS over **183** edges. Three atomic packages deliver the nine-step VDC "Migration safety" sequence, completing C-03's deferred runtime half: `run_upgrade` + `migration_impact.py` under `kernel.persistence`; `MigrationSafetySequence` under `lifecycle.recovery`, composing Phase 5's `RecoveryService`/`BackupRestore`, Phase 4's PDP/PEP and Phase 19's `WorkflowApprovalGate` unmodified; `check_migration_data_loss_risk` under `acceptance.engine`, re-derived over the live shipping chain on every gate evaluation. **4/4 requirements discharged**, all MANDATORY — `ARK-REQ-0151`, `0152`, `0336`, `0337` — taking cumulative verified 166 → **170**. `docs/contracts/migration_safety.md` is the derived contract document. **Phase 21 unlocked** |
+| Phase 21 | **UNLOCKED — NOT STARTED.** Plugins + Integrations + Research. `GovernanceState.current_work_phase()` returns `21`. `RequirementRegister.for_phase("21")` returns **6** entries: 5 MANDATORY (`ARK-REQ-0117`, `0163`–`0166`) and 1 OPTIONAL (`ARK-REQ-0167`). Prerequisites Phase 4 and Phase 9, both MACHINE-ACCEPTED. Matrix Gate column is "GATE 4 if boundary changes", resolving to `HUMAN_GATE_4` by `GovernanceState.phase_gates` — the same gate token Phase 19 carried. `HGR-002`'s own "KNOWN MECHANISM GAP" note states plainly that its Phase 19 grant does **not** cover Phase 21's own separate `HUMAN_GATE_4` obligation, and `HGR-003` (this session's Phase 20 `HUMAN_GATE_6` grant) is a different gate token entirely and is additionally scoped to phase 20 only — neither can satisfy a future Phase 21 `HUMAN_GATE_4` check; an independent human decision is required when Phase 21 is reached. No Phase 21 code has been written. Cumulative verified stays **170** |
+| Human Gates | `HUMAN_GATE_1` ACCEPTED (project-singular). `HUMAN_GATE_4` GRANTED for the Phase 19 candidate only (`HGR-002`) — still not reached for Phase 21. `HUMAN_GATE_6` GRANTED for the Phase 20 candidate only (`HGR-003`) — no `RUNTIME_OPERATION`-scope grant exists for any real `APPLY_MIGRATION`. Gates 2, 3, 5, 7, 8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced |
-| Cumulative verified | **166** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + 11 Phase 15 + 3 Phase 16 + 9 Phase 17 + 4 Phase 18 + **5 Phase 19**), reconciled by check C6 against each phase's traceability record. Of the 166, **165 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged; all 5 of Phase 19's are MANDATORY. Phase 8 adds none — its denominator is zero |
+| Cumulative verified | **170** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + 11 Phase 15 + 3 Phase 16 + 9 Phase 17 + 4 Phase 18 + 5 Phase 19 + **4 Phase 20**), reconciled by check C6 against each phase's traceability record. Of the 170, **169 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged; all 5 of Phase 19's and all 4 of Phase 20's are MANDATORY. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
@@ -375,7 +376,9 @@ repository, the repository wins.
 | 204 | `cefdd31` | **HUMAN_GATE_SCOPE_GAP Package 2** — `acceptance.engine` phase-gate scoped enforcement. `GovernanceState` gains `repo_root` and `operation_grant()` (the `HumanGateSource` `Protocol` method, composed structurally — no new `lifecycle.recovery → acceptance.engine` edge). `governance_gates._evaluate_human_gate` replaces flat gate-ID membership with a scoped `(gate, phase, evidence-digest)` lookup for every gate except the two singletons. Phase 19's own already-accepted `BUILD_STATE.md` status is untouched; `check_human_gate("20")` re-verified unchanged: still `BLOCKED` |
 | 205 | `37bdf89` | **HUMAN_GATE_SCOPE_GAP Package 4** — `lifecycle.recovery` runtime-operation scoped enforcement. `HumanGateSource` widens to `operation_grant(gate, operation, target_identity, revision_identity)`; `step_apply` gains a `backup: BackupSet` parameter and derives `target_identity`/`revision_identity` from real, kernel-computed facts (`BackupSet.manifest.digest`, the resolved target revision) — no field on `MigrationSafetyRequest` a caller could set to spoof either. `pdp.py`/`policy_contract.py` unchanged. All 20 pre-existing migration-safety tests re-verified green; 2 new confused-deputy/scope-precision tests added, proven against two independently-computed real backup digests |
 | 206 | `3113a58` | **HUMAN_GATE_SCOPE_GAP Package 5+7** — `HUMAN_GATE_RECORDS.md` gains one append-only section (two machine-readable tables); HGR-001/HGR-002 above remain unedited. `HGR-002-SCOPED` mechanically restates HGR-002's already-recorded Phase 19 decision, proven against the real live document to satisfy a Phase 19 lookup and refuse Phase 21. Operation-scope table seeded empty — `HUMAN_GATE_6` is NOT granted; `check_human_gate("20")` re-verified `BLOCKED`. `docs/contracts/human_gate_authorization.md` is the derived contract document |
-| 207 | `baaec85` | **HANDOFF REFRESH (§12 rule) — HUMAN_GATE_SCOPE_GAP REMEDIATION.** `docs/acceptance/HUMAN_GATE_RECORDS.md` is a governed path, so the four remediation commits required this refresh despite zero architecture/public-surface change. Section 4 ledger rows 203–206 added; Section 11 gains this refresh's own row. Section 3/8/9 deliberately left unrewritten — Phase 20's own contract and status are unaffected ← HEAD at generation |
+| 207 | `baaec85` | **HANDOFF REFRESH (§12 rule) — HUMAN_GATE_SCOPE_GAP REMEDIATION.** `docs/acceptance/HUMAN_GATE_RECORDS.md` is a governed path, so the four remediation commits required this refresh despite zero architecture/public-surface change. Section 4 ledger rows 203–206 added; Section 11 gains this refresh's own row. Section 3/8/9 deliberately left unrewritten — Phase 20's own contract and status are unaffected |
+| 208 | `0233413` | **F-0051** — `test_human_gate_authorization.py`'s `test_checker_reports_phase_19_human_gate_pass_and_phase_20_still_blocked` hard-coded `checker.check_human_gate("20")` as permanently `BLOCKED`, true only because no `HUMAN_GATE_6` grant of any kind existed yet for any phase. Rewritten as `test_phase_19_grant_does_not_satisfy_phase_20`, asserting directly against the real grant table that Phase 19's own digest (`HGR-002-SCOPED`) never satisfies a Phase 20 lookup — the actual invariant the class exists to protect, independent of whether Phase 20 later carries its own legitimate, separately-scoped grant. 29 passed/1 failed to 30 passed |
+| 209 | `707b6fc` | **HGR-003 — HUMAN_GATE_6 GRANTED FOR THE PHASE 20 CANDIDATE ONLY; PHASE 20 MACHINE-ACCEPTED.** Recorded by the human acceptance authority after independent mechanical re-verification against HEAD `a6cb3f5`: clean tree, `check_handoff.py` PASS, current phase 20, evidence byte-identical to `73a968f`, digest recomputed to `sha256:b94d28bb...202c2c`, governance suite 399 passed/0 failed, 8 architecture gates PASS/0 violations, 0 open BLOCKER/HIGH. `HGR-003-SCOPED` restates the grant in the mechanical phase-scope table, bound to `(HUMAN_GATE_6, phase=20, this digest)` only; no `RUNTIME_OPERATION`-scope row was created. `python scripts/run_phase_gate.py 20 21` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, HUMAN_GATE PASS via `HGR-003-SCOPED`, every other check PASS/NOT_APPLICABLE. `BUILD_STATE.md`'s Phase 20 row flips to MACHINE-ACCEPTED (4/4 requirements discharged, all MANDATORY, cumulative verified 166 to 170, MANDATORY verified 165 to 169) and gains a Phase 21 row (UNLOCKED, NOT STARTED) so `current_work_phase()` resolves to 21 ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -463,134 +466,92 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 20
+## 8. Current phase contract — Phase 21
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Database Migration Safety + Full Backup/Recovery** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 20) |
-| Status | **UNLOCKED — candidate complete, gate run, `AWAITING_HUMAN_GATE`, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `20`. Three atomic packages deliver the nine-step VDC "Migration safety" sequence; the traceability record, C-17 report and one real gate run are committed |
-| Prerequisites | Phase **5** (Persistence + Project Registry + Minimal Backup/Restore) and Phase **6** (Evidence Plane) — both MACHINE-ACCEPTED. `PREREQ` check: 2/2 |
-| Contract IDs | No new C-ID. Completes C-03's deferred runtime half (`docs/contracts/persistence.md` explicitly deferred HUMAN_GATE_6 and the nine-step sequence to Phase 20). `docs/contracts/migration_safety.md` is the derived contract document |
-| Human gate | `HUMAN_GATE_6` (matrix Gate column `GATE 6` on APPLY, resolved by `GovernanceState.phase_gates`) — **required and not recorded**. `docs/acceptance/HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached". This is the sole reason the gate verdict is `AWAITING_HUMAN_GATE` rather than `PHASE_ACCEPTED_BY_MACHINE` — every other check (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE, RESCORING, DATA_LOSS_RISK, FINDINGS, PREREQ, all 8 architecture gates) PASSES. At the PDP level `APPLY_MIGRATION` is `ASK_USER` at TRUST-0/1 unconditionally (never `AUTO`); the `HUMAN_GATE_6` label attaches specifically when `targets_real_or_stable_data` is true — verified directly in `pdp.py`, not assumed |
-| ARK-REQ IDs | `RequirementRegister.for_phase("20")` returns **4** entries, all MANDATORY: `ARK-REQ-0151`/`0336` (owner `lifecycle.recovery`), `ARK-REQ-0152` (owner `control.policy`), `ARK-REQ-0337` (owner `acceptance.engine`). All four are claimed SATISFIED with named evidence in `phase_20_traceability.json`; none is discharged (discharge happens only at phase acceptance) |
-| What this candidate built | Package 1 (`kernel.persistence`): `run_upgrade` + `migration_impact.py` (AST-based data-loss-risk analyser). Package 2 (`lifecycle.recovery`): `MigrationSafetySequence` (`migration_safety.py`/`_steps.py`/`_types.py`) — the nine steps, composing Phase 5's `RecoveryService`/`BackupRestore`, Phase 4's PDP/PEP and Phase 19's `WorkflowApprovalGate` unmodified; Apply gated by a real human decision plus, for real-or-stable-data targets, a recorded `HUMAN_GATE_6` read through a `HumanGateSource` structural `Protocol` (never an `acceptance.engine` import — see the architecture-hazard row below). Package 3 (`acceptance.engine`): `check_migration_data_loss_risk` (`migration_release_check.py`, `governance_gates.py` absorbing two pre-existing checks' bodies under ADR-0008 after `checker.py` hit its line/context budgets). Then the composed journey, structural proof, `docs/contracts/migration_safety.md`, the traceability record, the C-17 report and one real gate run |
-| What remains unbuilt | No PostgreSQL migration evidence (no driver on this host, honestly `NOT_CONFIGURED`); no Stable-revision rollback (Phase 22B's `ROLLBACK_STABLE` remains untouched `DENY`); no HTTP/UI surface for `MigrationSafetySequence` — library composition only |
-| Architecture facts | 8 gates PASS over **183** real cross-context edges (up from 169), all 9 budgets. 14 new edges from six new modules (`kernel.persistence` ×8, `control.policy` ×6 — see §3's Architecture violations row for the exact per-module breakdown). `lifecycle.recovery` public surface **28 of 40**; `kernel.persistence` **38 of 40**; `acceptance.engine` stays **40 of 40** (new functions are leading-underscore-named, so the module-level-symbol budget counts none of them); `control.policy.pep` fan-in **15 of 15** — its ceiling, not exceeded. `max_orchestration_depth` unchanged at **4 of 4** on `acceptance.engine → control.specification → control.architecture → kernel.contracts`, deliberately kept clear of `lifecycle.recovery` via the `HumanGateSource` `Protocol` |
+| Name | **Plugins + Integrations + Research** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 21) |
+| Status | **UNLOCKED.** `GovernanceState.current_work_phase()` returns `21`. No Phase 21 code has been written; no candidate exists yet |
+| Prerequisites | Phase **4** (Security + Governance + Isolation Backends) and Phase **9** (Provider + Model Runtime) — both MACHINE-ACCEPTED. `PREREQ` will read 2/2 once a gate run is attempted |
+| Contract IDs | `C-30`, per `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 21. Not yet researched or derived beyond the matrix citation — a session starting this phase must read the canonical set (Master Spec, Build Protocol, Verification Contract) for C-30's actual shape before writing any code |
+| Human gate | Matrix Gate column is **"GATE 4 if boundary changes"**, resolving to `HUMAN_GATE_4` by `GovernanceState.phase_gates` — the identical gate token Phase 19 carried. `HGR-002`'s own "KNOWN MECHANISM GAP" note states plainly that its Phase 19 grant does **not** cover Phase 21's own separate `HUMAN_GATE_4` obligation; this session's `HGR-003` (Phase 20's `HUMAN_GATE_6` grant) is a different gate token entirely and is additionally scoped to phase 20 only. Neither can satisfy a future Phase 21 `HUMAN_GATE_4` check — an independent human decision is required when Phase 21's own candidate reaches its gate, and only if Phase 21's own work genuinely changes a security boundary, sandbox tier or protected-core policy (the gate is conditional — "if boundary changes" — not automatic) |
+| ARK-REQ IDs | `RequirementRegister.for_phase("21")` returns **6** entries: 5 MANDATORY (`ARK-REQ-0117`, `0163`, `0164`, `0165`, `0166`) and 1 OPTIONAL (`ARK-REQ-0167`). None claimed, none satisfied, none discharged — no work has begun |
+| What this candidate built | Nothing. This phase has not been started |
+| What remains unbuilt | Everything — the entire Phase 21 capability. No research beyond the mechanical facts above (name, denominator, prerequisites, gate token) has been performed this session |
+| Architecture facts | Unchanged since Phase 20's acceptance: 8 gates PASS over **183** real cross-context edges, all 9 budgets. The acceptance/handoff/HGR-003 commits added no production code and no cross-context edge |
 
-**Phase 19 is MACHINE-ACCEPTED.** Its denominator was **5**, all discharged.
-**Phase 20's candidate is complete and its gate has been run** — verdict
-`AWAITING_HUMAN_GATE`. It remains **UNLOCKED, NOT ACCEPTED** until the human
-acceptance authority grants `HUMAN_GATE_6` and a session re-runs `python
-scripts/run_phase_gate.py 20 21` to obtain the machine verdict (no candidate
-edit is needed for a grant alone).
+**Phase 20 is MACHINE-ACCEPTED.** Its denominator was **4**, all discharged,
+via `HGR-003`'s scoped `HUMAN_GATE_6` grant. **Phase 21 is UNLOCKED and NOT
+STARTED.** Per this session's explicit mission instruction, Phase 21
+implementation must not begin; a future session should research the
+canonical set for C-30's actual shape before writing any Phase 21 code.
 
 ## 9. Next exact action
 
-**Phase 20's candidate is complete. The gate has been run and returned
-`AWAITING_HUMAN_GATE`, not acceptance.** `python scripts/run_phase_gate.py
-20 21` returned verdict `AWAITING_HUMAN_GATE`, progression STOPPED, failing
-condition "HUMAN_GATE_6 required and not recorded" — and nothing else.
-Every other check PASSES: C1 (report complete) · C2 (all 4 mandatory
-requirements accounted for) · C3 (11 runs recorded with exit codes) · C4 (8
-architecture gates evaluated) · C5 (no non-PASS state converted to PASS) ·
-C6 (all 4 discharged requirements claimed SATISFIED with named evidence) ·
-EXTERNAL_RESULT (all 11 runs declare their class, none unsubstantiated) ·
-**PROTECTED_CORE COMPLETE** (`acceptance.engine` is touched by the new
-ARK-REQ-0337 check — `checker.py`, plus the new `governance_gates.py` and
-`migration_release_check.py` — so the stronger profile is owed and all
-three categories are satisfied: security review 245, adversarial review
-802, full regression 2762, all exit 0) · RESCORING (NOT_APPLICABLE, first
-submission) · DATA_LOSS_RISK (9 declared revisions, zero flagged) · FINDINGS
-(0 open BLOCKER/HIGH) · PREREQ (2/2). All 8 architecture gates PASS over
-**183** edges with all 9 budgets.
+**Phase 20 is MACHINE-ACCEPTED.** `python scripts/run_phase_gate.py 20 21`
+returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED**, following
+`HGR-003` (`docs/acceptance/HUMAN_GATE_RECORDS.md`) — the human acceptance
+authority granted `HUMAN_GATE_6` for this exact candidate (evidence commit
+`73a968f`, evidence-package digest `sha256:b94d28bb...202c2c`) after
+independent mechanical re-verification of HEAD/branch/clean-tree,
+`check_handoff.py` PASS, `current_work_phase()` == `20`, the candidate's
+evidence byte-identical to `73a968f`, the recomputed digest, the complete
+governance suite (399 passed, 0 failed), all 8 architecture gates (0
+violations) and 0 open BLOCKER/HIGH — all confirmed immediately before the
+grant was recorded. C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded
+runs; **PROTECTED_CORE COMPLETE** (`acceptance.engine` touched by the new
+data-loss-risk check; security review 245, adversarial review 802, full
+regression 2762, all exit 0); RESCORING NOT_APPLICABLE (first submission);
+DATA_LOSS_RISK PASS (9 declared revisions, zero flagged); FINDINGS PASS;
+PREREQ 2/2; **HUMAN_GATE PASS via `HGR-003-SCOPED`**; all 8 architecture
+gates PASS over **183** edges with all 9 budgets. **4/4 requirements
+discharged**, all MANDATORY, taking cumulative verified 166 → **170**.
 
-**This was verified mechanically BEFORE any Phase 20 code was written, not
-discovered afterward.** `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md`
-maps Phase 20's Gate column to `HUMAN_GATE_6` ("APPLY of a migration to real
-or stable data") — confirmed by `GovernanceState.phase_gates["20"] ==
-"HUMAN_GATE_6"`. Note this maps the *whole phase* to the gate (the matrix
-cell's "on APPLY" qualifier is prose the parser does not narrow on), the
-identical mechanism Phase 19's `HUMAN_GATE_4` used — a distinction worth
-carrying forward for any future phase whose Gate column carries a similar
-qualifier. `docs/acceptance/HUMAN_GATE_RECORDS.md`'s own "Outstanding
-gates" table lists `HUMAN_GATE_6` as "not reached", and
-`accepted_human_gates` contains only `HUMAN_GATE_1` and the narrowly-scoped
-`HUMAN_GATE_4` (Phase 19 candidate only, via `HGR-002`). `HUMAN_GATE_RECORDS.md`
-is an **append-only ledger of recorded human decisions** — so **no
-implementing actor may add a granting record to it**, the same discipline
-GOV-001 already established for re-scoring authorizations. This is a
-genuine Section-1-shaped stop condition, not a defect in the candidate and
-not something a future session can engineer around.
+**HGR-003's scope, stated plainly for a future session.** The grant covers
+`PHASE_ACCEPTANCE` of the exact Phase 20 candidate at evidence commit
+`73a968f` and digest `sha256:b94d28bb...202c2c` — nothing else. It is
+**not** a global `HUMAN_GATE_6` grant, does **not** authorize Phase 21 or
+any other phase, does **not** authorize a modified Phase 20 candidate (a
+changed evidence package has a different digest), and — critically — does
+**not** authorize any real future `APPLY_MIGRATION` operation against any
+migration target/revision. That requires its own separate
+`RUNTIME_OPERATION`-scope grant bound to the exact target identity and
+revision identity resolved at call time, mechanically enforced by
+`human_gate_authorization._find_operation_gate_grant`; no such grant exists,
+and none was created by this refresh. `docs/acceptance/HUMAN_GATE_RECORDS.md`
+is an **append-only ledger of recorded human decisions** — no implementing
+actor may add a granting record to it, the same discipline GOV-001 already
+established for re-scoring authorizations.
 
-**NEXT EXACT ACTION is to await the human acceptance authority's decision on
-`HUMAN_GATE_6` for this candidate.** Phase 20's denominator — 4 requirements
-— is fully claimed SATISFIED with named evidence and awaits only this gate.
-If granted and recorded as a new `HGR-00N` row in `HUMAN_GATE_RECORDS.md`'s
-append-only ledger, a session should re-run `python scripts/run_phase_gate.py
-20 21` unchanged — no candidate edit is required for a grant alone, since
-every other check already PASSES — to obtain the machine verdict, then
-perform the `BUILD_STATE.md` Phase 20 row update to MACHINE-ACCEPTED and the
-mandatory §12 handoff refresh as the following commit(s), then the
-HEAD-at-generation marker advance as a further separate commit, exactly the
-established sequence. If not granted, or if further evidence is requested
-first, a session should treat that as a continuing genuine stop condition
-and must **not** begin Phase 21 implementation.
+**`GovernanceState.current_work_phase()` now returns `21`** (Plugins +
+Integrations + Research). Phase 21's denominator — 6 requirements — is
+pre-existing in the register (5 MANDATORY, 1 OPTIONAL) — adding its status
+row was mechanically required, the same reason every prior newly-unlocked
+phase's own row was added in its unlocking commit. §8 and §9 are rewritten
+for the new current phase; §3's Phase 20 row states its acceptance and
+names `HGR-003`; the live architecture summary is unchanged at **183**
+edges (the acceptance/handoff/HGR-003 commits added no production code).
 
-**What Phase 20's candidate actually delivered, for a session that resumes
-after the gate is granted.** Three atomic packages: `kernel.persistence`'s
-`run_upgrade` (the real Alembic apply mechanic) and `migration_impact.py`
-(the AST-based data-loss-risk analyser, flagging `op.drop_table`/
-`op.drop_column`/a raw destructive `op.execute`, never executing the file it
-inspects) (Package 1); `lifecycle.recovery`'s `MigrationSafetySequence`,
-composing Phase 5's `RecoveryService`/`BackupRestore` machine, Package 1's
-mechanics, Phase 4's PDP/PEP and Phase 19's `WorkflowApprovalGate` — all
-reused unmodified — into Impact → Backup → Dry Run → Integrity → Candidate
-Migration → Application Tests → Apply → Verify → Rollback Point, split
-across three files under the module logical-line budget (Package 2);
-`acceptance.engine`'s `check_migration_data_loss_risk`, re-derived over the
-live shipping chain on every phase-gate evaluation, with `checker.py`'s own
-budget overflow answered by decomposition into `governance_gates.py` and
-`migration_release_check.py` (Package 3); then the composed journey
-(`test_phase_20_journey.py`), `docs/contracts/migration_safety.md`, the
-traceability record, the C-17 report and the one real gate run. **No
-PostgreSQL migration evidence, no Stable-revision rollback and no HTTP/UI
-surface are delivered** — each is a recorded deliberate boundary, not a
-silent gap.
-
-**A real defect was caught and fixed before this candidate was submitted.**
-`migration_release_check.py`'s first draft resolved the migrations directory
-against the *repository* root `PhaseGateChecker` is constructed with, not
-the *backend* root `VERSIONS_DIR` is actually relative to — it silently
-found nothing and reported a vacuous PASS. Running the real
-`run_phase_gate.py` end to end (not a unit test making the identical
-assumption) caught it; `BACKEND_RELPATH` fixes it, and
-`test_migration_release_check.py` pins the fix with a negative control
-reproducing the original mistake. A session touching this module again
-should keep that test green rather than "simplifying" the path resolution
-back to a bare `repo_root / VERSIONS_DIR`.
-
-**Budget facts to carry forward, updated from Phase 19's own row above.**
-`control.policy.pep` fan-in is now **15 of 15** — at its ceiling; a future
-context needing `PolicyEnforcementPoint` should check whether an existing
-importer in its own context can be reused before adding a seventh direct
-import. `lifecycle.recovery` public surface is **28 of 40**;
-`kernel.persistence` is **38 of 40**. `acceptance.engine` remains **40 of
-40** but has real headroom in practice: any further check or helper in that
-context should default to a leading-underscore name unless it genuinely
-needs to be a public API, since the budget only counts module-level public
-symbols. `max_orchestration_depth` remains **4 of 4** on the same path as
-Phase 19, deliberately kept clear of `lifecycle.recovery` — a future phase
-needing a fact from `acceptance.engine`'s governance state should default to
-the same `Protocol` composition rather than a direct import.
+**NEXT EXACT ACTION is to research Phase 21 (C-30, Plugins + Integrations +
+Research) before writing any code.** This session's explicit mission
+instruction was to record the human acceptance authority's `HUMAN_GATE_6`
+decision, obtain the machine acceptance verdict, and perform the mandatory
+§12 handoff refresh — **not** to begin Phase 21. A future session must read
+the canonical set (Master Spec, Build Protocol, Verification Contract,
+`REQUIREMENT_REGISTER.md`'s six Phase 21 rows) to derive C-30's actual
+shape before implementing anything; nothing about Phase 21's design has
+been researched or assumed here beyond the mechanical facts in §8 (name,
+denominator, prerequisites, conditional `HUMAN_GATE_4` gate token). **No
+Phase 21 implementation was begun.**
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15**. There is still **no Python lockfile**; do not create
 one. No PostgreSQL driver is installed on this host (`ModuleNotFoundError`
 for both `psycopg2` and `psycopg`, verified directly); PostgreSQL-specific
-migration behaviour is honestly `NOT_CONFIGURED`, not fabricated, and this
-was true before Phase 20 and remains true after it.
+migration behaviour remains honestly `NOT_CONFIGURED`, not fabricated, and
+this was true before Phase 20 and remains true after it.
 
 ## 10. New-session bootstrap protocol
 
@@ -615,7 +576,8 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
-| Refresh reason | **HUMAN_GATE_SCOPE_GAP REMEDIATION** — a read-only audit of the Phase 20 `AWAITING_HUMAN_GATE` candidate, requested by the human acceptance authority before deciding `HUMAN_GATE_6`, found `GovernanceState.accepted_human_gates` mechanically gate-ID-only: a grant recorded for one candidate/phase/operation satisfied any future check of the same gate number, proven both for `HUMAN_GATE_4` (HGR-002's own "KNOWN MECHANISM GAP" note) and for `HUMAN_GATE_6` (a non-mutating probe against the real PDP and the real `step_apply`, reproduced before any repair code existed). The human authority ruled the repair may proceed under the stronger Protected Core profile without `HUMAN_GATE_4` as a prerequisite — the repair narrows existing authority, it does not weaken, relax, bypass, expand or redefine a security permission — and explicitly forbade citing HGR-002 to authorize touching the mechanism HGR-002's own scope defect lives in. Four packages (ledger rows 203–206): `human_gate_authorization.py` (`_PhaseGateGrant` reusing GOV-001's exact digest-binding pattern; `_OperationGateGrant` binding gate+operation+target+revision; `SINGLETON_GATES = {HUMAN_GATE_1, HUMAN_GATE_7}`, the only two gates canon itself names as unique project events); `acceptance.engine`'s `check_human_gate` rewritten to a scoped lookup (Phase 19's own already-accepted `BUILD_STATE.md` status untouched); `lifecycle.recovery`'s `step_apply` deriving `target_identity`/`revision_identity` from a real `BackupSet` rather than any caller-settable field (`pdp.py`/`policy_contract.py` unchanged — the defect was never in the PDP's decision logic); and `HUMAN_GATE_RECORDS.md`'s new append-only scoped tables, seeded with `HGR-002-SCOPED` (restating HGR-002's own Phase 19 decision, proven — against the real live document — to satisfy Phase 19 and refuse Phase 21) and an empty operation-scope table. **`HUMAN_GATE_6` is NOT granted by this remediation** — `checker.check_human_gate("20")` re-verified `BLOCKED` after every package, exactly as before. Live architecture is unchanged at **183** edges and every public-surface figure in §3/§8 (the repair added zero new cross-context edges and zero new public symbols anywhere). 30 new tests (`test_human_gate_authorization.py`) plus 2 new confused-deputy/scope-precision tests in `test_migration_safety.py` prove all fifteen governance-ruling negative controls; all 20 pre-existing migration-safety tests re-verified green with identical observable behaviour. Full regression, security review, adversarial review, structural and repository-structure checks all re-run clean (one real defect — a standalone word "fake" in a new docstring, tripping the genuine no-fake-marker structural check — caught and fixed before this refresh). **Phase 20 remains `UNLOCKED`, `AWAITING_HUMAN_GATE`, NOT ACCEPTED; cumulative verified stays 166; Phase 21 was not started.** |
+| Refresh reason | **PHASE 20 MACHINE ACCEPTANCE** — the human acceptance authority reviewed the frozen Phase 20 candidate (evidence commit `73a968f`, digest `sha256:b94d28bb...202c2c`) and explicitly, narrowly `GRANT`ed `HUMAN_GATE_6` for `PHASE_ACCEPTANCE` of that exact candidate only — not a global grant, not authorization for any other phase, and not a `RUNTIME_OPERATION`-scope grant for any real future `APPLY_MIGRATION`. Before recording, a full read-only mechanical audit re-verified: HEAD `a6cb3f5`/branch `main`/clean tree; `check_handoff.py` PASS; `current_work_phase()` == `20`; Phase 20 evidence byte-identical to `73a968f` (`git diff` empty, SHA256 match); the evidence-package digest recomputed to the exact value named above; the HUMAN_GATE_SCOPE_GAP scoped-authorization mechanism still active (Phase 19's grant proven not to satisfy Phase 20 or Phase 21, synthetic operation-scope lookups proven isolated); the governance suite (399 passed, 0 failed); all 8 architecture gates (0 violations); 0 open BLOCKER/HIGH. One pre-existing test (`test_checker_reports_phase_19_human_gate_pass_and_phase_20_still_blocked`) hard-coded Phase 20's `HUMAN_GATE_6` check as permanently `BLOCKED` — true only because no such grant existed yet for any phase — and needed repair (**F-0051**, ledger row 208, `0233413`) before the targeted suite could return "all PASS"; rewritten to assert the real non-leak invariant (Phase 19's digest never satisfies Phase 20) instead of a transient absence. `HGR-003` was then recorded (ledger row 209, `707b6fc`) — the prose record plus its mechanical `HGR-003-SCOPED` restatement in the phase-scope table; the operation-scope table is untouched and stays empty. `python scripts/run_phase_gate.py 20 21` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, HUMAN_GATE PASS specifically via `HGR-003-SCOPED`, every other check PASS or NOT_APPLICABLE (identical to the pre-grant run, which showed every check but HUMAN_GATE already PASS). `BUILD_STATE.md`'s Phase 20 row flips to MACHINE-ACCEPTED (4/4 requirements discharged, all MANDATORY, cumulative verified 166 → **170**, MANDATORY verified 165 → **169**) and gains a Phase 21 row (`UNLOCKED — NOT STARTED`, gate `HUMAN_GATE_4` per the matrix — `HGR-002`'s own known-gap note still applies, and `HGR-003` is scoped to phase 20 only and equally cannot cover it) so `GovernanceState.current_work_phase()` resolves to `21`. Live architecture is unchanged at **183** edges and every public-surface figure in §3/§8 — this refresh's own commits added no production code and no cross-context edge. §8 and §9 are rewritten for the new current phase (Phase 21, Plugins + Integrations + Research, denominator 6). **No `RUNTIME_OPERATION`-scope grant was created; Phase 21 implementation was not started.** |
+| Previously refreshed for | **HUMAN_GATE_SCOPE_GAP REMEDIATION** — a read-only audit of the Phase 20 `AWAITING_HUMAN_GATE` candidate, requested by the human acceptance authority before deciding `HUMAN_GATE_6`, found `GovernanceState.accepted_human_gates` mechanically gate-ID-only: a grant recorded for one candidate/phase/operation satisfied any future check of the same gate number, proven both for `HUMAN_GATE_4` (HGR-002's own "KNOWN MECHANISM GAP" note) and for `HUMAN_GATE_6` (a non-mutating probe against the real PDP and the real `step_apply`, reproduced before any repair code existed). The human authority ruled the repair may proceed under the stronger Protected Core profile without `HUMAN_GATE_4` as a prerequisite — the repair narrows existing authority, it does not weaken, relax, bypass, expand or redefine a security permission — and explicitly forbade citing HGR-002 to authorize touching the mechanism HGR-002's own scope defect lives in. Four packages (ledger rows 203–206): `human_gate_authorization.py` (`_PhaseGateGrant` reusing GOV-001's exact digest-binding pattern; `_OperationGateGrant` binding gate+operation+target+revision; `SINGLETON_GATES = {HUMAN_GATE_1, HUMAN_GATE_7}`, the only two gates canon itself names as unique project events); `acceptance.engine`'s `check_human_gate` rewritten to a scoped lookup (Phase 19's own already-accepted `BUILD_STATE.md` status untouched); `lifecycle.recovery`'s `step_apply` deriving `target_identity`/`revision_identity` from a real `BackupSet` rather than any caller-settable field (`pdp.py`/`policy_contract.py` unchanged — the defect was never in the PDP's decision logic); and `HUMAN_GATE_RECORDS.md`'s new append-only scoped tables, seeded with `HGR-002-SCOPED` (restating HGR-002's own Phase 19 decision, proven — against the real live document — to satisfy Phase 19 and refuse Phase 21) and an empty operation-scope table. **`HUMAN_GATE_6` is NOT granted by this remediation** — `checker.check_human_gate("20")` re-verified `BLOCKED` after every package, exactly as before. Live architecture is unchanged at **183** edges and every public-surface figure in §3/§8 (the repair added zero new cross-context edges and zero new public symbols anywhere). 30 new tests (`test_human_gate_authorization.py`) plus 2 new confused-deputy/scope-precision tests in `test_migration_safety.py` prove all fifteen governance-ruling negative controls; all 20 pre-existing migration-safety tests re-verified green with identical observable behaviour. Full regression, security review, adversarial review, structural and repository-structure checks all re-run clean (one real defect — a standalone word "fake" in a new docstring, tripping the genuine no-fake-marker structural check — caught and fixed before this refresh). **Phase 20 remains `UNLOCKED`, `AWAITING_HUMAN_GATE`, NOT ACCEPTED; cumulative verified stays 166; Phase 21 was not started.** |
 | Previously refreshed for | **PHASE 20 CANDIDATE — GATE RUN, `AWAITING_HUMAN_GATE`** — three atomic packages deliver the nine-step VDC "Migration safety" sequence, completing C-03's deferred runtime half: `run_upgrade` + `migration_impact.py` under `kernel.persistence` (Package 1, ARK-REQ-0151 step 1); `MigrationSafetySequence` under `lifecycle.recovery`, composing Phase 5's `RecoveryService`/`BackupRestore`, Phase 4's PDP/PEP and Phase 19's `WorkflowApprovalGate` unmodified into Impact/Backup/Dry Run/Integrity/Candidate Migration/Application Tests/Apply/Verify/Rollback Point, Apply gated by a real human decision plus, for real-or-stable-data targets, a `HUMAN_GATE_6` read through a `HumanGateSource` structural `Protocol` rather than an `acceptance.engine` import (Package 2, ARK-REQ-0151/0336/0152); `check_migration_data_loss_risk` under `acceptance.engine`, re-derived over the live shipping chain on every gate evaluation, `checker.py`'s budget overflow answered by ADR-0008 decomposition into `governance_gates.py`/`migration_release_check.py` (Package 3, ARK-REQ-0337). `run_phase_gate.py 20 21` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_6 required and not recorded" — the **only** failing condition; C1–C6, EXTERNAL_RESULT, **PROTECTED_CORE COMPLETE** (`acceptance.engine` touched; security review 245, adversarial review 802, full regression 2762, all exit 0), RESCORING (NOT_APPLICABLE), DATA_LOSS_RISK, FINDINGS, PREREQ (2/2) and all 8 architecture gates over 183 edges all PASS. `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md` maps Phase 20's Gate column to `HUMAN_GATE_6`; `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached" — verified mechanically **before** any Phase 20 code was written, not discovered afterward, and confirmed by the real gate run rather than asserted. **This is a genuine stop condition; no implementing actor may self-grant a human gate.** **4/4 requirements claimed SATISFIED with named evidence, none discharged** — discharge happens only at phase acceptance, which this gate run did not reach. Cumulative verified stays **166**. No new `allowed_sibling_edges` entry was required (no same-layer edge added). The live architecture summary is re-derived at **183** edges (up from 169); `control.policy.pep` fan-in rises to **15 of 15**, its ceiling, not exceeded. §8 and §9 are rewritten to describe the candidate and gate outcome, not an acceptance; §3's Phase 20 row states `AWAITING_HUMAN_GATE`, NOT ACCEPTED, explicitly. `BUILD_STATE.md`'s Phase 20 row and top summary paragraph updated to match. A real defect (a vacuous-PASS path-resolution bug in `migration_release_check.py`, caught by running the real gate end to end before submission) was fixed and pinned by a negative-control test before this candidate was recorded. **Phase 21 was not started; only this candidate's own work is recorded.** |
 | Previously refreshed for | **PHASE 19 MACHINE ACCEPTANCE** — following `HGR-002` (the human acceptance authority's narrow, digest-bound `HUMAN_GATE_4` grant for the exact candidate at HEAD `ef5cb3b`, obtained after independent mechanical re-verification of twelve stated conditions, none altered from the original submission), `run_phase_gate.py 19 20` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED**. C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile — `backend/arkali/control/` and `backend/arkali/acceptance/` both empty in `git diff --stat` across the whole candidate); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; HUMAN_GATE PASS (`HUMAN_GATE_4` recorded ACCEPTED via HGR-002); 8 gates PASS over 169 edges. **5/5 requirements discharged**, all MANDATORY, taking cumulative verified 161 → **166**. `GovernanceState.current_work_phase()` now returns **20** (Database Migration Safety + Full Backup/Recovery, denominator 4, pre-existing) — adding its status row was mechanically required. §8 and §9 are rewritten for the new current phase; §3's Phase 19 row states its acceptance and names HGR-002; the live architecture summary is unchanged at 169 edges (the acceptance/human-gate commits added no production code). `HUMAN_GATE_RECORDS.md`'s "Outstanding gates" table updated to show `HUMAN_GATE_4` granted for Phase 19 only, explicitly still "not reached" for Phase 21 pending HGR-002's own known-gap note. **No Phase 20 implementation was begun**, per this session's explicit mission instruction to stop after Phase 19 acceptance and the final handoff refresh |
 | Previously refreshed for | **PHASE 19 CANDIDATE — GATE RUN, `AWAITING_HUMAN_GATE`** — five atomic packages deliver C-29 under `engineering.import`: `ImportedProjectDescriptor`/`TierAssignment`/`StaticInspectionReport` and `RescueModeVocabulary` (Package 1, ARK-REQ-0161/0162); `StaticInspector` reusing `engineering.codeintel.PythonGraphBuilder` unmodified, AST-only, proven never to execute a landmine fixture (Package 2, ARK-REQ-0115/0161); `tier_authority.assign_tier` (no tier parameter) and `execution_gate.assert_execution_approved`, composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified** — no file under `backend/arkali/control/` touched — plus one additive guard on the pre-existing `ImportProject` state machine (Package 3, ARK-REQ-0116, condition 7); `ImportPipeline` composing Packages 1–3 into the real state machine and materialising a genuinely isolated working copy via `engineering.candidate.workspace.WorkspaceAuthority`, reused through a structural `Protocol` rather than a direct import specifically because `engineering.candidate`'s own chain into `kernel.contracts` was already 4 of 4 as of Phase 16 (Package 4, ARK-REQ-0162, 0348 conditions 3–6); the composed journey proving all seven VDC acceptance conditions, the structural authority proof, `docs/contracts/import.md`, the traceability record and the C-17 report (Package 5). `run_phase_gate.py 19 20` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_4 required and not recorded" — the **only** failing condition; C1–C6, EXTERNAL_RESULT, PROTECTED_CORE (normal profile), RESCORING (NOT_APPLICABLE), FINDINGS, PREREQ (3/3) and all 8 architecture gates over 169 edges all PASS. `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md` maps Phase 19's Gate column to `HUMAN_GATE_4`; `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached" — verified mechanically **before** any Phase 19 code was written, not discovered afterward, and confirmed by the real gate run rather than asserted. **This is a genuine stop condition; no implementing actor may self-grant a human gate.** **5/5 requirements claimed SATISFIED with named evidence, none discharged** — discharge happens only at phase acceptance, which this gate run did not reach. Cumulative verified stays **161**. One declared sibling edge added (`engineering.import → engineering.codeintel`; `allowed_sibling_edges` now 10); no `engineering.import → engineering.candidate` edge exists. The live architecture summary is re-derived at **169** edges (up from 159); `kernel.contracts.error_base` fan-in rises to **14 of 15**. §8 and §9 are rewritten to describe the candidate and gate outcome, not an acceptance; §3's Phase 19 row states `AWAITING_HUMAN_GATE`, NOT ACCEPTED, explicitly. `BUILD_STATE.md`'s Phase 19 row and top summary paragraph updated to match. **Phase 20 was not started; only read-only Phase 20 discovery, if any, is permitted next, and none was performed this session.** |
@@ -704,7 +666,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: baaec854c54b7ece49ddef6dc9496d68afe2994a
+head: 707b6fcac595e5ecd003bbfa4c166fd1b7d13d7d
 branch: main
 working_tree_clean: true
 
@@ -734,13 +696,14 @@ verified_by_phase:
   "17": 9
   "18": 4
   "19": 5
-cumulative_verified: 166
+  "20": 4
+cumulative_verified: 170
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"]
-unlocked_phase: "20"
-next_exact_action_phase: "20"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]
+unlocked_phase: "21"
+next_exact_action_phase: "21"
 
-accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_4"]
+accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_4", "HUMAN_GATE_6"]
 adr_accepted: 9
 adr_proposed: 0
 open_blocker_high: []
