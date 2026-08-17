@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `3113a585b2533a7cd83afc09ddf3d0b8e6169d86` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `baaec854c54b7ece49ddef6dc9496d68afe2994a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -374,7 +374,8 @@ repository, the repository wins.
 | 203 | `a316713` | **HUMAN_GATE_SCOPE_GAP Package 1** — scoped human-gate contract. `acceptance.engine/human_gate_authorization.py`: `_PhaseGateGrant` (mirrors GOV-001's digest binding exactly) and `_OperationGateGrant` (gate + operation + target + revision identity). `SINGLETON_GATES = {HUMAN_GATE_1, HUMAN_GATE_7}`, the only two gates canon itself names as unique, non-repeatable project events. All five new types/functions leading-underscore-named — `acceptance.engine` public surface stays 40 of 40. 30 new tests prove all fifteen governance-ruling negative controls. Not a phase; no requirement discharged; `HUMAN_GATE_6` not granted |
 | 204 | `cefdd31` | **HUMAN_GATE_SCOPE_GAP Package 2** — `acceptance.engine` phase-gate scoped enforcement. `GovernanceState` gains `repo_root` and `operation_grant()` (the `HumanGateSource` `Protocol` method, composed structurally — no new `lifecycle.recovery → acceptance.engine` edge). `governance_gates._evaluate_human_gate` replaces flat gate-ID membership with a scoped `(gate, phase, evidence-digest)` lookup for every gate except the two singletons. Phase 19's own already-accepted `BUILD_STATE.md` status is untouched; `check_human_gate("20")` re-verified unchanged: still `BLOCKED` |
 | 205 | `37bdf89` | **HUMAN_GATE_SCOPE_GAP Package 4** — `lifecycle.recovery` runtime-operation scoped enforcement. `HumanGateSource` widens to `operation_grant(gate, operation, target_identity, revision_identity)`; `step_apply` gains a `backup: BackupSet` parameter and derives `target_identity`/`revision_identity` from real, kernel-computed facts (`BackupSet.manifest.digest`, the resolved target revision) — no field on `MigrationSafetyRequest` a caller could set to spoof either. `pdp.py`/`policy_contract.py` unchanged. All 20 pre-existing migration-safety tests re-verified green; 2 new confused-deputy/scope-precision tests added, proven against two independently-computed real backup digests |
-| 206 | `3113a58` | **HUMAN_GATE_SCOPE_GAP Package 5+7** — `HUMAN_GATE_RECORDS.md` gains one append-only section (two machine-readable tables); HGR-001/HGR-002 above remain unedited. `HGR-002-SCOPED` mechanically restates HGR-002's already-recorded Phase 19 decision, proven against the real live document to satisfy a Phase 19 lookup and refuse Phase 21. Operation-scope table seeded empty — `HUMAN_GATE_6` is NOT granted; `check_human_gate("20")` re-verified `BLOCKED`. `docs/contracts/human_gate_authorization.md` is the derived contract document ← HEAD at generation |
+| 206 | `3113a58` | **HUMAN_GATE_SCOPE_GAP Package 5+7** — `HUMAN_GATE_RECORDS.md` gains one append-only section (two machine-readable tables); HGR-001/HGR-002 above remain unedited. `HGR-002-SCOPED` mechanically restates HGR-002's already-recorded Phase 19 decision, proven against the real live document to satisfy a Phase 19 lookup and refuse Phase 21. Operation-scope table seeded empty — `HUMAN_GATE_6` is NOT granted; `check_human_gate("20")` re-verified `BLOCKED`. `docs/contracts/human_gate_authorization.md` is the derived contract document |
+| 207 | `baaec85` | **HANDOFF REFRESH (§12 rule) — HUMAN_GATE_SCOPE_GAP REMEDIATION.** `docs/acceptance/HUMAN_GATE_RECORDS.md` is a governed path, so the four remediation commits required this refresh despite zero architecture/public-surface change. Section 4 ledger rows 203–206 added; Section 11 gains this refresh's own row. Section 3/8/9 deliberately left unrewritten — Phase 20's own contract and status are unaffected ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -703,7 +704,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 3113a585b2533a7cd83afc09ddf3d0b8e6169d86
+head: baaec854c54b7ece49ddef6dc9496d68afe2994a
 branch: main
 working_tree_clean: true
 
