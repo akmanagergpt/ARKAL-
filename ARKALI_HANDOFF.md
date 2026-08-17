@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `ad7eb35430f2d3d1abdb5d8c02f9ea9c318e7336` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `c3b51f8eff56f4dfc2235eb1e00b727bd125417a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -145,11 +145,12 @@ repository, the repository wins.
 | Phase 16 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_16_report.json`, `phase_16_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 11 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 3/3 (Phases 12, 14, 15), HUMAN_GATE NOT_APPLICABLE. Two atomic packages compose the real existing authorities under human governance ruling **D-026**: `execution_routing.py` evaluates the exact eight-tier preference order (deterministic tool → verified knowledge → local model → stronger local reviewer → cloud provider → stronger cloud specialist → multi-reviewer → human governance), composing the real `CapabilityGraph`/`RepairBudgetLedger` and honestly resolving `NOT_CONFIGURED` for every tier whose owning authority is unbuilt or has no live runtime instance; `product_generation.py` deterministically scaffolds a real, importable, executable module from a fully-resolved C-37 blueprint, refusing any blueprint carrying an unresolved question. A real orchestration-depth violation (`engineering.candidate`'s chain was already 4 of 4) was answered by a structural `Protocol` rather than an import. **3/3 requirements discharged**, all MANDATORY; cumulative verified 145 → **148**. No AI provider contacted, no Golden Factory Acceptance claimed (Phase 30's own obligation). **Phase 17 unlocked** |
 | Phase 17 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first fully-corrected submission (`docs/acceptance/phase_17_report.json`, `phase_17_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 12 recorded runs, **PROTECTED_CORE COMPLETE** (member `control.policy`, via `workflow_approval.py`/`policy_errors.py` — security review 245, adversarial review 788, full regression 2610, all exit 0), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 3/3 (Phases 7, 8, 13), HUMAN_GATE NOT_APPLICABLE, 8 gates PASS over 156 edges and all 9 budgets. Eight atomic packages delivered C-20 (the canonical workflow graph document): the graph domain model, persistence/revision store, the ADR-0004 derived execution plan, `control.policy`'s HUMAN APPROVAL enforced policy stop, the executor (real evidence for all 10 node kinds and 10 control constructs), the `surfaces.command` HTTP API, the frontend Visual Workflow Studio (a hand-rolled canvas — real pointer drag, real click-to-connect, no graph-drawing library — proven by a real T10 Playwright journey through compose/publish/reload persistence/fresh-context persistence/execution pause/the ARK-REQ-0330 negative path (`ARK-ERR-0133`)/a real approval to `SUCCEEDED`), and the ARK-REQ-0331 coverage check (a structural cross-check, `test_contract_drift.py`'s own idiom, since `execution.workflow`, `surfaces.command` and `acceptance.engine` were all at their 40-of-40 public-surface ceiling). **9/9 requirements discharged**, all MANDATORY; cumulative verified 148 → **157**. No AI provider contacted. **Phase 18 unlocked** |
 | Phase 18 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission (`docs/acceptance/phase_18_report.json`, `phase_18_traceability.json`). C1–C6 PASS, EXTERNAL_RESULT PASS over all 10 recorded runs, PROTECTED_CORE PASS (no member touched, normal profile), RESCORING NOT_APPLICABLE, FINDINGS PASS, PREREQ 1/1 (Phase 13), HUMAN_GATE NOT_APPLICABLE, 8 gates PASS over 159 edges and all 9 budgets. Knowledge + Verified Components (C-28), owned by `engineering.knowledge`. Four atomic packages delivered C-28: `EvidenceReference`/`SelfReportedClaim` (evidence-backed knowledge, excluding self-report by type) and `KnowledgeRecord`'s derived five-state validity lifecycle (Package 1, `ARK-REQ-0126`/`0127`); `ReusableComponentDescriptor` with mandatory test/security/compatibility metadata (Package 2, `ARK-REQ-0128`); `VerifiedOutcome`/`aggregate` per-model/per-task-class empirical statistics reusing the same evidence exclusion (Package 3, `ARK-REQ-0394`/D-026); the composed journey, `docs/contracts/knowledge.md`, structural authority proofs and the traceability/report for the gate (Package 4). C-28 is `INT` — no table, no migration, matching C-11/C-13. **4/4 requirements discharged**, all MANDATORY; cumulative verified 157 → **161**. No AI provider contacted. `execution_routing.py`'s `VERIFIED_KNOWLEDGE` tier remains `NOT_CONFIGURED` by deliberate deferral. **Phase 19 unlocked** |
-| Phase 19 | **UNLOCKED — candidate complete, gate run, `AWAITING_HUMAN_GATE`, NOT ACCEPTED.** Import / Reverse Engineering / Rescue (C-29). `GovernanceState.current_work_phase()` returns `19`. `RequirementRegister.for_phase("19")` returns **5** entries — `ARK-REQ-0115`, `0161`, `0162`, `0348` (owner `engineering.import`) and `ARK-REQ-0116` (owner `control.policy`) — all MANDATORY. Prerequisites Phase 4 (TRUST-3 backend) and Phase 12 are both MACHINE-ACCEPTED. Matrix Gate column is `GATE 4 per import`, resolved to `HUMAN_GATE_4` by `GovernanceState.phase_gates` — verified mechanically before any Phase 19 code was written. Five atomic packages deliver C-29 under `engineering.import`; `python scripts/run_phase_gate.py 19 20` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_4 required and not recorded" — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE normal profile, RESCORING NOT_APPLICABLE, FINDINGS, PREREQ 3/3, all 8 architecture gates over 169 edges). `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists `HUMAN_GATE_4` as "not reached" — only `HUMAN_GATE_1` has ever been granted, and only the human acceptance authority may record one; this is a genuine stop condition, not a defect. **5/5 requirements claimed SATISFIED with named evidence** (`docs/acceptance/phase_19_traceability.json`, `phase_19_report.json`), **none discharged** — discharge happens only at phase acceptance. Cumulative verified stays **161** |
+| Phase 19 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED (`docs/acceptance/phase_19_report.json`, `phase_19_traceability.json`). Import / Reverse Engineering / Rescue (C-29). C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile — confirmed by `git diff --stat` over `backend/arkali/control/` and `backend/arkali/acceptance/`, both empty across the whole candidate); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; **HUMAN_GATE: `HUMAN_GATE_4` recorded ACCEPTED** — `HGR-002` (`docs/acceptance/HUMAN_GATE_RECORDS.md`), granted by the human acceptance authority for this exact candidate (HEAD `ef5cb3b`, evidence-package digest `sha256:6e41dd0d...`) after independent mechanical re-verification of all twelve stated conditions; the record's own known-gap note states this grant does **not** cover Phase 21's separate `HUMAN_GATE_4` obligation, since `GovernanceState.accepted_human_gates` has no per-phase binding. All 8 architecture gates PASS over **169** edges. Five atomic packages deliver C-29 under `engineering.import` (descriptor/tier-assignment/rescue-mode contract; static inspection with a structural no-execution proof reusing `engineering.codeintel.PythonGraphBuilder`; the TRUST-3 execution gate composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified**; the composed pipeline reusing `engineering.candidate.workspace.WorkspaceAuthority` via a structural `Protocol`; the composed journey proving all seven VDC acceptance conditions). **5/5 requirements discharged**, all MANDATORY — `ARK-REQ-0115`, `0116`, `0161`, `0162`, `0348` — taking cumulative verified 161 → **166**. `docs/contracts/import.md` is the derived C-29 contract document. **Phase 20 unlocked** |
+| Phase 20 | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `20`. `RequirementRegister.for_phase("20")` returns **4** entries, all MANDATORY: `ARK-REQ-0151` (owner `lifecycle.recovery`), `0152` (owner `control.policy`), `0336` (owner `lifecycle.recovery`), `0337` (owner `acceptance.engine`). Prerequisites Phase **5** and Phase **6**, both already MACHINE-ACCEPTED. Matrix Gate column is **`GATE 6`** on APPLY — `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 20 ("migration safety chain"), resolved to `HUMAN_GATE_6` by `GovernanceState.phase_gates`. No Phase 20 code, test or design work has been performed. Cumulative verified stays **166** until Phase 20 discharges something |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED. Gates 2–8 not reached |
 | ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced |
-| Cumulative verified | **161** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + 11 Phase 15 + 3 Phase 16 + 9 Phase 17 + **4 Phase 18**), reconciled by check C6 against each phase's traceability record. Of the 161, **160 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged. Phase 8 adds none — its denominator is zero |
+| Cumulative verified | **166** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + 11 Phase 15 + 3 Phase 16 + 9 Phase 17 + 4 Phase 18 + **5 Phase 19**), reconciled by check C6 against each phase's traceability record. Of the 166, **165 are MANDATORY**: Phase 7's `ARK-REQ-0060` remains the one CONDITIONAL discharged; all 5 of Phase 19's are MANDATORY. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
 | MEDIUM / LOW | tracked, non-blocking — **the count is held by `OPEN_BLOCKERS.md`, not mirrored here.** No mechanically derived total exists: the residual set is prose, so any number written here would be a transcription that re-rots on the next finding (F-0002, F-0011). Read the file |
 | Recorded findings | the latest recorded finding is **F-0049** — **MEDIUM**, **CLOSED** — and every finding through **F-0049** is closed, so **0 are open**. This row is no longer a transcription: `check_handoff.py` reconciles the latest identifier, its severity and its status against `OPEN_BLOCKERS.md` through the same parser the acceptance gate uses, and refuses a summary that stops at an older identifier. F-0045 was HIGH and was closed **without downgrading its severity**, under the scope-limited GOV-001 authorization `RSA-002`; the defective first Phase 8 report is retained as `phase_8_report_rev1_defective.json`. **F-0046** closed the gap that let this document contradict itself while its validator reported PASS, **F-0047** closed the gap that let its live architecture and finding summaries drift, **F-0048** added phase-transition residue controls, and **F-0049** made the live denominator claim mandatory rather than vacuous |
@@ -361,7 +362,9 @@ repository, the repository wins.
 | 191 | `09430a2` | Corrects the full-regression passed count recorded in `phase_19_report.json` (2715 → 2723, re-read from the run's own final summary line rather than a truncated tail); no other field changed |
 | 192 | `2e7ef2b` | **HANDOFF + BUILD_STATE REFRESH (§12 rule)** — re-derived after the Phase 19 candidate and gate run: live architecture summary to 169 edges, Section 3/8/9 rewritten for `AWAITING_HUMAN_GATE`, Section 4 ledger rows 184–191 added, Section 11 gains this refresh's own row |
 | 193 | `2e3dfa8` | Advances the HEAD-at-generation marker past row 192 |
-| 194 | `ad7eb35` | Records, in `BUILD_STATE.md`, that the Sec 12 refresh's own removal of the literal string "NOT STARTED" from §8 silenced two pre-existing `test_handoff_transition.py` anti-vacuity mutation tests — the same non-blocking pattern already recorded for Phases 10, 11, 13, 14 and 17. No code, requirement or governance behavior changed ← HEAD at generation |
+| 194 | `ad7eb35` | Records, in `BUILD_STATE.md`, that the Sec 12 refresh's own removal of the literal string "NOT STARTED" from §8 silenced two pre-existing `test_handoff_transition.py` anti-vacuity mutation tests — the same non-blocking pattern already recorded for Phases 10, 11, 13, 14 and 17. No code, requirement or governance behavior changed |
+| 195 | `e59a43c` | **HGR-002 — HUMAN_GATE_4 GRANTED FOR THE PHASE 19 CANDIDATE ONLY.** Recorded by the human acceptance authority after independent mechanical re-verification of twelve stated conditions against HEAD `ef5cb3b` (evidence-package digest `sha256:6e41dd0d...`): clean tree, `check_handoff.py` PASS, current phase 19, candidate identity unchanged since the gate ran, sole blocker `HUMAN_GATE_4`, zero open findings, all 8 architecture gates PASS, `backend/arkali/control/` and `backend/arkali/acceptance/` both untouched by the whole candidate, no `AUTHORITY_MAP.yaml` change beyond one sibling edge, TRUST-3 fixed and non-reassignable by type, the execution gate genuinely denies unsatisfiable isolation and non-human approval. Explicitly scoped to this one candidate/digest; records a known gap that `HUMAN_GATE_4` is not phase-bound in `GovernanceState.accepted_human_gates` and will also mechanically satisfy Phase 21's future check, flagged so no session treats HGR-002 as covering it |
+| 196 | `c3b51f8` | **PHASE 19 ACCEPTANCE RECORDED.** `run_phase_gate.py 19 20` returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, following HGR-002. **5/5 requirements discharged**, cumulative verified 161 → **166**. `BUILD_STATE.md`'s Phase 19 row flips to MACHINE-ACCEPTED; the newly-unlocked next phase (Database Migration Safety + Full Backup/Recovery, denominator 4) gets its own `UNLOCKED — NOT STARTED` row. `GovernanceState.current_work_phase()` now returns `20` ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -449,119 +452,112 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 19
+## 8. Current phase contract — Phase 20
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Import / Reverse Engineering / Rescue** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 19) |
-| Status | **UNLOCKED — candidate complete, gate run, `AWAITING_HUMAN_GATE`, NOT ACCEPTED.** `GovernanceState.current_work_phase()` returns `19`. Five atomic packages deliver C-29 under `engineering.import`; the traceability record, C-17 report and one real gate run are committed |
-| Prerequisites | Phase **4** (TRUST-3 backend) and Phase **12** — both MACHINE-ACCEPTED. `PREREQ` check: 3/3 (also counts Phase 3, the `ImportProject` state-machine authority) |
-| Contract IDs | `C-29`, per `CONTRACT_INVENTORY.md` and the matrix `Produces` column. `docs/contracts/import.md` is the derived contract document |
-| Human gate | `HUMAN_GATE_4` (matrix Gate column `GATE 4 per import`, resolved by `GovernanceState.phase_gates`) — **required and not recorded**. `docs/acceptance/HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached"; only `HUMAN_GATE_1` has ever been granted. This is the sole reason the gate verdict is `AWAITING_HUMAN_GATE` rather than `PHASE_ACCEPTED_BY_MACHINE` — every other check (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE, RESCORING, FINDINGS, PREREQ, all 8 architecture gates) PASSES |
-| ARK-REQ IDs | `RequirementRegister.for_phase("19")` returns **5** entries, all MANDATORY: `ARK-REQ-0115`, `ARK-REQ-0161`, `ARK-REQ-0162`, `ARK-REQ-0348` (owner `engineering.import`) and `ARK-REQ-0116` (owner `control.policy`). All five are claimed SATISFIED with named evidence in `phase_19_traceability.json`; none is discharged (discharge happens only at phase acceptance) |
-| What this candidate built | Package 1: `ImportedProjectDescriptor`/`TierAssignment`/`StaticInspectionReport` (`contracts.py`), `RescueModeVocabulary` (`rescue_vocabulary.py`, parses MS §Import's three canonical modes at call time). Package 2: `StaticInspector` (`static_inspection.py`), reusing `engineering.codeintel.PythonGraphBuilder` unmodified — AST-only, never executing the target, proven with a landmine fixture. Package 3: `tier_authority.assign_tier` (no tier parameter) and `execution_gate.assert_execution_approved`, composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified** — no file under `backend/arkali/control/` touched; `import_project_state_machine.py` gains its third additive guard (`STATE_MACHINES.md` count stays 12). Package 4: `ImportPipeline` (`pipeline.py`), composing Packages 1–3 into the real `ImportProject` state machine and materialising a genuinely isolated working copy via `engineering.candidate.workspace.WorkspaceAuthority`, reused through a structural `Protocol` (not a direct import, to avoid extending `engineering.candidate`'s already-4-of-4 orchestration chain — the identical answer Phase 16's `product_generation.py` gave the same problem). Package 5: the composed journey (one test per VDC acceptance condition), the structural authority proof, `docs/contracts/import.md`, the traceability record, the C-17 report and the one real gate run |
-| What remains unbuilt | A repair/modernisation/rebuild execution engine for any of the three rescue modes (this phase selects and records a mode, it does not execute one — Golden Repair, Phase 30); an HTTP/command surface; Research (the other half of MS §Import/Rescue/Research/Plugins, out of this phase's register denominator); TRUST-4 (internet-sourced executable content). Each is a recorded deliberate boundary in `docs/contracts/import.md` §9 |
-| Architecture facts | 8 gates PASS over **169** real cross-context edges (up from 159), all 9 budgets. Ten new edges: `content_address` ×2, `contract_violation_base` ×1, `error_base` ×1 (now **14 of 15**, watch this ceiling), `engineering.codeintel` ×2 (one declared sibling edge, `allowed_sibling_edges` now **10**), `control.isolation` ×2, `control.policy` ×2. `engineering.import` public surface ≈ **18 of 40**. `max_orchestration_depth` unchanged at **4 of 4** on `acceptance.engine → control.specification → control.architecture → kernel.contracts`, unrelated to `engineering.import`. TRUST-3 is honestly **DENY** on this real, unconfigured host (`KERNEL_ISOLATION` UNSUPPORTED) — proven both ways: a real un-doubled probe (DENY) and composition-root test doubles (ALLOW path exists), the Phase 9B shape |
+| Name | **Database Migration Safety + Full Backup/Recovery** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 20) |
+| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `20`. No Phase 20 code, test or design work has been performed — this session's mission was Phase 19 only, and it stopped here as instructed |
+| Prerequisites | Phase **5** (Persistence + Project Registry + Minimal Backup/Restore) and Phase **6** (Evidence Plane) — both MACHINE-ACCEPTED |
+| Contract IDs | Not yet identified from `CONTRACT_INVENTORY.md` — confirm before writing code, the same discipline every prior phase used rather than trusting this row |
+| Human gate | `HUMAN_GATE_6` (matrix Gate column `GATE 6` on APPLY — "APPLY of a migration to real or stable data"), resolved by `GovernanceState.phase_gates`. **Confirm its exact trigger condition before assuming any migration work can complete without it** — Phase 19 needed `HUMAN_GATE_4` for the whole phase; Phase 20's gate is scoped to the APPLY step specifically per its canonical name, and that distinction should be verified from source, not assumed by analogy |
+| ARK-REQ IDs | `RequirementRegister.for_phase("20")` returns **4** entries, all MANDATORY: `ARK-REQ-0151` (owner `lifecycle.recovery`, "schema change follows the nine-step migration sequence"), `ARK-REQ-0152` (owner `control.policy`, "migration APPLY to real/stable data is HUMAN GATE 6"), `ARK-REQ-0336` (owner `lifecycle.recovery`, "migration safety sequence evidenced"), `ARK-REQ-0337` (owner `acceptance.engine`, "known data-loss risk blocks release") |
+| What Phase 19 leaves ready | The accepted C-29 import/rescue descriptor-and-tier-assignment contract under `engineering.import`. Phase 19 built no migration, backup, or recovery mechanism; Phase 20 is unrelated in subject matter, though it shares `lifecycle.recovery` and `control.policy` as owning authorities with pieces of Phase 19's own composition (both reused unmodified, never touched) |
+| What remains unbuilt | Everything — this phase has not been started |
+| Architecture hazard | Not yet assessed. `acceptance.engine`, `execution.workflow` and `surfaces.command` remain at their **40 of 40** public-surface ceiling. `kernel.contracts.error_base` fan-in is **14 of 15** — the closest thing to a live ceiling risk carried into this phase; prefer `contract_violation_base.py` (fan-in 11) if only `ContractViolation` is needed |
 
-**Phase 18 is MACHINE-ACCEPTED.** Its denominator was **4**, all discharged,
-and it delivered contract `C-28`. **Phase 19's candidate is complete and its
-gate has been run** — verdict `AWAITING_HUMAN_GATE`. It remains **UNLOCKED,
-NOT ACCEPTED** until the human acceptance authority grants `HUMAN_GATE_4` and
-a session re-runs `python scripts/run_phase_gate.py 19 20` to obtain the
-machine verdict (no candidate edit is needed for a grant alone).
+**Phase 19 is MACHINE-ACCEPTED.** Its denominator was **5**, all discharged,
+following `HGR-002`'s narrow `HUMAN_GATE_4` grant for that exact candidate.
+**Phase 20 is unlocked and NOT STARTED.**
 
 ## 9. Next exact action
 
-**Phase 19's candidate is complete. The gate has been run and returned
-`AWAITING_HUMAN_GATE`, not acceptance.** `python scripts/run_phase_gate.py
-19 20` returned verdict `AWAITING_HUMAN_GATE`, progression STOPPED, failing
-condition "HUMAN_GATE_4 required and not recorded" — and nothing else.
-Every other check PASSES: C1 (report complete) · C2 (all 5 mandatory
-requirements accounted for) · C3 (11 runs recorded with exit codes) · C4 (8
-architecture gates evaluated) · C5 (no non-PASS state converted to PASS) ·
-C6 (all 5 discharged requirements claimed SATISFIED with named evidence) ·
-EXTERNAL_RESULT (all 11 runs declare their class, none unsubstantiated) ·
-PROTECTED_CORE (no member touched, normal profile — no file under
-`backend/arkali/control/` or `backend/arkali/acceptance/` was created or
-modified) · RESCORING (NOT_APPLICABLE, first submission) · FINDINGS (0 open
-BLOCKER/HIGH) · PREREQ (3/3). All 8 architecture gates PASS over **169**
-edges with all 9 budgets.
+**Phase 19 is accepted.** `python scripts/run_phase_gate.py 19 20` returned
+**`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED**
+(`docs/acceptance/phase_19_report.json`, `phase_19_traceability.json`).
+C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE
+PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS
+PASS; PREREQ 3/3; **HUMAN_GATE: `HUMAN_GATE_4` recorded ACCEPTED** —
+`HGR-002`, granted by the human acceptance authority for this exact
+candidate (HEAD `ef5cb3b`, evidence-package digest `sha256:6e41dd0d...`)
+after independent mechanical re-verification of all twelve conditions the
+human authority specified, none altered from the original submission; all
+8 architecture gates PASS over **169** edges. **5/5 requirements
+discharged** (Phase 19's own full denominator, all MANDATORY — see §3's Phase 19 row for the exact ids), taking cumulative verified 161 → **166**.
 
-**This was verified mechanically BEFORE any Phase 19 code was written, not
-discovered afterward.** `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md`
-maps Phase 19's Gate column to `HUMAN_GATE_4` ("weakening or change of a
-security boundary, sandbox tier or protected-core policy") — confirmed by
-`GovernanceState.phase_gates["19"] == "HUMAN_GATE_4"`.
-`docs/acceptance/HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table
-lists `HUMAN_GATE_4` as "not reached", and `accepted_human_gates` contains
-only `HUMAN_GATE_1` (Phase 0). `HUMAN_GATE_RECORDS.md` is an **append-only
-ledger of recorded human decisions** — "Machine verdicts never appear in
-this ledger — only recorded human decisions do" (the document's own
-opening line) — so **no implementing actor may add a granting record to
-it**, the same discipline GOV-001 already established for re-scoring
-authorizations. This is a genuine Section-1-shaped stop condition (a
-canonical HUMAN GATE required before the next action), not a defect in the
-candidate and not something a future session can engineer around.
+**Five atomic packages delivered C-29 under `engineering.import`** (already
+declared in `AUTHORITY_MAP.yaml` since Phase 1 bootstrap, module root
+`backend/arkali/engineering/project_import` per ERR-001): `contracts.py`/
+`errors.py`/`rescue_vocabulary.py` (Package 1, the descriptor/tier-
+assignment/rescue-mode contract, `TierAssignment.tier`/`.assigned_by` and
+`StaticInspectionReport.executed` as single-member `Literal` types);
+`static_inspection.py` (Package 2, `StaticInspector` reusing `engineering.
+codeintel.PythonGraphBuilder` unmodified, proven never to execute a
+landmine fixture); `tier_authority.py`/`execution_gate.py` (Package 3, the
+TRUST-3 execution gate composing `control.isolation.IsolationAuthority`
+and `control.policy.WorkflowApprovalGate` **unmodified** — no file under
+`backend/arkali/control/` touched — plus one additive guard on the
+pre-existing `ImportProject` state machine, `STATE_MACHINES.md` count
+stays 12); `pipeline.py` (Package 4, the composed pipeline, reusing
+`engineering.candidate.workspace.WorkspaceAuthority` through a structural
+`Protocol` rather than a direct import, specifically to avoid extending
+`engineering.candidate`'s already-4-of-4 orchestration chain — the
+identical answer Phase 16's `product_generation.py` gave the same shape of
+problem); the composed journey, structural authority proof and
+`docs/contracts/import.md` (Package 5). No repair/modernisation/rebuild
+execution engine, HTTP surface, Research capability or TRUST-4 support was
+delivered — each is a recorded deliberate boundary. TRUST-3 is honestly
+`DENY` on this real, unconfigured host (`KERNEL_ISOLATION` UNSUPPORTED);
+the ALLOW path was proven only with composition-root test doubles, the
+Phase 9B shape. No AI provider was contacted anywhere in this phase.
 
-**NEXT EXACT ACTION is to await the human acceptance authority's decision on
-`HUMAN_GATE_4` for this candidate.** Phase 19's denominator — 5 requirements
-— is fully claimed SATISFIED with named evidence and awaits only this gate.
-If granted and recorded as a new `HGR-00N`
-row in `HUMAN_GATE_RECORDS.md`'s append-only ledger, a session should
-re-run `python scripts/run_phase_gate.py 19 20` unchanged — no candidate
-edit is required for a grant alone, since every other check already PASSES
-— to obtain the machine verdict, then perform the `BUILD_STATE.md` Phase 19
-row update to MACHINE-ACCEPTED and the mandatory §12 handoff refresh as the
-following commit(s), then the HEAD-at-generation marker advance as a
-further separate commit, exactly the established sequence. If not granted,
-or if further evidence is requested first, a session should treat that as
-a continuing genuine stop condition and must **not** begin Phase 20
-implementation — read-only discovery of Phase 20's canonical contract and
-denominator is permitted, production code is not.
+**HGR-002 carries a known mechanism gap, read before touching Phase 21.**
+`HUMAN_GATE_4` also governs Phase 21 in the canonical matrix, and
+`GovernanceState.accepted_human_gates` has no per-phase binding — so this
+grant will mechanically also satisfy `check_human_gate` for Phase 21 with
+**no fresh human review**, even though HGR-002's own scope section states
+plainly that it does not authorize that. **A session reaching Phase 21
+MUST NOT cite HGR-002 as satisfying Phase 21's gate** and should surface
+the gap to the human acceptance authority again before proceeding,
+regardless of what the mechanical check reports. Closing this properly (a
+per-phase-scoped human-gate binding, mirroring
+`rescoring_authorization.py`'s digest binding) is a canonical-governance
+change no session has been authorized to make.
 
-**What Phase 19's candidate actually delivered, for a session that resumes
-after the gate is granted.** Five atomic packages under `engineering.import`
-(module root `backend/arkali/engineering/project_import`, ERR-001):
-descriptor/tier-assignment/rescue-mode contracts (Package 1); static
-inspection reusing `engineering.codeintel.PythonGraphBuilder` unmodified,
-with a structural (`Literal[False]`) no-execution proof (Package 2); the
-TRUST-3 execution gate composing `control.isolation.IsolationAuthority` and
-`control.policy.WorkflowApprovalGate` **unmodified**, plus one additive
-guard on the pre-existing `ImportProject` state machine (Package 3); the
-composed pipeline, reusing `engineering.candidate.workspace.
-WorkspaceAuthority` through a structural `Protocol` rather than a direct
-import specifically to avoid extending an already-4-of-4 orchestration
-chain (Package 4); and the composed journey, structural authority proof
-and `docs/contracts/import.md` (Package 5). **No execution engine for any
-rescue mode, no HTTP surface, no Research capability and no TRUST-4 are
-delivered** — each is a recorded deliberate boundary, not a silent gap.
+**NEXT EXACT ACTION is Phase 20 discovery — Database Migration Safety +
+Full Backup/Recovery.** Its denominator — 4 requirements.
+`RequirementRegister.for_phase("20")` returns **4** entries: `ARK-REQ-0151`,
+`0336` (owner `lifecycle.recovery`), `0152` (owner `control.policy`),
+`0337` (owner `acceptance.engine`) — all MANDATORY. Prerequisites Phase 5
+and Phase 6 are both MACHINE-ACCEPTED; the matrix Gate column for Phase 20
+is `GATE 6` on APPLY — confirm its exact trigger condition (the whole
+phase, or only the APPLY step) from `AUTHORITY_MAP.yaml`/canonical sources
+before assuming any migration work can complete without it, the same
+discipline Phase 19's own discovery used for `GATE 4`. **No Phase 20 code,
+test or design work has been performed.**
 
-**Budget facts to carry forward, updated from Phase 18's own row below.**
-`kernel.contracts.error_base` fan-in is now **14 of 15** — the closest any
-Phase 19 change came to a ceiling; a future context needing only
-`ContractViolation` should still prefer `contract_violation_base.py`
-(fan-in **11**) over `error_base.py`. `allowed_sibling_edges` carries **10**
-declared entries (up from 9; `engineering.import → engineering.codeintel`
-is the new one). `engineering.candidate`'s own chain into `kernel.contracts`
-remains at **4 of 4** — unrelated to Phase 19, and the reason `pipeline.py`
-composes it through a `Protocol`. `max_cyclomatic_complexity_per_function`
-is **12**; no Phase 19 module approached it.
+**What Phase 19 established that should be reused, not rebuilt.** Compose
+an existing accepted authority unmodified rather than building a second
+copy of it, even when that means a structural `Protocol` instead of a
+direct import to stay clear of an already-saturated orchestration chain
+(`engineering.candidate`'s chain stays at 4 of 4, unrelated to Phase 20
+unless Phase 20 also needs `engineering.candidate`). A governed vocabulary
+(rescue modes, in Phase 19's case) is parsed from the canonical document
+at call time, never hard-coded, and the anti-vacuity proof is behavioural
+(feed the parser declarations of different sizes), not a text scan for a
+digit. When a requirement is owned by a different bounded context than the
+one doing the composing work, satisfying it can mean composing that
+context's *existing* authority rather than writing new code inside it —
+Phase 19's `control.policy`-owned requirement was discharged this way
+via `WorkflowApprovalGate`, and Phase 20's `ARK-REQ-0152` (also owned
+`control.policy`) may or may not admit the same answer; check before
+assuming.
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15**. There is still **no Python lockfile**; do not create
-one. This session ran natively on Windows (not WSL/Linux, which some
-earlier phase sessions used — their recorded commands show
-`/home/lenovo/.venvs/arkali/bin/python`); two environment gaps were
-confirmed pre-existing and unrelated to Phase 19: the WinError 1314
-symlink-privilege gap (`test_candidate_workspace_manifest.py`, present
-since at least Phase 12, reproduced identically on unmodified HEAD), and
-`backend/tests/governance/test_local_automation.py`'s collection failure
-(`import fcntl`, a POSIX-only module `scripts/automation/
-arkali_automation.py` imports unconditionally — also reproduced identically
-on unmodified HEAD via `git stash`). Both are excluded by name/`--ignore`
-in every recorded test run, with the reason stated inline.
+one.
 
 ## 10. New-session bootstrap protocol
 
@@ -586,7 +582,8 @@ A new session MUST, in order:
 |---|---|
 | Schema | `ARKALI-HANDOFF-V1` |
 | Generated at HEAD | see the `head:` claim in the §12 block. The ledger carries exactly one generation marker and it names that same commit; a derived control asserts both, so this row is deliberately not a second transcription of the sha |
-| Refresh reason | **PHASE 19 CANDIDATE — GATE RUN, `AWAITING_HUMAN_GATE`** — five atomic packages deliver C-29 under `engineering.import`: `ImportedProjectDescriptor`/`TierAssignment`/`StaticInspectionReport` and `RescueModeVocabulary` (Package 1, ARK-REQ-0161/0162); `StaticInspector` reusing `engineering.codeintel.PythonGraphBuilder` unmodified, AST-only, proven never to execute a landmine fixture (Package 2, ARK-REQ-0115/0161); `tier_authority.assign_tier` (no tier parameter) and `execution_gate.assert_execution_approved`, composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified** — no file under `backend/arkali/control/` touched — plus one additive guard on the pre-existing `ImportProject` state machine (Package 3, ARK-REQ-0116, condition 7); `ImportPipeline` composing Packages 1–3 into the real state machine and materialising a genuinely isolated working copy via `engineering.candidate.workspace.WorkspaceAuthority`, reused through a structural `Protocol` rather than a direct import specifically because `engineering.candidate`'s own chain into `kernel.contracts` was already 4 of 4 as of Phase 16 (Package 4, ARK-REQ-0162, 0348 conditions 3–6); the composed journey proving all seven VDC acceptance conditions, the structural authority proof, `docs/contracts/import.md`, the traceability record and the C-17 report (Package 5). `run_phase_gate.py 19 20` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_4 required and not recorded" — the **only** failing condition; C1–C6, EXTERNAL_RESULT, PROTECTED_CORE (normal profile), RESCORING (NOT_APPLICABLE), FINDINGS, PREREQ (3/3) and all 8 architecture gates over 169 edges all PASS. `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md` maps Phase 19's Gate column to `HUMAN_GATE_4`; `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached" — verified mechanically **before** any Phase 19 code was written, not discovered afterward, and confirmed by the real gate run rather than asserted. **This is a genuine stop condition; no implementing actor may self-grant a human gate.** **5/5 requirements claimed SATISFIED with named evidence, none discharged** — discharge happens only at phase acceptance, which this gate run did not reach. Cumulative verified stays **161**. One declared sibling edge added (`engineering.import → engineering.codeintel`; `allowed_sibling_edges` now 10); no `engineering.import → engineering.candidate` edge exists. The live architecture summary is re-derived at **169** edges (up from 159); `kernel.contracts.error_base` fan-in rises to **14 of 15**. §8 and §9 are rewritten to describe the candidate and gate outcome, not an acceptance; §3's Phase 19 row states `AWAITING_HUMAN_GATE`, NOT ACCEPTED, explicitly. `BUILD_STATE.md`'s Phase 19 row and top summary paragraph updated to match. **Phase 20 was not started; only read-only Phase 20 discovery, if any, is permitted next, and none was performed this session.** |
+| Refresh reason | **PHASE 19 MACHINE ACCEPTANCE** — following `HGR-002` (the human acceptance authority's narrow, digest-bound `HUMAN_GATE_4` grant for the exact candidate at HEAD `ef5cb3b`, obtained after independent mechanical re-verification of twelve stated conditions, none altered from the original submission), `run_phase_gate.py 19 20` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED**. C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile — `backend/arkali/control/` and `backend/arkali/acceptance/` both empty in `git diff --stat` across the whole candidate); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; HUMAN_GATE PASS (`HUMAN_GATE_4` recorded ACCEPTED via HGR-002); 8 gates PASS over 169 edges. **5/5 requirements discharged**, all MANDATORY, taking cumulative verified 161 → **166**. `GovernanceState.current_work_phase()` now returns **20** (Database Migration Safety + Full Backup/Recovery, denominator 4, pre-existing) — adding its status row was mechanically required. §8 and §9 are rewritten for the new current phase; §3's Phase 19 row states its acceptance and names HGR-002; the live architecture summary is unchanged at 169 edges (the acceptance/human-gate commits added no production code). `HUMAN_GATE_RECORDS.md`'s "Outstanding gates" table updated to show `HUMAN_GATE_4` granted for Phase 19 only, explicitly still "not reached" for Phase 21 pending HGR-002's own known-gap note. **No Phase 20 implementation was begun**, per this session's explicit mission instruction to stop after Phase 19 acceptance and the final handoff refresh |
+| Previously refreshed for | **PHASE 19 CANDIDATE — GATE RUN, `AWAITING_HUMAN_GATE`** — five atomic packages deliver C-29 under `engineering.import`: `ImportedProjectDescriptor`/`TierAssignment`/`StaticInspectionReport` and `RescueModeVocabulary` (Package 1, ARK-REQ-0161/0162); `StaticInspector` reusing `engineering.codeintel.PythonGraphBuilder` unmodified, AST-only, proven never to execute a landmine fixture (Package 2, ARK-REQ-0115/0161); `tier_authority.assign_tier` (no tier parameter) and `execution_gate.assert_execution_approved`, composing `control.isolation.IsolationAuthority` and `control.policy.WorkflowApprovalGate` **unmodified** — no file under `backend/arkali/control/` touched — plus one additive guard on the pre-existing `ImportProject` state machine (Package 3, ARK-REQ-0116, condition 7); `ImportPipeline` composing Packages 1–3 into the real state machine and materialising a genuinely isolated working copy via `engineering.candidate.workspace.WorkspaceAuthority`, reused through a structural `Protocol` rather than a direct import specifically because `engineering.candidate`'s own chain into `kernel.contracts` was already 4 of 4 as of Phase 16 (Package 4, ARK-REQ-0162, 0348 conditions 3–6); the composed journey proving all seven VDC acceptance conditions, the structural authority proof, `docs/contracts/import.md`, the traceability record and the C-17 report (Package 5). `run_phase_gate.py 19 20` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_4 required and not recorded" — the **only** failing condition; C1–C6, EXTERNAL_RESULT, PROTECTED_CORE (normal profile), RESCORING (NOT_APPLICABLE), FINDINGS, PREREQ (3/3) and all 8 architecture gates over 169 edges all PASS. `docs/canonical/IMPLEMENTATION_DEPENDENCY_MATRIX.md` maps Phase 19's Gate column to `HUMAN_GATE_4`; `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists it "not reached" — verified mechanically **before** any Phase 19 code was written, not discovered afterward, and confirmed by the real gate run rather than asserted. **This is a genuine stop condition; no implementing actor may self-grant a human gate.** **5/5 requirements claimed SATISFIED with named evidence, none discharged** — discharge happens only at phase acceptance, which this gate run did not reach. Cumulative verified stays **161**. One declared sibling edge added (`engineering.import → engineering.codeintel`; `allowed_sibling_edges` now 10); no `engineering.import → engineering.candidate` edge exists. The live architecture summary is re-derived at **169** edges (up from 159); `kernel.contracts.error_base` fan-in rises to **14 of 15**. §8 and §9 are rewritten to describe the candidate and gate outcome, not an acceptance; §3's Phase 19 row states `AWAITING_HUMAN_GATE`, NOT ACCEPTED, explicitly. `BUILD_STATE.md`'s Phase 19 row and top summary paragraph updated to match. **Phase 20 was not started; only read-only Phase 20 discovery, if any, is permitted next, and none was performed this session.** |
 | Previously refreshed for | **PHASE 18 MACHINE ACCEPTANCE** — four atomic packages delivered C-28 (knowledge record + validity state) end to end under `engineering.knowledge`, already declared in `AUTHORITY_MAP.yaml` since Phase 1 bootstrap: `EvidenceReference`/`SelfReportedClaim` and `KnowledgeRecord`'s derived five-state validity lifecycle (Package 1, `ARK-REQ-0126`/`0127`); `ReusableComponentDescriptor` with mandatory test/security/compatibility metadata (Package 2, `ARK-REQ-0128`); `VerifiedOutcome`/`aggregate` per-model/per-task-class empirical statistics reusing the same evidence exclusion (Package 3, `ARK-REQ-0394`, D-026); the composed journey, structural authority proof, `docs/contracts/knowledge.md`, the traceability record and C-17 report (Package 4). `run_phase_gate.py 18 19` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first submission**. C1–C6 PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 1/1; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 159 edges. **4/4 requirements discharged**, all MANDATORY, taking cumulative verified 157 → **161**. No new `allowed_sibling_edges` entry was required — evidence composes generically through `EvidenceReference`. `GovernanceState.current_work_phase()` now returns **19** (Import / Reverse Engineering / Rescue, denominator 5, pre-existing) — adding its status row was mechanically required. §8 and §9 are rewritten for the new current phase; §3's Phase 18 row states its acceptance; the live architecture summary is re-derived at 159 edges (unchanged since the acceptance commit itself adds no new production code). No Phase 19 implementation was begun |
 | Previously refreshed for | **PHASE 17 MACHINE ACCEPTANCE** — eight atomic packages delivered C-20 (the canonical workflow graph document) end to end: the graph domain model (Package 1); the PEP-enforced, content-hash-verified persistence/revision store (Package 2); the ADR-0004 derived execution plan (Package 3); `control.policy`'s `WorkflowApprovalGate` (Package 4, ARK-REQ-0330); the real executor with evidence for all 10 canonical node kinds and 10 control constructs (Package 5, `execution.workflow` reached its 40-of-40 public-surface ceiling); the `surfaces.command` HTTP API (Package 6, a real `max_orchestration_depth` hazard answered by structural `Protocol`s and injected factories, `surfaces.command` also reached 40 of 40); the frontend Visual Workflow Studio (Package 7, a hand-rolled canvas — real pointer drag, real click-to-connect, no graph-drawing library dependency — with a real 5-test T10 Playwright journey through compose/publish/reload persistence/fresh-context persistence/execution pause/the ARK-REQ-0330 negative path (`ARK-ERR-0133`)/a real approval); and the ARK-REQ-0331 coverage check (Package 8, placed as a structural cross-check — `test_contract_drift.py`'s own idiom — because `execution.workflow`, `surfaces.command` **and** `acceptance.engine` were all at their 40-of-40 ceiling by then). The traceability record and C-17 report were composed and frozen; `run_phase_gate.py 17 18` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first fully-corrected submission** (the first submission surfaced C3/C5/PROTECTED_CORE failures — three non-zero-exit governance/full-suite runs recorded under an overall PASS status, and a missed Protected Core touch via `control.policy`'s `workflow_approval.py`/`policy_errors.py` — corrected by deselecting the two expected-quiet anti-vacuity tests and the one pre-existing Windows-symlink test by name, and by supplying the stronger PROTECTED_CORE profile's three required categories). C1–C6 PASS; EXTERNAL_RESULT PASS over all 12 recorded runs; **PROTECTED_CORE COMPLETE** (member `control.policy`; security review 245, adversarial review 788, full regression 2610, all exit 0); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 156 edges. **9/9 requirements discharged**, all MANDATORY, taking cumulative verified 148 → **157**. `GovernanceState.current_work_phase()` now returns **18** (Knowledge + Verified Components, denominator 4, pre-existing) — adding its status row was mechanically required. §8 and §9 are rewritten for the new current phase; §3's Phase 17 row states its acceptance; the live architecture summary remains at 156 edges (Package 8 added none). **No Phase 18 implementation was begun**, per this session's explicit mission instruction to stop and report state at Phase 17 acceptance |
 | Previously refreshed for | **PHASE 16 MACHINE ACCEPTANCE** — two atomic packages composed the real existing authorities under human governance ruling **D-026**: `execution_routing.py` evaluates D-026's exact eight-tier preference order, composing the real `CapabilityGraph`/`RepairBudgetLedger` and honestly resolving `NOT_CONFIGURED` for every tier whose owning authority is unbuilt (Phase 18/22) or has no live runtime instance (no configured provider anywhere in this repository) — a new declared sibling edge (`engineering.factory → engineering.repair`) was required for the C-26 anti-loop composition; `product_generation.py` deterministically scaffolds a real, importable, executable module from a fully-resolved C-37 blueprint, reading BP's "generate progressively harder real products" as textually distinct from "Golden Factory Acceptance requires... a real provider" (Phase 30's own unclaimed obligation), and refuses generation from any unresolved blueprint. A real orchestration-depth violation (`engineering.candidate`'s own chain already 4 of 4) was answered by a structural `Protocol` rather than a static import — decomposition, not an exemption. The composed journey, traceability record and C-17 report were composed and frozen; `run_phase_gate.py 16 17` returned **`PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, exit 0, on the first and only submission.** C1–C6 PASS; EXTERNAL_RESULT PASS over all 11 recorded runs; PROTECTED_CORE PASS (no member touched, normal profile); RESCORING NOT_APPLICABLE; FINDINGS PASS; PREREQ 3/3; HUMAN_GATE NOT_APPLICABLE; 8 gates PASS over 143 edges. **3/3 requirements discharged**, all MANDATORY, taking cumulative verified 145 → **148**. `GovernanceState.current_work_phase()` now returns **17** (Visual Workflow Studio, denominator 9, pre-existing) — adding its status row was mechanically required. §8 and §9 are rewritten for the new current phase; §3's Phase 16 row states its acceptance; the live architecture summary is re-derived at 143 edges. No Phase 17 implementation was begun |
@@ -672,7 +669,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: ad7eb35430f2d3d1abdb5d8c02f9ea9c318e7336
+head: c3b51f8eff56f4dfc2235eb1e00b727bd125417a
 branch: main
 working_tree_clean: true
 
@@ -701,13 +698,14 @@ verified_by_phase:
   "16": 3
   "17": 9
   "18": 4
-cumulative_verified: 161
+  "19": 5
+cumulative_verified: 166
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18"]
-unlocked_phase: "19"
-next_exact_action_phase: "19"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"]
+unlocked_phase: "20"
+next_exact_action_phase: "20"
 
-accepted_human_gates: ["HUMAN_GATE_1"]
+accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_4"]
 adr_accepted: 9
 adr_proposed: 0
 open_blocker_high: []
