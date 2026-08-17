@@ -284,13 +284,34 @@ class TestControl3RealHistoricalPhase19DoesNotLeakToPhase21:
         digest = evidence_package_digest(REPO, "19")
         assert _find_phase_gate_grant(REPO, "HUMAN_GATE_4", "21", digest) is None
 
-    def test_checker_reports_phase_19_human_gate_pass_and_phase_20_still_blocked(self) -> None:
+    def test_phase_19_grant_does_not_satisfy_phase_20(self) -> None:
+        """HGR-002-SCOPED (Phase 19) must not satisfy Phase 20's own,
+        separately-granted HUMAN_GATE_6 check.
+
+        F-0051. The original version of this test asserted
+        `checker.check_human_gate("20") is BLOCKED` outright - true only
+        because, at write time, no HUMAN_GATE_6 grant of any kind existed
+        yet for any phase. That is a transient fact about the repository's
+        acceptance history, not an invariant of the scoping mechanism: once
+        the human acceptance authority legitimately grants HUMAN_GATE_6 for
+        Phase 20's own evidence package (a different gate token, `HUMAN_
+        GATE_6` vs `HUMAN_GATE_4`, and a different phase), Phase 20's check
+        correctly flips to PASS, and asserting BLOCKED forever would just be
+        asserting that Phase 20 must never legitimately clear its own gate.
+        The invariant this test actually exists to protect - Phase 19's
+        grant, bound to Phase 19's own digest, must never be the reason
+        Phase 20 clears - is checked directly against the real, live grant
+        table instead, so it stays meaningful regardless of whether Phase 20
+        carries its own independent, separately-scoped grant.
+        """
         checker = PhaseGateChecker(REPO)
-        result_19 = checker.check_human_gate("19")
-        assert result_19.state is HonestState.PASS
-        result_20 = checker.check_human_gate("20")
-        assert result_20.state is HonestState.BLOCKED
-        assert "HUMAN_GATE_6" in result_20.summary
+        assert checker.check_human_gate("19").state is HonestState.PASS
+        # Phase 20 may itself be PASS or BLOCKED depending on whether its own
+        # grant exists - what must never happen is HGR-002-SCOPED (Phase 19's
+        # grant) being the reason. Assert directly against the real HGR table.
+        digest_19 = evidence_package_digest(REPO, "19")
+        leaked = _find_phase_gate_grant(REPO, "HUMAN_GATE_6", "20", digest_19)
+        assert leaked is None, "Phase 19's own digest must never satisfy Phase 20"
 
 
 class TestSingletonGateLegacyPath:
