@@ -1,0 +1,72 @@
+{
+  "phase_id": "22B",
+  "note": "Derived from RequirementRegister.for_phase(\"22B\"): exactly ARK-REQ-0135, 0136, 0154-0160, 0338, 0339 (11 entries, all MANDATORY), owned by control.policy, lifecycle.recovery and evidence.audit. Matrix Gate column is empty for Phase 22B, so no human gate applies. Prerequisites (Phases 5, 6, 13, 20) were all MACHINE-ACCEPTED before this candidate began.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0135",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.evolution/core_upgrade_state_machine.py's pre-existing recovery_supervisor_guard (declared since the twelve state machines were first built) gates SNAPSHOT_TAKEN -> CANDIDATE_BUILT on recovery_supervisor_verified. This candidate supplies the only real, non-fabricable source for that fact: lifecycle.recovery/recovery_supervisor.py's RecoverySupervisor.is_verified(), which re-queries the evidence chain for a completed ARK-REQ-0338 PASS row on every call.",
+      "evidence": "backend/tests/persistence/test_self_evolution_gate.py::TestEntryDeniedBeforeVerification::test_core_upgrade_entry_is_refused_before_any_real_rollback (GuardRejected before any rollback) and TestEntryPermittedAfterVerification::test_core_upgrade_entry_is_permitted_once_a_real_rollback_is_evidenced (transition succeeds only after a genuine evidenced rollback)"
+    },
+    {
+      "req_id": "ARK-REQ-0136",
+      "state": "SATISFIED",
+      "implementation": "RecoverySupervisor.is_verified() is derived, never settable: it queries the real evidence sink for an ARK-REQ-0338 PASS row, and that row can only be produced by RecoverySupervisor.rollback(), which cannot succeed without a real PDP AUTO grant (pdp.py::_rollback_rule). The precondition is therefore causally downstream of a real policy decision, not a caller-asserted convention.",
+      "evidence": "backend/tests/persistence/test_self_evolution_gate.py::TestNotEnforceableByConvention::test_only_recovery_supervisor_can_ever_emit_the_verification_requirement (structural scan of backend/arkali/ proving exactly one production module can ever emit the ARK-REQ-0338 evidence the guard depends on) and TestEntryPermittedAfterVerification (the guard only opens after a real PDP-gated rollback)"
+    },
+    {
+      "req_id": "ARK-REQ-0154",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.recovery/recovery_supervisor.py's RecoverySupervisor is the sole production caller of ROLLBACK_STABLE (check_repository_structure.py check 11 confines Stable-mutation write capability to this context). It imports no AI provider, no candidate-generation authority and no repair pipeline - only the PDP grant (via RollbackAuthorization), the Package-1 Stable-revision pointer, and the C-14/C-15 evidence plane (via EvidenceSink).",
+      "evidence": "backend/tests/persistence/test_phase_22b_journey.py::TestNoNovelContentNoAIInvocation::test_recovery_supervisor_imports_no_engineering_or_ai_context (structural scan) and TestTheComposedVDCSequence::test_the_whole_sequence_leaves_a_known_good_stable_and_a_failure_record (chaos: real bad-candidate/health-failure/rollback/failure-record/stable-available sequence)"
+    },
+    {
+      "req_id": "ARK-REQ-0155",
+      "state": "SATISFIED",
+      "implementation": "pdp.py's fixed rule for ROLLBACK_STABLE (RECOVERY_SUPERVISOR_ONLY) is the sole path by which any actor may mutate the Stable revision pointer; WRITE_STABLE_FILE remains DENY for every actor unconditionally, untouched by this phase.",
+      "evidence": "backend/tests/security/test_pdp_decisions.py::TestFixedRulesAreAbsolute::test_write_stable_file_is_deny_for_every_actor (unchanged) and test_rollback_is_granted_to_the_canonical_invoker_with_a_verified_target (the one narrow exception, proven)"
+    },
+    {
+      "req_id": "ARK-REQ-0156",
+      "state": "SATISFIED",
+      "implementation": "pdp.py::_rollback_rule denies ROLLBACK_STABLE to every actor except the canonical invoker read from AUTHORITY_MAP.yaml (lifecycle.recovery), never hard-coded, and the grant cannot be forged by stating the verified fact as any other actor.",
+      "evidence": "backend/tests/security/test_pdp_decisions.py::TestFixedRulesAreAbsolute::test_rollback_stable_is_denied_to_ordinary_actors, test_rollback_grant_cannot_be_forged_by_a_different_actor, test_rollback_invoker_is_read_from_authority_not_hard_coded"
+    },
+    {
+      "req_id": "ARK-REQ-0157",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.release/stable_pointer.py's StableRevisionPointer.is_previously_verified(revision_id) is the whole of what a 'previously verified immutable revision' means: membership in the pointer's own durable history, built only from genuine StableCandidatePath.promotion_receipt proofs (the full canonical stable->candidate->verification->acceptance->promotion path) - never a caller's bare assertion.",
+      "evidence": "backend/tests/persistence/test_stable_pointer.py::TestPromotion and TestRollback (promotion requires the full receipt; rollback refuses any target the pointer never recorded) and test_phase_22b_journey.py::TestWrongCandidateAndCorruptedTargetRefusal (denied twice over: real PDP and the pointer's own defence-in-depth check)"
+    },
+    {
+      "req_id": "ARK-REQ-0158",
+      "state": "SATISFIED",
+      "implementation": "StableRevisionPointer serialises its whole state once and swaps it into place with a single os.replace, so a reader never observes a partially written pointer; the abandoned current revision joins history rather than being discarded on every switch (promote or rollback_to).",
+      "evidence": "backend/tests/persistence/test_stable_pointer.py::TestTamperResistance::test_no_temp_file_is_left_behind_after_a_successful_promotion and test_phase_22b_journey.py::TestCrashDuringSwitchLeavesNoPartialState::test_a_stray_temp_file_from_an_interrupted_write_never_leaks_into_current (real crash-mid-write simulation)"
+    },
+    {
+      "req_id": "ARK-REQ-0159",
+      "state": "SATISFIED",
+      "implementation": "rollback_to is an identity-only pointer switch (no content read, generated or transformed); RecoverySupervisor imports no AI provider and no candidate-generation authority; every rollback target must already be pointer-recorded (no unverified target); evidence is always emitted (no bypass); the rollback record itself states 'transformation: none'.",
+      "evidence": "backend/tests/persistence/test_phase_22b_journey.py::TestNoNovelContentNoAIInvocation (structural scans plus the real persisted artifact payload asserting its own transformation field) and TestWrongCandidateAndCorruptedTargetRefusal (unverified-target refusal)"
+    },
+    {
+      "req_id": "ARK-REQ-0160",
+      "state": "SATISFIED",
+      "implementation": "RecoverySupervisor.rollback always registers a real C-14 artifact describing the rollback and appends a real C-15 evidence row against it for ARK-REQ-0160 itself, via the EvidenceSink Protocol adapting evidence.audit.AuditChain unmodified.",
+      "evidence": "backend/tests/persistence/test_recovery_supervisor.py::TestGenuineRollback::test_evidence_is_really_persisted_and_chain_intact (3 real persisted, chain-intact evidence rows, re-read from a fresh session) and test_phase_22b_journey.py::TestTheComposedVDCSequence"
+    },
+    {
+      "req_id": "ARK-REQ-0338",
+      "state": "SATISFIED",
+      "implementation": "The composed VDC 'Recovery Supervisor' sequence (bad candidate -> launch -> health failure -> known-good rollback -> failure record -> stable available) runs end to end on real SQLite (via the real Alembic chain), the real PDP, the real Stable-revision pointer and the real C-14/C-15 evidence plane, and the run itself is what RecoverySupervisor.is_verified() detects.",
+      "evidence": "backend/tests/persistence/test_phase_22b_journey.py::TestTheComposedVDCSequence::test_the_whole_sequence_leaves_a_known_good_stable_and_a_failure_record (chaos, run) and TestIdempotentRetry::test_repeating_a_successful_rollback_stays_safe_and_keeps_evidencing"
+    },
+    {
+      "req_id": "ARK-REQ-0339",
+      "state": "SATISFIED",
+      "implementation": "rollback_to switches the pointer's current revision to a target StableRevisionPointer.is_previously_verified confirms was itself previously verified through the canonical promotion path, performing no content transformation - the registered rollback artifact records this explicitly.",
+      "evidence": "backend/tests/persistence/test_phase_22b_journey.py::TestNoNovelContentNoAIInvocation::test_rollback_is_an_identity_switch_never_a_content_rewrite (asserts the real persisted artifact payload's transformation field) and TestTheComposedVDCSequence (from_revision_id/to_revision_id both real, previously-promoted revisions)"
+    }
+  ]
+}
