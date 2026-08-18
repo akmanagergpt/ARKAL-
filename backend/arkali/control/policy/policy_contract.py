@@ -46,6 +46,13 @@ class PolicyRequest(BaseModel):
     lockfile_bound: bool | None = None
     targets_real_or_stable_data: bool | None = None
 
+    #: Whether the ROLLBACK_STABLE target is a revision this repository's own
+    #: Stable-revision pointer (`lifecycle.release`) already recorded as
+    #: previously Stable (Phase 22B, `ARK-REQ-0157`). The PDP trusts the fact
+    #: but never computes it - only the real invoker, having actually checked
+    #: the pointer's durable history, may state it truthfully.
+    rollback_target_verified_immutable: bool | None = None
+
     #: Resolved by control.isolation and injected. False means the tier's
     #: required properties are not all satisfiable on this host.
     isolation_satisfied: bool = True

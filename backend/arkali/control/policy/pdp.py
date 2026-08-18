@@ -199,24 +199,41 @@ class PolicyDecisionPoint:
     def _rollback_rule(
         self, rule: OperationClassRule, request: PolicyRequest
     ) -> PolicyDecisionRecord:
-        """ROLLBACK_STABLE is DENY at Phase 4, for every actor including the invoker.
+        """ROLLBACK_STABLE (Phase 22B, ARK-REQ-0135/0136/0155/0156).
 
-        The canonical set carves out exactly one exception: `lifecycle.recovery`
-        invoking a verified Recovery Supervisor, which is Phase 22B. Granting
-        anything to that invoker now would grant it to a component that does not
-        exist and whose canonical preconditions - verified immutable target, no
-        transformation, evidence emitted - cannot be checked. The invoker is
-        still read from authority so the reason names it, and so this decision
-        follows the map if the map ever changes.
+        DENY for every actor except the canonical invoker read from
+        `AUTHORITY_MAP.yaml` (`lifecycle.recovery`'s Recovery Supervisor), and
+        DENY even for that invoker unless the request itself states the target
+        is a previously verified immutable revision
+        (`rollback_target_verified_immutable is True`). The PDP never computes
+        that fact - it only ever narrows on it, per this module's own fail-
+        closed discipline (an unstated or false fact is refused, never assumed
+        permissive). Only `AUTO` or `DENY` are possible outcomes: a genuine
+        Recovery Supervisor rollback is deterministic and unattended by
+        design (MS "Independent deterministic Recovery Supervisor"), so there
+        is no `ASK_USER` state for this rule to reach.
         """
         invoker = self.authority.rollback_invoker
-        detail = (
-            f"only {invoker} may ever invoke this, and only through a verified "
-            "Recovery Supervisor (Phase 22B), which is not implemented"
-        )
+        if request.actor != invoker:
+            return self._record(
+                request, Decision.DENY, rule.name,
+                f"fixed rule RECOVERY_SUPERVISOR_ONLY; only {invoker} may ever "
+                "invoke this",
+                None,
+            )
+        if request.rollback_target_verified_immutable is not True:
+            return self._record(
+                request, Decision.DENY, rule.name,
+                f"fixed rule RECOVERY_SUPERVISOR_ONLY; {invoker} may invoke this "
+                "only against a previously verified immutable revision, which "
+                "this request does not state",
+                None,
+            )
         return self._record(
-            request, Decision.DENY, rule.name,
-            f"fixed rule RECOVERY_SUPERVISOR_ONLY; {detail}", None,
+            request, Decision.AUTO, rule.name,
+            f"fixed rule RECOVERY_SUPERVISOR_ONLY; {invoker} invoking against a "
+            "previously verified immutable revision",
+            None,
         )
 
     def _base_decision(

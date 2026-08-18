@@ -141,18 +141,60 @@ class TestFixedRulesAreAbsolute:
             record = pdp.decide(request_for("ROLLBACK_STABLE", "TRUST-0", actor=actor))
             assert record.decision is Decision.DENY
 
-    def test_rollback_is_denied_even_to_the_canonical_invoker_at_this_phase(
+    def test_rollback_is_denied_to_the_canonical_invoker_without_the_verified_fact(
         self, pdp: PolicyDecisionPoint
     ) -> None:
-        """The one carve-out needs a verified Recovery Supervisor (Phase 22B).
-
-        Granting anything now would grant it to a component that does not exist
-        and whose canonical preconditions cannot be checked.
+        """The one carve-out (Phase 22B) needs a *stated* verified-immutable
+        target. An invoker request that is silent on the fact - the PDP never
+        computes it - is refused exactly like any other actor.
         """
         invoker = PolicyAuthority.load(REPO).rollback_invoker
         record = pdp.decide(request_for("ROLLBACK_STABLE", "TRUST-0", actor=invoker))
         assert record.decision is Decision.DENY
         assert invoker in record.reason, "the reason must name the canonical invoker"
+
+    def test_rollback_is_denied_to_the_canonical_invoker_when_the_fact_is_false(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        invoker = PolicyAuthority.load(REPO).rollback_invoker
+        record = pdp.decide(
+            request_for(
+                "ROLLBACK_STABLE", "TRUST-0", actor=invoker,
+                rollback_target_verified_immutable=False,
+            )
+        )
+        assert record.decision is Decision.DENY
+
+    def test_rollback_is_granted_to_the_canonical_invoker_with_a_verified_target(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        """ARK-REQ-0135/0136/0155/0156: the sole exception, and only this far.
+
+        `AUTO`, not `ASK_USER`: a genuine Recovery Supervisor rollback is
+        deterministic and unattended by design.
+        """
+        invoker = PolicyAuthority.load(REPO).rollback_invoker
+        record = pdp.decide(
+            request_for(
+                "ROLLBACK_STABLE", "TRUST-0", actor=invoker,
+                rollback_target_verified_immutable=True,
+            )
+        )
+        assert record.decision is Decision.AUTO
+        assert invoker in record.reason
+
+    def test_rollback_grant_cannot_be_forged_by_a_different_actor(
+        self, pdp: PolicyDecisionPoint
+    ) -> None:
+        """Stating the verified-immutable fact grants nothing to anyone else."""
+        for actor in ("engineering.agent", "lifecycle.release", "workflow"):
+            record = pdp.decide(
+                request_for(
+                    "ROLLBACK_STABLE", "TRUST-0", actor=actor,
+                    rollback_target_verified_immutable=True,
+                )
+            )
+            assert record.decision is Decision.DENY
 
     def test_rollback_invoker_is_read_from_authority_not_hard_coded(self) -> None:
         assert PolicyAuthority.load(REPO).rollback_invoker == "lifecycle.recovery"
