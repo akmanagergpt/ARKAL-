@@ -113,6 +113,74 @@ class TestPromotion:
         assert reopened.current().revision_id == REV_A  # type: ignore[union-attr]
 
 
+class TestRollback:
+    def test_rollback_refuses_a_revision_never_recorded_as_stable(
+        self, path: StableCandidatePath, tmp_path: pathlib.Path
+    ) -> None:
+        pointer = StableRevisionPointer(path, tmp_path / "stable_pointer.json")
+        pointer.promote(
+            _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
+        )
+        with pytest.raises(StablePointerError):
+            pointer.rollback_to(REV_B)
+
+    def test_rollback_to_a_previously_promoted_revision_switches_current(
+        self, path: StableCandidatePath, tmp_path: pathlib.Path
+    ) -> None:
+        pointer = StableRevisionPointer(path, tmp_path / "stable_pointer.json")
+        pointer.promote(
+            _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
+        )
+        pointer.promote(
+            _promotion_receipt(path, "cand-2"), revision_id=REV_B, candidate_id="cand-2"
+        )
+        record = pointer.rollback_to(REV_A)
+        assert record.revision_id == REV_A
+        assert pointer.current().revision_id == REV_A  # type: ignore[union-attr]
+
+    def test_rollback_carries_the_abandoned_revision_into_history_not_lossy(
+        self, path: StableCandidatePath, tmp_path: pathlib.Path
+    ) -> None:
+        pointer = StableRevisionPointer(path, tmp_path / "stable_pointer.json")
+        pointer.promote(
+            _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
+        )
+        pointer.promote(
+            _promotion_receipt(path, "cand-2"), revision_id=REV_B, candidate_id="cand-2"
+        )
+        pointer.rollback_to(REV_A)
+        assert {rec.revision_id for rec in pointer.history()} == {REV_B}
+        assert pointer.is_previously_verified(REV_A) is True
+        assert pointer.is_previously_verified(REV_B) is True
+
+    def test_rollback_to_the_current_revision_is_a_harmless_no_op(
+        self, path: StableCandidatePath, tmp_path: pathlib.Path
+    ) -> None:
+        pointer = StableRevisionPointer(path, tmp_path / "stable_pointer.json")
+        pointer.promote(
+            _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
+        )
+        record = pointer.rollback_to(REV_A)
+        assert record.revision_id == REV_A
+        assert pointer.history() == ()
+
+    def test_rollback_never_appears_twice_in_history_after_switching_back(
+        self, path: StableCandidatePath, tmp_path: pathlib.Path
+    ) -> None:
+        """The rolled-back-to revision leaves history to become current again -
+        it is never simultaneously current and its own history entry."""
+        pointer = StableRevisionPointer(path, tmp_path / "stable_pointer.json")
+        pointer.promote(
+            _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
+        )
+        pointer.promote(
+            _promotion_receipt(path, "cand-2"), revision_id=REV_B, candidate_id="cand-2"
+        )
+        pointer.rollback_to(REV_A)
+        ids_in_history = [rec.revision_id for rec in pointer.history()]
+        assert ids_in_history.count(REV_A) == 0
+
+
 class TestTamperResistance:
     def test_a_truncated_pointer_file_is_refused_not_silently_repaired(
         self, path: StableCandidatePath, tmp_path: pathlib.Path

@@ -168,6 +168,45 @@ class StableRevisionPointer:
         )
         return record
 
+    def rollback_to(self, revision_id: str) -> StableRevisionRecord:
+        """Atomically switch Stable back to a previously verified revision.
+
+        The raw mechanic only. It carries no policy decision and does not
+        consult the policy authority - the sole legitimate caller
+        (`lifecycle.recovery`'s Recovery Supervisor, Phase 22B) always obtains
+        its own real, unattended grant from that authority first and calls
+        this only after that grant is in hand, the same order
+        `migration_safety.py`'s Apply step already uses against its own
+        approval gate. Refuses any target this pointer never itself recorded
+        (`ARK-REQ-0157`) - the abandoned current revision is carried into
+        history, never discarded, so this operation is never lossy.
+        """
+        _validate_revision_id(revision_id)
+        state = self._read()
+        if not self.is_previously_verified(revision_id):
+            raise StablePointerError(
+                f"rollback target {revision_id!r} was never recorded as Stable "
+                "by this pointer; refusing to roll back to an unverified or "
+                "unknown revision"
+            )
+        if state.current is not None and state.current.revision_id == revision_id:
+            return state.current
+        target = next(
+            (rec for rec in state.history if rec.revision_id == revision_id), None
+        )
+        if target is None:
+            raise StablePointerError(
+                f"rollback target {revision_id!r} could not be resolved to a "
+                "recorded revision"
+            )
+        # The target leaves history to become current; the abandoned current
+        # joins history in its place, preserving the remaining chronology.
+        new_history = tuple(rec for rec in state.history if rec.revision_id != revision_id)
+        if state.current is not None:
+            new_history = (*new_history, state.current)
+        self._write(StablePointerState(current=target, history=new_history))
+        return target
+
     def _read(self) -> StablePointerState:
         if not self._pointer_path.is_file():
             return StablePointerState(current=None, history=())
