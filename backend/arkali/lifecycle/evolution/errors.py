@@ -23,3 +23,11 @@ class CampaignStillRunningError(ContractViolation):
     (ARK-REQ-0140) - the campaign is still eligible to continue."""
 
     code = "ARK-ERR-0154"
+
+
+class ChildProductNotSdkEligibleError(ContractViolation):
+    """A `STANDARD`/`AI_ASSISTED` child product cannot declare a Product
+    Evolution SDK campaign - MS reserves the SDK for
+    `AI_NATIVE_SELF_EVOLVING` products only (ARK-REQ-0131)."""
+
+    code = "ARK-ERR-0157"
