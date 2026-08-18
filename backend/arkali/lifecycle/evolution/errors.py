@@ -31,3 +31,20 @@ class ChildProductNotSdkEligibleError(ContractViolation):
     `AI_NATIVE_SELF_EVOLVING` products only (ARK-REQ-0131)."""
 
     code = "ARK-ERR-0157"
+
+
+class UnknownVersionReferenceError(ContractViolation):
+    """A rollback or lookup named a `version_ref` this lineage never
+    recorded (ARK-REQ-0132) - a caller's claim that some content was "an
+    earlier version" is never trusted without the lineage's own history
+    proving it."""
+
+    code = "ARK-ERR-0158"
+
+
+class VersionLineageOrderError(ContractViolation):
+    """A version was appended out of sequence or with a parent reference
+    that does not honestly continue this lineage (ARK-REQ-0358) - a gap or
+    a rewritten parent is refused, never silently accepted."""
+
+    code = "ARK-ERR-0159"
