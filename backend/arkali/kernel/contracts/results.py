@@ -3,6 +3,10 @@
 Authoritative source: CLAUDE_ARKALI_GENESIS_V2_BUILD_PROTOCOL.md (Honest states)
 and ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md (Direct-AI benchmark
 states). The member list is fixed by the canonical set; it is not extended here.
+
+`HonestState` itself now lives in `honest_state.py` (ADR-0008 decomposition,
+the `error_base.py` -> `contract_violation_base.py` shape) and is re-exported
+here unchanged, so every existing importer of this module is untouched.
 """
 
 from __future__ import annotations
@@ -12,19 +16,12 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from arkali.kernel.contracts.honest_state import HonestState
 
-class HonestState(str, enum.Enum):
-    """The canonical honest-state taxonomy. No other verdict value is legal."""
-
-    PASS = "PASS"
-    FAIL = "FAIL"
-    BLOCKED = "BLOCKED"
-    NOT_TESTED = "NOT_TESTED"
-    NOT_CONFIGURED = "NOT_CONFIGURED"
-    UNSUPPORTED = "UNSUPPORTED"
-    NOT_APPLICABLE = "NOT_APPLICABLE"
-    EXTERNAL_UNAVAILABLE = "EXTERNAL_UNAVAILABLE"
-
+__all__ = [
+    "HonestState", "PROGRESSING_STATES", "NON_PASS_STATES", "Severity",
+    "ACCEPTANCE_STOPPING", "Finding", "CheckResult",
+]
 
 #: States that permit progression. Everything else stops it.
 PROGRESSING_STATES: Final[frozenset[HonestState]] = frozenset(
