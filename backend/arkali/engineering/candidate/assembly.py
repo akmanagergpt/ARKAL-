@@ -15,10 +15,9 @@ from typing import Annotated, Final
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from arkali.engineering.candidate.assembly_vocabulary import AssemblyVocabulary
+from arkali.engineering.candidate.content_identity import address_of, is_address
 from arkali.engineering.candidate.errors import InvalidAssemblyReportError
 from arkali.engineering.candidate.manifest import CandidateManifest
-from arkali.evidence.artifact.content_address import is_address
-from arkali.kernel.contracts.content_address import address_of
 
 ASSEMBLY_REPORT_VERSION: Final[str] = "1.0.0"
 Declared = Annotated[str, Field(min_length=1)]
