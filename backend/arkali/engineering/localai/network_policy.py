@@ -2,16 +2,29 @@
 
 Owner: engineering.localai.
 
-UNDER LOCAL-ONLY, LOCAL AI MUST REMAIN AVAILABLE AND NEVER REACH THE NETWORK.
-MS §Local-Only mode: "Local AI, local execution and all local capabilities
-remain available" while "the Policy Decision Point returns DENY for all
-outbound network egress from every trust tier". Every adapter call this
-context makes targets loopback by construction (`ollama_adapter.py`,
-`openai_compatible_adapter.py` both refuse a non-loopback endpoint at
-construction), so the real PDP's `NETWORK_EXTERNAL` `LOOPBACK_ONLY`/Local-Only
-rule can only ever see `target_is_loopback=True` here - proving the negative
-control structurally rather than merely by policy: this context never
-constructs an adapter capable of asking the PDP to permit a non-loopback call.
+WHY LOCAL AI'S OWN TRAFFIC IS NEVER ROUTED THROUGH THIS MODULE. MS
+§Local-Only mode is two separate guarantees: outbound network egress is DENY
+"from every trust tier" (`NETWORK_EXTERNAL`'s canonical fixed rule is
+unconditional DENY-in-Local-Only - real, measured directly: the PDP denies
+`NETWORK_EXTERNAL` even for a loopback target once `local_only=True`, because
+that class exists to gate traffic that LEAVES the host, not to award loopback
+an exemption), while separately "Local AI, local execution and all local
+capabilities remain available" and "loopback remains permitted". The
+canonical resolution is structural, not a policy exemption: `ollama_adapter.py`
+and `openai_compatible_adapter.py` both refuse a non-loopback endpoint at
+CONSTRUCTION (`errors.LocalRuntimeTargetNotLoopbackError`) and import nothing
+from `control.policy` - their real HTTP calls are never classified as
+`NETWORK_EXTERNAL` at all, so Local-Only mode cannot deny what it is never
+asked to permit. That is what "remains available" means here: independence
+from the policy state, not a carved-out AUTO.
+
+WHAT `gate_local_call` ACTUALLY PROVES. The negative control: if a caller
+somehow held a non-loopback endpoint, classifying it as `NETWORK_EXTERNAL` and
+asking the real PDP proves the honest, unweakened decision the canonical
+matrix specifies (`ASK_USER` outside Local-Only, `DENY` inside) - this
+context's own adapters never construct such a target, so this function exists
+to prove the negative control holds even if one were attempted, never to gate
+a genuine loopback call.
 
 STRUCTURAL PROTOCOL, NOT AN IMPORT. `PolicyDecisionSource` mirrors
 `control.policy.pdp.PolicyDecisionPoint.decide_network_egress` exactly, the

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import platform
 
-from arkali.engineering.localai.adapter import HonestState, RuntimeProbeResult
+from arkali.engineering.localai.adapter import (
+    HonestState,
+    InferenceResult,
+    LocalModelDescriptor,
+    RuntimeProbeResult,
+)
 from arkali.engineering.localai.host_probe import (
     HostFacts,
     probe_accelerator,
@@ -15,7 +20,7 @@ from arkali.engineering.localai.host_probe import (
 )
 
 
-class _FakeAdapter:
+class _DoubleAdapter:
     """A composition-root double, not a production adapter."""
 
     def __init__(self, state: HonestState) -> None:
@@ -23,16 +28,21 @@ class _FakeAdapter:
 
     @property
     def runtime(self) -> str:
-        return "fake"
+        return "double"
 
     def probe(self) -> RuntimeProbeResult:
-        return RuntimeProbeResult(runtime="fake", state=self._state, detail="test")
+        return RuntimeProbeResult(runtime="double", state=self._state, detail="test")
 
-    def list_models(self) -> tuple:
+    def list_models(self) -> tuple[LocalModelDescriptor, ...]:
         return ()
 
-    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0):
-        raise NotImplementedError
+    def infer(
+        self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0
+    ) -> InferenceResult:
+        return InferenceResult(
+            runtime="double", model_id=model_id, state=HonestState.NOT_TESTED,
+            detail="not exercised by this double",
+        )
 
 
 class TestHostFactsAreReallyProbed:
@@ -58,14 +68,14 @@ class TestHostFactsAreReallyProbed:
 
 class TestRuntimeProbeIsGenuinelyAsked:
     def test_a_passing_adapter_makes_the_runtime_available(self) -> None:
-        assert probe_local_ai_runtime(_FakeAdapter(HonestState.PASS)) is True
+        assert probe_local_ai_runtime(_DoubleAdapter(HonestState.PASS)) is True
 
     def test_a_not_configured_adapter_makes_the_runtime_unavailable(self) -> None:
-        assert probe_local_ai_runtime(_FakeAdapter(HonestState.NOT_CONFIGURED)) is False
+        assert probe_local_ai_runtime(_DoubleAdapter(HonestState.NOT_CONFIGURED)) is False
 
     def test_an_external_unavailable_adapter_is_not_upgraded_to_available(self) -> None:
         assert probe_local_ai_runtime(
-            _FakeAdapter(HonestState.EXTERNAL_UNAVAILABLE)
+            _DoubleAdapter(HonestState.EXTERNAL_UNAVAILABLE)
         ) is False
 
 
