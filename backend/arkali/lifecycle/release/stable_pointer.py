@@ -32,6 +32,12 @@ HISTORY IS APPEND-ONLY AND NEVER REWRITTEN. `promote` always carries the
 prior current revision forward into `history`; nothing here can remove or
 edit an existing entry. A tampered or truncated pointer file is refused on
 read (recomputed against its own declared count), never silently repaired.
+
+`ArkaliError` COMES FROM `error_root`, NOT `error_base`. `error_base.py`'s own
+docstring asks a new consumer needing only `ArkaliError` to import
+`error_root` directly rather than add to its own fan-in - found as a real,
+measured `max_fan_in_per_module` violation (`error_base.py` was already at
+15 of 15) by running the gate, not assumed.
 """
 
 from __future__ import annotations
@@ -46,7 +52,7 @@ from typing import Final
 from pydantic import BaseModel, ConfigDict, Field
 
 from arkali.kernel.contracts.content_address import is_address
-from arkali.kernel.contracts.error_base import ArkaliError
+from arkali.kernel.contracts.error_root import ArkaliError
 from arkali.lifecycle.release.stable_path import StableCandidatePath, StageReceipt
 
 POINTER_VERSION: Final[str] = "1.0.0"

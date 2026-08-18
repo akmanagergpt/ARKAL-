@@ -28,12 +28,14 @@ from arkali.kernel.persistence.migrations import ALEMBIC_INI
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 from arkali.lifecycle.recovery.recovery_supervisor import (
     ACTOR,
+    TRUST_TIER,
     HealthCheckResult,
     RecoverySupervisor,
     RecoverySupervisorError,
 )
 from arkali.lifecycle.release.stable_path import StableCandidatePath, StageReceipt
 from arkali.lifecycle.release.stable_pointer import StableRevisionPointer
+from tests.persistence.conftest import AuditChainEvidenceSink, PepRollbackAuthorization
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BACKEND = REPO / "backend"
@@ -96,15 +98,24 @@ def _promotion_receipt(path: StableCandidatePath, candidate_id: str) -> StageRec
     return path.promotion_receipt(receipt)
 
 
+def _supervisor(
+    session: object, pep: PolicyEnforcementPoint,
+    pointer: StableRevisionPointer, blobs: ArtifactBlobStore,
+) -> RecoverySupervisor:
+    return RecoverySupervisor(
+        PepRollbackAuthorization(pep, actor=ACTOR, trust_tier=TRUST_TIER),
+        pointer, ArtifactStore(session, blobs),  # type: ignore[arg-type]
+        AuditChainEvidenceSink(AuditChain(session, pep, REPO)),  # type: ignore[arg-type]
+    )
+
+
 class TestHealthyCandidateRefusal:
     def test_rollback_is_refused_for_a_reported_healthy_candidate(
         self, engine: Engine, pep: PolicyEnforcementPoint,
         pointer: StableRevisionPointer, blobs: ArtifactBlobStore,
     ) -> None:
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             with pytest.raises(RecoverySupervisorError):
                 supervisor.rollback(
                     health=HealthCheckResult(
@@ -123,10 +134,7 @@ class TestUnverifiedTargetRefusal:
         PDP itself (not a convention) refuses this rollback."""
         with pytest.raises(PolicyDenied):
             with unit_of_work(create_session_factory(engine)) as session:
-                supervisor = RecoverySupervisor(
-                    pep, pointer, ArtifactStore(session, blobs),
-                    AuditChain(session, pep, REPO),
-                )
+                supervisor = _supervisor(session, pep, pointer, blobs)
                 supervisor.rollback(
                     health=HealthCheckResult(
                         candidate_id="cand-2", healthy=False, detail="startup crash"
@@ -148,9 +156,7 @@ class TestGenuineRollback:
             _promotion_receipt(path, "cand-2"), revision_id=REV_B, candidate_id="cand-2"
         )
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             record = supervisor.rollback(
                 health=HealthCheckResult(
                     candidate_id="cand-2", healthy=False, detail="startup crash"
@@ -171,9 +177,7 @@ class TestGenuineRollback:
             _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
         )
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             supervisor.rollback(
                 health=HealthCheckResult(
                     candidate_id="cand-1", healthy=False, detail="crash loop"
@@ -198,9 +202,7 @@ class TestGenuineRollback:
             _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
         )
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             assert supervisor.is_verified() is False
             supervisor.rollback(
                 health=HealthCheckResult(
@@ -218,10 +220,7 @@ class TestGenuineRollback:
         for _ in range(2):
             with pytest.raises(PolicyDenied):
                 with unit_of_work(create_session_factory(engine)) as session:
-                    supervisor = RecoverySupervisor(
-                        pep, pointer, ArtifactStore(session, blobs),
-                        AuditChain(session, pep, REPO),
-                    )
+                    supervisor = _supervisor(session, pep, pointer, blobs)
                     supervisor.rollback(
                         health=HealthCheckResult(
                             candidate_id="cand-x", healthy=False, detail="crash"

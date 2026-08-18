@@ -31,9 +31,15 @@ from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_u
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 from arkali.lifecycle.evolution.core_upgrade_state_machine import build as build_core_upgrade
-from arkali.lifecycle.recovery.recovery_supervisor import HealthCheckResult, RecoverySupervisor
+from arkali.lifecycle.recovery.recovery_supervisor import (
+    ACTOR,
+    TRUST_TIER,
+    HealthCheckResult,
+    RecoverySupervisor,
+)
 from arkali.lifecycle.release.stable_path import StableCandidatePath, StageReceipt
 from arkali.lifecycle.release.stable_pointer import StableRevisionPointer
+from tests.persistence.conftest import AuditChainEvidenceSink, PepRollbackAuthorization
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BACKEND = REPO / "backend"
@@ -95,15 +101,24 @@ def _promotion_receipt(path: StableCandidatePath, candidate_id: str) -> StageRec
     return path.promotion_receipt(receipt)
 
 
+def _supervisor(
+    session: object, pep: PolicyEnforcementPoint,
+    pointer: StableRevisionPointer, blobs: ArtifactBlobStore,
+) -> RecoverySupervisor:
+    return RecoverySupervisor(
+        PepRollbackAuthorization(pep, actor=ACTOR, trust_tier=TRUST_TIER),
+        pointer, ArtifactStore(session, blobs),  # type: ignore[arg-type]
+        AuditChainEvidenceSink(AuditChain(session, pep, REPO)),  # type: ignore[arg-type]
+    )
+
+
 class TestEntryDeniedBeforeVerification:
     def test_core_upgrade_entry_is_refused_before_any_real_rollback(
         self, engine: Engine, pep: PolicyEnforcementPoint,
         pointer: StableRevisionPointer, blobs: ArtifactBlobStore,
     ) -> None:
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             assert supervisor.is_verified() is False
 
             machine = build_core_upgrade()
@@ -124,9 +139,7 @@ class TestEntryPermittedAfterVerification:
             _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
         )
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             supervisor.rollback(
                 health=HealthCheckResult(
                     candidate_id="cand-1", healthy=False, detail="crash loop"
@@ -154,9 +167,7 @@ class TestEntryPermittedAfterVerification:
             _promotion_receipt(path, "cand-1"), revision_id=REV_A, candidate_id="cand-1"
         )
         with unit_of_work(create_session_factory(engine)) as session:
-            RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            ).rollback(
+            _supervisor(session, pep, pointer, blobs).rollback(
                 health=HealthCheckResult(
                     candidate_id="cand-1", healthy=False, detail="crash loop"
                 ),
@@ -164,10 +175,7 @@ class TestEntryPermittedAfterVerification:
             )
 
         with unit_of_work(create_session_factory(engine)) as reopened_session:
-            reopened = RecoverySupervisor(
-                pep, pointer, ArtifactStore(reopened_session, blobs),
-                AuditChain(reopened_session, pep, REPO),
-            )
+            reopened = _supervisor(reopened_session, pep, pointer, blobs)
             assert reopened.is_verified() is True
 
 

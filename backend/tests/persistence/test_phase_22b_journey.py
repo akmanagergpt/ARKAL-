@@ -29,6 +29,8 @@ from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_u
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 from arkali.lifecycle.recovery.recovery_supervisor import (
+    ACTOR,
+    TRUST_TIER,
     HealthCheckResult,
     RecoverySupervisor,
 )
@@ -37,6 +39,7 @@ from arkali.lifecycle.release.stable_pointer import (
     StablePointerError,
     StableRevisionPointer,
 )
+from tests.persistence.conftest import AuditChainEvidenceSink, PepRollbackAuthorization
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BACKEND = REPO / "backend"
@@ -107,6 +110,17 @@ def _promotion_receipt(path: StableCandidatePath, candidate_id: str) -> StageRec
     return path.promotion_receipt(receipt)
 
 
+def _supervisor(
+    session: object, pep: PolicyEnforcementPoint,
+    pointer: StableRevisionPointer, blobs: ArtifactBlobStore,
+) -> RecoverySupervisor:
+    return RecoverySupervisor(
+        PepRollbackAuthorization(pep, actor=ACTOR, trust_tier=TRUST_TIER),
+        pointer, ArtifactStore(session, blobs),  # type: ignore[arg-type]
+        AuditChainEvidenceSink(AuditChain(session, pep, REPO)),  # type: ignore[arg-type]
+    )
+
+
 class TestTheComposedVDCSequence:
     """Bad candidate -> launch -> health failure -> known-good rollback ->
     failure record -> stable available, end to end."""
@@ -135,9 +149,7 @@ class TestTheComposedVDCSequence:
         )
 
         with unit_of_work(create_session_factory(engine)) as session:
-            supervisor = RecoverySupervisor(
-                pep, pointer, ArtifactStore(session, blobs), AuditChain(session, pep, REPO)
-            )
+            supervisor = _supervisor(session, pep, pointer, blobs)
             # Known-good rollback + failure record, in one evidenced call.
             record = supervisor.rollback(health=health, target_revision_id=REV_GOOD)
 
@@ -169,10 +181,7 @@ class TestIdempotentRetry:
         )
         for _ in range(2):
             with unit_of_work(create_session_factory(engine)) as session:
-                supervisor = RecoverySupervisor(
-                    pep, pointer, ArtifactStore(session, blobs),
-                    AuditChain(session, pep, REPO),
-                )
+                supervisor = _supervisor(session, pep, pointer, blobs)
                 record = supervisor.rollback(health=health, target_revision_id=REV_GOOD)
                 assert record.to_revision_id == REV_GOOD
         assert pointer.current().revision_id == REV_GOOD  # type: ignore[union-attr]
@@ -238,7 +247,9 @@ class TestNoNovelContentNoAIInvocation:
         with unit_of_work(create_session_factory(engine)) as session:
             artifacts = ArtifactStore(session, blobs)
             supervisor = RecoverySupervisor(
-                pep, pointer, artifacts, AuditChain(session, pep, REPO)
+                PepRollbackAuthorization(pep, actor=ACTOR, trust_tier=TRUST_TIER),
+                pointer, artifacts,
+                AuditChainEvidenceSink(AuditChain(session, pep, REPO)),
             )
             record = supervisor.rollback(
                 health=HealthCheckResult(
@@ -272,10 +283,7 @@ class TestWrongCandidateAndCorruptedTargetRefusal:
     ) -> None:
         with pytest.raises(PolicyDenied):
             with unit_of_work(create_session_factory(engine)) as session:
-                RecoverySupervisor(
-                    pep, pointer, ArtifactStore(session, blobs),
-                    AuditChain(session, pep, REPO),
-                ).rollback(
+                _supervisor(session, pep, pointer, blobs).rollback(
                     health=HealthCheckResult(
                         candidate_id="cand-x", healthy=False, detail="crash"
                     ),

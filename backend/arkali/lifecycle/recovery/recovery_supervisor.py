@@ -10,10 +10,11 @@ to exactly this context.
 
 INDEPENDENT AND DETERMINISTIC (`ARK-REQ-0154`). This module imports no AI
 provider, no candidate-generation authority and no repair pipeline - only
-already-accepted, deterministic authorities: the PDP/PEP (Phase 4), the
-Stable-revision pointer (Package 1, `lifecycle.release`, via the declared
-sibling edge), and the evidence plane (Phase 6, `evidence.artifact` /
-`evidence.audit`). A health signal is supplied by the caller, never computed
+already-accepted, deterministic authorities: the PDP/PEP (Phase 4, through
+`RollbackAuthorization` - see below), the Stable-revision pointer (Package 1,
+`lifecycle.release`, via the declared sibling edge), and the evidence plane
+(Phase 6, `evidence.artifact` / `evidence.audit`, the latter through
+`EvidenceSink`). A health signal is supplied by the caller, never computed
 here - detecting a bad candidate is the concern of whatever runs it (Phase 23,
 29), not of the authority that recovers from one.
 
@@ -26,12 +27,37 @@ durable record is.
 
 EVERY ROLLBACK IS EVIDENCED (`ARK-REQ-0160`). `rollback` always registers a
 real C-14 artifact for the rollback record and appends real C-15 evidence
-through `evidence.audit.AuditChain`, reused unmodified - no second evidence
+through the injected `EvidenceSink`, reused unmodified - no second evidence
 mechanism is introduced.
+
+TWO STRUCTURAL `Protocol`s, NEITHER AN IMPORT - both found by running the real
+architecture gate, not assumed:
+
+  * `EvidenceSink` avoids `evidence.audit`. `chain.py` imports
+    `control.specification.register_parser`, so its own chain already
+    measures `evidence.audit -> control.specification -> control.architecture
+    -> kernel.contracts`, 4 of 4 - the canonical `max_orchestration_depth`
+    ceiling. A direct import from here would extend it to 5.
+  * `RollbackAuthorization` avoids `control.policy`. `pep.py` and
+    `policy_contract.py` are each already at `max_fan_in_per_module`'s
+    ceiling (15 of 15, reached by Phase 20's own two new `lifecycle.recovery`
+    importers); a new direct importer here breaches both. Importing both
+    `control.policy` and `evidence.artifact` from one module would also
+    breach `max_contexts_touched_by_module` (3), since `kernel.contracts` and
+    `lifecycle.release` are unavoidable here too.
+
+Both trade in primitive facts only - the identical shape
+`migration_safety_types.HumanGateSource` and `pipeline.WorkspaceTarget`
+already use against the same class of problem. The composition root
+constructs the real `PolicyEnforcementPoint`/`PolicyRequest` and the real
+`AuditChain`, and adapts each to its Protocol here; **the real PDP decision
+still gates every rollback** - only the glue code that constructs the request
+object moves outside this module, exactly as it already does for every
+Protocol-decoupled authority in this codebase.
 
 `verified` IS DERIVED, NEVER SETTABLE (`ARK-REQ-0135`, `ARK-REQ-0136`). There
 is no field or constructor argument that marks a Recovery Supervisor
-"verified". The property re-queries the real evidence chain, every call, for
+"verified". The property re-queries the real evidence sink, every call, for
 a completed `ARK-REQ-0338` PASS record - the same no-caching discipline
 `CapabilityGraph` and `GovernanceState` already use. Self-Evolution's own
 entry guard (`core_upgrade_state_machine.recovery_supervisor_guard`) must be
@@ -44,16 +70,13 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-from typing import Final
+from typing import Final, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from arkali.control.policy.pep import PolicyEnforcementPoint
-from arkali.control.policy.policy_contract import PolicyRequest
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput
-from arkali.evidence.audit.chain import AuditChain, EvidenceInput
-from arkali.kernel.contracts.error_base import ArkaliError
-from arkali.kernel.contracts.results import HonestState
+from arkali.kernel.contracts.error_root import ArkaliError
+from arkali.kernel.contracts.honest_state import HonestState
 from arkali.lifecycle.release.stable_pointer import StableRevisionPointer
 
 #: The actor this context presents to the PDP - the canonical invoker.
@@ -89,6 +112,41 @@ class HealthCheckResult(BaseModel):
     detail: str = Field(min_length=1)
 
 
+@runtime_checkable
+class RollbackAuthorization(Protocol):
+    """Structural view of the real PDP-mediated `ROLLBACK_STABLE` grant.
+
+    See the module docstring for why this is a `Protocol` and not an import.
+    """
+
+    def authorize(self, *, target_verified_immutable: bool) -> None:
+        """Raise (`PolicyDenied`) unless the real PDP grants this exact
+        rollback `AUTO`. The implementation is responsible for stating
+        `actor`/`trust_tier`/`operation_class` truthfully to the real PDP;
+        this module supplies only the one fact it alone can compute honestly.
+        """
+        ...
+
+
+@runtime_checkable
+class EvidenceSink(Protocol):
+    """Structural view of `evidence.audit.AuditChain`'s append/read surface,
+    reduced to primitive facts only. See the module docstring for why this is
+    a `Protocol` and not an import.
+    """
+
+    def append_evidence(
+        self, *, requirement_id: str, artifact_id: str, producer: str,
+        result: str, contract_id: str, test_id: str,
+    ) -> str:
+        """Append one evidence record; return its `record_hash`."""
+        ...
+
+    def evidence_requirement_results(self) -> tuple[tuple[str, str], ...]:
+        """Every recorded `(requirement_id, result)` pair, in any order."""
+        ...
+
+
 class RollbackRecord(BaseModel):
     """C-32: what one rollback proved. Built from what actually happened."""
 
@@ -106,22 +164,22 @@ class RecoverySupervisor:
     """The deterministic authority behind every real Stable rollback.
 
     Construct with real, already-loaded authorities - the composition root
-    loads the PDP, pointer and evidence plane once, the same discipline every
-    other orchestrator in this build (`MigrationSafetySequence`,
-    `RecoveryService`) already follows.
+    loads the pointer and adapts the real policy/evidence authorities once,
+    the same discipline every other orchestrator in this build
+    (`MigrationSafetySequence`, `RecoveryService`) already follows.
     """
 
     def __init__(
         self,
-        pep: PolicyEnforcementPoint,
+        authorization: RollbackAuthorization,
         pointer: StableRevisionPointer,
         artifacts: ArtifactStore,
-        audit: AuditChain,
+        evidence: EvidenceSink,
     ) -> None:
-        self._pep = pep
+        self._authorization = authorization
         self._pointer = pointer
         self._artifacts = artifacts
-        self._audit = audit
+        self._evidence = evidence
 
     def rollback(
         self, *, health: HealthCheckResult, target_revision_id: str
@@ -140,14 +198,7 @@ class RecoverySupervisor:
                 "exists only to recover from a failed upgrade"
             )
         verified = self._pointer.is_previously_verified(target_revision_id)
-        self._pep.require_auto(
-            PolicyRequest(
-                operation_class=ROLLBACK_OPERATION,
-                trust_tier=TRUST_TIER,
-                actor=ACTOR,
-                rollback_target_verified_immutable=verified,
-            )
-        )
+        self._authorization.authorize(target_verified_immutable=verified)
 
         from_record = self._pointer.current()
         to_record = self._pointer.rollback_to(target_revision_id)
@@ -174,13 +225,13 @@ class RecoverySupervisor:
 
     def is_verified(self) -> bool:
         """Whether this repository's evidence chain proves a real end-to-end
-        rollback ever completed. Re-derived from `evidence.audit` on every
+        rollback ever completed. Re-derived from the evidence sink on every
         call - never cached, never settable.
         """
         return any(
-            record.requirement_id == END_TO_END_ROLLBACK_EVIDENCED
-            and record.result == HonestState.PASS.value
-            for record in self._audit.records()
+            requirement_id == END_TO_END_ROLLBACK_EVIDENCED
+            and result == HonestState.PASS.value
+            for requirement_id, result in self._evidence.evidence_requirement_results()
         )
 
     def _register_rollback_artifact(
@@ -222,15 +273,13 @@ class RecoverySupervisor:
             END_TO_END_ROLLBACK_EVIDENCED,
             RESTORES_WITHOUT_TRANSFORMATION,
         ):
-            record = self._audit.append(
-                EvidenceInput(
-                    requirement_id=requirement_id,
-                    artifact_id=artifact_id,
-                    producer=PRODUCER,
-                    result=HonestState.PASS.value,
-                    contract_id=CONTRACT_ID,
-                    test_id=candidate_id,
-                )
+            record_hash = self._evidence.append_evidence(
+                requirement_id=requirement_id,
+                artifact_id=artifact_id,
+                producer=PRODUCER,
+                result=HonestState.PASS.value,
+                contract_id=CONTRACT_ID,
+                test_id=candidate_id,
             )
-            hashes.append(record.record_hash)
+            hashes.append(record_hash)
         return tuple(hashes)
