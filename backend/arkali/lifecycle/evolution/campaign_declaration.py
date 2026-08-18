@@ -22,7 +22,7 @@ from typing import Annotated, Final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from arkali.kernel.contracts.content_address import address_of
+from arkali.lifecycle.evolution.content_identity import address_of
 
 CONTRACT_VERSION: Final[str] = "1.0.0"
 Declared = Annotated[str, Field(min_length=1)]
