@@ -35,8 +35,9 @@ def descriptor(
 
 class TestEstimation:
     def test_a_known_quantization_yields_a_positive_estimate(self) -> None:
-        assert estimate_memory_bytes(descriptor()) is not None
-        assert estimate_memory_bytes(descriptor()) > 0
+        estimate = estimate_memory_bytes(descriptor())
+        assert estimate is not None
+        assert estimate > 0
 
     def test_an_unknown_quantization_is_not_estimated(self) -> None:
         assert estimate_memory_bytes(descriptor(quantization="MYSTERY")) is None
