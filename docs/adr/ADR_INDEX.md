@@ -18,6 +18,7 @@ All nine Phase 0 ADRs were transitioned PROPOSED → ACCEPTED by the human accep
 | ADR-0007 | Durable runtime without a mandatory Temporal dependency | ACCEPTED | ARK-REQ-0059, 0061 |
 | ADR-0008 | Numeric architecture budgets and GATE 8 exception path | ACCEPTED | ARK-REQ-0030, 0031, 0032 |
 | ADR-0009 | Promotion and rollback as separate lifecycle authorities | ACCEPTED | ARK-REQ-0023, 0155, 0156 |
+| ADR-0010 | HUMAN_GATE_3 default-approval-gated policy for child-product promotion | PROPOSED | ARK-REQ-0132, 0133, 0358 |
 
 ---
 
@@ -65,3 +66,8 @@ All nine Phase 0 ADRs were transitioned PROPOSED → ACCEPTED by the human accep
 **Context.** If one component both promotes and rolls back, a failed promotion could approve its own recovery.
 **Decision.** `lifecycle.release` owns promotion; `lifecycle.recovery` owns rollback. `ROLLBACK_STABLE` is invocable only by the Recovery Supervisor, targets only a previously verified immutable revision, performs no transformation, and emits evidence.
 **Consequences.** Two authorities, one direction of trust. Recovery Supervisor must be verified (Phase 22B) before Self-Evolution (Phase 23) is permitted.
+
+## ADR-0010 — HUMAN_GATE_3 default-approval-gated policy for child-product promotion
+**Context.** `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 24 and `ARCHITECTURE.md:153` both gate Phase 24's promotion path with "GATE 3 when/where approval-gated" — explicitly conditional, unlike GATE 2's unconditional "always" (`ARCHITECTURE.md:154`) for Stable Core promotion. No canonical document (MS, VDC, BUILD_PROTOCOL, `ARCHITECTURE.md`, `AUTHORITY_MAP.yaml`) defines the mechanical condition that marks a specific generated-product promotion as "approval-gated" versus not — confirmed by two independent searches (Phase 24 Discovery Report research and a fresh re-search immediately before this ADR, both returning the identical single mention with no elaboration). This is a genuine canonical silence, not an oversight in this search.
+**Decision.** Every child-product promotion is treated as approval-gated by default: `HUMAN_GATE_3` is required for every real `PROMOTE_CHILD_PRODUCT`-class operation, with no code path that treats any candidate as exempt. This mirrors GATE 2's own "always" precedent for the structurally closest concern (Candidate→Stable promotion) and this repository's consistent fail-closed posture elsewhere (PDP deny-by-default, Recovery Supervisor deny-by-default, `SINGLETON_GATES` as a narrow, canon-cited carve-out rather than a general mechanism). The grant is scoped to the exact candidate/operation identity at call time — the identical `RUNTIME_OPERATION`-scope shape `HUMAN_GATE_2`/`CORE_PROMOTION` already established (`human_gate_authorization._OperationGateGrant`), reused unmodified, not a new grant mechanism.
+**Consequences.** No child-product promotion can ever bypass human review under the current canonical text, even though the matrix's own wording contemplates a future non-approval-gated case. If a later canonical ruling defines an explicit exemption condition, that ruling supersedes this ADR (a new ADR, not an edit in place) rather than an implementing session inventing the exemption logic itself. Not Protected Core: `lifecycle.evolution` is `protected_core: false` (`AUTHORITY_MAP.yaml`), so this ADR does not require HUMAN GATE 2 to accept or, later, to supersede.
