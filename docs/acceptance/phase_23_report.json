@@ -1,0 +1,111 @@
+{
+  "phase_id": "23",
+  "objective": "Self-Evolution: the governed mechanism by which ARKALI may propose, build, verify and promote a candidate improvement to its own Stable core, without ever mutating it directly. Discharges all 9 MANDATORY register requirements: the campaign declaration and its six MS-named budgets before execution (ARK-REQ-0139), the campaign ledger's successor-eligibility and honest terminal-state derivation across the four canonical states (ARK-REQ-0140, ARK-REQ-0141), the structural impossibility of restarting a terminal campaign (ARK-REQ-0142), a real restorable snapshot recorded and proved before every core-upgrade candidate (ARK-REQ-0137), a real scoped HUMAN_GATE_2 grant gating every core promotion (ARK-REQ-0138), the composed pipeline reaching a genuine StableRevisionPointer.promote with live core never directly rewritten (ARK-REQ-0134), the structural proof that no uncontrolled mutation path exists (ARK-REQ-0359), and the acceptance-engine shape check refusing an evolution run's outcome without a bounded campaign record (ARK-REQ-0360). No live self-evolution campaign is run against ARKALI's own source; no Product Evolution SDK (Phase 24), Golden Factory/Repair, or production surface is built.",
+  "ark_req_ids_closed": [
+    "ARK-REQ-0134", "ARK-REQ-0137", "ARK-REQ-0138", "ARK-REQ-0139",
+    "ARK-REQ-0140", "ARK-REQ-0141", "ARK-REQ-0142", "ARK-REQ-0359", "ARK-REQ-0360"
+  ],
+  "files_created": [
+    "backend/arkali/lifecycle/evolution/campaign_declaration.py",
+    "backend/arkali/lifecycle/evolution/campaign_ledger.py",
+    "backend/arkali/lifecycle/evolution/errors.py",
+    "backend/arkali/lifecycle/evolution/content_identity.py",
+    "backend/arkali/lifecycle/evolution/core_upgrade_orchestrator.py",
+    "backend/arkali/lifecycle/evolution/core_promotion.py",
+    "backend/arkali/lifecycle/recovery/core_snapshot.py",
+    "backend/arkali/acceptance/campaign_record_shape.py",
+    "backend/arkali/engineering/candidate/content_identity.py",
+    "backend/tests/lifecycle/__init__.py",
+    "backend/tests/lifecycle/test_evolution_campaign_declaration.py",
+    "backend/tests/lifecycle/test_evolution_campaign_ledger.py",
+    "backend/tests/lifecycle/test_core_upgrade_orchestrator.py",
+    "backend/tests/lifecycle/test_core_promotion_gate_scope.py",
+    "backend/tests/persistence/test_core_snapshot.py",
+    "backend/tests/persistence/test_core_promotion.py",
+    "backend/tests/persistence/test_phase_23_journey.py",
+    "backend/tests/structural/test_self_evolution_no_direct_mutation.py",
+    "backend/tests/acceptance/test_campaign_record_shape.py",
+    "docs/contracts/campaign.md",
+    "docs/acceptance/phase_23_traceability.json",
+    "docs/acceptance/phase_23_report.json"
+  ],
+  "files_modified": [
+    "backend/arkali/engineering/candidate/assembly.py",
+    "backend/arkali/engineering/candidate/manifest.py",
+    "backend/arkali/lifecycle/evolution/core_upgrade_state_machine.py",
+    "docs/build/BUILD_STATE.md"
+  ],
+  "public_contracts": ["C-33"],
+  "migrations": [],
+  "state_machine_capability_changes": "No state machine was added; STATE_MACHINES.md still declares exactly 12. lifecycle.evolution/core_upgrade_state_machine.py's pre-existing gate_2_guard and evolution_campaign_state_machine.py's pre-existing declaration_guard (both declared since the twelve machines were first built) are unchanged in their own definitions - this phase supplies the first real, non-fabricable sources for the context keys they already read (a scoped HUMAN_GATE_2 grant lookup; a real CampaignDeclaration's guard_context()). One import-only edit to core_upgrade_state_machine.py (StateMachineInstance added to its existing kernel.contracts.state_machine import, an ADR-0008 fan-in decomposition - see architecture_checks) touches no state, transition or guard.",
+  "tests_executed": [
+    {
+      "command": "python -m pytest tests/lifecycle/ tests/structural/test_self_evolution_no_direct_mutation.py tests/persistence/test_core_snapshot.py tests/persistence/test_core_promotion.py tests/persistence/test_phase_23_journey.py tests/acceptance/test_campaign_record_shape.py -q (backend/)",
+      "exit_code": 0, "passed": 73, "failed": 0,
+      "summary": "The complete Phase 23 unit, structural, security-composition and journey evidence for all 9 register requirements: campaign declaration/guard composition (16 tests), campaign ledger successor-eligibility/terminal-state/no-restart (16 tests), core-upgrade orchestrator snapshot-entry and gate-2-guard composition (8 tests), CORE_PROMOTION/HUMAN_GATE_2 grant-scope composition against a real temporary HUMAN_GATE_RECORDS.md (5 tests), the real restorable-snapshot mechanism against real SQLite/PDP/ArtifactStore (6 tests), the real composed promotion sequencing two independent refusals (4 tests), the structural no-direct-mutation/no-shadow-router scan (10 tests), the campaign-record shape check including reconciliation against the real authorities (11 tests), and the composed VDC Self-Evolution journey reaching both a real promotion and a real no-further-gain terminal state (2 tests).",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python -m pytest tests/security -q (backend/)",
+      "exit_code": 0, "passed": 254, "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - security review. 254 passed, exit 0. No PDP rule, operation class, or fixed grant was changed by this phase (CORE_PROMOTION is a human-gate table scoping key, not a PDP operation class); WRITE_STABLE_FILE and ROLLBACK_STABLE remain exactly as Phase 22B left them.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python -m pytest tests/structural tests/governance -q --ignore=tests/governance/test_local_automation.py (backend/)",
+      "exit_code": 0, "passed": 807, "failed": 0,
+      "summary": "PROTECTED CORE PROFILE - adversarial review and governance regression. An unfiltered run reproduces exactly 3 failures at exit 1: the same self-correcting handoff-architecture-drift family every prior candidate since Phase 19 has recorded (test_a_stale_edge_count_is_detected, test_a_removed_edge_count_is_detected, test_live_handoff_has_no_governance_drift) - correctly detecting this candidate's real, honest edge-count change (197 -> 202) not yet reflected in ARKALI_HANDOFF.md's prose, resolved by the handoff-refresh commit that follows this candidate per the established Sec 12 rule. This deselected run: 807 passed, 3 deselected, exit 0. test_local_automation.py is excluded: it imports fcntl (POSIX-only), a pre-existing environment limitation on this host, unrelated to this phase (same class Phase 22B's own report recorded).",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python -m pytest . -q --ignore=tests/governance/test_local_automation.py (backend/)",
+      "exit_code": 0, "passed": 3078, "failed": 0,
+      "summary": "FULL REGRESSION. An unfiltered run reproduces exactly 4 failures at exit 1: the same 3 self-correcting handoff-architecture-drift controls above, plus tests/engineering/test_candidate_workspace_manifest.py::TestIsolatedWorkspace::test_a_symlink_cannot_turn_a_confined_path_into_an_escape - reproduced identically on the untouched pre-candidate tree (git stash), confirming this is a pre-existing Windows-sandbox symlink-privilege gap (WinError 1314, no elevated privilege/Developer Mode in this environment), not a regression this phase introduced and not this phase's to fix - this candidate did not create the test or the symlink call, and the same class of pre-existing environment gap (WSL RAM-probe) is already recorded in Phase 22B's own report. This deselected run: 3078 passed (up from 3000 before this phase), 13 skipped (documented PostgreSQL-driver-absent and ProviderHealth-forbidden-pair/terminal-state NOT_CONFIGURED reasons, none related to this phase), 4 deselected (3 handoff-drift + 1 symlink, both explained above), exit 0.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python scripts/check_repository_structure.py",
+      "exit_code": 0, "passed": 12, "failed": 0,
+      "summary": "12/12 repository structure checks passed.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python scripts/check_repository_structure_negative.py",
+      "exit_code": 0, "passed": 27, "failed": 0,
+      "summary": "Negative control passed: illegal ownership, keywords, moves, renames and untracked violations were detected; canonical files restored unchanged.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python scripts/check_phase_graph.py",
+      "exit_code": 0, "passed": 10, "failed": 0,
+      "summary": "10/10 phase graph checks passed over 41 phases and 92 derived edges. This candidate touches no canonical document except BUILD_STATE.md's Phase 23 status row, so the graph is unchanged from Phase 22B's own acceptance.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python scripts/check_phase_graph_negative.py",
+      "exit_code": 0, "passed": 7, "failed": 0,
+      "summary": "Negative control passed: the injected 22B/26 deadlock was refused by three independent checks and the repository matrix remained unmodified.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    },
+    {
+      "command": "python scripts/check_phase0_deliverables.py",
+      "exit_code": 0, "passed": 27, "failed": 0,
+      "summary": "Phase 0A 16/16 and Phase 0B 11/11 deliverables passed, derived from canonical protocol lists.",
+      "external_result": "NO_EXTERNAL_RESULT"
+    }
+  ],
+  "architecture_checks": "8 of 8 architecture gates PASS over 202 real cross-context edges (up from 197 at Phase 22B's own acceptance - 5 new declared/undeclared edges this phase's own composition needs: lifecycle.evolution -> lifecycle.release [already declared, now exercised a second way], plus the Protocol-decoupled reaches into lifecycle.recovery and acceptance.engine, plus engineering.candidate's own consolidated content_identity edge) with all 9 numeric budgets evaluated under measurement contract 1.0.0, zero violations. max_orchestration_depth remains 4 of 4 on acceptance.engine -> control.specification -> control.architecture -> kernel.contracts, unchanged by this phase. Two real, measured fan-in violations were found by running the gate, not assumed, and repaired by decomposition (ADR-0008), not exception: kernel.contracts.content_address reached 16 of 15 twice over (once when campaign_declaration.py needed it, again when campaign_ledger.py separately needed it, and once more when engineering.candidate's own pre-existing two-file duplication combined with this phase's new need) - resolved by introducing one shared content_identity.py re-export per context (lifecycle.evolution, engineering.candidate) rather than each new/existing module holding its own direct edge; kernel.contracts.state_machine reached 16 of 15 when core_upgrade_orchestrator.py needed StateMachineInstance as a third lifecycle.evolution importer - resolved by routing it through core_upgrade_state_machine.py's already-existing kernel import instead of a new direct edge. A third violation, acceptance.engine's public-surface budget (40 of 40, already at ceiling), was found when campaign_record_shape.py added one new public function - resolved by keeping the function private, since no live campaign-acceptance caller exists yet to justify the surface (checker.py gains a public caller for it the day one does, not before). No exception was requested for any of the three; all fixed by real decomposition or scope discipline.",
+  "duplicate_shadow_check": "duplicate_canonical_authority PASS and shadow_registry PASS. Phase 23 introduces no shadow copy of control.policy's PDP/PEP/operation-class vocabulary, acceptance.engine's scoped human-gate grant mechanism, lifecycle.release's StableRevisionPointer.promote (the campaign_record_shape.py module restates the six budget names and four terminal states as plain strings only because acceptance.engine cannot import lifecycle.evolution at all - a layer-direction fact, not a duplicated authority - and a dedicated reconciliation test proves the restatement is never allowed to silently diverge from the real one), engineering.repair's C-26 anti-loop ledger (CampaignLedger mirrors its structural shape but is a distinct C-33 record with a distinct owner and distinct six budgets), or a thirteenth state machine. No duplicate release/lifecycle authority: promotion remains solely lifecycle.release, rollback remains solely lifecycle.recovery (scripts/check_phase_graph.py check 9, unchanged).",
+  "security_findings": "PROTECTED CORE PROFILE (acceptance.engine touched via campaign_record_shape.py, confirmed directly against AUTHORITY_MAP.yaml's protected_core flag - lifecycle.evolution and lifecycle.recovery's core_snapshot.py are not Protected Core themselves, but compose Protected Core lifecycle.release/lifecycle.recovery authorities through declared edges or Protocols): security review 254 passed exit 0, adversarial review 807 passed (3 deselected, explained in tests_executed) exit 0, full regression 3078 passed (4 deselected, explained in tests_executed) exit 0, all real zero-exit executions. The self-approval boundary was proven from every angle CORE_PROMOTION/HUMAN_GATE_2 can be probed from: no grant at all is refused, an exact real grant is honoured, a barred automated actor's self-issued GRANTED row is refused (the same forbidden-issuer check every other scoped gate already uses), a grant for a different candidate manifest does not leak, and a grant for a different gate does not satisfy HUMAN_GATE_2 - none of these five controls required a second implementation of scope-checking; all compose the already-proven acceptance.engine mechanism. Direct-mutation resistance was proven structurally, not merely asserted: an AST scan of every lifecycle.evolution module confirms only core_promotion.py can ever call StableRevisionPointer.promote or .rollback_to, core_promotion.py itself never calls .rollback_to, and no module performs file/process I/O of its own. check_repository_structure.py check 11 (Stable-mutation write capability confined to its owning context/module) passes unchanged. A real ordering defect was found by testing, not assumed: the composed promotion sequence originally applied the CoreUpgrade state transition before validating the promotion receipt, which would have let a stale/incomplete receipt leave the instance claiming PROMOTED while Stable was never written - reordered so the receipt is validated first and nothing mutates until both independent refusals have had their chance to fire. GovernanceState reports 0 open BLOCKER/HIGH.",
+  "fake_success_scan": "No context key this phase's guards depend on can be satisfied by a caller-asserted boolean alone reaching production: recovery_supervisor_verified (Package 3/22B) and human_gate_2_recorded (Package 4) are both populated exclusively by real orchestrator functions (begin_core_upgrade, authorize_promotion) that call real, already-proven authorities (RestorableSnapshotProof over take_core_snapshot, HumanGate2Source over GovernanceState.operation_grant) - the kernel guard itself stays generic by design (it cannot know this context's vocabulary without duplicating it), and the composed VDC journey proves both real sources end to end rather than asserting the fact. take_core_snapshot refuses (SnapshotNotRestorableError) rather than trusts a registered artifact until it is read back and re-verified - proven with a test double whose verify() always reports false, showing the refusal fires before content_of is ever called. CampaignLedger.record refuses an attempt outright once may_generate_successor() is false, and terminal_state() refuses to answer at all while the campaign may still continue - there is no path to a terminal verdict that skips checking whether the campaign has actually exhausted its declared bound. The campaign-record shape check accepts only a record carrying exactly the six canonical budget names and a genuine terminal state; a fabricated seventh budget or an invented terminal-state string is refused, proven directly.",
+  "evidence_created": [
+    "backend/tests/persistence/test_phase_23_journey.py - composed VDC Self-Evolution journey: a real prior rollback verifies the Recovery Supervisor, a real snapshot precedes a real candidate build, promotion is refused without a grant and succeeds with one, and a separate campaign is driven to a real COMPLETE_WITH_NO_FURTHER_MEASURED_GAIN terminal state having never touched Stable",
+    "backend/tests/lifecycle/*.py, backend/tests/persistence/test_core_snapshot.py, test_core_promotion.py, backend/tests/structural/test_self_evolution_no_direct_mutation.py, backend/tests/acceptance/test_campaign_record_shape.py - unit, property-shaped, structural and composition evidence for every Phase 23 module",
+    "docs/contracts/campaign.md - the derived C-33 contract document",
+    "docs/acceptance/phase_23_traceability.json - 9 SATISFIED claims against the derived MANDATORY denominator, reconciled against the register with zero violations (reconcile_discharge)"
+  ],
+  "limitations": "No live self-evolution campaign is run, claimed or scaffolded against ARKALI's own source - this phase builds and evidences the governed mechanism only; an actual improvement cycle is not this phase's scope. No candidate-generation, repair-delegation, or AI-routing decision exists in shipped code (D-026's select_execution_tier is composed by contract, not called, since no candidate-generation step exists yet to call it). No Product Evolution SDK (Phase 24), Golden Factory or Golden Repair capability is built. No production surface exposes any Phase-23 module anywhere - every one is a library composition, exercised only through tests, matching every other Phase-23-adjacent authority's own scope boundary. CampaignLedger's regression_ceiling and cost_budget accept zero as a valid ceiling (a campaign that permits no regression or no cost at all is expressible and legal); this is deliberate, not a gap - MS states the budgets are declared by the campaign, not bounded away from zero by this mechanism. This phase's own acceptance requires a fresh HUMAN_GATE_2 grant scoped to (phase_id=23, this report's own evidence digest) per the matrix's GATE 2 column - no such grant exists yet, confirmed directly against the live, unmodified HUMAN_GATE_RECORDS.md, so the expected machine verdict is AWAITING_HUMAN_GATE, not PHASE_ACCEPTED_BY_MACHINE (see blockers and next_exact_action). mypy/ruff findings in files this phase did not touch are unchanged from Phase 22B's own recorded baseline (not re-verified in this report since none of this phase's own new or modified files were re-checked against a fresh baseline run).",
+  "blockers": "Matrix Gate column for Phase 23 is GATE 2 (HUMAN_GATE_2, \"ARKALI Stable Core promotion\") - confirmed directly against IMPLEMENTATION_DEPENDENCY_MATRIX.md row 23 and AUTHORITY_MAP.yaml's human_gates block. No HGR record of any kind exists for HUMAN_GATE_2 in the live, unmodified HUMAN_GATE_RECORDS.md (confirmed directly; its own \"Outstanding gates\" table lists the gate 'not reached'). This phase's own machine verdict therefore requires a human-issued _PhaseGateGrant(HUMAN_GATE_2, phase_id=\"23\", evidence_digest=<this report's digest>) that does not yet exist - the same shape Phase 19/GATE 4 (HGR-002) and Phase 20/GATE 6 (HGR-003) each needed for their own acceptance. Phases 13, 16 and 22B (this phase's prerequisites) are all MACHINE-ACCEPTED. No BLOCKER/HIGH finding is open (GovernanceState.open_stopping_findings is empty, confirmed directly). This is the first Phase 23 submission, so no re-scoring authority is applicable.",
+  "next_exact_action": "Run python scripts/run_phase_gate.py 23 24 to obtain the machine verdict, expected AWAITING_HUMAN_GATE per the blockers field above. A human authority must record a _PhaseGateGrant for HUMAN_GATE_2 scoped to phase_id=\"23\" and this report's evidence digest in docs/acceptance/HUMAN_GATE_RECORDS.md before Phase 23 can be MACHINE-ACCEPTED and Phase 24 (Generated Product Evolution SDK) unlocked. No implementing actor may record that grant.",
+  "status": "PASS"
+}

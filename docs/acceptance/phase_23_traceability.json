@@ -1,0 +1,60 @@
+{
+  "phase_id": "23",
+  "note": "Derived from RequirementRegister.for_phase(\"23\"): exactly ARK-REQ-0134, 0137-0142, 0359, 0360 (9 entries, all MANDATORY), owned by lifecycle.evolution, lifecycle.recovery, control.policy and acceptance.engine. Matrix Gate column is GATE 2 for Phase 23's own acceptance (see phase_23_report.json's blockers field). Prerequisites (Phases 13, 16, 22B) were all MACHINE-ACCEPTED before this candidate began.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0134",
+      "state": "SATISFIED",
+      "implementation": "The self-evolution pipeline is followed end to end through real composition: begin_core_upgrade (real restorable snapshot) -> recovery_supervisor_guard (real, already-proven-verified Recovery Supervisor) -> VERIFYING -> AWAITING_GATE_2 -> promote_core_upgrade (real scoped HUMAN_GATE_2 grant, then the real StableRevisionPointer.promote, the only promote() in the codebase). Live core is never directly rewritten: a structural AST scan proves no lifecycle.evolution module but core_promotion.py can ever call .promote or .rollback_to, and core_promotion.py itself never calls .rollback_to.",
+      "evidence": "backend/tests/persistence/test_phase_23_journey.py::TestTheComposedSelfEvolutionSequenceReachesAGenuinePromotion::test_the_whole_pipeline_promotes_a_genuine_new_stable_revision (full real pipeline, real genesis + real prior rollback verification, refused without a grant then promoted with one) and backend/tests/structural/test_self_evolution_no_direct_mutation.py::TestOnlyCorePromotionReachesTheRealMutation"
+    },
+    {
+      "req_id": "ARK-REQ-0137",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.recovery/core_snapshot.py::take_core_snapshot records a real C-14 artifact for the current Stable revision and proves it restorable by reading the bytes back through ArtifactStore.verify/.content_of, refusing (SnapshotNotRestorableError) rather than trusting the write. begin_core_upgrade is the only production path that can construct a CoreUpgrade instance in SNAPSHOT_TAKEN.",
+      "evidence": "backend/tests/persistence/test_core_snapshot.py::TestTakeCoreSnapshot (refuses with no Stable revision, a genuine snapshot proves restorable, snapshotting does not mutate the pointer) and TestBeginCoreUpgrade, plus TestSnapshotRefusesRatherThanTrustsTheWrite (a failed verification is refused, not trusted)"
+    },
+    {
+      "req_id": "ARK-REQ-0138",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.evolution/core_upgrade_orchestrator.py::authorize_promotion populates AWAITING_GATE_2 -> PROMOTED's guard context only from a real scoped HUMAN_GATE_2 grant lookup (HumanGate2Source Protocol, satisfied structurally by acceptance.engine.GovernanceState.operation_grant) - never a caller-asserted boolean. CORE_PROMOTION is this context's own scoping key; no PDP operation_classes change was needed since StableRevisionPointer.promote is gated by StableCandidatePath's receipt proof, not the PDP.",
+      "evidence": "backend/tests/lifecycle/test_core_upgrade_orchestrator.py::TestGateTwoGuardComposition (the real guard refuses without a grant, accepts with one) and backend/tests/lifecycle/test_core_promotion_gate_scope.py (a real temporary HUMAN_GATE_RECORDS.md: no grant, an exact grant, a barred-actor grant, a different-candidate grant, a different-gate grant - all resolve correctly)"
+    },
+    {
+      "req_id": "ARK-REQ-0139",
+      "state": "SATISFIED",
+      "implementation": "lifecycle.evolution/campaign_declaration.py::CampaignBudgets carries the six MS-named budgets as typed, required fields; CampaignDeclaration.guard_context() is the only path that can satisfy evolution_campaign_state_machine.declaration_guard's DECLARED -> RUNNING transition with a real declaration, never a hand-built dict with six arbitrary strings.",
+      "evidence": "backend/tests/lifecycle/test_evolution_campaign_declaration.py::TestDeclarationGuardIsSatisfiableOnlyByARealDeclaration (a real declaration satisfies the guard; five of the six MS budgets is refused; missing objective is refused)"
+    },
+    {
+      "req_id": "ARK-REQ-0140",
+      "state": "SATISFIED",
+      "implementation": "CampaignLedger.terminal_state() derives exactly one of PROMOTED / COMPLETE_WITH_NO_FURTHER_MEASURED_GAIN / ESCALATED from the ledger's own recorded facts, mirroring HardeningRound's own canonical rule, and refuses to answer while the campaign may still continue. BLOCKED is deliberately CoreUpgrade's own entry-gate concern, not derived here.",
+      "evidence": "backend/tests/lifecycle/test_evolution_campaign_ledger.py::TestTerminalState (still-running refuses; a promoted attempt yields PROMOTED; exhaustion with an intact baseline yields no-further-gain; exhaustion with a regression yields ESCALATED) and backend/tests/persistence/test_phase_23_journey.py (both terminal states reached against real infrastructure)"
+    },
+    {
+      "req_id": "ARK-REQ-0141",
+      "state": "SATISFIED",
+      "implementation": "CampaignLedger.may_generate_successor() is true only while every one of the six declared budget dimensions has headroom and the no-progress threshold has not been reached; false unconditionally once any attempt is PROMOTED. record() refuses an attempt outright once may_generate_successor() is false.",
+      "evidence": "backend/tests/lifecycle/test_evolution_campaign_ledger.py::TestMayGenerateSuccessor (candidate-budget exhaustion, no-progress-threshold exhaustion before budget exhausts, a measured gain resets the counter, a promoted attempt ends the campaign even with budget remaining) and test_phase_23_journey.py::TestARejectedCampaignReachesNoFurtherGainWithoutTouchingStable (two no-gain rejections exhaust the campaign cleanly; a third record() is refused)"
+    },
+    {
+      "req_id": "ARK-REQ-0142",
+      "state": "SATISFIED",
+      "implementation": "Structural in the kernel state-machine primitive (kernel.contracts.state_machine.StateMachine.evaluate): every terminal state carries no outgoing transition, so TerminalStateEscape refuses any further transition unconditionally - proven against the real EvolutionCampaign machine, not only the generic kernel test.",
+      "evidence": "backend/tests/lifecycle/test_evolution_campaign_ledger.py::TestNoRestart::test_a_terminal_evolution_campaign_cannot_transition_again and backend/tests/persistence/test_phase_23_journey.py (both real journeys reach a real terminal state and stop)"
+    },
+    {
+      "req_id": "ARK-REQ-0359",
+      "state": "SATISFIED",
+      "implementation": "check_repository_structure.py check 11 confines Stable-mutation write capability to lifecycle.recovery (rollback) and this phase's own core_promotion.py (promotion via the pre-existing StableRevisionPointer.promote, unmodified). A structural AST scan proves no other lifecycle.evolution module can reach .promote or .rollback_to at all, and the CORE_PROMOTION/HUMAN_GATE_2 grant lookup structurally refuses a barred automated actor's self-issued grant.",
+      "evidence": "backend/tests/structural/test_self_evolution_no_direct_mutation.py (the full structural scan) and backend/tests/lifecycle/test_core_promotion_gate_scope.py::TestCorePromotionGrantScope::test_a_barred_actor_cannot_manufacture_its_own_core_promotion_grant"
+    },
+    {
+      "req_id": "ARK-REQ-0360",
+      "state": "SATISFIED",
+      "implementation": "acceptance.engine/campaign_record_shape.py::_check_campaign_record_shape refuses an evolution run's outcome unless its campaign record proves bounded (real objective, real baseline metrics, exactly the six canonical budgets, a genuine terminal state) - VDC's own enumerated fields. A dedicated reconciliation test proves its restated vocabulary is identical to the real CampaignBudgets.model_fields and EvolutionCampaign's real terminal set.",
+      "evidence": "backend/tests/acceptance/test_campaign_record_shape.py (fabricated-shape refusals, a real declaration+ledger driven to PROMOTED accepted end to end, constants reconciled against the real authorities) and test_phase_23_journey.py's own closing assertion against a real composed record"
+    }
+  ]
+}
