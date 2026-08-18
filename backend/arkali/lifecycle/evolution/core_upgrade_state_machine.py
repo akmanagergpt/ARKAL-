@@ -20,6 +20,7 @@ from arkali.kernel.contracts.state_machine import (
     GuardContext,
     StateMachine,
     StateMachineDefinition,
+    StateMachineInstance,
 )
 
 MACHINE = "CoreUpgrade"
