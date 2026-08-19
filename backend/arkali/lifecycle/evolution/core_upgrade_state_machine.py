@@ -16,11 +16,21 @@ by `backend/tests/state_machines/test_canonical_reconciliation.py`.
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.state_machine import (
+# `StateMachineInstance as StateMachineInstance` marks the intentional
+# re-export mypy strict mode requires (three lifecycle.evolution modules
+# import it from here rather than from kernel.contracts.state_machine
+# directly, keeping that module's own fan-in at its 15-of-15 ceiling). Kept
+# in this one statement deliberately, against ruff's own import-sort
+# preference (which would split it into a second `from` line): a second
+# statement from this file measures as a second import edge and reproduces
+# the exact fan-in-16-of-15 violation this re-export exists to avoid -
+# confirmed by running the real architecture gate before settling on this
+# form, not assumed.
+from arkali.kernel.contracts.state_machine import (  # noqa: I001
     GuardContext,
     StateMachine,
     StateMachineDefinition,
-    StateMachineInstance,
+    StateMachineInstance as StateMachineInstance,
 )
 
 MACHINE = "CoreUpgrade"
