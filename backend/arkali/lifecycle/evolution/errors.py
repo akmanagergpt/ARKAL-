@@ -48,3 +48,28 @@ class VersionLineageOrderError(ContractViolation):
     a rewritten parent is refused, never silently accepted."""
 
     code = "ARK-ERR-0159"
+
+
+class ChildProductPromotionNotAuthorizedError(ContractViolation):
+    """A child-product promotion was attempted without a recorded, scoped
+    `HUMAN_GATE_3` grant naming this exact (product, candidate, current
+    version) triple (ADR-0010, ARK-REQ-0132/0358). Refused before anything
+    is mutated - never a partial promotion."""
+
+    code = "ARK-ERR-0160"
+
+
+class ChildProductAcceptanceRequiredError(ContractViolation):
+    """A child-product promotion was attempted without a passing
+    acceptance record naming the exact candidate being promoted - real
+    executed evidence, never a caller-asserted boolean (ARK-REQ-0132)."""
+
+    code = "ARK-ERR-0161"
+
+
+class ChildProductCandidateInvalidError(ContractViolation):
+    """A promotion candidate reference is not a genuine content address,
+    or the product is not SDK-eligible - refused before any grant is even
+    looked up (ARK-REQ-0131/0132)."""
+
+    code = "ARK-ERR-0162"

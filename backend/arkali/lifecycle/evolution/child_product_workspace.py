@@ -9,7 +9,7 @@ candidate`'s own chain into `kernel.contracts` was already measured at
 own `WorkspaceTarget`) and Phase 19 (`project_import/pipeline.py`'s own
 `_WorkspaceTarget`/`_WorkspaceHandle`) - a static `lifecycle.evolution ->
 engineering.candidate` import would extend that same chain to 5.
-`WorkspaceAllocator`/`WorkspaceHandle` below are structural `Protocol`s
+`_WorkspaceAllocator`/`_WorkspaceHandle` below are structural `Protocol`s
 matching `WorkspaceAuthority.allocate`/`CandidateWorkspace`'s exact shape,
 the identical pattern both of those phases already used for the identical
 problem - so a real `WorkspaceAuthority` instance satisfies this module
@@ -47,7 +47,7 @@ from arkali.lifecycle.evolution.child_product_identity import ChildProductIdenti
 from arkali.lifecycle.evolution.content_identity import address_of
 
 
-class WorkspaceHandle(Protocol):
+class _WorkspaceHandle(Protocol):
     """Structural shape of an allocated workspace - matches
     `engineering.candidate.workspace.CandidateWorkspace`, unimported."""
 
@@ -55,7 +55,7 @@ class WorkspaceHandle(Protocol):
     snapshot: pathlib.Path
 
 
-class WorkspaceAllocator(Protocol):
+class _WorkspaceAllocator(Protocol):
     """Structural shape of
     `engineering.candidate.workspace.WorkspaceAuthority`, unimported. See
     the module docstring for why."""
@@ -67,7 +67,7 @@ class WorkspaceAllocator(Protocol):
         task_id: str,
         agent_id: str,
         stable_snapshot: pathlib.Path,
-    ) -> WorkspaceHandle: ...
+    ) -> _WorkspaceHandle: ...
 
 
 def child_workspace_id(identity: ChildProductIdentity, *, campaign_id: str) -> str:
@@ -80,12 +80,12 @@ def child_workspace_id(identity: ChildProductIdentity, *, campaign_id: str) -> s
 
 
 def allocate_child_product_workspace(
-    allocator: WorkspaceAllocator,
+    allocator: _WorkspaceAllocator,
     identity: ChildProductIdentity,
     *,
     campaign_id: str,
     stable_snapshot: pathlib.Path,
-) -> WorkspaceHandle:
+) -> _WorkspaceHandle:
     """ARK-REQ-0132: allocate one isolated working copy for a child
     product's campaign, through the real, unmodified Phase 12 authority -
     never a second workspace mechanism."""
