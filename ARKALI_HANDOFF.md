@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `4a6294af17ebc5acdb757b501b363e34a2a1e0cc` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `42390ee0fc71037f9bf96f493f909c005a26dd4a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -151,9 +151,9 @@ repository, the repository wins.
 | Phase 22 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_22_report.json`, `phase_22_traceability.json`). Local AI + Model Laboratory. C1–C6 PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; PROTECTED_CORE PASS (no member touched — `kernel.contracts`, the only canonical context modified, is not Protected Core, confirmed directly against `AUTHORITY_MAP.yaml`); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS (9 declared revisions, zero flagged); FINDINGS PASS; PREREQ 2/2 (Phases 4, 9); HUMAN_GATE NOT_APPLICABLE (Matrix Gate column empty for Phase 22); all 8 architecture gates PASS over **191** edges. `engineering.localai` delivers a real local-AI adapter architecture under its own already-declared concern (`local_model_adapters`), claiming no new contract family: `LocalRuntimeAdapter`, one structural Protocol satisfied by two real, transport-distinct, loopback-only adapters (Ollama's native API, an OpenAI-compatible local HTTP surface) proving "no hard dependency on one runtime" by construction (`ARK-REQ-0016`); read-only host/runtime/hardware probes and a hardware-aware, accelerator-independent suitability decision, real `CapabilityGraph`-exposed capability (earned `configured_state`, no shadow-registry field) proving Phase 16's unmodified `execution_routing.select_execution_tier` resolves the local tier eligible, one real bounded local inference call against this development host's installed Ollama server, and the real PDP's Local-Only negative control (`ARK-REQ-0129`, genuinely APPLICABLE on this host — a real NVIDIA GPU and a real, loopback-reachable Ollama runtime were both probed directly). `ARK-REQ-0130` is honestly NOT_APPLICABLE: no dataset-verification authority exists anywhere in this repository. Decomposes `kernel.contracts.results` (ADR-0008): `HonestState` now lives in `honest_state.py`, re-exported unchanged, because `results.py` was already at its fan-in ceiling (15 of 15) before this phase's new importers — a real, measured budget hit repaired during development. **2/2 requirements discharged**, 1 MANDATORY (`ARK-REQ-0016`) and 1 CONDITIONAL (`ARK-REQ-0129`) — taking cumulative verified 175 → **177**. No Provider/Model Registry entry, capability-graph instance, or routing-tier change is claimed in production source; Phase 16's `execution_routing.py` is composed unmodified. **Phase 22B unlocked** |
 | Phase 22B | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first and only submission (`docs/acceptance/phase_22B_report.json`, `phase_22B_traceability.json`). Recovery Supervisor + Core Rollback Verification. C1–C6 PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; **PROTECTED_CORE COMPLETE** (three Protected Core contexts touched — `control.policy` via `pdp.py`/`policy_contract.py`, `lifecycle.release` via `stable_pointer.py`, `lifecycle.recovery` via `recovery_supervisor.py`; security review 253, adversarial review 801, full regression 3000, all exit 0); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS (9 declared revisions, zero flagged); FINDINGS PASS; PREREQ 4/4 (Phases 5, 6, 13, 20); HUMAN_GATE NOT_APPLICABLE (Matrix Gate column empty for Phase 22B); all 8 architecture gates PASS over **197** edges. Five atomic packages: the minimal Stable-revision pointer primitive (D-017, `lifecycle.release`), a revision entering its durable history only through a genuine `StableCandidatePath.promotion_receipt`, never a caller's assertion — the whole of what `ARK-REQ-0157` means by "previously verified immutable revision"; the PDP's real conditional `ROLLBACK_STABLE` grant, `AUTO` to exactly the canonical invoker with a truthfully-stated verified-immutable fact, `DENY` otherwise (`control.policy`, `ARK-REQ-0155`/`0156`); the independent, deterministic Recovery Supervisor, the sole production caller of that grant, importing no AI provider, no candidate-generation authority and no repair pipeline, every rollback an identity-only pointer switch always evidenced through the real C-14/C-15 plane (`lifecycle.recovery`, `ARK-REQ-0154`/`0159`/`0160`); composed proof that `lifecycle.evolution`'s pre-existing `core_upgrade_state_machine.recovery_supervisor_guard` is satisfiable only from the Recovery Supervisor's real, evidence-derived `is_verified()` fact, structurally proven the sole production module able to produce it (`ARK-REQ-0135`/`0136`); and the composed VDC "Recovery Supervisor" journey (bad candidate → launch → health failure → known-good rollback → failure record → stable available), proving the end-to-end evidenced rollback without transformation (`ARK-REQ-0338`/`0339`). Running the real architecture gate — never assumed clean — found five real violations (`max_orchestration_depth` 5 of 4 via `evidence.audit`'s own chain into `control.specification`; `control.policy.pep`/`.policy_contract` fan-in 16 of 15, both already at their Phase-20-set ceiling; `kernel.contracts.error_base`/`.results` fan-in 16 of 15) and repaired them with two new ADR-0008 structural `Protocol`s (`RollbackAuthorization`, `EvidenceSink`, adapted by a real `PolicyEnforcementPoint`/`PolicyRequest` and a real `AuditChain` at the composition root — the real PDP decision and the real evidence chain still gate/record every rollback) plus two free redirects to the already-established `error_root.py`/`honest_state.py` absorbers. **11/11 requirements discharged**, all MANDATORY — `ARK-REQ-0135`, `0136`, `0154`–`0160`, `0338`, `0339` — taking cumulative verified 177 → **188**. No Self-Evolution capability is built (Phase 23's own obligation); no full release/supply-chain/deployment system is built (Phase 26, D-017 explicit); no production surface exposes `RecoverySupervisor` anywhere. **Phase 23 unlocked** |
 | Phase 23 | **MACHINE-ACCEPTED** — verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED (`docs/acceptance/phase_23_report.json`, `phase_23_traceability.json`). Self-Evolution (C-33). C1–C6 PASS; EXTERNAL_RESULT PASS over all 9 recorded runs; **PROTECTED_CORE COMPLETE** (`acceptance.engine` touched via `campaign_record_shape.py`; security review 254, adversarial review 807, full regression 3078, all exit 0); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS; FINDINGS PASS; PREREQ 3/3 (Phases 13, 16, 22B); **HUMAN_GATE: `HUMAN_GATE_2` recorded ACCEPTED** — `HGR-005` (`docs/acceptance/HUMAN_GATE_RECORDS.md`), granted by the human acceptance authority for this exact candidate (candidate freeze commit `54f9e8b0272deb1a1efd58267b2f4a54c2d02cf6`, evidence-package digest `sha256:3ad6f5fe20c8279ce62d2f15951a108099bb196b0fc4f53c8ae10e1f1eb5c00e`) after independent mechanical re-verification of HEAD/branch/clean-tree, `check_handoff.py` PASS, `current_work_phase()` == `23`, evidence byte-identical to `54f9e8b`, the recomputed digest, the governance suite, all 8 architecture gates (0 violations) and 0 open BLOCKER/HIGH; the record's own scope section states this grant does **not** cover any other phase, Phase 24, any modified Phase 23 candidate, or any real future `CORE_PROMOTION` runtime operation, which requires its own separate `RUNTIME_OPERATION`-scope grant (the operation-scope table stays empty — `HGR-005` adds only a `PHASE_ACCEPTANCE`-scope row); all 8 architecture gates PASS over **202** edges (unchanged since the candidate froze — the acceptance commits add no production code). Eight atomic packages deliver C-33 under `lifecycle.evolution`/`lifecycle.recovery`/`control.policy`/`acceptance.engine`, all reusing every Protected Core authority they touch unmodified: the campaign declaration/ledger wired to the pre-existing `declaration_guard` (`ARK-REQ-0139`) and mirroring `RepairBudgetLedger`'s successor-eligibility/terminal-state shape (`ARK-REQ-0140`/`0141`/`0142`); a real restorable snapshot proved before every core-upgrade candidate (`ARK-REQ-0137`); a real scoped `HUMAN_GATE_2` grant lookup feeding the pre-existing `gate_2_guard` (`ARK-REQ-0138`); composed promotion reaching the real, unmodified `StableRevisionPointer.promote` — a real ordering defect (a stale receipt could leave the state machine claiming `PROMOTED` while Stable was never written) found by testing and repaired before submission (`ARK-REQ-0134` pipeline half); structural AST proof that no `lifecycle.evolution` module but `core_promotion.py` can reach a Stable mutation, plus the self-approval boundary proven end-to-end against a real temporary `HUMAN_GATE_RECORDS.md` (`ARK-REQ-0134` live-core half, `ARK-REQ-0359`); the campaign-record shape check, kept private since `acceptance.engine`'s public surface was already at its ceiling (`ARK-REQ-0360`); and the composed VDC "ARKALI Self-Evolution" journey, `docs/contracts/campaign.md`, the C-17 report and traceability record. Three real architecture-budget violations were found by running the gate and repaired by decomposition (ADR-0008), not exception — see "Architecture violations" below. **9/9 requirements discharged**, all MANDATORY — `ARK-REQ-0134`, `0137`–`0142`, `0359`, `0360` — taking cumulative verified 188 → **197**. No live self-evolution campaign is run against ARKALI's own source; no Product Evolution SDK, Golden Factory or Golden Repair capability is built; no production surface exposes any Phase 23 module. **Phase 24 unlocked** |
-| Phase 24 | **UNLOCKED — NOT STARTED.** Generated Product Evolution SDK (C-36). `GovernanceState.current_work_phase()` returns `24`. `RequirementRegister.for_phase("24")` returns **4** entries, all MANDATORY (`ARK-REQ-0131`, `0132`, `0133`, `0358`), owned by `lifecycle.evolution`. Prerequisites Phase **13** (Acceptance Infrastructure) and Phase **16** (AI Software Factory), both MACHINE-ACCEPTED. Matrix Gate column is `GATE 3 where approval-gated` — `HUMAN_GATE_3` is a precondition only where the matrix's own qualifier applies, not unconditionally. No Phase 24 code has been written; no candidate exists yet. Cumulative verified stays **197** |
+| Phase 24 | **UNLOCKED — AWAITING_HUMAN_GATE, NOT ACCEPTED.** Generated Product Evolution SDK (C-36). `python scripts/run_phase_gate.py 24 25` returned **`AWAITING_HUMAN_GATE`**, progression STOPPED, failing condition "HUMAN_GATE_3 required and not recorded for this exact evidence package" (digest `sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1`) — the **only** failing condition; C1–C6 PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; PROTECTED_CORE normal profile (no protected-core member touched); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS; FINDINGS PASS; PREREQ 2/2 (Phases 13, 16); all 8 architecture gates PASS over **202** edges (unchanged from Phase 23's own baseline — this candidate added zero new cross-context edges). Seven atomic packages deliver C-36 under `lifecycle.evolution`: child-product identity and the three canonical modes (Package 1, `ARK-REQ-0131`); per-product version lineage (Package 2, `ARK-REQ-0132`/`0358`); working-copy isolation reusing Phase 12's `WorkspaceAuthority` (Package 3, `ARK-REQ-0132`/`0358`); scoped `HUMAN_GATE_3` promotion reusing the `HUMAN_GATE_2`/`CORE_PROMOTION` grant mechanism unmodified, plus ADR-0010 (Package 4, `ARK-REQ-0132`/`0358`); a separate rollback authority requiring no fresh grant (Package 5, `ARK-REQ-0132`/`0358`); structural negative/adversarial proofs of no direct mutation and no self-approval (Package 6); and the composed real-authority journey, `docs/contracts/product_sdk.md`, the C-17 report and traceability record (Package 7, candidate frozen). **4/4 requirements claimed SATISFIED with named evidence, none discharged** — discharge happens only at phase acceptance, which this gate run did not reach. Cumulative verified stays **197**. `HUMAN_GATE_RECORDS.md`'s own "Outstanding gates" table lists `HUMAN_GATE_3` "not reached", verified mechanically before any Phase 24 code was written. **This is a genuine stop condition; no implementing actor may self-grant a human gate. Phase 25 was not started** |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED (project-singular). `HUMAN_GATE_4` GRANTED for the Phase 19 candidate only (`HGR-002`) and separately GRANTED for the Phase 21 candidate only (`HGR-004`) — neither authorizes the other, any other phase, or any modified candidate of either. `HUMAN_GATE_6` GRANTED for the Phase 20 candidate only (`HGR-003`) — no `RUNTIME_OPERATION`-scope grant exists for any real `APPLY_MIGRATION`. `HUMAN_GATE_2` GRANTED for the Phase 23 candidate only (`HGR-005`) — no `RUNTIME_OPERATION`-scope grant exists for any real future `CORE_PROMOTION`. Phase 22 carried no human gate. Gates 3, 5, 7, 8 not reached |
-| ADRs | 9 **ACCEPTED**, 0 PROPOSED — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
+| ADRs | 9 **ACCEPTED**, 1 PROPOSED (`ADR-0010`, `HUMAN_GATE_3` default-approval-gated policy for child-product promotion — PROPOSED pending Phase 24's own acceptance, not yet a ratified canonical ruling) — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced. Phase 22 discharged 2 of its 3 pre-existing entries; Phase 23 discharged all 9 of its own pre-existing entries; none was added, renumbered or removed |
 | Cumulative verified | **197** discharged (5 Phase 1 + 23 Phase 2 + 4 Phase 3 + 33 Phase 4 + 7 Phase 5 + 3 Phase 6 + 5 Phase 7 + 3 Phase 9 + 3 Phase 9B + 5 Phase 10 + 2 Phase 11 + 7 Phase 12 + 27 Phase 13 + 7 Phase 14 + 11 Phase 15 + 3 Phase 16 + 9 Phase 17 + 4 Phase 18 + 5 Phase 19 + 4 Phase 20 + 5 Phase 21 + 2 Phase 22 + 11 Phase 22B + **9 Phase 23**), reconciled by check C6 against each phase's traceability record. Of the 197, **195 are MANDATORY**: Phase 7's `ARK-REQ-0060` and Phase 22's `ARK-REQ-0129` are the only two CONDITIONAL requirements discharged; all 5 of Phase 19's, all 4 of Phase 20's, all 5 of Phase 21's, `ARK-REQ-0016` of Phase 22's, all 11 of Phase 22B's and all 9 of Phase 23's are MANDATORY. Phase 8 adds none — its denominator is zero |
 | BLOCKER / HIGH | **0 / 0** (derived by the validator from declared Status cells) |
@@ -421,7 +421,18 @@ repository, the repository wins.
 | 245 | `08aeb4b` | **HANDOFF + BUILD_STATE REFRESH (§12 rule)** — re-derived after the Phase 23 candidate and gate run: live architecture summary to 202 edges, Sections 3/8/9 rewritten for `AWAITING_HUMAN_GATE`, Section 4 ledger rows 237–244 added, Section 11 gains this refresh's own row |
 | 246 | `bf53bed` | **HGR-005 — HUMAN_GATE_2 GRANTED FOR THE PHASE 23 CANDIDATE ONLY.** Recorded by the human acceptance authority after independent mechanical re-verification against HEAD `b87a0d4`: clean tree, branch `main`, `check_handoff.py` PASS, `current_work_phase()` == `23`, Phase 23 evidence byte-identical to candidate freeze commit `54f9e8b`, evidence-package digest recomputed to `sha256:3ad6f5fe20c8279ce62d2f15951a108099bb196b0fc4f53c8ae10e1f1eb5c00e`, `RequirementRegister.for_phase("23")` unchanged at 9 entries, governance suite clean, 8 architecture gates PASS/0 violations over 202 edges, 0 open BLOCKER/HIGH. `HGR-005-SCOPED` restates the grant in the mechanical phase-scope table, bound to `(HUMAN_GATE_2, phase=23, this digest)` only; no `RUNTIME_OPERATION`-scope row was created — `authorize_promotion` continues to consult only the separate operation-scope table, left untouched and empty. Not a phase acceptance by itself; the acceptance-record commit follows separately |
 | 247 | `c697f44` | **RECORD PHASE 23 ACCEPTANCE AND UNLOCK THE NEXT PHASE.** `BUILD_STATE.md`'s Phase 23 row flips to MACHINE-ACCEPTED following the real, official gate run (`python scripts/run_phase_gate.py 23 24`, exit 0, following `HGR-005`); returns `PHASE_ACCEPTED_BY_MACHINE`. 9/9 requirements discharged, all MANDATORY — `ARK-REQ-0134`, `0137`–`0142`, `0359`, `0360` — taking cumulative verified 188 → 197. The newly-unlocked phase, Generated Product Evolution SDK (C-36, denominator 4, all MANDATORY — `ARK-REQ-0131`, `0132`, `0133`, `0358` — Matrix Gate `GATE 3 where approval-gated`, prerequisites Phases 13/16 already MACHINE-ACCEPTED), gains its status row so `GovernanceState.current_work_phase()` resolves past 23. `ARKALI_HANDOFF.md` Sections 3/8/9/11 rewritten to match; Section 4 ledger gains this row. No further implementation was begun |
-| 248 | `4a6294a` | **HANDOFF REFRESH (§12 rule) — PHASE 23 MACHINE ACCEPTANCE.** Re-derived after Phase 23's real gate run and acceptance via `HGR-005`: Section 3 Phase 23 row rewritten MACHINE-ACCEPTED, a status row added for the newly-unlocked successor (Generated Product Evolution SDK, C-36, denominator 4), Human Gates/Requirements/Cumulative verified rows updated (188 → 197), Section 4 ledger rows 246–247 added, Sections 8/9 rewritten for the new current phase, Section 11 gains this refresh's own row. Live architecture unchanged at 202 edges ← HEAD at generation |
+| 248 | `4a6294a` | **HANDOFF REFRESH (§12 rule) — PHASE 23 MACHINE ACCEPTANCE.** Re-derived after Phase 23's real gate run and acceptance via `HGR-005`: Section 3 Phase 23 row rewritten MACHINE-ACCEPTED, a status row added for the newly-unlocked successor (Generated Product Evolution SDK, C-36, denominator 4), Human Gates/Requirements/Cumulative verified rows updated (188 → 197), Section 4 ledger rows 246–247 added, Sections 8/9 rewritten for the new current phase, Section 11 gains this refresh's own row. Live architecture unchanged at 202 edges |
+| 249 | `166f837` | **DEF-009** — `docs/build/OPEN_BLOCKERS.md` gains a permanent deferred-item record tracking the Real Product Checkpoint 2 finding that no live orchestrator chains GOAL → BLUEPRINT → ROUTING → MODEL → CANDIDATE → PRODUCT, with three named sub-gaps (live worker/scheduler loop, live orchestrating surface, real AI-driven multi-file generation beyond Phase 16's deterministic ceiling). Explicitly out of Phase 24's own canonical scope. Not a phase acceptance; no requirement discharged |
+| 250 | `40c54be` | **PHASE 24 PACKAGE 1** (`ARK-REQ-0131`/`0132`/`0133`) — `lifecycle.evolution/child_product_identity.py`: `ChildProductMode` (exactly the three MS-named modes — Standard, AI-Assisted, AI-Native Self-Evolving), `ChildProductIdentity.uses_evolution_sdk` the single eligibility gate. `child_product_campaign.py` reuses Phase 23's real, unmodified `EvolutionCampaign` machine (identity, not equality, proven directly) for child-product campaign declaration — no new `StateMachineDefinition`. Not a phase acceptance; no requirement discharged |
+| 251 | `e682194` | **PHASE 24 PACKAGE 2** (`ARK-REQ-0132`/`0358`) — `child_product_version.py`: content-addressed, append-only per-product version lineage, mirroring `StableRevisionPointer`'s discipline without sharing its instance. Not a phase acceptance; no requirement discharged |
+| 252 | `8d5f609` | **PHASE 24 PACKAGE 3** (`ARK-REQ-0132`/`0358`) — `child_product_workspace.py`: isolated working-copy allocation reusing Phase 12's `WorkspaceAuthority`; never resolves a path outside its caller-supplied stable snapshot. Not a phase acceptance; no requirement discharged |
+| 253 | `dd4be77` | **ADR-0010** — `HUMAN_GATE_3` default-approval-gated policy for child-product promotion. Records the engineering decision that, given the matrix's own "GATE 3 where approval-gated" qualifier is genuinely silent on the exact trigger condition, every child-product promotion is treated as approval-gated by default, fail-closed, no exemption path. PROPOSED, pending Phase 24's own acceptance — not a canonical ruling this ADR is authorized to make for the whole matrix. Not a phase acceptance; no requirement discharged |
+| 254 | `7b366e3` | **PHASE 24 PACKAGE 4** (`ARK-REQ-0132`/`0358`, ADR-0010) — `child_product_promotion.py::promote_child_product`: candidate → accepted → scoped `HUMAN_GATE_3` grant lookup → promoted, reusing the `HUMAN_GATE_2`/`CORE_PROMOTION` scoped-grant mechanism unmodified (`PROMOTE_CHILD_PRODUCT` is this context's own distinct scoping key). Imports neither `lifecycle.release` nor `lifecycle.recovery`. Not a phase acceptance; no requirement discharged |
+| 255 | `bfeff93` | **PHASE 24 PACKAGE 5** (`ARK-REQ-0132`/`0358`) — `child_product_rollback.py::rollback_child_product`: a separate authority from promotion, per ADR-0009, restoring a child product to an already-approved version; requires no fresh grant. Not a phase acceptance; no requirement discharged |
+| 256 | `22e9867` | **PHASE 24 PACKAGE 6** (`ARK-REQ-0134`/`0359`-shaped adversarial proof, restated for `HUMAN_GATE_3`) — structural AST proof of no direct Stable/live mutation anywhere in the child-product SDK and a fail-closed self-approval boundary (a barred issuer's own GRANTED row does not authorize a promotion), mirroring `test_core_promotion_gate_scope.py`'s own barred-issuer test. Not a phase acceptance; no requirement discharged |
+| 257 | `bc1e4b7` | **PHASE 24 PACKAGE 7 (journey half)** — `test_child_product_journey.py`'s composed two-cycle journey reaches a real, `StableRevisionPointer`-independent promotion on real filesystem/SQLite/evidence infrastructure. Finds and fixes a real defect: `child_product_campaign._child_campaign_id` collided across two evolution requests for the same product, depending on product identity alone — repaired by binding `campaign_id` to `(product_ref, objective)` together, content-addressed (`ARK-REQ-0132`/`0133`/`0358`). Not a phase acceptance; no requirement discharged |
+| 258 | `1977658` | **MYPY STRICT-MODE FIX** — `core_upgrade_state_machine.py` gains the standard `X as X` re-export idiom for `StateMachineInstance`, closing a real pre-existing strict-mode gap (flagged across 3 files, 2 already in Phase 23's own accepted source) surfaced by this phase's own new `child_product_campaign.py` import. Kept as one import statement deliberately, after a two-statement form reproduced a real fan-in-16-of-15 architecture violation. Not a phase acceptance; no requirement discharged |
+| 259 | `42390ee` | **PHASE 24 CANDIDATE — COMPOSED VDC JOURNEY, C-36 CONTRACT, C-17 REPORT, TRACEABILITY, CANDIDATE FROZEN.** `docs/contracts/product_sdk.md`, `phase_24_report.json` and `phase_24_traceability.json` committed: 4 SATISFIED claims, `reconcile_discharge` zero violations; 10 recorded runs including the 90-test Phase 24 target suite, security (254, unchanged), structural (411), governance (395 passed, 4 pre-existing deselections explained inline) and full regression (3167 passed, 13 skipped, 5 pre-existing deselections). `python scripts/run_phase_gate.py 24 25` returned `AWAITING_HUMAN_GATE`, progression STOPPED, the sole failing condition "HUMAN_GATE_3 required and not recorded" (digest `sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1`) — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE normal profile, PREREQ 2/2, all 8 architecture gates over 202 edges). Not a phase acceptance; candidate frozen at this commit ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -516,22 +527,21 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Generated Product Evolution SDK** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 24) |
-| Status | **UNLOCKED.** `GovernanceState.current_work_phase()` returns `24`. No Phase 24 code has been written; no candidate exists yet |
-| Prerequisites | Phase **13** (Acceptance Infrastructure) and Phase **16** (AI Software Factory) — both MACHINE-ACCEPTED. `PREREQ` will read 2/2 once a gate run is attempted |
-| Contract IDs | `C-36`, per `IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 24. Not yet researched or derived beyond the matrix citation — a session starting this phase must read the canonical set for the actual shape before writing any code |
-| Human gate | Matrix Gate column is `GATE 3 where approval-gated` — `HUMAN_GATE_3` is a precondition of this phase's own acceptance only where the matrix's own qualifier applies, not unconditionally; the exact applicability condition is not yet researched |
-| ARK-REQ IDs | `RequirementRegister.for_phase("24")` returns **4** entries, all MANDATORY (`ARK-REQ-0131`, `0132`, `0133`, `0358`), owned by `lifecycle.evolution`. None claimed, none satisfied, none discharged — no work has begun |
-| What this candidate built | Nothing. This phase has not been started |
-| What remains unbuilt | Everything — the entire Phase 24 capability. No research beyond the mechanical facts above (name, denominator, prerequisites, gate token) has been performed this session |
-| Architecture facts | Unchanged since Phase 23's acceptance: 8 gates PASS over **202** real cross-context edges, all 9 budgets. The acceptance/handoff commits added no production code and no cross-context edge |
+| Status | **UNLOCKED — AWAITING_HUMAN_GATE, NOT ACCEPTED.** `python scripts/run_phase_gate.py 24 25` returned `AWAITING_HUMAN_GATE`, progression STOPPED. `GovernanceState.current_work_phase()` still returns `24` (declared state remains `UNLOCKED` — only `ACCEPTED`/`MACHINE-ACCEPTED` grant acceptance, and this phase has neither) |
+| Prerequisites | Phase **13** and Phase **16** — both MACHINE-ACCEPTED. `PREREQ` reads **2/2** |
+| Contract IDs | `C-36`, documented as `docs/contracts/product_sdk.md` |
+| Human gate | Matrix Gate column is `GATE 3 where approval-gated` — ADR-0010 (PROPOSED) records the engineering decision that every child-product promotion is treated as approval-gated by default, fail-closed, given the matrix's own qualifier is genuinely silent on the exact trigger condition. Under that decision `HUMAN_GATE_3` is a precondition of this phase's own acceptance. No HGR record of any kind exists for it in the live, unmodified `HUMAN_GATE_RECORDS.md`; its own "Outstanding gates" table lists it "not reached". A human-issued `_PhaseGateGrant(HUMAN_GATE_3, phase_id="24", evidence_digest=sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1)` is required before this phase can be MACHINE-ACCEPTED — the same shape Phase 19/`GATE 4` (HGR-002), Phase 20/`GATE 6` (HGR-003), Phase 21/`GATE 4` (HGR-004) and Phase 23/`GATE 2` (HGR-005) each needed |
+| ARK-REQ IDs | `RequirementRegister.for_phase("24")` returns **4** entries (`ARK-REQ-0131`, `0132`, `0133`, `0358`). All 4 **claimed SATISFIED** with named evidence in `phase_24_traceability.json`; **none discharged** — discharge happens only at phase acceptance |
+| What this candidate built | Seven atomic packages under `lifecycle.evolution`: child-product identity and the three canonical modes (`uses_evolution_sdk` the single eligibility gate); per-product version lineage; working-copy isolation reusing Phase 12's `WorkspaceAuthority`; scoped-`HUMAN_GATE_3` promotion reusing the `HUMAN_GATE_2`/`CORE_PROMOTION` grant mechanism unmodified (plus ADR-0010); a separate rollback authority requiring no fresh grant; structural no-direct-mutation/no-self-approval proofs; the composed real-authority journey, contract document, C-17 report and traceability record. Full detail in `docs/contracts/product_sdk.md` and `phase_24_report.json` |
+| What remains unbuilt | A live goal-to-child-product generation pipeline (tracked separately and permanently as DEF-009, `docs/build/OPEN_BLOCKERS.md`); AI-provider-driven multi-file product generation (Phase 30's own obligation); any production surface exposing this SDK. Deliberately out of this phase's scope, not a gap |
+| Architecture facts | 8 gates PASS over **202** real cross-context edges (unchanged from Phase 23 — this candidate added zero new cross-context edges), all 9 budgets. Two real violations (fan-in, public surface) found by running the gate, repaired by decomposition/privatization — see §3 "Architecture violations" |
 
 **Phase 23 is MACHINE-ACCEPTED.** Its denominator was **9**, all
-MANDATORY, 9/9 discharged (`ARK-REQ-0134`, `0137`–`0142`, `0359`, `0360`),
-following `HGR-005` (`HUMAN_GATE_2` granted for that exact candidate only).
-**Phase 24 is UNLOCKED and NOT STARTED.** Per this session's explicit
-mission instruction, Phase 24 implementation must not begin; a future
-session should research the canonical set for Phase 24's actual shape
-before writing any Phase 24 code.
+MANDATORY, 9/9 discharged. **Phase 24's candidate is complete and frozen,
+`AWAITING_HUMAN_GATE` on `HUMAN_GATE_3`.** No implementing actor may record
+that grant. A future session must not attempt to self-grant it, must not
+begin Phase 25, and should simply re-run `scripts/run_phase_gate.py 24 25`
+once a human-issued `_PhaseGateGrant` exists to confirm acceptance follows.
 
 ## 9. Next exact action
 
@@ -641,30 +651,102 @@ as empty as it was before `HGR-005`, since `HGR-005` adds only a
 (HGR-002) and Phase 20/`GATE 6` (HGR-003) each needed for their own
 acceptance.
 
-**Phase 24 (Generated Product Evolution SDK, C-36) is now the unlocked
-phase.** Its denominator — 4 requirements, all MANDATORY — is pre-existing
-in the register; adding its status row was mechanically required, the same
-reason every prior newly-unlocked phase's own row was added in its
-unlocking commit. Its prerequisites (Phases 13, 16) were already
-MACHINE-ACCEPTED before Phase 23 began, so this unlock is purely sequential
-(matching this project's established one-phase-at-a-time convention), not a
-new dependency being satisfied. §8 and §9 are rewritten for the new current
-phase; §3's Phase 23 row states its acceptance; the live architecture
-summary is unchanged at **202** edges (the acceptance/handoff commits added
-no further production code).
+**Phase 24 (Generated Product Evolution SDK, C-36) is now complete and
+frozen, `AWAITING_HUMAN_GATE` on `HUMAN_GATE_3`.** `python scripts/
+run_phase_gate.py 24 25` returned **`AWAITING_HUMAN_GATE`**, progression
+STOPPED, failing condition "HUMAN_GATE_3 required and not recorded for this
+exact evidence package" (digest `sha256:ecf43065fcdedb13fceece933145c58085
+363cda775b67e41873f8e286c06dc1`) — the **only** failing condition; C1–C6
+PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; PROTECTED_CORE normal
+profile (no protected-core member touched — `lifecycle.evolution` is not
+Protected Core, confirmed directly against `AUTHORITY_MAP.yaml`); RESCORING
+NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS; FINDINGS PASS;
+PREREQ 2/2 (Phases 13, 16); all 8 architecture gates PASS over **202** edges
+(unchanged — this candidate added zero new cross-context edges).
 
-**NEXT EXACT ACTION is to research Phase 24 (Generated Product Evolution
-SDK) before writing any code.** This session's explicit mission instruction
-was to record the `HGR-005` grant, record Phase 23's machine acceptance, and
-perform the mandatory §12 handoff refresh — **not** to begin Phase 24. A
-future session must read the canonical set (Master Spec, Build Protocol,
-Verification Contract, `REQUIREMENT_REGISTER.md`'s four Phase 24 rows,
-`CONTRACT_INVENTORY.md` row C-36) to derive Phase 24's actual shape,
-including the exact condition under which the matrix's "GATE 3 where
-approval-gated" qualifier applies, before implementing anything; nothing
-about Phase 24's design has been researched or assumed here beyond the
-mechanical facts in §8 (name, denominator, prerequisites, conditional
-`GATE 3`). **No Phase 24 implementation was begun.**
+**What Phase 24 built, stated plainly for a future session.** Seven atomic
+packages under `lifecycle.evolution`, all reusing every Protected Core
+authority they touch unmodified. **Package 1**: child-product identity and
+the three canonical modes (Standard, AI-Assisted, AI-Native
+Self-Evolving); `uses_evolution_sdk` the single place SDK eligibility is
+decided; campaign declaration reuses Phase 23's real, unmodified
+`EvolutionCampaign` machine (proven by identity, not equality) —
+no second campaign authority is minted (`ARK-REQ-0131`). **Package 2**:
+per-product version lineage, content-addressed and append-only, mirroring
+`StableRevisionPointer`'s discipline without sharing its instance
+(`ARK-REQ-0132`/`0358`). **Package 3**: working-copy/candidate isolation
+reusing Phase 12's `WorkspaceAuthority`; never resolves a path outside its
+caller-supplied stable snapshot (`ARK-REQ-0132`/`0358`). **Package 4**:
+`promote_child_product` — candidate → accepted → scoped `HUMAN_GATE_3`
+grant lookup → promoted — reusing the `HUMAN_GATE_2`/`CORE_PROMOTION`
+scoped-grant mechanism unmodified (`PROMOTE_CHILD_PRODUCT` is this
+context's own distinct scoping key, proven never to collide with
+`CORE_PROMOTION`); ADR-0010 records the fail-closed default-approval-gated
+policy this promotion path relies on (`ARK-REQ-0132`/`0358`). **Package 5**:
+`rollback_child_product`, a separate authority from promotion per ADR-0009,
+requiring no fresh grant (`ARK-REQ-0132`/`0358`). **Package 6**: structural
+AST proof that no child-product module reaches ARKALI's own
+`StableRevisionPointer`/`RecoverySupervisor`, and a fail-closed
+self-approval boundary — a barred issuer's own GRANTED row does not
+authorize a promotion, mirroring `test_core_promotion_gate_scope.py`'s own
+barred-issuer test restated for `HUMAN_GATE_3`. **Package 7**: the composed
+real-authority journey (real filesystem workspace, real SQLite via the real
+Alembic chain, real C-14/C-15 evidence, real scoped `HUMAN_GATE_3` grants,
+two full evolution cycles, rollback, full history verified intact),
+`docs/contracts/product_sdk.md`, the C-17 report and traceability record,
+candidate frozen. A real defect was found running the journey and repaired
+before the candidate froze: `child_product_campaign._child_campaign_id`
+collided across two evolution requests for the same product, since it
+depended on product identity alone — fixed to bind `campaign_id` to
+`(product_ref, objective)` together, content-addressed.
+
+**Two real architecture-budget violations were found by running the gate,
+not assumed, and repaired by decomposition/privatization, not exception.**
+`kernel.contracts.state_machine` fan-in reached 16 of 15 twice (routed
+through the existing `core_upgrade_state_machine.py` re-export instead of a
+second direct import); `lifecycle.evolution`'s own public surface reached
+42 of 40 twice (three Protocol-only types and four identity-derivation
+helpers privatized, matching Phase 19's own `project_import/pipeline.py`
+precedent). Current public surface: 38 of 40. `max_orchestration_depth`
+stays 4 of 4 throughout, on the unchanged, unrelated
+`acceptance.engine → control.specification → control.architecture →
+kernel.contracts` path. No new `allowed_sibling_edges` entry was needed —
+every composition this phase makes is intra-context.
+
+**GATE 3 is a genuine, mechanically-derived stop condition, confirmed
+before any Phase 24 code was written and again after the candidate froze,
+and it has not yet been satisfied by any human decision — not self-granted,
+not reinterpreted, not bypassed.** `docs/canonical/
+IMPLEMENTATION_DEPENDENCY_MATRIX.md` maps Phase 24's Gate column to
+`GATE 3 where approval-gated`; ADR-0010 (PROPOSED) resolves that the
+qualifier's silence on the exact trigger condition is answered by treating
+every promotion as approval-gated by default. `HUMAN_GATE_RECORDS.md`'s own
+"Outstanding gates" table lists `HUMAN_GATE_3` "not reached". No
+`_PhaseGateGrant(HUMAN_GATE_3, phase_id="24", ...)` exists anywhere in the
+live, unmodified authorization table. **This is a genuine stop condition;
+no implementing actor may self-grant a human gate.**
+
+**No live goal-to-child-product generation pipeline exists or is claimed**
+— tracked separately and permanently as DEF-009 (`docs/build/
+OPEN_BLOCKERS.md`), explicitly out of this phase's canonical scope (Phase
+24 evolves child products that already exist; it does not build initial
+generation). No AI-provider-driven multi-file product generation (Phase
+30's own obligation, per `product_generation.py`'s own docstring, the
+dependency matrix's Phase 30 prerequisites, and Phase 16's own acceptance
+record). No live scheduler or worker executes anything built here in
+production — every module is a library composition, exercised only through
+tests. No change to ARKALI's own `StableRevisionPointer` or
+`RecoverySupervisor` anywhere.
+
+**NEXT EXACT ACTION is a human `HUMAN_GATE_3` decision on this exact Phase
+24 candidate** (candidate freeze commit `42390ee`, evidence-package digest
+`sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1`)
+— **not** to begin Phase 25. No implementing actor may record that grant. A
+future session must not attempt to self-grant it and must not begin any
+Phase 25 implementation; it should re-run `scripts/run_phase_gate.py
+24 25` once a human-issued `_PhaseGateGrant` exists to confirm acceptance
+follows, then perform the standard post-acceptance §12 handoff refresh.
+**No Phase 25 implementation was begun.**
 
 **RUN EVERYTHING FROM THE CANONICAL ENVIRONMENT.** The official runtime is
 Python **3.13.15**, and this session's canonical interpreter runs under WSL
@@ -802,7 +884,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 4a6294af17ebc5acdb757b501b363e34a2a1e0cc
+head: 42390ee0fc71037f9bf96f493f909c005a26dd4a
 branch: main
 working_tree_clean: true
 
@@ -845,7 +927,7 @@ next_exact_action_phase: "24"
 
 accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_2", "HUMAN_GATE_4", "HUMAN_GATE_6"]
 adr_accepted: 9
-adr_proposed: 0
+adr_proposed: 1
 open_blocker_high: []
 
 authoritative_sources:
