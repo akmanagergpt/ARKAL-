@@ -173,6 +173,55 @@ class PolicyDecisionPoint:
             )
         ).decision.value
 
+    def decide_computer_use(
+        self,
+        *,
+        operation_class: str,
+        trust_tier: str,
+        actor: str,
+        facts: dict[str, bool] | None = None,
+        local_only: bool = False,
+        recorded_human_gates: tuple[str, ...] = (),
+    ) -> tuple[str, str, str | None]:
+        """Any Computer-Use operation class (ARK-REQ-0170), as primitives in
+        and out, for a caller that cannot import `policy_contract.PolicyRequest`
+        (fan-in ceiling 15 of 15 - the identical constraint
+        `decide_network_egress` already answers the same way, generalised
+        here across all fourteen classes rather than one, since Computer-Use
+        genuinely needs more than `NETWORK_EXTERNAL`).
+
+        `facts` carries the tri-state fixed-rule inputs
+        (`target_is_loopback`/`target_is_own_process`/
+        `within_preauthorized_scope`/`lockfile_bound`) by key rather than as
+        separate parameters - `max_parameters_per_public_function` is 6, and
+        nine named booleans would have breached it; an absent key means
+        "not stated", the identical `None` default `PolicyRequest` itself
+        uses, never the permissive value.
+
+        Returns `(decision.value, rule/reason, required_human_gate)` - never
+        the `PolicyDecisionRecord`/`Decision` objects themselves, so a
+        structural `Protocol` mirroring this exact signature needs no import
+        of this module's own types either. Uses `decide_or_deny_unmapped`
+        (ARK-REQ-0166's own shape) rather than `decide`, so an operation
+        class Computer-Use cannot resolve is a recorded `DENY`, never an
+        uncaught exception a worker process could crash on.
+        """
+        stated = facts or {}
+        record = self.decide_or_deny_unmapped(
+            PolicyRequest(
+                operation_class=operation_class,
+                trust_tier=trust_tier,
+                actor=actor,
+                local_only=local_only,
+                target_is_loopback=stated.get("target_is_loopback"),
+                target_is_own_process=stated.get("target_is_own_process"),
+                within_preauthorized_scope=stated.get("within_preauthorized_scope"),
+                lockfile_bound=stated.get("lockfile_bound"),
+                recorded_human_gates=recorded_human_gates,
+            )
+        )
+        return record.decision.value, record.reason, record.required_human_gate
+
     # -- steps ---------------------------------------------------------------
 
     def _require_known_tier(self, request: PolicyRequest) -> None:
