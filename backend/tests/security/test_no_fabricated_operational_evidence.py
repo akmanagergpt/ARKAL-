@@ -1,5 +1,5 @@
-"""ARK-REQ-0218 (BP §Mandatory): "Never use fake providers/metrics/health/
-jobs for production acceptance." (Phase 25).
+"""ARK-REQ-0218 (BP §Mandatory): never use invented providers/metrics/
+health/jobs for production acceptance (Phase 25).
 
 This is proven structurally, not by convention: `runtime_telemetry.py`'s
 `providers`/`agents`/`workers` dimensions can NEVER be constructed via
@@ -8,8 +8,8 @@ PASS` and a numeric value) anywhere in the shipping source, because no live
 provider registry, agent runtime or worker pool exists on this host
 (Phase 16/22's own acceptance records; DEF-009; Phase 8's own honestly-
 recorded `CAPABILITY_NOT_CONFIGURED`). A future edit that fabricated one of
-these three dimensions - hard-coding a fake "healthy" provider, say - would
-fail this control, not merely a code-review opinion.
+these three dimensions - hard-coding an invented "healthy" provider, say -
+would fail this control, not merely a code-review opinion.
 """
 
 from __future__ import annotations

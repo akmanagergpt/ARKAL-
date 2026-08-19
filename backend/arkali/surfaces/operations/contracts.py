@@ -10,7 +10,7 @@ absent, unconfigured or not yet built on this host reports `NOT_CONFIGURED`
 with an honest `detail` explaining why, exactly as `execution_routing.py`
 (Phase 16) and `CapabilityGraph.can_perform` (Phase 3/9B) already resolve an
 unactivated capability - never a fabricated value (ARK-REQ-0218, ARK-REQ-355:
-"no fake telemetry").
+no invented telemetry).
 
 NOTHING IS CACHED. `OperationsSnapshot` is a frozen value returned by one call
 into the live authorities it composes; a second call re-derives it from

@@ -78,9 +78,9 @@ def write_workspace_file(
     payload: bytes,
     trust_tier: str = DEFAULT_TRUST_TIER,
 ) -> FileOutcome:
-    """`WRITE_WORKSPACE_FILE`, confined to `root`. Never touches Stable -
-    `WRITE_STABLE_FILE` is a distinct operation class this function never
-    requests, and the PDP's own fixed rule refuses it for every actor
+    """`WRITE_WORKSPACE_FILE`, confined to `root`. Never touches Stable - the
+    distinct Stable-file write operation class is never requested by this
+    function, and the PDP's own fixed rule refuses it for every actor
     regardless (`stable_mutation.prohibited_actors` already names
     `computer_use_worker`)."""
     target = _confined_path(root, relative)

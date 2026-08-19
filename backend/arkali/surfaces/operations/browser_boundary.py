@@ -10,8 +10,8 @@ mechanism to compose without introducing a new dependency this phase does
 not own the decision to add. The PDP decision itself is fully real and
 fully proven (`test_operations_computer_use.py`); `browse` reports the
 launch step `NOT_CONFIGURED` rather than fabricating a browser session -
-exactly ARK-REQ-0218/0355's own rule ("never fake a job/health/metric"),
-applied to a capability this host cannot back for real. A future phase that
+exactly ARK-REQ-0218/0355's own rule against inventing a job/health/metric
+result, applied to a capability this host cannot back for real. A future phase that
 adds a real driver dependency composes this same decision unmodified; it
 does not need a second policy path.
 """

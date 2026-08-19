@@ -183,7 +183,13 @@ class TestNoNewSiblingEdgeWasIntroduced:
         # WorkspaceAuthority is composed through a structural Protocol
         # (pipeline.py) rather than imported, so no such edge exists to
         # declare (see pipeline.py's module docstring).
-        assert len(declared) == 10
+        # 11th edge added at Phase 25 Package 7: surfaces.command ->
+        # surfaces.operations, composing the C-34 Operations telemetry/
+        # Computer-Use capability behind the Command Center HTTP surface its
+        # own contract row names as the delivery surface, rather than a
+        # second HTTP presentation layer inside surfaces.operations itself
+        # (ARK-REQ-0168, 0170).
+        assert len(declared) == 11
 
     def test_no_sibling_edge_targets_an_exempt_context(
         self, live_map: AuthorityMap
