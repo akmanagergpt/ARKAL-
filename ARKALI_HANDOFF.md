@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `42390ee0fc71037f9bf96f493f909c005a26dd4a` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `183b01416a9b9b961cc01d14d8d4fd147e2a3f12` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -432,7 +432,8 @@ repository, the repository wins.
 | 256 | `22e9867` | **PHASE 24 PACKAGE 6** (`ARK-REQ-0134`/`0359`-shaped adversarial proof, restated for `HUMAN_GATE_3`) — structural AST proof of no direct Stable/live mutation anywhere in the child-product SDK and a fail-closed self-approval boundary (a barred issuer's own GRANTED row does not authorize a promotion), mirroring `test_core_promotion_gate_scope.py`'s own barred-issuer test. Not a phase acceptance; no requirement discharged |
 | 257 | `bc1e4b7` | **PHASE 24 PACKAGE 7 (journey half)** — `test_child_product_journey.py`'s composed two-cycle journey reaches a real, `StableRevisionPointer`-independent promotion on real filesystem/SQLite/evidence infrastructure. Finds and fixes a real defect: `child_product_campaign._child_campaign_id` collided across two evolution requests for the same product, depending on product identity alone — repaired by binding `campaign_id` to `(product_ref, objective)` together, content-addressed (`ARK-REQ-0132`/`0133`/`0358`). Not a phase acceptance; no requirement discharged |
 | 258 | `1977658` | **MYPY STRICT-MODE FIX** — `core_upgrade_state_machine.py` gains the standard `X as X` re-export idiom for `StateMachineInstance`, closing a real pre-existing strict-mode gap (flagged across 3 files, 2 already in Phase 23's own accepted source) surfaced by this phase's own new `child_product_campaign.py` import. Kept as one import statement deliberately, after a two-statement form reproduced a real fan-in-16-of-15 architecture violation. Not a phase acceptance; no requirement discharged |
-| 259 | `42390ee` | **PHASE 24 CANDIDATE — COMPOSED VDC JOURNEY, C-36 CONTRACT, C-17 REPORT, TRACEABILITY, CANDIDATE FROZEN.** `docs/contracts/product_sdk.md`, `phase_24_report.json` and `phase_24_traceability.json` committed: 4 SATISFIED claims, `reconcile_discharge` zero violations; 10 recorded runs including the 90-test Phase 24 target suite, security (254, unchanged), structural (411), governance (395 passed, 4 pre-existing deselections explained inline) and full regression (3167 passed, 13 skipped, 5 pre-existing deselections). `python scripts/run_phase_gate.py 24 25` returned `AWAITING_HUMAN_GATE`, progression STOPPED, the sole failing condition "HUMAN_GATE_3 required and not recorded" (digest `sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1`) — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE normal profile, PREREQ 2/2, all 8 architecture gates over 202 edges). Not a phase acceptance; candidate frozen at this commit ← HEAD at generation |
+| 259 | `42390ee` | **PHASE 24 CANDIDATE — COMPOSED VDC JOURNEY, C-36 CONTRACT, C-17 REPORT, TRACEABILITY, CANDIDATE FROZEN.** `docs/contracts/product_sdk.md`, `phase_24_report.json` and `phase_24_traceability.json` committed: 4 SATISFIED claims, `reconcile_discharge` zero violations; 10 recorded runs including the 90-test Phase 24 target suite, security (254, unchanged), structural (411), governance (395 passed, 4 pre-existing deselections explained inline) and full regression (3167 passed, 13 skipped, 5 pre-existing deselections). `python scripts/run_phase_gate.py 24 25` returned `AWAITING_HUMAN_GATE`, progression STOPPED, the sole failing condition "HUMAN_GATE_3 required and not recorded" (digest `sha256:ecf43065fcdedb13fceece933145c58085363cda775b67e41873f8e286c06dc1`) — every other check PASSES (C1–C6, EXTERNAL_RESULT, PROTECTED_CORE normal profile, PREREQ 2/2, all 8 architecture gates over 202 edges). Not a phase acceptance; candidate frozen at this commit |
+| 260 | `183b014` | **HANDOFF + BUILD_STATE REFRESH (§12 rule)** — re-derived after the Phase 24 candidate and gate run: live architecture summary unchanged at 202 edges, Sections 3/8/9 rewritten for `AWAITING_HUMAN_GATE`, Section 4 ledger rows 249–259 added, Section 11 gains this refresh's own row ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -884,7 +885,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 42390ee0fc71037f9bf96f493f909c005a26dd4a
+head: 183b01416a9b9b961cc01d14d8d4fd147e2a3f12
 branch: main
 working_tree_clean: true
 
