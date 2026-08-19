@@ -127,6 +127,23 @@ class WorkflowExecutor:
             raise UnknownWorkflowExecution(f"no execution {execution_id!r} is registered")
         return found
 
+    def list_by_state(self, states: tuple[str, ...]) -> tuple[WorkflowExecutionRecord, ...]:
+        """Every workflow execution currently in one of the given states.
+
+        Read-only, real-time observability (ARK-REQ-0168, Phase 25) - the
+        same shape `execution.durable.JobStore.list_by_state` already
+        established for jobs. An empty `states` tuple returns no rows.
+        """
+        self._guard(READ)
+        if not states:
+            return ()
+        rows = self._session.execute(
+            select(WorkflowExecutionRecord).where(
+                WorkflowExecutionRecord.lifecycle_state.in_(states)
+            )
+        ).scalars()
+        return tuple(rows)
+
     def evidence(self, execution_id: str) -> tuple[WorkflowNodeExecutionRecord, ...]:
         self._guard(READ)
         rows = self._session.execute(

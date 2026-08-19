@@ -150,6 +150,23 @@ class JobStore:
             )
         ).scalar_one_or_none()
 
+    def list_by_state(self, states: tuple[str, ...]) -> tuple[DurableJobRecord, ...]:
+        """Every job currently recorded in one of the given lifecycle states.
+
+        Read-only, real-time observability (ARK-REQ-0168, Phase 25): the
+        state is read fresh from the row on every call, never cached, so a
+        caller cannot see a stale count. An empty `states` tuple returns no
+        rows rather than every row, so a caller cannot accidentally list the
+        whole table by omission.
+        """
+        self._guard(READ)
+        if not states:
+            return ()
+        rows = self._session.execute(
+            select(DurableJobRecord).where(DurableJobRecord.lifecycle_state.in_(states))
+        ).scalars()
+        return tuple(rows)
+
     def checkpoints(self, job_id: str) -> tuple[JobCheckpointRecord, ...]:
         """Every checkpoint for a job, oldest first."""
         self._guard(READ)
