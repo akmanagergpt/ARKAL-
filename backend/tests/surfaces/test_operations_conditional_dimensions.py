@@ -8,6 +8,7 @@ import pathlib
 
 from arkali.engineering.knowledge.contracts import EvidenceKind, EvidenceReference
 from arkali.engineering.knowledge.outcome_statistics import VerifiedOutcome
+from arkali.engineering.localai import host_probe
 from arkali.kernel.contracts.content_address import address_of
 from arkali.kernel.contracts.honest_state import HonestState
 from arkali.surfaces.operations.conditional_dimensions import (
@@ -17,11 +18,15 @@ from arkali.surfaces.operations.conditional_dimensions import (
 from arkali.surfaces.operations.hardware_telemetry import observe_hardware
 
 
+def _observe(path: str):  # noqa: ANN201
+    return observe_hardware(path, host_probe.probe_host)
+
+
 class TestHardwareCostDimensionsArk0356:
     def test_gpu_and_vram_reflect_the_real_hardware_reading(
         self, tmp_path: pathlib.Path,
     ) -> None:
-        hardware = observe_hardware(str(tmp_path))
+        hardware = _observe(str(tmp_path))
         dims = observe_hardware_cost_dimensions(hardware)
         assert dims.gpu == hardware.gpu_present
         assert dims.vram == hardware.vram_total_bytes
@@ -29,7 +34,7 @@ class TestHardwareCostDimensionsArk0356:
     def test_cost_and_token_usage_are_honestly_not_applicable_with_no_provider(
         self, tmp_path: pathlib.Path,
     ) -> None:
-        hardware = observe_hardware(str(tmp_path))
+        hardware = _observe(str(tmp_path))
         dims = observe_hardware_cost_dimensions(hardware)
         assert dims.cost.state is HonestState.NOT_APPLICABLE
         assert dims.token_usage.state is HonestState.NOT_APPLICABLE

@@ -43,11 +43,11 @@ from typing import Final, Protocol, runtime_checkable
 
 from sqlalchemy import Engine
 
-from arkali.execution.durable.job_store import JobStore
-from arkali.execution.durable.recovery import JobRecovery
 from arkali.surfaces.operations.contracts import OperationsSnapshot
-from arkali.surfaces.operations.hardware_telemetry import observe_hardware
+from arkali.surfaces.operations.hardware_telemetry import HostFactsSource, observe_hardware
 from arkali.surfaces.operations.runtime_telemetry import (
+    HeartbeatSource,
+    JobSource,
     WorkflowActivitySource,
     observe_runtime,
 )
@@ -72,17 +72,23 @@ class ReadAuthorization(Protocol):
 def observe_operations(
     *,
     pep: ReadAuthorization,
-    job_store: JobStore,
-    job_recovery: JobRecovery,
-    executor: WorkflowActivitySource,
+    durable: tuple[JobSource, HeartbeatSource, WorkflowActivitySource],
     engine: Engine,
     workspace_path: str,
+    probe_host: HostFactsSource,
 ) -> OperationsSnapshot:
-    """The complete real-time Operations view, re-derived on every call."""
+    """The complete real-time Operations view, re-derived on every call.
+
+    `durable` is `(job_store, job_recovery, executor)`, grouped into one
+    parameter - `max_parameters_per_public_function` is 6, and this
+    function's five real collaborators plus the newly-added `probe_host`
+    (Package 7's own depth-avoidance `Protocol`) would otherwise breach it.
+    """
+    job_store, job_recovery, executor = durable
     pep.require_auto(actor=ACTOR)
     return OperationsSnapshot(
         runtime=observe_runtime(job_store, job_recovery, executor),
-        hardware=observe_hardware(workspace_path),
+        hardware=observe_hardware(workspace_path, probe_host),
         storage=observe_storage(engine),
     )
 

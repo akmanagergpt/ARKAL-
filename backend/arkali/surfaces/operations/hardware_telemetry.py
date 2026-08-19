@@ -3,14 +3,18 @@ and GPU/VRAM (CONDITIONAL, ARK-REQ-0356).
 
 Owner: `surfaces.operations`.
 
-REUSES `engineering.localai.host_probe`, NEVER RE-PROBES CPU/RAM/GPU
-PRESENCE. That module already owns real, read-only `probe_logical_cores`/
-`probe_total_ram_bytes`/`probe_accelerator` for `ARK-REQ-0129`; a second,
-independent CPU/RAM/GPU probe here would be exactly the F-0013 shadow-model
-defect (two implementations of the same fact, free to drift). This module
-composes those three and adds only the two dimensions that module has no
-reason to own: disk free space and a local network-interface check, plus one
-VRAM query layered on `host_probe`'s own accelerator-presence result.
+REUSES `engineering.localai.host_probe`'s REAL FACTS, NEVER RE-PROBES CPU/
+RAM/GPU PRESENCE - but through a structural `HostFactsSource` `Protocol`,
+not a direct import. A real, measured `max_orchestration_depth` violation:
+`engineering.localai`'s own longest chain (`engineering.localai ->
+control.capability -> kernel.contracts`, from `capability_exposure.py`) was
+already 3 of 4, so once Package 7 declared `surfaces.command ->
+surfaces.operations`, the composed path `surfaces.command ->
+surfaces.operations -> engineering.localai -> control.capability ->
+kernel.contracts` reached 5 - the identical shape Package 1 already
+answered once for `execution.workflow` via `WorkflowActivitySource`. A
+caller still supplies the real `host_probe.probe_host` function; only the
+reference at this call site is structural.
 
 NO OUTBOUND NETWORK CALL IS MADE. "network telemetry" here means real local
 interface enumeration (is there at least one non-loopback interface with an
@@ -27,11 +31,27 @@ from __future__ import annotations
 import shutil
 import socket
 import subprocess
+from typing import Protocol
 
-from arkali.engineering.localai import host_probe
 from arkali.surfaces.operations.contracts import DimensionReading, HardwareSnapshot
 
 _NO_ACCELERATOR = "no accelerator detected (engineering.localai.host_probe.probe_accelerator)"
+
+
+class HostFactsLike(Protocol):
+    """Structural match for `engineering.localai.host_probe.HostFacts`."""
+
+    os_name: str
+    logical_cores: int
+    total_ram_bytes: int
+    accelerator_present: bool
+    accelerator_detail: str
+
+
+class HostFactsSource(Protocol):
+    """Structural match for `engineering.localai.host_probe.probe_host`."""
+
+    def __call__(self) -> HostFactsLike: ...
 
 
 def _probe_disk_free_bytes(path: str) -> DimensionReading:
@@ -96,9 +116,14 @@ def _probe_vram_total_bytes(accelerator_present: bool) -> DimensionReading:
     )
 
 
-def observe_hardware(workspace_path: str) -> HardwareSnapshot:
-    """The real, live hardware dimensions, re-derived on every call."""
-    facts = host_probe.probe_host()
+def observe_hardware(workspace_path: str, probe_host: HostFactsSource) -> HardwareSnapshot:
+    """The real, live hardware dimensions, re-derived on every call.
+
+    `probe_host` has no default - a caller must explicitly supply the real
+    `engineering.localai.host_probe.probe_host` function (or, in a test, a
+    fixture double), so this module never silently falls back to anything.
+    """
+    facts = probe_host()
     return HardwareSnapshot(
         cpu_logical_cores=DimensionReading.real(
             "cpu_logical_cores", float(facts.logical_cores),
@@ -125,4 +150,4 @@ def observe_hardware(workspace_path: str) -> HardwareSnapshot:
     )
 
 
-__all__ = ["observe_hardware"]
+__all__ = ["observe_hardware", "HostFactsSource", "HostFactsLike"]

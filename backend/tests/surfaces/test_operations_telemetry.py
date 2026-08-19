@@ -8,6 +8,7 @@ import pytest
 
 from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.control.policy.policy_errors import PolicyDenied
+from arkali.engineering.localai import host_probe
 from arkali.execution.durable.job_store import JobSubmission
 from arkali.kernel.contracts.honest_state import HonestState
 from arkali.surfaces.operations.telemetry import observe_operations
@@ -31,8 +32,8 @@ class TestObserveOperationsComposesAllThreeProbes:
         with reopen.session() as (recovery, executor, engine, _session):
             snapshot = observe_operations(
                 pep=auth,
-                job_store=recovery.execution.jobs, job_recovery=recovery,
-                executor=executor, engine=engine, workspace_path=str(tmp_path),
+                durable=(recovery.execution.jobs, recovery, executor),
+                engine=engine, workspace_path=str(tmp_path), probe_host=host_probe.probe_host,
             )
         assert snapshot.runtime.jobs_active.state is HonestState.PASS
         assert snapshot.hardware.cpu_logical_cores.state is HonestState.PASS
@@ -48,16 +49,16 @@ class TestObserveOperationsComposesAllThreeProbes:
             )
             session.commit()
             before = observe_operations(
-                pep=auth, job_store=recovery.execution.jobs, job_recovery=recovery,
-                executor=executor, engine=engine, workspace_path=str(tmp_path),
+                pep=auth, durable=(recovery.execution.jobs, recovery, executor),
+                engine=engine, workspace_path=str(tmp_path), probe_host=host_probe.probe_host,
             )
             recovery.execution.jobs.submit(
                 JobSubmission(job_id="JOB-B", job_type="arkali.test.noop", idempotency_key="k2")
             )
             session.commit()
             after = observe_operations(
-                pep=auth, job_store=recovery.execution.jobs, job_recovery=recovery,
-                executor=executor, engine=engine, workspace_path=str(tmp_path),
+                pep=auth, durable=(recovery.execution.jobs, recovery, executor),
+                engine=engine, workspace_path=str(tmp_path), probe_host=host_probe.probe_host,
             )
         assert after.runtime.jobs_queued.value == before.runtime.jobs_queued.value + 1.0
 
@@ -103,6 +104,7 @@ class TestTheAggregateViewIsGenuinelyGated:
         with reopen.session() as (recovery, executor, engine, _session):
             with pytest.raises(PolicyDenied):
                 observe_operations(
-                    pep=auth, job_store=recovery.execution.jobs, job_recovery=recovery,
-                    executor=executor, engine=engine, workspace_path=str(tmp_path),
+                    pep=auth, durable=(recovery.execution.jobs, recovery, executor),
+                    engine=engine, workspace_path=str(tmp_path),
+                    probe_host=host_probe.probe_host,
                 )

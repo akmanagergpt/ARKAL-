@@ -24,6 +24,7 @@ API and deliberately offers no delete, no update and no bulk operation.
 from __future__ import annotations
 
 import datetime as dt
+import pathlib
 from collections.abc import Callable, Iterator
 from typing import Final
 
@@ -62,6 +63,8 @@ from arkali.surfaces.command.error_mapping import (
     status_for,
 )
 from arkali.surfaces.command.jobs import build_jobs_router
+from arkali.surfaces.command.operations import Wiring as OperationsWiring
+from arkali.surfaces.command.operations import _build_operations_router
 from arkali.surfaces.command.workflow import (
     DocumentBuilder,
     ExecutorFactory,
@@ -108,6 +111,8 @@ def create_app(
     pdp: PolicyDecisionPoint,
     clock: Callable[[], dt.datetime] | None = None,
     workflow_wiring: tuple[DocumentBuilder, GraphStoreFactory, ExecutorFactory] | None = None,
+    operations_wiring: OperationsWiring | None = None,
+    operations_repo_root: pathlib.Path | None = None,
 ) -> FastAPI:
     """Build the Command Center API over a real engine and a real PDP.
 
@@ -126,6 +131,16 @@ def create_app(
     control.policy → kernel.contracts`) to five, breaching
     `max_orchestration_depth`. `None` omits the workflow routes entirely, so
     every existing caller of `create_app` is unaffected.
+
+    `operations_wiring` is `(job_recovery_factory, executor_factory, pdp,
+    probe_host)` for the C-34 Operations routes (Phase 25) - see
+    `operations.py`'s own module docstring for why the PEP/PolicyRequest
+    construction those factories need, and the `engineering.localai`
+    host-probe import, both stay out of this module (real, measured
+    `max_fan_in_per_module`/`max_contexts_touched_by_module` violations).
+    `operations_repo_root` is required alongside it - both `None` together
+    omit the operations routes entirely, so every existing caller of
+    `create_app` is unaffected.
     """
     factory = create_session_factory(engine)
     pep = PolicyEnforcementPoint(pdp, SURFACE)
@@ -296,6 +311,17 @@ def create_app(
             build_workflow_router(
                 session_scope, guard, refuse,
                 document_builder, graph_store_factory, executor_factory,
+            )
+        )
+    # The C-34 Operations routes (Phase 25) are additive and optional at this
+    # composition root, the identical shape `workflow_wiring` already
+    # established: a caller that supplies none gets the pre-Phase-25
+    # application unchanged.
+    if operations_wiring is not None and operations_repo_root is not None:
+        app.include_router(
+            _build_operations_router(
+                session_scope, guard, refuse, engine, operations_repo_root,
+                operations_wiring,
             )
         )
     return app

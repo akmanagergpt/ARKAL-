@@ -83,7 +83,7 @@ class AiReviewBundle(BaseModel):
     source: SourceExport
 
 
-def _observe_architecture(repo_root: pathlib.Path) -> ArchitectureSummary:
+def observe_architecture(repo_root: pathlib.Path) -> ArchitectureSummary:
     authority_map = AuthorityMap.load(repo_root)
     results = GateRunner(repo_root, authority_map).run_all()
     passed = [r for r in results if r.state.value == "PASS"]
@@ -123,7 +123,7 @@ def build_ai_review_bundle(
     (PDP-gated) tree actually exported as `source`/`tree` - the two may
     differ, since a caller might export only a subdirectory."""
     return AiReviewBundle(
-        architecture=_observe_architecture(repo_root),
+        architecture=observe_architecture(repo_root),
         contracts=_reference(repo_root, "docs/canonical/CONTRACT_INVENTORY.md"),
         issues=_reference(repo_root, "docs/build/OPEN_BLOCKERS.md"),
         evidence=_reference(repo_root, "docs/acceptance"),
@@ -136,5 +136,5 @@ def build_ai_review_bundle(
 
 __all__ = [
     "ArchitectureSummary", "DocumentReference", "AiReviewBundle",
-    "build_ai_review_bundle",
+    "build_ai_review_bundle", "observe_architecture",
 ]

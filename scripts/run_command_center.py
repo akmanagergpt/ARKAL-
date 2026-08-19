@@ -38,6 +38,8 @@ from sqlalchemy.orm import Session  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
+from arkali.engineering.localai import host_probe  # noqa: E402
+from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
 from arkali.execution.workflow.graph_model import (  # noqa: E402
     WorkflowEdge,
@@ -87,6 +89,31 @@ def _workflow_wiring(
     return document_builder, graph_store_factory, executor_factory
 
 
+def _operations_wiring(
+    pdp: PolicyDecisionPoint, repo_root: pathlib.Path
+) -> tuple[Callable[..., Any], Callable[..., Any], PolicyDecisionPoint, Callable[..., Any]]:
+    """The C-34 composition-root wiring (Phase 25) - the identical shape and
+    the identical reason `_workflow_wiring` above already established: this
+    script sits outside the measured architecture graph, so constructing
+    real `JobRecovery`/`WorkflowExecutor` instances (which need a real
+    `PolicyEnforcementPoint`) and importing the real
+    `engineering.localai.host_probe.probe_host` here adds no edge the
+    architecture budget would ever see. See `operations.py`'s own module
+    docstring for why `surfaces.command` itself may not do either directly.
+    """
+    vocabulary = GraphVocabulary.load(repo_root)
+    approval_gate = WorkflowApprovalGate.load(repo_root)
+
+    def job_recovery_factory(session: Session) -> JobRecovery:
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.execution")
+        return JobRecovery(session, pep)
+
+    def executor_factory(session: Session) -> WorkflowExecutor:
+        return WorkflowExecutor(session, pdp, vocabulary, approval_gate)
+
+    return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
+
+
 def migrate(database: pathlib.Path) -> None:
     """Bring the database to head with the real migration chain."""
     config = Config(str(ROOT / "backend" / ALEMBIC_INI))
@@ -126,7 +153,10 @@ def main(argv: list[str]) -> int:
 
     engine = create_persistence_engine(sqlite_url(database))
     pdp = PolicyDecisionPoint.load(ROOT)
-    app = create_app(engine, pdp, workflow_wiring=_workflow_wiring(pdp, ROOT))
+    app = create_app(
+        engine, pdp, workflow_wiring=_workflow_wiring(pdp, ROOT),
+        operations_wiring=_operations_wiring(pdp, ROOT), operations_repo_root=ROOT,
+    )
     print(f"command center on http://{args.host}:{args.port} over {database}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0

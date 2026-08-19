@@ -4,7 +4,7 @@
 Owner: `surfaces.operations`.
 
 COMPOSES THE OWNING AUTHORITIES; STORES NOTHING OF ITS OWN. Job state comes
-from the real `execution.durable.JobStore`/`JobRecovery` this session already
+from the real `execution.durable.JobStore`/`JobRecovery` a caller already
 holds - reused unmodified except for the one additive `list_by_state` read
 Phase 25 added (mirroring `JobStore.get`'s own PEP-gated shape). Stuck-job
 detection reuses `execution.durable.JobRecovery.heartbeat_stale` per running
@@ -12,16 +12,19 @@ job rather than re-deriving the staleness rule a second time (F-0036's own
 lesson: a name and a rule drift apart the moment two places compute the same
 fact).
 
-WHY WORKFLOW ACTIVITY IS A STRUCTURAL `Protocol`, NOT A DIRECT IMPORT. A real,
-measured `max_orchestration_depth` violation, found by running the gate:
-`execution.workflow`'s own chain into `kernel.contracts`
-(`execution.workflow -> execution.durable -> control.policy ->
-kernel.contracts`) was already 4 of 4, so a direct `WorkflowExecutor` import
-here would have extended it to 5 - the identical shape Phase 16's
+WHY JOBS/WORKFLOWS ARE ALL STRUCTURAL `Protocol`s, NOT DIRECT IMPORTS. Two
+real, measured `max_orchestration_depth` violations, found by running the
+gate at different points: first `execution.workflow`'s own chain into
+`kernel.contracts` (already 4 of 4) would have been extended to 5 by a
+direct `WorkflowExecutor` import - the identical shape Phase 16's
 `product_generation.py` and Phase 19's `pipeline.py` each answered with a
-`Protocol` instead of an import, never requested as a GATE 8 exception.
-`execution.durable` has no such problem - its own chain is one hop shorter -
-so `JobStore`/`JobRecovery` stay direct imports.
+`Protocol`. Then Package 7 declared `surfaces.command -> surfaces.
+operations`, and `execution.durable`'s own chain (`execution.durable ->
+control.policy -> kernel.contracts`, already 3 of 4 on its own) became a
+*second* path to 5 once wrapped by that new edge - so `JobStore`/
+`JobRecovery` are Protocols too now, for the identical reason. A caller
+still passes real instances; only the references at this call site are
+structural.
 
 WHY PROVIDERS/AGENTS/WORKERS ARE HONEST `NOT_CONFIGURED`. `control.registry.
 provider` holds no live provider registry on this host (Phase 16/22's own
@@ -37,9 +40,23 @@ from __future__ import annotations
 
 from typing import Final, Protocol, Sequence
 
-from arkali.execution.durable.job_store import JobStore
-from arkali.execution.durable.recovery import JobRecovery
 from arkali.surfaces.operations.contracts import DimensionReading, RuntimeSnapshot
+
+
+class _JobLike(Protocol):
+    job_id: str
+
+
+class JobSource(Protocol):
+    """Structural match for `execution.durable.JobStore.list_by_state`."""
+
+    def list_by_state(self, states: tuple[str, ...]) -> Sequence[_JobLike]: ...
+
+
+class HeartbeatSource(Protocol):
+    """Structural match for `execution.durable.JobRecovery.heartbeat_stale`."""
+
+    def heartbeat_stale(self, job_id: str) -> bool: ...
 
 
 class WorkflowActivitySource(Protocol):
@@ -51,6 +68,7 @@ class WorkflowActivitySource(Protocol):
     """
 
     def list_by_state(self, states: tuple[str, ...]) -> Sequence[object]: ...
+
 
 #: Non-terminal Job states (STATE_MACHINES.md §3): active work in progress.
 _JOB_ACTIVE_STATES: Final[tuple[str, ...]] = (
@@ -79,7 +97,7 @@ _NO_WORKER_POOL = (
 
 
 def observe_runtime(
-    job_store: JobStore, job_recovery: JobRecovery, executor: WorkflowActivitySource,
+    job_store: JobSource, job_recovery: HeartbeatSource, executor: WorkflowActivitySource,
 ) -> RuntimeSnapshot:
     """The real, live runtime dimensions, re-derived on every call."""
     active_jobs = job_store.list_by_state(_JOB_ACTIVE_STATES)
@@ -114,4 +132,4 @@ def observe_runtime(
     )
 
 
-__all__ = ["observe_runtime"]
+__all__ = ["observe_runtime", "JobSource", "HeartbeatSource", "WorkflowActivitySource"]

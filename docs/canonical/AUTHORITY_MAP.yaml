@@ -40,6 +40,7 @@ allowed_sibling_edges:
   - {from: control.specification, to: control.architecture, reason: "D-025: requirement/architecture intelligence composes the live authority map's concerns rather than duplicating them"}
   - {from: engineering.factory, to: engineering.repair, reason: "D-026 / ARK-REQ-0393: failover reuses the existing C-26 anti-loop/budget mechanism rather than a second one"}
   - {from: engineering.import, to: engineering.codeintel, reason: "Phase 19 / ARK-REQ-0115, 0161: static inspection reuses the existing AST-only PythonGraphBuilder rather than a second Python parser"}
+  - {from: surfaces.command, to: surfaces.operations, reason: "Phase 25 / ARK-REQ-0168, 0170: the Command Center HTTP surface composes the Operations telemetry/Computer-Use capability its own contract row (C-34) names as its delivery surface, rather than a second HTTP presentation layer inside surfaces.operations itself"}
 
 # ---------------------------------------------------------------------------
 # Architecture budgets. Numeric. Exception = HUMAN GATE 8 + ADR.
