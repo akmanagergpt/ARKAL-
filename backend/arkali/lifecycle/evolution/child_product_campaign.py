@@ -61,7 +61,7 @@ _RUNNING: Final[str] = "RUNNING"
 _CAMPAIGN_ID_PREFIX: Final[str] = "child-product"
 
 
-def child_campaign_id(identity: ChildProductIdentity) -> str:
+def _child_campaign_id(identity: ChildProductIdentity) -> str:
     """The deterministic `campaign_id` a child product's campaigns share as
     a namespace - traceable back to the exact product identity that
     produced it, never a caller-chosen free string."""
@@ -89,7 +89,7 @@ def declare_child_product_campaign(
             "are eligible for the Product Evolution SDK"
         )
     return CampaignDeclaration(
-        campaign_id=child_campaign_id(identity),
+        campaign_id=_child_campaign_id(identity),
         objective=objective,
         baseline_metrics=baseline_metrics,
         budgets=budgets,

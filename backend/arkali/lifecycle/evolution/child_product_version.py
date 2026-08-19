@@ -31,7 +31,7 @@ of is not built here.
 
 ROLLBACK IS A NEW EVENT, NEVER A DELETION. Mirrors `StableRevisionPointer`'s
 own "append-only and never rewritten" rule and `RecoverySupervisor`'s "no
-novel content" invariant: `rollback_to` appends a new `ChildProductVersion`
+novel content" invariant: `restore_to` appends a new `ChildProductVersion`
 whose `content_ref` points back at an *already-recorded* version's content,
 never truncates or edits history. "Rolled back to v1.4" is itself a fact
 in the lineage, not an erasure of v1.5.
@@ -74,7 +74,7 @@ class ChildProductVersion(BaseModel):
     #: never a caller-chosen label.
     content_ref: Declared
     #: The campaign that produced this version, traceable back to
-    #: `child_product_campaign.child_campaign_id` - a free identifier, not an
+    #: `child_product_campaign._child_campaign_id` - a free identifier, not an
     #: embedded object, the same loose-coupling `CampaignAttempt.candidate_id`
     #: already uses.
     campaign_id: Declared
@@ -106,7 +106,7 @@ class ChildProductVersionLineage(BaseModel):
 
     Mirrors `CampaignLedger`'s immutable-update shape: every mutating method
     returns a *new* lineage rather than mutating this one, and `versions` is
-    a tuple no caller can append to except through `append`/`rollback_to`,
+    a tuple no caller can append to except through `append`/`restore_to`,
     both of which validate order before returning anything.
     """
 
@@ -122,7 +122,7 @@ class ChildProductVersionLineage(BaseModel):
 
     def find(self, version_ref: str) -> ChildProductVersion:
         """The already-recorded version this `version_ref` names, or refuse.
-        `rollback_to` calls this so a rollback target must already be in
+        `restore_to` calls this so a rollback target must already be in
         this lineage's own durable history - a caller's claim that some
         content was "an earlier version" is never trusted on its own."""
         for version in self.versions:
@@ -151,7 +151,7 @@ class ChildProductVersionLineage(BaseModel):
             {**self.model_dump(), "versions": (*self.versions, version)}
         )
 
-    def rollback_to(
+    def restore_to(
         self, version_ref: str, *, campaign_id: str
     ) -> ChildProductVersionLineage:
         """ARK-REQ-0132: roll back to an already-recorded version by

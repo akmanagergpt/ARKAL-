@@ -16,9 +16,9 @@ problem - so a real `WorkspaceAuthority` instance satisfies this module
 without adding the edge the measured graph would see. Decomposition per
 ADR-0008, not an exemption.
 
-ISOLATION PER PRODUCT AND PER CAMPAIGN, NOT PER CALL. `child_workspace_id`
+ISOLATION PER PRODUCT AND PER CAMPAIGN, NOT PER CALL. `_child_workspace_id`
 derives a deterministic identifier from the exact `(product, campaign)`
-pair, mirroring `child_product_campaign.child_campaign_id`'s own
+pair, mirroring `child_product_campaign._child_campaign_id`'s own
 traceability discipline - two campaigns for the same product, or the same
 campaign requested twice, resolve to the same workspace identity rather
 than silently allocating two disjoint ones `WorkspaceAuthority.allocate`
@@ -70,7 +70,7 @@ class _WorkspaceAllocator(Protocol):
     ) -> _WorkspaceHandle: ...
 
 
-def child_workspace_id(identity: ChildProductIdentity, *, campaign_id: str) -> str:
+def _child_workspace_id(identity: ChildProductIdentity, *, campaign_id: str) -> str:
     """The deterministic workspace identifier for one product's one
     campaign - content-addressed over both, never a caller-chosen free
     string, so the same (product, campaign) pair always resolves to the
@@ -90,7 +90,7 @@ def allocate_child_product_workspace(
     product's campaign, through the real, unmodified Phase 12 authority -
     never a second workspace mechanism."""
     return allocator.allocate(
-        workspace_id=child_workspace_id(identity, campaign_id=campaign_id),
+        workspace_id=_child_workspace_id(identity, campaign_id=campaign_id),
         task_id=identity.product_id,
         agent_id="lifecycle.evolution",
         stable_snapshot=stable_snapshot,

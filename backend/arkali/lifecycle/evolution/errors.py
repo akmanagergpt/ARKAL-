@@ -73,3 +73,12 @@ class ChildProductCandidateInvalidError(ContractViolation):
     looked up (ARK-REQ-0131/0132)."""
 
     code = "ARK-ERR-0162"
+
+
+class ChildProductRollbackRequestInvalidError(ContractViolation):
+    """A rollback request named an identity that does not match the
+    lineage it was given, or carried no real reason - refused before
+    `ChildProductVersionLineage.restore_to` is ever reached (ARK-REQ-0132,
+    ARK-REQ-0358)."""
+
+    code = "ARK-ERR-0163"

@@ -31,7 +31,7 @@ grant; there is no parameter, flag, or code path that treats any candidate
 as exempt from `HUMAN_GATE_3`.
 
 IDENTITY IS DERIVED, NEVER CALLER-ASSERTED (ARK-REQ-0132's anti-replay
-half). `child_promotion_target_identity`/`child_promotion_revision_identity`
+half). `_child_promotion_target_identity`/`_child_promotion_revision_identity`
 are content-addressed over the real product identity, the real candidate
 content, and the real current version - never a free string a caller
 could invent. A grant recorded for one product/candidate/current-version
@@ -52,7 +52,7 @@ existing lineage byte-identical, never a half-promoted or orphaned state.
 ONLY THIS MODULE MAY ADVANCE A LINEAGE WITH NEW CONTENT. Mirrors Phase 23's
 own `core_promotion.py` AST proof: `test_child_product_no_direct_promotion.
 py` proves no `lifecycle.evolution` module but this one and
-`child_product_version.py` itself (whose `rollback_to` legitimately calls
+`child_product_version.py` itself (whose `restore_to` legitimately calls
 its own `append`) ever calls `ChildProductVersionLineage.append`.
 """
 
@@ -126,7 +126,7 @@ class ChildProductAcceptanceRecord:
         return self.exit_code == 0
 
 
-def child_promotion_target_identity(
+def _child_promotion_target_identity(
     identity: ChildProductIdentity, candidate_ref: str,
 ) -> str:
     """Content-addressed identity of (product, candidate) - the exact
@@ -137,7 +137,7 @@ def child_promotion_target_identity(
     return address_of(payload)
 
 
-def child_promotion_revision_identity(
+def _child_promotion_revision_identity(
     current_version_ref: str | None, candidate_ref: str,
 ) -> str:
     """Content-addressed identity of the exact promotion transition - which
@@ -165,8 +165,8 @@ def authorize_child_product_promotion(
     recorded = gates.operation_grant(
         GATE_3,
         PROMOTE_CHILD_PRODUCT_OPERATION,
-        child_promotion_target_identity(identity, candidate_ref),
-        child_promotion_revision_identity(current_ref, candidate_ref),
+        _child_promotion_target_identity(identity, candidate_ref),
+        _child_promotion_revision_identity(current_ref, candidate_ref),
     )
     return {"human_gate_3_recorded": recorded}
 

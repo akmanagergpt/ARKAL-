@@ -13,8 +13,8 @@ from arkali.kernel.contracts.state_machine_errors import GuardRejected
 from arkali.lifecycle.evolution import evolution_campaign_state_machine as ecsm
 from arkali.lifecycle.evolution.campaign_declaration import CampaignBudgets
 from arkali.lifecycle.evolution.child_product_campaign import (
+    _child_campaign_id,
     begin_child_product_campaign,
-    child_campaign_id,
     declare_child_product_campaign,
 )
 from arkali.lifecycle.evolution.child_product_identity import (
@@ -72,23 +72,23 @@ class TestModeEligibilityRefusesBeforeConstruction:
 
 class TestCampaignIdBindsToTheExactProduct:
     def test_two_different_products_get_different_campaign_id_namespaces(self) -> None:
-        first = child_campaign_id(identity(product_id="product-a"))
-        second = child_campaign_id(identity(product_id="product-b"))
+        first = _child_campaign_id(identity(product_id="product-a"))
+        second = _child_campaign_id(identity(product_id="product-b"))
         assert first != second
 
     def test_the_same_identity_is_deterministic(self) -> None:
-        assert child_campaign_id(identity()) == child_campaign_id(identity())
+        assert _child_campaign_id(identity()) == _child_campaign_id(identity())
 
     def test_campaign_id_is_traceable_to_its_product(self) -> None:
         subject = identity()
-        assert subject.product_ref in child_campaign_id(subject)
+        assert subject.product_ref in _child_campaign_id(subject)
 
     def test_declared_campaign_carries_the_bound_id(self) -> None:
         subject = identity()
         declaration = declare_child_product_campaign(
             subject, objective="x", baseline_metrics={"m": 1.0}, budgets=budgets(),
         )
-        assert declaration.campaign_id == child_campaign_id(subject)
+        assert declaration.campaign_id == _child_campaign_id(subject)
 
 
 class TestBeginsTheRealUnmodifiedEvolutionCampaignMachine:

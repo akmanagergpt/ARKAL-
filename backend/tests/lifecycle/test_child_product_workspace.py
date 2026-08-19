@@ -20,8 +20,8 @@ from arkali.lifecycle.evolution.child_product_identity import (
     ChildProductMode,
 )
 from arkali.lifecycle.evolution.child_product_workspace import (
+    _child_workspace_id,
     allocate_child_product_workspace,
-    child_workspace_id,
 )
 
 MODULE: Final[pathlib.Path] = (
@@ -43,26 +43,26 @@ def identity(**updates: object) -> ChildProductIdentity:
 class TestChildWorkspaceId:
     def test_deterministic_for_the_same_product_and_campaign(self) -> None:
         subject = identity()
-        assert child_workspace_id(subject, campaign_id="c-1") == child_workspace_id(
+        assert _child_workspace_id(subject, campaign_id="c-1") == _child_workspace_id(
             subject, campaign_id="c-1"
         )
 
     def test_distinct_products_never_collide(self) -> None:
-        first = child_workspace_id(identity(product_id="a"), campaign_id="c-1")
-        second = child_workspace_id(identity(product_id="b"), campaign_id="c-1")
+        first = _child_workspace_id(identity(product_id="a"), campaign_id="c-1")
+        second = _child_workspace_id(identity(product_id="b"), campaign_id="c-1")
         assert first != second
 
     def test_distinct_campaigns_for_the_same_product_never_collide(self) -> None:
         subject = identity()
-        first = child_workspace_id(subject, campaign_id="c-1")
-        second = child_workspace_id(subject, campaign_id="c-2")
+        first = _child_workspace_id(subject, campaign_id="c-1")
+        second = _child_workspace_id(subject, campaign_id="c-2")
         assert first != second
 
     def test_the_id_is_a_single_valid_path_segment(self) -> None:
         """`WorkspaceAuthority._segment` requires exactly one non-empty
         path component - proven against the real authority below, not
         assumed here."""
-        workspace_id = child_workspace_id(identity(), campaign_id="c-1")
+        workspace_id = _child_workspace_id(identity(), campaign_id="c-1")
         assert pathlib.PurePath(workspace_id).name == workspace_id
 
 

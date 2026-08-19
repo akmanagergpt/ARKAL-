@@ -117,10 +117,10 @@ class TestRollback:
             )
         )
 
-    def test_rollback_to_an_earlier_version_appends_never_truncates(self) -> None:
+    def test_restore_to_an_earlier_version_appends_never_truncates(self) -> None:
         two = self._two_version_lineage()
         target = two.versions[0].version_ref
-        rolled_back = two.rollback_to(target, campaign_id="c-3")
+        rolled_back = two.restore_to(target, campaign_id="c-3")
         assert len(rolled_back.versions) == 3
         assert rolled_back.versions[0] == two.versions[0]
         assert rolled_back.versions[1] == two.versions[1]
@@ -128,17 +128,17 @@ class TestRollback:
     def test_the_new_entry_reproduces_the_target_content_and_is_flagged(self) -> None:
         two = self._two_version_lineage()
         target = two.versions[0]
-        rolled_back = two.rollback_to(target.version_ref, campaign_id="c-3")
+        rolled_back = two.restore_to(target.version_ref, campaign_id="c-3")
         newest = rolled_back.current
         assert newest is not None
         assert newest.content_ref == target.content_ref
         assert newest.is_rollback is True
         assert newest.sequence == 3
 
-    def test_rollback_to_an_unrecorded_version_is_refused(self) -> None:
+    def test_restore_to_an_unrecorded_version_is_refused(self) -> None:
         two = self._two_version_lineage()
         with pytest.raises(UnknownVersionReferenceError):
-            two.rollback_to("sha256:" + "f" * 64, campaign_id="c-3")
+            two.restore_to("sha256:" + "f" * 64, campaign_id="c-3")
 
     def test_rollback_current_stays_recoverable_by_a_second_rollback(self) -> None:
         """No data is lost: after rolling back, the version rolled away
@@ -146,8 +146,8 @@ class TestRollback:
         later rollback."""
         two = self._two_version_lineage()
         newer_ref = two.versions[1].version_ref
-        rolled_back = two.rollback_to(two.versions[0].version_ref, campaign_id="c-3")
-        forward_again = rolled_back.rollback_to(newer_ref, campaign_id="c-4")
+        rolled_back = two.restore_to(two.versions[0].version_ref, campaign_id="c-3")
+        forward_again = rolled_back.restore_to(newer_ref, campaign_id="c-4")
         assert forward_again.current is not None
         assert forward_again.current.content_ref == two.versions[1].content_ref
         assert len(forward_again.versions) == 4

@@ -1,5 +1,5 @@
 """No `lifecycle.evolution` module other than `child_product_promotion.py`
-(and `child_product_version.py`'s own internal `rollback_to`) can ever
+(and `child_product_version.py`'s own internal `restore_to`) can ever
 advance a `ChildProductVersionLineage` with new content (ARK-REQ-0132,
 ARK-REQ-0358). Mirrors `test_self_evolution_no_direct_mutation.py`'s
 AST-based idiom: the property is that a *call* to the mutating method

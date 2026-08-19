@@ -22,9 +22,9 @@ from arkali.lifecycle.evolution.child_product_promotion import (
     GATE_3,
     PROMOTE_CHILD_PRODUCT_OPERATION,
     ChildProductAcceptanceRecord,
+    _child_promotion_revision_identity,
+    _child_promotion_target_identity,
     authorize_child_product_promotion,
-    child_promotion_revision_identity,
-    child_promotion_target_identity,
     promote_child_product,
 )
 from arkali.lifecycle.evolution.child_product_version import (
@@ -114,32 +114,32 @@ class TestIdentityDerivation:
     def test_target_identity_is_deterministic(self) -> None:
         subject = identity()
         ref = content_ref("v2")
-        assert child_promotion_target_identity(
+        assert _child_promotion_target_identity(
             subject, ref
-        ) == child_promotion_target_identity(subject, ref)
+        ) == _child_promotion_target_identity(subject, ref)
 
     def test_different_products_get_different_target_identity(self) -> None:
         ref = content_ref("v2")
-        assert child_promotion_target_identity(
+        assert _child_promotion_target_identity(
             identity(product_id="a"), ref
-        ) != child_promotion_target_identity(identity(product_id="b"), ref)
+        ) != _child_promotion_target_identity(identity(product_id="b"), ref)
 
     def test_different_candidates_get_different_target_identity(self) -> None:
         subject = identity()
-        assert child_promotion_target_identity(
+        assert _child_promotion_target_identity(
             subject, content_ref("v2")
-        ) != child_promotion_target_identity(subject, content_ref("v3"))
+        ) != _child_promotion_target_identity(subject, content_ref("v3"))
 
     def test_revision_identity_changes_when_current_version_changes(self) -> None:
         ref = content_ref("v2")
-        assert child_promotion_revision_identity(
+        assert _child_promotion_revision_identity(
             None, ref
-        ) != child_promotion_revision_identity(content_ref("v1"), ref)
+        ) != _child_promotion_revision_identity(content_ref("v1"), ref)
 
     def test_revision_identity_changes_when_candidate_changes(self) -> None:
-        assert child_promotion_revision_identity(
+        assert _child_promotion_revision_identity(
             content_ref("v1"), content_ref("v2")
-        ) != child_promotion_revision_identity(content_ref("v1"), content_ref("v3"))
+        ) != _child_promotion_revision_identity(content_ref("v1"), content_ref("v3"))
 
 
 class TestScopedGrantLookup:
@@ -159,8 +159,8 @@ class TestScopedGrantLookup:
         subject = identity()
         candidate_ref = content_ref("v2")
         lineage = ChildProductVersionLineage(product_ref=subject.product_ref)
-        target = child_promotion_target_identity(subject, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target = _child_promotion_target_identity(subject, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-1", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target, revision,
             real_issuer, "GRANTED",
@@ -178,8 +178,8 @@ class TestScopedGrantLookup:
         subject = identity()
         candidate_ref = content_ref("v2")
         lineage = ChildProductVersionLineage(product_ref=subject.product_ref)
-        target = child_promotion_target_identity(subject, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target = _child_promotion_target_identity(subject, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-2", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target, revision,
             barred_issuer, "GRANTED",
@@ -197,8 +197,8 @@ class TestScopedGrantLookup:
         product_a = identity(product_id="product-a")
         product_b = identity(product_id="product-b")
         candidate_ref = content_ref("v2")
-        target_a = child_promotion_target_identity(product_a, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target_a = _child_promotion_target_identity(product_a, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-3", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target_a, revision,
             real_issuer, "GRANTED",
@@ -217,8 +217,8 @@ class TestScopedGrantLookup:
         subject = identity()
         granted_candidate = content_ref("v2")
         other_candidate = content_ref("v2-tampered")
-        target = child_promotion_target_identity(subject, granted_candidate)
-        revision = child_promotion_revision_identity(None, granted_candidate)
+        target = _child_promotion_target_identity(subject, granted_candidate)
+        revision = _child_promotion_revision_identity(None, granted_candidate)
         text = OPERATION_HEADER + operation_row(
             "PC3-4", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target, revision,
             real_issuer, "GRANTED",
@@ -236,8 +236,8 @@ class TestScopedGrantLookup:
     ) -> None:
         subject = identity()
         candidate_ref = content_ref("v2")
-        target = child_promotion_target_identity(subject, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target = _child_promotion_target_identity(subject, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-5", "HUMAN_GATE_2", PROMOTE_CHILD_PRODUCT_OPERATION, target,
             revision, real_issuer, "GRANTED",
@@ -258,8 +258,8 @@ class TestScopedGrantLookup:
         already been promoted and `current` has moved on."""
         subject = identity()
         candidate_ref = content_ref("v2")
-        stale_target = child_promotion_target_identity(subject, candidate_ref)
-        stale_revision = child_promotion_revision_identity(None, candidate_ref)
+        stale_target = _child_promotion_target_identity(subject, candidate_ref)
+        stale_revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-6", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, stale_target,
             stale_revision, real_issuer, "GRANTED",
@@ -352,8 +352,8 @@ class TestPromoteChildProductFullFlow:
         subject = identity()
         candidate_ref = content_ref("v2")
         lineage = ChildProductVersionLineage(product_ref=subject.product_ref)
-        target = child_promotion_target_identity(subject, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target = _child_promotion_target_identity(subject, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-7", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target, revision,
             real_issuer, "GRANTED",
@@ -380,8 +380,8 @@ class TestPromoteChildProductFullFlow:
         subject = identity()
         candidate_ref = content_ref("v2")
         lineage = ChildProductVersionLineage(product_ref=subject.product_ref)
-        target = child_promotion_target_identity(subject, candidate_ref)
-        revision = child_promotion_revision_identity(None, candidate_ref)
+        target = _child_promotion_target_identity(subject, candidate_ref)
+        revision = _child_promotion_revision_identity(None, candidate_ref)
         text = OPERATION_HEADER + operation_row(
             "PC3-8", GATE_3, PROMOTE_CHILD_PRODUCT_OPERATION, target, revision,
             real_issuer, "GRANTED",
