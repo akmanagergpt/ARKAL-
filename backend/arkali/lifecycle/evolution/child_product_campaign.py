@@ -42,6 +42,7 @@ from arkali.lifecycle.evolution.campaign_declaration import (
     CampaignDeclaration,
 )
 from arkali.lifecycle.evolution.child_product_identity import ChildProductIdentity
+from arkali.lifecycle.evolution.content_identity import address_of
 
 # Re-exported from `core_upgrade_state_machine`, already a counted
 # `kernel.contracts.state_machine` importer, rather than importing this
@@ -61,11 +62,18 @@ _RUNNING: Final[str] = "RUNNING"
 _CAMPAIGN_ID_PREFIX: Final[str] = "child-product"
 
 
-def _child_campaign_id(identity: ChildProductIdentity) -> str:
-    """The deterministic `campaign_id` a child product's campaigns share as
-    a namespace - traceable back to the exact product identity that
-    produced it, never a caller-chosen free string."""
-    return f"{_CAMPAIGN_ID_PREFIX}:{identity.product_ref}"
+def _child_campaign_id(identity: ChildProductIdentity, objective: str) -> str:
+    """The deterministic `campaign_id` for one product's one evolution
+    request - content-addressed over both, never a caller-chosen free
+    string. Binding to `objective` as well as `product_ref` (not the
+    product alone) is deliberate and was a real defect found by running
+    `test_child_product_journey.py`: a child product receives more than one
+    evolution request over its lifetime, and each is its own campaign, not
+    a shared namespace one product's every campaign would otherwise
+    collide into - the second request's workspace allocation genuinely
+    failed as "already allocated" against the first's before this fix."""
+    payload = f"{identity.product_ref}:{objective}".encode()
+    return f"{_CAMPAIGN_ID_PREFIX}:{address_of(payload)}"
 
 
 def declare_child_product_campaign(
@@ -89,7 +97,7 @@ def declare_child_product_campaign(
             "are eligible for the Product Evolution SDK"
         )
     return CampaignDeclaration(
-        campaign_id=_child_campaign_id(identity),
+        campaign_id=_child_campaign_id(identity, objective),
         objective=objective,
         baseline_metrics=baseline_metrics,
         budgets=budgets,

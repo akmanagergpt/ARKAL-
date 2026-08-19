@@ -70,25 +70,33 @@ class TestModeEligibilityRefusesBeforeConstruction:
         assert declaration.objective == "add recurring tasks"
 
 
-class TestCampaignIdBindsToTheExactProduct:
-    def test_two_different_products_get_different_campaign_id_namespaces(self) -> None:
-        first = _child_campaign_id(identity(product_id="product-a"))
-        second = _child_campaign_id(identity(product_id="product-b"))
+class TestCampaignIdBindsToTheExactProductAndRequest:
+    def test_two_different_products_get_different_campaign_ids(self) -> None:
+        first = _child_campaign_id(identity(product_id="product-a"), "x")
+        second = _child_campaign_id(identity(product_id="product-b"), "x")
         assert first != second
 
-    def test_the_same_identity_is_deterministic(self) -> None:
-        assert _child_campaign_id(identity()) == _child_campaign_id(identity())
+    def test_the_same_product_and_objective_is_deterministic(self) -> None:
+        assert _child_campaign_id(identity(), "x") == _child_campaign_id(identity(), "x")
 
-    def test_campaign_id_is_traceable_to_its_product(self) -> None:
+    def test_two_different_evolution_requests_for_the_same_product_get_different_ids(
+        self,
+    ) -> None:
+        """The real defect `test_child_product_journey.py` found: a second
+        evolution request for the *same* product must not collide with the
+        first's campaign_id (which would then collide the workspace it
+        allocates, refused as "already allocated")."""
         subject = identity()
-        assert subject.product_ref in _child_campaign_id(subject)
+        first = _child_campaign_id(subject, "add recurring tasks")
+        second = _child_campaign_id(subject, "add task search")
+        assert first != second
 
     def test_declared_campaign_carries_the_bound_id(self) -> None:
         subject = identity()
         declaration = declare_child_product_campaign(
             subject, objective="x", baseline_metrics={"m": 1.0}, budgets=budgets(),
         )
-        assert declaration.campaign_id == _child_campaign_id(subject)
+        assert declaration.campaign_id == _child_campaign_id(subject, "x")
 
 
 class TestBeginsTheRealUnmodifiedEvolutionCampaignMachine:
