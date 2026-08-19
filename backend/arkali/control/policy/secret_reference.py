@@ -127,3 +127,24 @@ def assert_no_raw_secret(payload: str, *, sink: str) -> None:
             f"raw secret material reached {sink}; this path may carry scoped "
             f"references only (matched {found.group(0)[:12]}...)"
         )
+
+
+#: The token a redacted match is replaced with. Never a partial mask (a
+#: truncated key can still be a working credential) - the whole match is
+#: removed, always.
+REDACTED_TOKEN = "[REDACTED-SECRET]"
+
+
+def redact_raw_secrets(payload: str) -> str:
+    """Replace every raw-secret-shaped match with `REDACTED_TOKEN`.
+
+    Reuses `_RAW_SECRET_SHAPES` - the identical pattern `assert_no_raw_secret`
+    already enforces - so an export path (ARK-REQ-0169/0357: "Source
+    Intelligence Export and AI Review Bundle... secrets redacted") and the
+    hard-refusal path can never independently drift on what counts as a
+    secret shape. Redaction is additive to, never a replacement for,
+    `assert_no_raw_secret`: a caller that must refuse rather than mask still
+    calls that function; this one is for a caller whose whole point is to
+    produce readable output with the secret shape removed.
+    """
+    return _RAW_SECRET_SHAPES.sub(REDACTED_TOKEN, payload)
