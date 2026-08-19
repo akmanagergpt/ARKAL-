@@ -51,7 +51,10 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from arkali.kernel.contracts.content_address import is_address
+from arkali.kernel.contracts.content_address import (  # noqa: I001
+    address_of as address_of,
+    is_address,
+)
 from arkali.kernel.contracts.error_root import ArkaliError
 from arkali.lifecycle.release.stable_path import StableCandidatePath, StageReceipt
 

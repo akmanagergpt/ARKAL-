@@ -13,10 +13,11 @@ declared by any implementing actor.
 
 from __future__ import annotations
 
-from arkali.kernel.contracts.state_machine import (
+from arkali.kernel.contracts.state_machine import (  # noqa: I001
     GuardContext,
-    StateMachine,
+    StateMachine as StateMachine,
     StateMachineDefinition,
+    StateMachineInstance as StateMachineInstance,
 )
 
 MACHINE = "Release"
