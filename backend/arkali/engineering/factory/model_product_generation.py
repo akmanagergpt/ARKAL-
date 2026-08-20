@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import json
 import pathlib
+from collections.abc import Mapping
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
-from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.errors import ModelGenerationError, ProductSemanticPreflightError
+from arkali.engineering.factory.product_preflight import inspect_product_files
 from arkali.kernel.contracts.honest_state import HonestState
 
 MAX_FILES = 64
@@ -112,34 +114,43 @@ class ModelProductResult(BaseModel):
 
 def _prompt(blueprint: RequirementBlueprint) -> str:
     requirements = [item.model_dump(mode="json") for item in blueprint.requirements]
-    return json.dumps({
-        "role": "You are the implementation worker in a bounded software factory.",
-        "task": "Generate a runnable professional multi-file application from the requirements.",
-        "output_contract": {
-            "format": "one JSON object only; no markdown or commentary",
-            "schema": {"files": [{"path": "relative/posix/path", "content": "complete text"}]},
-            "required_roots": sorted(REQUIRED_ROOTS),
-            "completeness_rule": (
-                "The response is invalid unless it includes at least one complete file "
-                "under every required root: backend/, frontend/, tests/, and config/. "
-                "The config root must include config/README.md with exact startup steps."
+    return json.dumps(
+        {
+            "role": "You are the implementation worker in a bounded software factory.",
+            "task": (
+                "Generate a runnable professional multi-file application from the requirements."
             ),
-            "requirements": [
-                "real backend API", "real frontend", "persistent SQLite database",
-                "automated tests", "configuration and documented startup path",
-                "loading, empty and error states; no fake data or embedded secrets",
-            ],
+            "output_contract": {
+                "format": "one JSON object only; no markdown or commentary",
+                "schema": {"files": [{"path": "relative/posix/path", "content": "complete text"}]},
+                "required_roots": sorted(REQUIRED_ROOTS),
+                "completeness_rule": (
+                    "The response is invalid unless it includes at least one complete file "
+                    "under every required root: backend/, frontend/, tests/, and config/. "
+                    "The config root must include config/README.md with exact startup steps."
+                ),
+                "requirements": [
+                    "real backend API",
+                    "real frontend",
+                    "persistent SQLite database",
+                    "automated tests",
+                    "configuration and documented startup path",
+                    "loading, empty and error states; no fake data or embedded secrets",
+                ],
+            },
+            "blueprint_id": blueprint.blueprint_id,
+            "goal": blueprint.goal.goal_text,
+            "derived_requirements": requirements,
         },
-        "blueprint_id": blueprint.blueprint_id,
-        "goal": blueprint.goal.goal_text,
-        "derived_requirements": requirements,
-    }, ensure_ascii=False, separators=(",", ":"))
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
 
 
 def _json_payload(output: str) -> str:
     stripped = output.strip()
     if stripped.startswith("```json\n") and stripped.endswith("\n```"):
-        body = stripped[len("```json\n"):-len("\n```")]
+        body = stripped[len("```json\n") : -len("\n```")]
         if "```" in body:
             raise ModelGenerationError("model response contains multiple fenced blocks")
         return body
@@ -149,13 +160,21 @@ def _json_payload(output: str) -> str:
 
 
 def write_model_product_output(
-    output: str, workspace: WorkspaceTarget,
+    output: str,
+    workspace: WorkspaceTarget,
+    *,
+    baseline: Mapping[str, str] | None = None,
 ) -> tuple[str, ...]:
     """Validate and write model bytes; shared by generation and repair roots."""
     try:
         envelope = ModelProductEnvelope.model_validate_json(_json_payload(output))
     except (ValueError, json.JSONDecodeError) as error:
         raise ModelGenerationError("model response violates the multi-file contract") from error
+    file_map = {item.path: item.content for item in envelope.files}
+    try:
+        inspect_product_files(file_map, baseline=baseline).require_pass()
+    except ProductSemanticPreflightError as error:
+        raise ModelGenerationError("model response fails semantic preflight") from error
     for item in envelope.files:
         workspace.write(item.path, item.content.encode("utf-8"))
     return tuple(item.path for item in envelope.files)

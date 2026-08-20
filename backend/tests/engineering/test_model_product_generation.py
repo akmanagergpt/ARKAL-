@@ -27,8 +27,11 @@ class FixedModel:
         assert "blueprint_id" in prompt
         assert timeout_seconds > 0
         return InferenceResult(
-            runtime="test-runtime", model_id=model_id, state=self.state,
-            detail="bounded test double", output=self.output,
+            runtime="test-runtime",
+            model_id=model_id,
+            state=self.state,
+            detail="bounded test double",
+            output=self.output,
             output_excerpt=self.output[:200],
         )
 
@@ -37,19 +40,31 @@ def _workspace(tmp_path: pathlib.Path):  # noqa: ANN202
     stable = tmp_path / "stable"
     stable.mkdir()
     return WorkspaceAuthority(tmp_path / "candidates").allocate(
-        workspace_id="candidate-1", task_id="task-1", agent_id="model-1",
+        workspace_id="candidate-1",
+        task_id="task-1",
+        agent_id="model-1",
         stable_snapshot=stable,
     )
 
 
 def _valid_output() -> str:
-    return json.dumps({"files": [
-        {"path": "backend/app.py", "content": "print('backend')\n"},
-        {"path": "backend/database.py", "content": "DB = 'sqlite'\n"},
-        {"path": "frontend/index.html", "content": "<main>App</main>"},
-        {"path": "tests/test_app.py", "content": "def test_app(): assert True\n"},
-        {"path": "config/README.md", "content": "run instructions\n"},
-    ]})
+    return json.dumps(
+        {
+            "files": [
+                {"path": "backend/app.py", "content": "def status(): return 'ok'\n"},
+                {
+                    "path": "backend/database.py",
+                    "content": "import sqlite3\ndef bootstrap(): sqlite3.connect('app.db').execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\nbootstrap()\n",
+                },
+                {"path": "frontend/index.html", "content": "<main>App</main>"},
+                {
+                    "path": "tests/test_app.py",
+                    "content": "from app import status\ndef test_app(): assert status() == 'ok'\n",
+                },
+                {"path": "config/README.md", "content": "run instructions\n"},
+            ]
+        }
+    )
 
 
 def test_validated_model_files_are_written_to_real_candidate_workspace(
@@ -57,9 +72,7 @@ def test_validated_model_files_are_written_to_real_candidate_workspace(
 ) -> None:
     blueprint = derive_blueprint(GOAL, AuthorityMap.load(REPO))
     workspace = _workspace(tmp_path)
-    result = generate_model_product(
-        blueprint, FixedModel(_valid_output()), "model-1", workspace
-    )
+    result = generate_model_product(blueprint, FixedModel(_valid_output()), "model-1", workspace)
 
     assert len(result.files) == 5
     assert (workspace.root / "backend" / "database.py").is_file()
@@ -73,7 +86,9 @@ def test_lossless_path_map_is_normalised_without_weakening_checks(
     mapped = json.dumps({"files": {item["path"]: item["content"] for item in listed}})
     result = generate_model_product(
         derive_blueprint(GOAL, AuthorityMap.load(REPO)),
-        FixedModel(mapped), "model-1", _workspace(tmp_path),
+        FixedModel(mapped),
+        "model-1",
+        _workspace(tmp_path),
     )
     assert result.files == tuple(item["path"] for item in listed)
 
@@ -82,7 +97,8 @@ def test_one_exact_json_fence_is_transport_only(tmp_path: pathlib.Path) -> None:
     result = generate_model_product(
         derive_blueprint(GOAL, AuthorityMap.load(REPO)),
         FixedModel(f"```json\n{_valid_output()}\n```"),
-        "model-1", _workspace(tmp_path),
+        "model-1",
+        _workspace(tmp_path),
     )
     assert "backend/app.py" in result.files
 
@@ -91,32 +107,40 @@ def test_persistence_inside_backend_module_is_semantically_detected(
     tmp_path: pathlib.Path,
 ) -> None:
     payload = json.loads(_valid_output())
-    payload["files"] = [
-        item for item in payload["files"] if item["path"] != "backend/database.py"
-    ]
-    payload["files"][0]["content"] = "import sqlite3\nDB = sqlite3.connect('app.db')\n"
+    payload["files"] = [item for item in payload["files"] if item["path"] != "backend/database.py"]
+    payload["files"][0]["content"] = (
+        "import sqlite3\nDB = sqlite3.connect('app.db')\nDB.execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\ndef status(): return 'ok'\n"
+    )
     result = generate_model_product(
         derive_blueprint(GOAL, AuthorityMap.load(REPO)),
-        FixedModel(json.dumps(payload)), "model-1", _workspace(tmp_path),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        _workspace(tmp_path),
     )
     assert "backend/app.py" in result.files
 
 
-@pytest.mark.parametrize("output", [
-    "not-json",
-    "commentary\n```json\n{}\n```",
-    "```json\n{}\n```\nmore",
-    json.dumps({"files": [{"path": "../escape", "content": "x"}]}),
-    json.dumps({"files": [{"path": "backend/app.py", "content": "x"}]}),
-])
+@pytest.mark.parametrize(
+    "output",
+    [
+        "not-json",
+        "commentary\n```json\n{}\n```",
+        "```json\n{}\n```\nmore",
+        json.dumps({"files": [{"path": "../escape", "content": "x"}]}),
+        json.dumps({"files": [{"path": "backend/app.py", "content": "x"}]}),
+    ],
+)
 def test_malformed_unsafe_or_incomplete_model_output_writes_nothing(
-    tmp_path: pathlib.Path, output: str,
+    tmp_path: pathlib.Path,
+    output: str,
 ) -> None:
     workspace = _workspace(tmp_path)
     with pytest.raises(ModelGenerationError):
         generate_model_product(
             derive_blueprint(GOAL, AuthorityMap.load(REPO)),
-            FixedModel(output), "model-1", workspace,
+            FixedModel(output),
+            "model-1",
+            workspace,
         )
     assert tuple(workspace.root.rglob("*.py")) == ()
 
@@ -128,5 +152,7 @@ def test_nonpassing_real_model_outcome_cannot_become_artifacts(
     with pytest.raises(ModelGenerationError, match="did not pass"):
         generate_model_product(
             derive_blueprint(GOAL, AuthorityMap.load(REPO)),
-            FixedModel("", HonestState.NOT_CONFIGURED), "model-1", workspace,
+            FixedModel("", HonestState.NOT_CONFIGURED),
+            "model-1",
+            workspace,
         )

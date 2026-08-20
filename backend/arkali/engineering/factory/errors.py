@@ -27,3 +27,9 @@ class ModelGenerationError(ContractViolation):
     """A real model call or its bounded multi-file contract did not resolve."""
 
     code = "ARK-ERR-0116"
+
+
+class ProductSemanticPreflightError(ContractViolation):
+    """Generated files contradict their own executable/test contracts."""
+
+    code = "ARK-ERR-0117"

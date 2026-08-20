@@ -294,7 +294,14 @@ def main(argv: list[str]) -> int:
         raise RuntimeError(
             f"model repair failed: {outcome.state.value}: {outcome.detail}"
         )
-    files = write_model_product_output(outcome.output, workspace)
+    files = write_model_product_output(
+        outcome.output,
+        workspace,
+        baseline={
+            item["path"]: (source / str(item["path"])).read_text(encoding="utf-8")
+            for item in frozen["files"]
+        },
+    )
     print(
         json.dumps(
             {
