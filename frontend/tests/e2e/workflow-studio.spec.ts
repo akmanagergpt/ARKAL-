@@ -29,10 +29,15 @@ const EXECUTION_ID = `exec-e2e-${RUN}`;
 
 test.describe.configure({ mode: 'serial' });
 
+async function openExpertStudio(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Uzman', exact: true }).click();
+  await page.getByRole('button', { name: 'Workflow Studio', exact: true }).click();
+}
+
 test.describe('Visual Workflow Studio journey', () => {
   test('an unpublished workflow identifier shows an honest empty canvas', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Workflow Studio' }).click();
+    await openExpertStudio(page);
 
     await page.getByLabel(/workflow identifier/i).fill(WORKFLOW_ID);
     await page.getByRole('button', { name: /load latest revision/i }).click();
@@ -45,7 +50,7 @@ test.describe('Visual Workflow Studio journey', () => {
 
   test('a graph is composed on the canvas and published as revision 1', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Workflow Studio' }).click();
+    await openExpertStudio(page);
     await page.getByLabel(/workflow identifier/i).fill(WORKFLOW_ID);
 
     // Compose: trigger -> HUMAN APPROVAL -> notification. Real drag-and-drop
@@ -86,7 +91,7 @@ test.describe('Visual Workflow Studio journey', () => {
   test('the published revision survives a page reload', async ({ page }) => {
     await page.goto('/');
     await page.reload();
-    await page.getByRole('button', { name: 'Workflow Studio' }).click();
+    await openExpertStudio(page);
     await page.getByLabel(/workflow identifier/i).fill(WORKFLOW_ID);
     await page.getByRole('button', { name: /load latest revision/i }).click();
 
@@ -105,7 +110,7 @@ test.describe('Visual Workflow Studio journey', () => {
     const page = await context.newPage();
     try {
       await page.goto('/');
-      await page.getByRole('button', { name: 'Workflow Studio' }).click();
+      await openExpertStudio(page);
       await page.getByLabel(/workflow identifier/i).fill(WORKFLOW_ID);
       await page.getByRole('button', { name: /load latest revision/i }).click();
 
@@ -126,7 +131,7 @@ test.describe('Visual Workflow Studio journey', () => {
     page,
   }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Workflow Studio' }).click();
+    await openExpertStudio(page);
     await page.getByLabel(/workflow identifier/i).fill(WORKFLOW_ID);
     await page.getByRole('button', { name: /load latest revision/i }).click();
     await expect(page.getByText(/Revision 1 \(1\.0\.0\)/)).toBeVisible();

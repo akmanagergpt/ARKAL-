@@ -28,15 +28,22 @@ const REVISION_ID = `rev-e2e-${RUN}`;
 
 test.describe.configure({ mode: 'serial' });
 
+async function openExpertProjects(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Uzman', exact: true }).click();
+  await page.getByRole('button', { name: 'Yönetilen Ürünler', exact: true }).click();
+}
+
 test.describe('Project Registry journey', () => {
   test('the empty registry is presented honestly', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Project Registry' })).toBeVisible();
+    await openExpertProjects(page);
+    await expect(page.getByRole('heading', { name: 'Projeler' })).toBeVisible();
     await expect(page.getByText('No projects yet')).toBeVisible();
   });
 
   test('a project is created and appears in the registry', async ({ page }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await expect(page.getByText('No projects yet')).toBeVisible();
 
     await page.getByLabel(/project identifier/i).fill(PROJECT_ID);
@@ -49,6 +56,7 @@ test.describe('Project Registry journey', () => {
 
   test('the detail view shows the project the backend recorded', async ({ page }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await page.getByRole('list').getByText(PROJECT_NAME).click();
 
     const detail = page.locator('section', { hasText: 'Project detail' });
@@ -59,6 +67,7 @@ test.describe('Project Registry journey', () => {
 
   test('a revision is recorded and rendered', async ({ page }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await page.getByRole('list').getByText(PROJECT_NAME).click();
 
     await page.getByLabel(/new revision identifier/i).fill(REVISION_ID);
@@ -76,6 +85,7 @@ test.describe('Project Registry journey', () => {
     page,
   }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await page.getByRole('list').getByText(PROJECT_NAME).click();
 
     // DRAFT -> ACTIVE is declared forbidden by the canonical Project machine.
@@ -102,6 +112,7 @@ test.describe('Project Registry journey', () => {
 
   test('a duplicate registration is refused with the backend reason', async ({ page }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await page.getByLabel(/project identifier/i).fill(PROJECT_ID);
     await page.getByLabel(/project name/i).fill('A Different Name');
     await page.getByRole('button', { name: /register project/i }).click();
@@ -113,6 +124,7 @@ test.describe('Project Registry journey', () => {
 
   test('a legal transition is accepted and the new state is displayed', async ({ page }) => {
     await page.goto('/');
+    await openExpertProjects(page);
     await page.getByRole('list').getByText(PROJECT_NAME).click();
 
     await page.getByLabel(/requested state/i).selectOption('SPECIFIED');
@@ -125,6 +137,7 @@ test.describe('Project Registry journey', () => {
   test('the state survives a page reload', async ({ page }) => {
     await page.goto('/');
     await page.reload();
+    await openExpertProjects(page);
 
     const row = page.getByRole('list').getByText(PROJECT_NAME);
     await expect(row).toBeVisible();
@@ -143,6 +156,7 @@ test.describe('Project Registry journey', () => {
     const page = await context.newPage();
     try {
       await page.goto('/');
+      await openExpertProjects(page);
       await page.getByRole('list').getByText(PROJECT_NAME).click();
 
       const detail = page.locator('section', { hasText: 'Project detail' });
