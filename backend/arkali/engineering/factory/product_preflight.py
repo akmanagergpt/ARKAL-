@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import pathlib
+import re
 import sys
 from collections.abc import Mapping
 
@@ -220,6 +221,21 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail=f"standard-library modules are not installable packages: {stdlib!r}",
             )
         )
+    requirements = files.get("backend/requirements.txt", "")
+    lowered = requirements.lower().replace("-", "_")
+    flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
+    werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
+    if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
+        findings.append(
+            SemanticFinding(
+                code="incompatible_dependency_range",
+                path="backend/requirements.txt",
+                detail=(
+                    "Flask releases before 2.2 require an explicit Werkzeug<3 "
+                    "compatibility bound"
+                ),
+            )
+        )
     package = files.get("frontend/package.json", "")
     if "react-scripts" in package and "frontend/public/index.html" not in files:
         findings.append(
@@ -230,6 +246,20 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
             )
         )
     return findings
+
+
+def _schema_context_findings(backend_text: str) -> list[SemanticFinding]:
+    if "flask_sqlalchemy" not in backend_text or "create_all(" not in backend_text:
+        return []
+    if "app_context()" in backend_text or "create_all(app=" in backend_text:
+        return []
+    return [
+        SemanticFinding(
+            code="schema_bootstrap_outside_app_context",
+            path="backend/",
+            detail="Flask-SQLAlchemy schema bootstrap requires an application context",
+        )
+    ]
 
 
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -257,6 +287,7 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="SQLite is selected but no schema creation or migration is present",
             )
         )
+    findings.extend(_schema_context_findings(backend_text))
     if not any(marker in backend_text for marker in ("@app.route", "@router.", "add_url_rule")):
         findings.append(
             SemanticFinding(

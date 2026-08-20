@@ -288,3 +288,40 @@ def test_react_scripts_entry_is_mechanically_hosted_without_rewriting_ui(
     assert (workspace.root / "frontend/src/App.js").read_text() == (
         "export default function App(){}\n"
     )
+
+
+def test_legacy_flask_requires_a_compatible_werkzeug_bound(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = "Flask==2.0.1\nFlask-SQLAlchemy==2.5.1\n"
+    with pytest.raises(ModelGenerationError, match="incompatible_dependency_range"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_flask_sqlalchemy_bootstrap_requires_application_context(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    database = next(item for item in payload["files"] if item["path"] == "backend/database.py")
+    database["content"] = (
+        "from flask_sqlalchemy import SQLAlchemy\n"
+        "db = SQLAlchemy()\n"
+        "DB_URI = 'sqlite:///app.db'\n"
+        "db.create_all()\n"
+    )
+    with pytest.raises(ModelGenerationError, match="schema_bootstrap_outside_app_context"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
