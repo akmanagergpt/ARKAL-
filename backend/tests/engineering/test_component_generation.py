@@ -45,9 +45,11 @@ class _QueueModel:
     def __init__(self, outcomes: list[tuple[HonestState, str]]) -> None:
         self._outcomes = list(outcomes)
         self.prompts: list[str] = []
+        self.model_ids: list[str] = []
 
     def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0) -> InferenceResult:
         self.prompts.append(prompt)
+        self.model_ids.append(model_id)
         state, output = self._outcomes.pop(0)
         return InferenceResult(
             runtime="test-runtime", model_id=model_id, state=state,
@@ -58,10 +60,10 @@ class _QueueModel:
 def _factory(per_stage: dict[str, list[tuple[HonestState, str]]]):  # noqa: ANN202
     models: dict[str, _QueueModel] = {}
 
-    def factory(stage_name: str) -> _QueueModel:
+    def factory(stage_name: str) -> tuple[_QueueModel, str]:
         if stage_name not in models:
             models[stage_name] = _QueueModel(per_stage[stage_name])
-        return models[stage_name]
+        return models[stage_name], "test-model"
 
     factory.models = models  # type: ignore[attr-defined]
     return factory
@@ -136,10 +138,32 @@ def test_all_eight_stages_pass_and_are_written_to_the_real_workspace(
     assert (workspace.root / "frontend" / "src" / "App.js").is_file()
 
 
+def test_the_real_model_id_is_passed_to_every_stage_not_the_stage_name(
+    tmp_path: pathlib.Path,
+) -> None:
+    models: dict[str, _QueueModel] = {}
+
+    def factory(stage_name: str) -> tuple[_QueueModel, str]:
+        if stage_name not in models:
+            models[stage_name] = _QueueModel(_happy_path_queues()[stage_name])
+        return models[stage_name], "qwen2.5-coder:14b"
+
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    for stage_name, model in models.items():
+        assert model.model_ids == ["qwen2.5-coder:14b"], (
+            f"stage {stage_name!r} was called with model_ids {model.model_ids!r}, "
+            "not the real model id"
+        )
+
+
 def test_a_stage_only_sees_its_declared_inputs_real_bytes(tmp_path: pathlib.Path) -> None:
     factory = _factory(_happy_path_queues())
     generate_staged_model_product(
-        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
     )
     # frontend_ui declares only frontend_client as an input.
     ui_prompt = factory.models["frontend_ui"].prompts[0]  # type: ignore[attr-defined]
@@ -156,7 +180,8 @@ def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
     queues["backend_contract"] = [(HonestState.PASS, bad), good]
     factory = _factory(queues)
     result = generate_staged_model_product(
-        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
     )
     assert result.attempts_used == 8
     prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
@@ -177,6 +202,24 @@ def test_stage_budget_exhaustion_raises_and_writes_nothing_for_that_candidate(
             vocabulary=StageVocabulary.load(REPO),
         )
     assert not (workspace.root / "backend").exists()
+
+
+def test_budget_exhaustion_retains_the_last_raw_model_output(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A caller must be able to freeze real diagnostic evidence, not just a
+    mechanical summary — golden-work-043 and this session's first
+    golden-work-045 attempt both had to be reported without the model's
+    actual rejected output because nothing retained it."""
+    queues = _happy_path_queues()
+    always_bad = _output({"backend/main.py": "app = object()\n"})
+    queues["backend_contract"] = [(HonestState.PASS, always_bad)] * 4
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path),
+            vocabulary=StageVocabulary.load(REPO),
+        )
+    assert excinfo.value.last_raw_output == always_bad  # type: ignore[attr-defined]
 
 
 def test_unresolved_blueprint_refuses(tmp_path: pathlib.Path) -> None:

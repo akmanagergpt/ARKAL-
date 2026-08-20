@@ -234,6 +234,7 @@ def _generate_one_stage(
     declaration: StageDeclaration,
     blueprint: RequirementBlueprint,
     model: ModelSource,
+    model_id: str,
     visible_files: Mapping[str, str],
     *,
     timeout_seconds: float,
@@ -242,9 +243,11 @@ def _generate_one_stage(
     from arkali.kernel.contracts.honest_state import HonestState
 
     failure: str | None = None
+    last_raw_output: str = ""
     for _ in range(1, max_attempts + 1):
         prompt = _stage_prompt(declaration, blueprint, visible_files, failure)
-        outcome = model.infer(declaration.name, prompt, timeout_seconds=timeout_seconds)
+        outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
+        last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
             continue
@@ -260,14 +263,21 @@ def _generate_one_stage(
             failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
             continue
         return stage_files
-    raise ModelGenerationError(
+    # The raw last-attempt output is retained on the exception (not just the
+    # mechanical failure summary) so a caller can freeze real diagnostic
+    # evidence — golden-work-043 and the first golden-work-045 stage failure
+    # this session both had to be reported without it, since nothing else in
+    # this pipeline persists a rejected attempt's actual bytes.
+    error = ModelGenerationError(
         f"stage {declaration.name!r} exhausted {max_attempts} attempts: {failure}"
     )
+    error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
+    raise error
 
 
 def generate_staged_model_product(
     blueprint: RequirementBlueprint,
-    model_factory: Callable[[str], ModelSource],
+    model_factory: Callable[[str], tuple[ModelSource, str]],
     workspace: WorkspaceTarget,
     *,
     vocabulary: StageVocabulary,
@@ -276,6 +286,12 @@ def generate_staged_model_product(
 ) -> ModelProductResult:
     """Generate a candidate as a sequence of small, bounded, contract-checked
     stages instead of one whole-product model call.
+
+    `model_factory(stage_name)` returns `(model, model_id)` — bundled
+    together, not two separate parameters, both because a real caller
+    typically sizes the adapter (`max_output_tokens`) per stage and picks
+    the same `model_id` for all of them, and because
+    `max_parameters_per_public_function` (6) left no room for a seventh.
 
     Every stage's model call is bounded (1-4 attempts, same shape
     `generate_model_product_bounded` already uses); a stage is written to
@@ -300,9 +316,9 @@ def generate_staged_model_product(
         for input_name in declaration.inputs:
             for path in written_by_stage[input_name]:
                 visible[path] = all_files[path]
-        model = model_factory(declaration.name)
+        model, model_id = model_factory(declaration.name)
         stage_files = _generate_one_stage(
-            declaration, blueprint, model, visible,
+            declaration, blueprint, model, model_id, visible,
             timeout_seconds=timeout_seconds, max_attempts=per_stage_max_attempts,
         )
         for path, content in stage_files.items():
@@ -315,14 +331,10 @@ def generate_staged_model_product(
     return ModelProductResult(
         blueprint_id=blueprint.blueprint_id,
         runtime="staged",
-        model_id=",".join(_vocabulary_stage_names(vocabulary)),
+        model_id=model_id,
         files=tuple(written_paths),
         attempts_used=attempts_used,
     )
-
-
-def _vocabulary_stage_names(vocabulary: StageVocabulary) -> tuple[str, ...]:
-    return tuple(declaration.name for declaration in vocabulary.stages())
 
 
 __all__ = ["generate_staged_model_product"]
