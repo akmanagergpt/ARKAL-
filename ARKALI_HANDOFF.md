@@ -463,7 +463,7 @@ repository, the repository wins.
 | 283 | `bac753e` | **PHASE 27 PACKAGE 3** — Project Registry UX consolidation with progressive disclosure of internal identifiers |
 | 284 | `40bfa8a` | **PHASE 27 PACKAGE 4** — real Chromium journeys updated for Expert Workflow integration; 14/14 over production build, live FastAPI and real SQLite |
 | 285 | `3728a74` | **PHASE 27 PACKAGE 5 / CANDIDATE FREEZE** — C-35 contract, two-claim traceability and C-17 report; full regression 3332 PASS |
-| 286 | `099d2ed` | **RECORD PHASE 27 MACHINE ACCEPTANCE AND UNLOCK PHASE 28.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, first submission; 2/2 MANDATORY requirements discharged, cumulative 215 → 217; Phase 28 canonical discovery recorded and implementation not begun ← HEAD at generation |
+| 286 | `099d2ed` | **RECORD PHASE 27 MACHINE ACCEPTANCE AND UNLOCK THE NEXT PHASE.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, first submission; 2/2 MANDATORY requirements discharged, cumulative 215 → 217; canonical desktop discovery recorded and implementation not begun ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
