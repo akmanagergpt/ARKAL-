@@ -10,7 +10,7 @@
  * the production request-building, status-interpretation and refresh paths.
  */
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -37,7 +37,9 @@ const lifecycleRoute = { status: 200, body: LIFECYCLE };
 function mount(routes: Parameters<typeof stubFetch>[0]) {
   const { fetchImpl, calls } = stubFetch(routes);
   const client = new ArkaliApiClient({ baseUrl: BASE, fetchImpl });
-  return { ...render(<App client={client} />), calls };
+  const rendered = render(<App client={client} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Yönetilen Ürünler' }));
+  return { ...rendered, calls };
 }
 
 describe('Project Registry page', () => {

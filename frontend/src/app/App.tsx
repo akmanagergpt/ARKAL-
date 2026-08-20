@@ -15,57 +15,33 @@ import { useState } from 'react';
 import type { ArkaliApiClient } from '@/api/client';
 import { ProjectRegistryPage } from '@/features/projects/ProjectRegistryPage';
 import { WorkflowStudioPage } from '@/features/workflow/WorkflowStudioPage';
-
-type Section = 'projects' | 'workflow';
+import { COMMAND_AREAS, type AreaId } from './areas';
+import { CommandCenterHome } from './CommandCenterHome';
 
 export function App({ client }: { client: ArkaliApiClient }) {
-  const [section, setSection] = useState<Section>('projects');
+  const [area, setArea] = useState<AreaId>('command');
+
+  const content = area === 'products'
+    ? <ProjectRegistryPage client={client} />
+    : area === 'workflow'
+      ? <WorkflowStudioPage client={client} />
+      : <CommandCenterHome navigate={setArea} />;
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6">
-          <div className="flex items-baseline gap-3">
-            <span className="text-base font-semibold tracking-tight text-slate-900">
-              ARKALI
-            </span>
-            <span className="text-sm text-slate-500">Command Center</span>
-          </div>
-          <nav aria-label="Sections" className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setSection('projects')}
-              aria-current={section === 'projects' ? 'page' : undefined}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                section === 'projects'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Project Registry
-            </button>
-            <button
-              type="button"
-              onClick={() => setSection('workflow')}
-              aria-current={section === 'workflow' ? 'page' : undefined}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                section === 'workflow'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Workflow Studio
-            </button>
-          </nav>
+    <div className="min-h-full bg-slate-50 lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
+      <aside className="border-b border-slate-200 bg-white lg:min-h-screen lg:border-b-0 lg:border-r">
+        <div className="flex items-center justify-between px-5 py-5 lg:block">
+          <button type="button" onClick={() => setArea('command')} className="text-left"><span className="block text-lg font-bold tracking-tight text-slate-950">ARKALI</span><span className="block text-xs font-medium text-slate-500">Command Center</span></button>
+          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Yerel</span>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {section === 'projects' ? (
-          <ProjectRegistryPage client={client} />
-        ) : (
-          <WorkflowStudioPage client={client} />
-        )}
-      </main>
+        <nav aria-label="Ana alanlar" className="flex gap-1 overflow-x-auto px-3 pb-4 lg:block lg:space-y-1 lg:overflow-visible">
+          {COMMAND_AREAS.map((item) => <button key={item.id} type="button" disabled={!item.available} aria-current={area === item.id ? 'page' : undefined} title={!item.available ? `${item.label} için kullanıcı yüzeyi henüz mevcut değil` : item.description} onClick={() => setArea(item.id)} className={`group min-w-max rounded-lg px-3 py-2 text-left text-sm transition lg:block lg:w-full ${area === item.id ? 'bg-slate-950 font-semibold text-white' : item.available ? 'text-slate-700 hover:bg-slate-100 hover:text-slate-950' : 'cursor-not-allowed text-slate-400'}`}><span>{item.label}</span>{!item.available ? <span className="ml-2 text-[10px] uppercase tracking-wide">Yakında</span> : null}</button>)}
+        </nav>
+      </aside>
+      <div className="min-w-0">
+        <header className="border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"><p className="text-sm font-medium text-slate-600">{COMMAND_AREAS.find((item) => item.id === area)?.description}</p></header>
+        <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">{content}</main>
+      </div>
     </div>
   );
 }
