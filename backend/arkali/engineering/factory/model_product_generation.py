@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 from collections.abc import Mapping
 from typing import Protocol
 
@@ -25,6 +26,7 @@ MAX_FILE_BYTES = 262_144
 MAX_TOTAL_BYTES = 2_000_000
 REQUIRED_ROOTS = frozenset({"backend", "frontend", "tests", "config"})
 REQUIRED_EXACT = frozenset({"frontend/package.json", "config/README.md"})
+MANIFEST_NORMALIZATION_VERSION = "1.0.0"
 
 
 def _require_runnable_manifests(paths: tuple[str, ...]) -> None:
@@ -34,6 +36,25 @@ def _require_runnable_manifests(paths: tuple[str, ...]) -> None:
     backend_manifests = {"backend/requirements.txt", "backend/pyproject.toml"}
     if not backend_manifests.intersection(paths):
         raise ValueError("generated backend needs a dependency manifest")
+
+
+def _normalise_requirements(files: dict[str, str]) -> dict[str, str]:
+    """Remove only impossible stdlib package declarations; code is untouched."""
+    path = "backend/requirements.txt"
+    if path not in files:
+        return files
+    retained: list[str] = []
+    for line in files[path].splitlines():
+        declared = line.split("#", 1)[0].strip()
+        name = declared.split("[", 1)[0]
+        for marker in ("==", ">=", "<=", "~=", "!=", ">", "<"):
+            name = name.split(marker, 1)[0]
+        if name.strip().replace("-", "_").lower() in sys.stdlib_module_names:
+            continue
+        retained.append(line)
+    normalized = dict(files)
+    normalized[path] = "\n".join(retained).rstrip() + "\n"
+    return normalized
 
 
 class InferenceOutcome(Protocol):
@@ -206,13 +227,13 @@ def write_model_product_output(
         raise ModelGenerationError(
             f"model response violates the multi-file contract: {error}"
         ) from error
-    file_map = {item.path: item.content for item in envelope.files}
+    file_map = _normalise_requirements({item.path: item.content for item in envelope.files})
     try:
         inspect_product_files(file_map, baseline=baseline).require_pass()
     except ProductSemanticPreflightError as error:
         raise ModelGenerationError(f"model response fails semantic preflight: {error}") from error
     for item in envelope.files:
-        workspace.write(item.path, item.content.encode("utf-8"))
+        workspace.write(item.path, file_map[item.path].encode("utf-8"))
     return tuple(item.path for item in envelope.files)
 
 

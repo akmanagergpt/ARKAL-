@@ -224,3 +224,22 @@ def test_bounded_generation_feeds_semantic_failure_to_final_attempt(
     assert result.attempts_used == 2
     assert "prior_attempt_failure" in model.prompts[1]
     assert "model response fails semantic preflight" in model.prompts[1]
+
+
+def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = "Flask==3.1.0\nsqlite3\n"
+    workspace = _workspace(tmp_path)
+    generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        workspace,
+    )
+    assert (workspace.root / "backend/requirements.txt").read_text() == "Flask==3.1.0\n"
+    assert (workspace.root / "backend/app.py").read_text() == "def status(): return 'ok'\n"
