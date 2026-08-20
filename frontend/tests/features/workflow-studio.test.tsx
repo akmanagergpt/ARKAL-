@@ -46,6 +46,7 @@ async function openStudio(routes: Parameters<typeof stubFetch>[0]) {
   const client = new ArkaliApiClient({ baseUrl: BASE, fetchImpl });
   const view = render(<App client={client} />);
   const user = userEvent.setup();
+  await user.click(view.getByRole('button', { name: 'Uzman' }));
   await user.click(view.getByRole('button', { name: 'Workflow Studio' }));
   return { ...view, calls, user };
 }
