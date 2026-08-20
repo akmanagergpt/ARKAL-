@@ -209,6 +209,29 @@ def _declared_dependencies(files: Mapping[str, str]) -> frozenset[str]:
     return frozenset(names)
 
 
+def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    findings: list[SemanticFinding] = []
+    stdlib = sorted(_declared_dependencies(files) & sys.stdlib_module_names)
+    if stdlib:
+        findings.append(
+            SemanticFinding(
+                code="stdlib_dependency",
+                path="backend/requirements.txt",
+                detail=f"standard-library modules are not installable packages: {stdlib!r}",
+            )
+        )
+    package = files.get("frontend/package.json", "")
+    if "react-scripts" in package and "frontend/public/index.html" not in files:
+        findings.append(
+            SemanticFinding(
+                code="missing_frontend_entry",
+                path="frontend/public/index.html",
+                detail="react-scripts requires a public HTML entry document",
+            )
+        )
+    return findings
+
+
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend_text = "\n".join(
         source.lower() for path, source in files.items() if path.startswith("backend/")
@@ -256,6 +279,7 @@ def inspect_product_files(
     modules = _python_modules(files, findings)
     findings.extend(_test_findings(files, modules))
     findings.extend(_persistence_findings(files))
+    findings.extend(_manifest_findings(files))
     findings.extend(_regression_findings(files, baseline))
     return ProductPreflightReport(findings=tuple(findings))
 

@@ -20,6 +20,8 @@ def _complete() -> dict[str, str]:
             "def test_connection():\n    assert connection() is not None\n"
         ),
         "frontend/src/App.js": "export default function App(){return null}\n",
+        "frontend/public/index.html": '<div id="root"></div>\n',
+        "frontend/package.json": '{"scripts":{"build":"echo ok"}}\n',
         "config/README.md": "run\n",
         "backend/requirements.txt": "pytest\n",
     }
@@ -62,6 +64,22 @@ def test_package_qualified_generated_module_import_resolves() -> None:
         ),
     }
     assert inspect_product_files(files).passed
+
+
+def test_stdlib_is_refused_as_an_installable_dependency() -> None:
+    files = {**_complete(), "backend/requirements.txt": "sqlite3\npytest\n"}
+    report = inspect_product_files(files)
+    assert "stdlib_dependency" in {item.code for item in report.findings}
+
+
+def test_react_scripts_requires_real_html_entry() -> None:
+    files = {
+        **_complete(),
+        "frontend/package.json": '{"dependencies":{"react-scripts":"5"}}',
+    }
+    files.pop("frontend/public/index.html")
+    report = inspect_product_files(files)
+    assert "missing_frontend_entry" in {item.code for item in report.findings}
 
 
 @pytest.mark.parametrize(
