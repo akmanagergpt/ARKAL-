@@ -26,6 +26,7 @@ from __future__ import annotations
 import datetime as dt
 import pathlib
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from typing import Final
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -63,6 +64,7 @@ from arkali.surfaces.command.error_mapping import (
     message_of,
     status_for,
 )
+from arkali.surfaces.command.factory import _build_factory_router, _FactorySubmitter
 from arkali.surfaces.command.jobs import build_jobs_router
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
@@ -80,6 +82,13 @@ SURFACE: Final[str] = "surfaces.command.api"
 
 READ: Final[str] = "READ_FILE"
 WRITE: Final[str] = "WRITE_WORKSPACE_FILE"
+
+
+@dataclass(frozen=True)
+class _CommandExtensions:
+    operations_wiring: OperationsWiring | None = None
+    operations_repo_root: pathlib.Path | None = None
+    factory_submitter: _FactorySubmitter | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -112,8 +121,7 @@ def create_app(
     pdp: PolicyDecisionPoint,
     clock: Callable[[], dt.datetime] | None = None,
     workflow_wiring: tuple[DocumentBuilder, GraphStoreFactory, ExecutorFactory] | None = None,
-    operations_wiring: OperationsWiring | None = None,
-    operations_repo_root: pathlib.Path | None = None,
+    extensions: _CommandExtensions | None = None,
 ) -> FastAPI:
     """Build the Command Center API over a real engine and a real PDP.
 
@@ -327,11 +335,18 @@ def create_app(
     # composition root, the identical shape `workflow_wiring` already
     # established: a caller that supplies none gets the pre-Phase-25
     # application unchanged.
-    if operations_wiring is not None and operations_repo_root is not None:
+    if (extensions is not None and extensions.operations_wiring is not None
+            and extensions.operations_repo_root is not None):
         app.include_router(
             _build_operations_router(
-                session_scope, guard, refuse, engine, operations_repo_root,
-                operations_wiring,
+                session_scope, guard, refuse, engine, extensions.operations_repo_root,
+                extensions.operations_wiring,
+            )
+        )
+    if extensions is not None and extensions.factory_submitter is not None:
+        app.include_router(
+            _build_factory_router(
+                session_scope, guard, WRITE, extensions.factory_submitter
             )
         )
     return app

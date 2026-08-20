@@ -40,8 +40,14 @@ from sqlalchemy.orm import Session  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
+from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
+from arkali.engineering.factory.production_orchestration import (  # noqa: E402
+    ProductionFactory,
+    ProductionGoalRequest,
+)
 from arkali.engineering.localai import host_probe  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
+from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
 from arkali.execution.workflow.graph_model import (  # noqa: E402
     WorkflowEdge,
@@ -55,7 +61,32 @@ from arkali.kernel.persistence.engine import (  # noqa: E402
     sqlite_url,
 )
 from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
-from arkali.surfaces.command.app import create_app  # noqa: E402
+from arkali.surfaces.command.app import _CommandExtensions, create_app  # noqa: E402
+
+
+class _DurableFactorySink:
+    def __init__(self, store: JobStore) -> None:
+        self._store = store
+
+    def enqueue(self, request_id: str, payload: dict[str, object]) -> str:
+        record = self._store.submit(JobSubmission(
+            job_id=request_id,
+            job_type="software_factory.production",
+            idempotency_key=request_id,
+            payload=payload,
+        ))
+        return record.job_id
+
+
+def _factory_submitter(pdp: PolicyDecisionPoint, repo_root: pathlib.Path) -> Callable[..., Any]:
+    factory = ProductionFactory(AuthorityMap.load(repo_root))
+
+    def submit(session: Session, body: Any) -> Any:
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
+        request = ProductionGoalRequest(**body.model_dump())
+        return factory.submit_goal(request, _DurableFactorySink(JobStore(session, pep)))
+
+    return submit
 
 
 def _workflow_wiring(
@@ -165,7 +196,11 @@ def main(argv: list[str]) -> int:
     pdp = PolicyDecisionPoint.load(ROOT)
     app = create_app(
         engine, pdp, workflow_wiring=_workflow_wiring(pdp, ROOT),
-        operations_wiring=_operations_wiring(pdp, ROOT), operations_repo_root=ROOT,
+        extensions=_CommandExtensions(
+            operations_wiring=_operations_wiring(pdp, ROOT),
+            operations_repo_root=ROOT,
+            factory_submitter=_factory_submitter(pdp, ROOT),
+        ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")
     config = uvicorn.Config(app, host=args.host, port=args.port, log_level="warning")

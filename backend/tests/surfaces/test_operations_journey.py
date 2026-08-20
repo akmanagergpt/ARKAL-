@@ -28,7 +28,7 @@ from arkali.execution.workflow.executor import WorkflowExecutor
 from arkali.execution.workflow.graph_vocabulary import GraphVocabulary
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
-from arkali.surfaces.command.app import create_app
+from arkali.surfaces.command.app import _CommandExtensions, create_app
 from arkali.surfaces.operations.computer_use import authorize_computer_use_action
 from arkali.surfaces.operations.file_boundary import read_workspace_file, write_workspace_file
 from arkali.surfaces.operations.process_boundary import execute_process
@@ -80,10 +80,10 @@ def engine(database_path: pathlib.Path) -> Iterator[Engine]:
 
 @pytest.fixture()
 def app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
-    return create_app(
-        engine, pdp, operations_wiring=_operations_wiring(pdp, REPO),
+    return create_app(engine, pdp, extensions=_CommandExtensions(
+        operations_wiring=_operations_wiring(pdp, REPO),
         operations_repo_root=REPO,
-    )
+    ))
 
 
 @pytest.fixture()

@@ -26,7 +26,7 @@ from arkali.execution.workflow.executor import WorkflowExecutor
 from arkali.execution.workflow.graph_vocabulary import GraphVocabulary
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.kernel.persistence.migrations import ALEMBIC_INI
-from arkali.surfaces.command.app import create_app
+from arkali.surfaces.command.app import _CommandExtensions, create_app
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 BACKEND = REPO / "backend"
@@ -76,10 +76,10 @@ def _operations_wiring(pdp: PolicyDecisionPoint, repo_root: pathlib.Path):  # no
 
 @pytest.fixture()
 def app(engine: Engine, pdp: PolicyDecisionPoint) -> FastAPI:
-    return create_app(
-        engine, pdp, operations_wiring=_operations_wiring(pdp, REPO),
+    return create_app(engine, pdp, extensions=_CommandExtensions(
+        operations_wiring=_operations_wiring(pdp, REPO),
         operations_repo_root=REPO,
-    )
+    ))
 
 
 @pytest.fixture()
