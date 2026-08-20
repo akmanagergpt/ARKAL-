@@ -54,9 +54,17 @@ def _valid_output() -> str:
                 {"path": "backend/app.py", "content": "def status(): return 'ok'\n"},
                 {
                     "path": "backend/database.py",
-                    "content": "import sqlite3\ndef bootstrap(): sqlite3.connect('app.db').execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\nbootstrap()\n",
+                    "content": (
+                        "import sqlite3\n"
+                        "def bootstrap():\n"
+                        "    sqlite3.connect('app.db').execute("
+                        "'CREATE TABLE IF NOT EXISTS records (id INTEGER)')\n"
+                        "bootstrap()\n"
+                    ),
                 },
+                {"path": "backend/requirements.txt", "content": "pytest\n"},
                 {"path": "frontend/index.html", "content": "<main>App</main>"},
+                {"path": "frontend/package.json", "content": '{"scripts":{"build":"echo ok"}}'},
                 {
                     "path": "tests/test_app.py",
                     "content": "from app import status\ndef test_app(): assert status() == 'ok'\n",
@@ -74,7 +82,7 @@ def test_validated_model_files_are_written_to_real_candidate_workspace(
     workspace = _workspace(tmp_path)
     result = generate_model_product(blueprint, FixedModel(_valid_output()), "model-1", workspace)
 
-    assert len(result.files) == 5
+    assert len(result.files) == 7
     assert (workspace.root / "backend" / "database.py").is_file()
     assert result.runtime == "test-runtime"
 
@@ -109,7 +117,10 @@ def test_persistence_inside_backend_module_is_semantically_detected(
     payload = json.loads(_valid_output())
     payload["files"] = [item for item in payload["files"] if item["path"] != "backend/database.py"]
     payload["files"][0]["content"] = (
-        "import sqlite3\nDB = sqlite3.connect('app.db')\nDB.execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\ndef status(): return 'ok'\n"
+        "import sqlite3\n"
+        "DB = sqlite3.connect('app.db')\n"
+        "DB.execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\n"
+        "def status(): return 'ok'\n"
     )
     result = generate_model_product(
         derive_blueprint(GOAL, AuthorityMap.load(REPO)),

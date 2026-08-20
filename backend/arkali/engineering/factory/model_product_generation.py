@@ -24,6 +24,16 @@ MAX_FILES = 64
 MAX_FILE_BYTES = 262_144
 MAX_TOTAL_BYTES = 2_000_000
 REQUIRED_ROOTS = frozenset({"backend", "frontend", "tests", "config"})
+REQUIRED_EXACT = frozenset({"frontend/package.json", "config/README.md"})
+
+
+def _require_runnable_manifests(paths: tuple[str, ...]) -> None:
+    missing = REQUIRED_EXACT - set(paths)
+    if missing:
+        raise ValueError(f"generated product misses runnable manifests: {sorted(missing)}")
+    backend_manifests = {"backend/requirements.txt", "backend/pyproject.toml"}
+    if not backend_manifests.intersection(paths):
+        raise ValueError("generated backend needs a dependency manifest")
 
 
 class InferenceOutcome(Protocol):
@@ -90,6 +100,7 @@ class ModelProductEnvelope(BaseModel):
         missing = REQUIRED_ROOTS - roots
         if missing:
             raise ValueError(f"generated product misses required roots: {sorted(missing)}")
+        _require_runnable_manifests(paths)
         persistence_markers = ("sqlite3", "sqlalchemy", "sqlite://", "database")
         if not any(
             "database" in item.path.lower()
@@ -129,6 +140,11 @@ def _prompt(blueprint: RequirementBlueprint) -> str:
                     "under every required root: backend/, frontend/, tests/, and config/. "
                     "The config root must include config/README.md with exact startup steps."
                 ),
+                "json_encoding_rule": (
+                    "Every file content is a JSON string. Escape newlines as \\n and all "
+                    "other control characters according to RFC 8259; never emit literal control "
+                    "characters inside a string."
+                ),
                 "requirements": [
                     "real backend API",
                     "real frontend",
@@ -136,6 +152,10 @@ def _prompt(blueprint: RequirementBlueprint) -> str:
                     "automated tests",
                     "configuration and documented startup path",
                     "loading, empty and error states; no fake data or embedded secrets",
+                    "backend/requirements.txt or backend/pyproject.toml",
+                    "frontend/package.json with runnable build and start scripts",
+                    "tests must import modules and symbols that the generated backend exposes",
+                    "SQLite selection requires executable schema bootstrap or migrations",
                 ],
             },
             "blueprint_id": blueprint.blueprint_id,
