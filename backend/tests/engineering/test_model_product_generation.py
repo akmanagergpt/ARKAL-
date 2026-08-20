@@ -111,6 +111,21 @@ def test_one_exact_json_fence_is_transport_only(tmp_path: pathlib.Path) -> None:
     assert "backend/app.py" in result.files
 
 
+def test_fence_inside_valid_json_file_content_is_not_transport_markup(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    readme = next(item for item in payload["files"] if item["path"] == "config/README.md")
+    readme["content"] = "```powershell\nnpm run build\n```\n"
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        _workspace(tmp_path),
+    )
+    assert "config/README.md" in result.files
+
+
 def test_persistence_inside_backend_module_is_semantically_detected(
     tmp_path: pathlib.Path,
 ) -> None:

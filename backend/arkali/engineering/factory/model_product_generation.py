@@ -169,6 +169,12 @@ def _prompt(blueprint: RequirementBlueprint) -> str:
 
 def _json_payload(output: str) -> str:
     stripped = output.strip()
+    try:
+        parsed = json.loads(stripped)
+    except (ValueError, json.JSONDecodeError):
+        parsed = None
+    if isinstance(parsed, dict):
+        return stripped
     if stripped.startswith("```json\n") and stripped.endswith("\n```"):
         body = stripped[len("```json\n") : -len("\n```")]
         if "```" in body:
