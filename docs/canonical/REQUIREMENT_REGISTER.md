@@ -409,7 +409,7 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 | ARK-REQ-0084 | `component.kind in {parser, security_boundary, ai_output_deserializer}` — outside this set, applicable only when the component is declared `fuzz_target: true` in its contract |
 | ARK-REQ-0129 | `isolation.probe.local_ai_runtime_available == true` AND `hardware.probe.accelerator_present == true` |
 | ARK-REQ-0130 | ARK-REQ-0129 applicable AND `dataset.verified_count > 0` |
-| ARK-REQ-0180 | `capability.local_executable == true` in the Capability Graph for the capability under test |
+| ARK-REQ-0180 | `capability.runtime_requirements.local_executable == true` in the Capability Graph for the capability under test (ERR-005; Phase 28 applicability only) |
 | ARK-REQ-0356 | Per dimension: `hardware.probe.<dimension>_available == true` (GPU/VRAM) or `provider.registry.<id>.cost_reporting == true` (cost/token). Absence of a dimension is NOT_APPLICABLE only for that dimension |
 | ARK-REQ-0362 | `provider.registry.configured_real_count >= 1` AND `acceptance.golden_product_suite == PASS` |
 | ARK-REQ-0369 | `ecosystem.sbom_supported == true` for the target ecosystem (Python, Node and Rust all evaluate true) |

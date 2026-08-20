@@ -227,6 +227,37 @@ The distinction between re-scoring a *rejected* phase (Phase 1) and a *previousl
 
 ---
 
+## ERR-005 — GOVERNANCE ERRATUM (Phase 28): ARK-REQ-0180 applicability path
+
+| Field | Value |
+|---|---|
+| **Type** | Human-authorized governance erratum — **not** an ordinary implementing-agent edit |
+| **Raised by** | Phase 28 canonical discovery: the Appendix A expression named a field absent from the closed C-13 `CapabilityNode` schema |
+| **Decision** | **AUTHORIZED** by the human acceptance authority |
+| **Scope** | ARK-REQ-0180 Appendix A applicability evaluation in Phase 28 only |
+| **Applies to** | `docs/canonical/REQUIREMENT_REGISTER.md` Appendix A, ARK-REQ-0180 row |
+| **Old value** | `capability.local_executable == true` |
+| **New value** | `capability.runtime_requirements.local_executable == true` |
+| **Rationale** | C-13 declares `runtime_requirements: {...}` and the executable model represents it as `Mapping[str, Any]`; a real model probe preserved nested `local_executable: true` as a boolean. C-13 also uses `extra="forbid"`, so the old top-level path cannot exist without an unauthorized schema change |
+
+### What this erratum does NOT change
+
+It does not change `CapabilityNode`, add a canonical capability field, alter any
+other requirement or applicability rule, create a policy authority, or establish
+a precedent for another phase. It does not declare any capability applicable:
+Phase 28 must still inspect each capability under test and obtain the nested
+boolean from the real Capability Graph. Missing, non-boolean, or false values do
+not become PASS by interpretation. No accepted phase is reopened or re-scored.
+
+### Mechanical compatibility evidence
+
+The live C-13 model accepted
+`runtime_requirements={"local_executable": True}`, preserved the nested value as
+Python `bool`, and serialized it as JSON `true`, without changing the twelve-field
+schema. The old top-level spelling remains structurally forbidden.
+
+---
+
 ## ERR-003 — GOVERNANCE ERRATUM (post-Phase 3): architecture-budget measurement contract
 
 | Field | Value |
