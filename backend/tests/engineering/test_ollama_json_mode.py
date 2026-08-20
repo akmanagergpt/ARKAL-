@@ -31,13 +31,16 @@ def test_json_mode_uses_ollama_native_structured_output(
         return _Response()
 
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
-    result = OllamaAdapter(json_mode=True).infer("coder", "prompt", timeout_seconds=9)
+    result = OllamaAdapter(json_mode=True, max_output_tokens=4096).infer(
+        "coder", "prompt", timeout_seconds=9
+    )
 
     assert captured["body"] == {
         "model": "coder",
         "prompt": "prompt",
         "stream": False,
         "format": "json",
+        "options": {"num_predict": 4096, "temperature": 0},
     }
     assert captured["timeout"] == 9
     assert result.output == "{}"
@@ -54,3 +57,4 @@ def test_default_adapter_does_not_force_runtime_specific_format(monkeypatch) -> 
     OllamaAdapter().infer("coder", "prompt")
 
     assert "format" not in captured
+    assert "options" not in captured

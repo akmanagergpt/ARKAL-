@@ -48,7 +48,7 @@ def main(argv: list[str]) -> int:
     blueprint = derive_blueprint(args.goal, AuthorityMap.load(ROOT))
     result = generate_model_product_bounded(
         blueprint,
-        OllamaAdapter(json_mode=True),
+        OllamaAdapter(json_mode=True, max_output_tokens=16384),
         args.model,
         workspace,
         timeout_seconds=args.timeout,

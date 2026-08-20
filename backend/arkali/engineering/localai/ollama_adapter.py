@@ -49,7 +49,13 @@ def _is_loopback(endpoint: str) -> bool:
 class OllamaAdapter:
     """`LocalRuntimeAdapter` over a real, locally-running Ollama server."""
 
-    def __init__(self, endpoint: str = DEFAULT_ENDPOINT, *, json_mode: bool = False) -> None:
+    def __init__(
+        self,
+        endpoint: str = DEFAULT_ENDPOINT,
+        *,
+        json_mode: bool = False,
+        max_output_tokens: int | None = None,
+    ) -> None:
         if not _is_loopback(endpoint):
             raise LocalRuntimeTargetNotLoopbackError(
                 f"ollama adapter endpoint {endpoint!r} is not loopback",
@@ -57,6 +63,9 @@ class OllamaAdapter:
             )
         self._endpoint = endpoint
         self._json_mode = json_mode
+        if max_output_tokens is not None and not 1 <= max_output_tokens <= 32768:
+            raise ValueError("max_output_tokens must be between 1 and 32768")
+        self._max_output_tokens = max_output_tokens
 
     @property
     def runtime(self) -> str:
@@ -129,6 +138,11 @@ class OllamaAdapter:
         }
         if self._json_mode:
             payload["format"] = "json"
+        if self._max_output_tokens is not None:
+            payload["options"] = {
+                "num_predict": self._max_output_tokens,
+                "temperature": 0,
+            }
         body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             f"{self._endpoint}/api/generate",

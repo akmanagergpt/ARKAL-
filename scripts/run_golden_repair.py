@@ -289,7 +289,7 @@ def main(argv: list[str]) -> int:
         ensure_ascii=False,
     )
     started = time.monotonic()
-    outcome = OllamaAdapter(json_mode=True).infer(
+    outcome = OllamaAdapter(json_mode=True, max_output_tokens=16384).infer(
         args.model, prompt, timeout_seconds=600
     )
     if outcome.state.value != "PASS":
