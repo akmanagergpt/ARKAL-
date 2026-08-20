@@ -424,3 +424,28 @@ def test_removed_framework_hook_is_rejected_for_selected_version(
             "model-1",
             _workspace(tmp_path),
         )
+
+
+def test_fastapi_decorators_are_real_routes_and_mutation_contracts(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] = (
+        "app = object()\n"
+        "@app.get('/items')\ndef items(): return []\n"
+        "@app.put('/items/{item_id}')\ndef update(item_id): return item_id\n"
+    )
+    frontend = next(
+        item for item in payload["files"] if item["path"] == "frontend/src/App.js"
+    )
+    frontend["content"] = "export const update = () => fetch('/items/1',{method:'PUT'});\n"
+    test = next(item for item in payload["files"] if item["path"] == "tests/test_app.py")
+    test["content"] = "from app import items\ndef test_items(): assert items() == []\n"
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        _workspace(tmp_path),
+    )
+    assert "backend/app.py" in result.files

@@ -353,7 +353,16 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
             )
         )
     findings.extend(_schema_context_findings(backend_text))
-    if not any(marker in backend_text for marker in ("@app.route", "@router.", "add_url_rule")):
+    route_markers = (
+        "@app.route",
+        "@app.get",
+        "@app.post",
+        "@app.put",
+        "@app.delete",
+        "@router.",
+        "add_url_rule",
+    )
+    if not any(marker in backend_text for marker in route_markers):
         findings.append(
             SemanticFinding(
                 code="missing_api_routes",
@@ -371,34 +380,6 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="backend has no executable server entrypoint",
             )
         )
-    return findings
-
-
-def _frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    backend = "\n".join(
-        source.lower()
-        for path, source in files.items()
-        if path.startswith("backend/") and path.endswith(".py")
-    )
-    frontend = "\n".join(
-        source.lower()
-        for path, source in files.items()
-        if path.startswith("frontend/src/")
-    )
-    findings: list[SemanticFinding] = []
-    for method in ("post", "put", "delete"):
-        if f"'{method}'" not in backend and f'"{method}"' not in backend:
-            continue
-        direct_call = f"axios.{method}(" in frontend
-        fetch_option = re.search(rf"method\s*:\s*['\"]{method}['\"]", frontend)
-        if not direct_call and fetch_option is None:
-            findings.append(
-                SemanticFinding(
-                    code="frontend_backend_contract_drift",
-                    path="frontend/src/",
-                    detail=f"backend exposes {method.upper()} but frontend has no matching call",
-                )
-            )
     return findings
 
 
@@ -433,7 +414,11 @@ def inspect_product_files(
     findings.extend(_test_findings(files, modules))
     findings.extend(_persistence_findings(files))
     findings.extend(_framework_api_findings(files))
-    findings.extend(_frontend_contract_findings(files))
+    from arkali.engineering.factory.http_contract_preflight import (
+        frontend_contract_findings,
+    )
+
+    findings.extend(frontend_contract_findings(files))
     findings.extend(_manifest_findings(files))
     findings.extend(_regression_findings(files, baseline))
     return ProductPreflightReport(findings=tuple(findings))
