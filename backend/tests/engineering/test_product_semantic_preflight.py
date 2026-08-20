@@ -28,6 +28,18 @@ def test_complete_self_consistent_product_passes() -> None:
     assert inspect_product_files(_complete()).passed
 
 
+def test_unittest_assertion_methods_are_meaningful() -> None:
+    files = {
+        **_complete(),
+        "tests/backend/test_service.py": (
+            "import unittest\nfrom service import connection\n"
+            "class TestService(unittest.TestCase):\n"
+            "    def test_connection(self): self.assertIsNotNone(connection())\n"
+        ),
+    }
+    assert inspect_product_files(files).passed
+
+
 @pytest.mark.parametrize(
     "mutation, expected",
     [

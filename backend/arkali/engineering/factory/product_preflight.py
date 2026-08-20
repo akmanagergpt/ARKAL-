@@ -129,6 +129,19 @@ def _nonstdlib_from_imports(tree: ast.AST) -> tuple[ast.ImportFrom, ...]:
     )
 
 
+def _has_assertion(tree: ast.AST) -> bool:
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assert):
+            return True
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr.startswith("assert")
+        ):
+            return True
+    return False
+
+
 def _test_findings(
     files: Mapping[str, str], modules: Mapping[str, tuple[str, set[str]]]
 ) -> list[SemanticFinding]:
@@ -150,7 +163,7 @@ def _test_findings(
             and node.name.startswith("test")
             for node in ast.walk(tree)
         )
-        if not has_test or not any(isinstance(node, ast.Assert) for node in ast.walk(tree)):
+        if not has_test or not _has_assertion(tree):
             findings.append(
                 SemanticFinding(
                     code="vacuous_tests",
