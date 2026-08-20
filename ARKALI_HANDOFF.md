@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `a30629727583128b49a98bb0136d45587ceda26d` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `3d1cdc6183e06420e20cbde49cd004b97bf85555` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -482,7 +482,8 @@ repository, the repository wins.
 | 300 | `3aaac9f` | **PHASE 29 PACKAGE 2** — installer failure composition through the existing C-32 Recovery Supervisor; no second rollback authority |
 | 301 | `dd1f2d0` | **PHASE 29 PACKAGE 3** — real 0.1.0→0.1.1 upgrade, corrupt-candidate refusal, C-32 recovery reinstall and uninstall/reinstall acceptance runners |
 | 302 | `88ea58a` | **PHASE 29 CANDIDATE FREEZE** — installer contract, one deferred optional claim, C-17 report; final regression 3354 PASS |
-| 303 | `a306297` | **RECORD PHASE 29 MACHINE ACCEPTANCE AND UNLOCK THE SUCCESSOR.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`; zero mandatory requirements and zero discharged requirements, cumulative remains 219; optional signed-bundle requirement remains DEFERRED; successor discovery only ← HEAD at generation |
+| 303 | `a306297` | **RECORD PHASE 29 MACHINE ACCEPTANCE AND UNLOCK THE SUCCESSOR.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`; zero mandatory requirements and zero discharged requirements, cumulative remains 219; optional signed-bundle requirement remains DEFERRED; successor discovery only |
+| 304 | `3d1cdc6` | **D-027 / PHASE 30 OWNERSHIP DECISION.** Human governance assigns only top-level production goal-to-release software-factory composition to `engineering.factory` for ARK-REQ-0072/0311/0312; all subordinate authorities remain unchanged and DEF-009 functional gaps remain open ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -577,7 +578,7 @@ Derived from authoritative artifacts, not from memory.
 | Field | Value |
 |---|---|
 | Name | **Golden Product + Golden Repair Verification** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 30) |
-| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `30`. Discovery only; no Phase 30 implementation exists |
+| Status | **UNLOCKED — IN PROGRESS.** `GovernanceState.current_work_phase()` returns `30`. D-027 records the narrow production-orchestration ownership decision; no Product Plane package has yet been implemented |
 | Prerequisites | Phases **14, 16 and 24**, all MACHINE-ACCEPTED |
 | Product / contract | Matrix product is Golden evidence with an **instantiated corpus**. C-27 is defined at Phase 0B and instantiated at Phase 30; its accepted definition must be reused, not rewritten |
 | Human gate | Matrix Gate column is `—` — no human gate applies to Phase 30 acceptance |
@@ -585,28 +586,25 @@ Derived from authoritative artifacts, not from memory.
 | Golden Factory | Five named product families plus unseen-domain generalization must be generated through the normal real pipeline. At least one real provider or working local model must generate real artifacts; absent provider means BLOCKED/NOT_CONFIGURED, never PASS |
 | Real product | Full intent→requirements→specification→architecture→tasks→providers/agents→artifacts→assembly→build→runtime→acceptance→release must be real. Manual products registered as generated are prohibited; multi-file frontend/backend/database artifacts and genuine user journeys are required by the combined evidence obligations |
 | Golden Repair | Instantiate the Phase 0B corpus against an accepted Golden Product revision; declare budgets before every run; prove all repairable defects, zero regression/test weakening, evidence-backed root causes/fingerprints, content hash and terminal ESCALATED for a genuinely unrepairable entry |
-| DEF-009 | Phase 30 owns gap (c), real provider/local-model-driven multi-file product generation. Repository truth still says gaps (a) live worker loop and (b) live orchestrating surface have no canonical owner; discovery must resolve whether the 23 mandatory normal-pipeline/full-flow obligations make them unavoidable before implementation |
+| DEF-009 | D-027 resolves only the ownership ambiguity: `engineering.factory` owns top-level Phase 30 composition for ARK-REQ-0072/0311/0312, while scheduler/durable/workflow and every other subordinate authority remain canonical owners of their behavior. The live shipping path, real provider/model generation, multi-file product, execution, tests, repair, acceptance, running product and preview gaps remain OPEN pending evidence |
 | Real Product Verification | Acceptance requires real L2 execution and applicable L3 clean-Windows evidence, actual running generated apps, browser console/network/dead-control/drift checks, restart/persistence, and real release-bound provenance. Simulation alone cannot PASS |
 | External AI dependency | Unlike Phase 29, a real provider or working local model is a mandatory Golden Factory acceptance precondition. No provider result may be fabricated; cost/credential authority is not implied by discovery |
 | Architecture facts | 8 gates PASS over **222** Python cross-context edges and all 9 budgets. `acceptance.engine` is Protected Core; any implementation change there triggers its governed stronger profile and Stable Core/HUMAN_GATE_2 implications according to repository truth |
 
 **Phase 29 is MACHINE-ACCEPTED.** It discharged zero requirements; optional
 ARK-REQ-0181 remains DEFERRED and cumulative verified remains 219.
-**Phase 30 is unlocked, discovery complete, and implementation has not begun.**
+**Phase 30 is in progress.** D-027 is recorded; Package 1 has not yet begun.
 
 ## 9. Next exact action
 
-Phase 30 denominator: 23 requirements, all MANDATORY. Before any implementation,
-re-read the Golden Product, real-provider, execution-level and Golden Repair
-sections; the Phase 0B C-27 corpus definition; DEF-004 and DEF-009; and derive
-the exact Product Plane/orchestration gap against the current shipping call
-graph. A real provider or working local model and real normal-pipeline product
-generation are mandatory; absence is BLOCKED/NOT_CONFIGURED, never PASS.
-
-Do not begin Phase 30 implementation from this checkpoint. Do not manually
-build products and register them as generated, modify the corpus to obtain PASS,
-or treat simulation/unit mocks as production evidence. This session stops after
-canonical discovery.
+Phase 30 denominator: 23 requirements, all MANDATORY. D-027 now authorizes
+`engineering.factory` as the narrow top-level composition owner for the real
+production goal-to-release path while preserving every subordinate authority.
+Begin Package 1 by converting the mechanically identified definition-only caller
+graph into a shipping factory composition boundary; do not create a second
+scheduler, workflow, model, candidate, repair, acceptance or release authority.
+A real provider or working local model and real normal-pipeline product generation
+remain mandatory; simulation/unit mocks cannot provide Level-4 evidence.
 
 ## 10. New-session bootstrap protocol
 
@@ -732,7 +730,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: a30629727583128b49a98bb0136d45587ceda26d
+head: 3d1cdc6183e06420e20cbde49cd004b97bf85555
 branch: main
 working_tree_clean: true
 
