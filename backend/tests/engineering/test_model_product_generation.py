@@ -1,0 +1,132 @@
+from __future__ import annotations
+
+import json
+import pathlib
+
+import pytest
+
+from arkali.control.architecture.authority_map import AuthorityMap
+from arkali.control.specification.blueprint_engine import derive_blueprint
+from arkali.engineering.candidate.workspace import WorkspaceAuthority
+from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.model_product_generation import generate_model_product
+from arkali.engineering.localai.adapter import HonestState, InferenceResult
+
+REPO = pathlib.Path(__file__).resolve().parents[3]
+GOAL = "The system must respond within at least 200 ms."
+
+
+class FixedModel:
+    def __init__(self, output: str, state: HonestState = HonestState.PASS) -> None:
+        self.output = output
+        self.state = state
+
+    def infer(
+        self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0
+    ) -> InferenceResult:
+        assert "blueprint_id" in prompt
+        assert timeout_seconds > 0
+        return InferenceResult(
+            runtime="test-runtime", model_id=model_id, state=self.state,
+            detail="bounded test double", output=self.output,
+            output_excerpt=self.output[:200],
+        )
+
+
+def _workspace(tmp_path: pathlib.Path):  # noqa: ANN202
+    stable = tmp_path / "stable"
+    stable.mkdir()
+    return WorkspaceAuthority(tmp_path / "candidates").allocate(
+        workspace_id="candidate-1", task_id="task-1", agent_id="model-1",
+        stable_snapshot=stable,
+    )
+
+
+def _valid_output() -> str:
+    return json.dumps({"files": [
+        {"path": "backend/app.py", "content": "print('backend')\n"},
+        {"path": "backend/database.py", "content": "DB = 'sqlite'\n"},
+        {"path": "frontend/index.html", "content": "<main>App</main>"},
+        {"path": "tests/test_app.py", "content": "def test_app(): assert True\n"},
+        {"path": "config/README.md", "content": "run instructions\n"},
+    ]})
+
+
+def test_validated_model_files_are_written_to_real_candidate_workspace(
+    tmp_path: pathlib.Path,
+) -> None:
+    blueprint = derive_blueprint(GOAL, AuthorityMap.load(REPO))
+    workspace = _workspace(tmp_path)
+    result = generate_model_product(
+        blueprint, FixedModel(_valid_output()), "model-1", workspace
+    )
+
+    assert len(result.files) == 5
+    assert (workspace.root / "backend" / "database.py").is_file()
+    assert result.runtime == "test-runtime"
+
+
+def test_lossless_path_map_is_normalised_without_weakening_checks(
+    tmp_path: pathlib.Path,
+) -> None:
+    listed = json.loads(_valid_output())["files"]
+    mapped = json.dumps({"files": {item["path"]: item["content"] for item in listed}})
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(mapped), "model-1", _workspace(tmp_path),
+    )
+    assert result.files == tuple(item["path"] for item in listed)
+
+
+def test_one_exact_json_fence_is_transport_only(tmp_path: pathlib.Path) -> None:
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(f"```json\n{_valid_output()}\n```"),
+        "model-1", _workspace(tmp_path),
+    )
+    assert "backend/app.py" in result.files
+
+
+def test_persistence_inside_backend_module_is_semantically_detected(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    payload["files"] = [
+        item for item in payload["files"] if item["path"] != "backend/database.py"
+    ]
+    payload["files"][0]["content"] = "import sqlite3\nDB = sqlite3.connect('app.db')\n"
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)), "model-1", _workspace(tmp_path),
+    )
+    assert "backend/app.py" in result.files
+
+
+@pytest.mark.parametrize("output", [
+    "not-json",
+    "commentary\n```json\n{}\n```",
+    "```json\n{}\n```\nmore",
+    json.dumps({"files": [{"path": "../escape", "content": "x"}]}),
+    json.dumps({"files": [{"path": "backend/app.py", "content": "x"}]}),
+])
+def test_malformed_unsafe_or_incomplete_model_output_writes_nothing(
+    tmp_path: pathlib.Path, output: str,
+) -> None:
+    workspace = _workspace(tmp_path)
+    with pytest.raises(ModelGenerationError):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(output), "model-1", workspace,
+        )
+    assert tuple(workspace.root.rglob("*.py")) == ()
+
+
+def test_nonpassing_real_model_outcome_cannot_become_artifacts(
+    tmp_path: pathlib.Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    with pytest.raises(ModelGenerationError, match="did not pass"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel("", HonestState.NOT_CONFIGURED), "model-1", workspace,
+        )

@@ -75,6 +75,11 @@ class InferenceResult(BaseModel):
     #: Truncated - evidence of genuine output, never the full generation, so a
     #: phase report never carries an unbounded or sensitive model output.
     output_excerpt: str = Field(default="", max_length=200)
+    #: Full bounded response for the in-process consumer that requested the
+    #: generation. Excluded from serialisation and repr so evidence/report code
+    #: cannot accidentally persist unbounded model text; callers persist only
+    #: validated, content-addressed artifacts.
+    output: str = Field(default="", max_length=1_000_000, repr=False, exclude=True)
 
 
 @runtime_checkable

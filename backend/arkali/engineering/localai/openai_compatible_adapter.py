@@ -157,7 +157,7 @@ class OpenAICompatibleAdapter:
         return InferenceResult(
             runtime=RUNTIME, model_id=model_id, state=HonestState.PASS,
             detail="genuine local inference completed", elapsed_seconds=elapsed,
-            output_excerpt=text[:200],
+            output_excerpt=text[:200], output=text,
         )
 
 

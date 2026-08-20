@@ -21,3 +21,9 @@ class UnresolvedBlueprintError(ContractViolation):
     """Generation was requested from a blueprint with unresolved questions."""
 
     code = "ARK-ERR-0115"
+
+
+class ModelGenerationError(ContractViolation):
+    """A real model call or its bounded multi-file contract did not resolve."""
+
+    code = "ARK-ERR-0116"
