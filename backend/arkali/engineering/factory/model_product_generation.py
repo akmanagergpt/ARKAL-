@@ -57,6 +57,26 @@ def _normalise_requirements(files: dict[str, str]) -> dict[str, str]:
     return normalized
 
 
+def _require_executable_product(files: tuple[GeneratedFile, ...]) -> None:
+    persistence_markers = ("sqlite3", "sqlalchemy", "sqlite://")
+    has_persistence = any(
+        item.path.endswith(".py")
+        and item.path.startswith("backend/")
+        and any(marker in item.content.lower() for marker in persistence_markers)
+        for item in files
+    )
+    if not has_persistence:
+        raise ValueError("generated backend needs executable persistence code")
+    source_suffixes = {".js", ".jsx", ".ts", ".tsx"}
+    has_frontend = any(
+        item.path.startswith("frontend/src/")
+        and pathlib.PurePosixPath(item.path).suffix in source_suffixes
+        for item in files
+    )
+    if not has_frontend:
+        raise ValueError("generated frontend needs executable source")
+
+
 class InferenceOutcome(Protocol):
     runtime: str
     model_id: str
@@ -122,14 +142,7 @@ class ModelProductEnvelope(BaseModel):
         if missing:
             raise ValueError(f"generated product misses required roots: {sorted(missing)}")
         _require_runnable_manifests(paths)
-        persistence_markers = ("sqlite3", "sqlalchemy", "sqlite://", "database")
-        if not any(
-            "database" in item.path.lower()
-            or "migration" in item.path.lower()
-            or any(marker in item.content.lower() for marker in persistence_markers)
-            for item in self.files
-        ):
-            raise ValueError("generated product needs a persistence/database artifact")
+        _require_executable_product(self.files)
         if sum(len(item.content.encode("utf-8")) for item in self.files) > MAX_TOTAL_BYTES:
             raise ValueError("generated product exceeds the aggregate byte bound")
         return self

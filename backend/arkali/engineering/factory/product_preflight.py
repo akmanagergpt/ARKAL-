@@ -234,19 +234,38 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
 
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend_text = "\n".join(
-        source.lower() for path, source in files.items() if path.startswith("backend/")
+        source.lower()
+        for path, source in files.items()
+        if path.startswith("backend/") and path.endswith(".py")
     )
     uses_sqlite = "sqlite3" in backend_text or "sqlite://" in backend_text
     creates_schema = "create table" in backend_text or "create_all(" in backend_text
-    if uses_sqlite and not creates_schema:
-        return [
+    findings: list[SemanticFinding] = []
+    if not uses_sqlite:
+        findings.append(
+            SemanticFinding(
+                code="missing_persistence_code",
+                path="backend/",
+                detail="backend Python source contains no executable SQLite persistence",
+            )
+        )
+    elif not creates_schema:
+        findings.append(
             SemanticFinding(
                 code="missing_schema_bootstrap",
                 path="backend/",
                 detail="SQLite is selected but no schema creation or migration is present",
             )
-        ]
-    return []
+        )
+    if not any(marker in backend_text for marker in ("@app.route", "@router.", "add_url_rule")):
+        findings.append(
+            SemanticFinding(
+                code="missing_api_routes",
+                path="backend/",
+                detail="backend source declares no HTTP API route",
+            )
+        )
+    return findings
 
 
 def _regression_findings(

@@ -74,7 +74,10 @@ def _valid_output() -> str:
     return json.dumps(
         {
             "files": [
-                {"path": "backend/app.py", "content": "def status(): return 'ok'\n"},
+                {
+                    "path": "backend/app.py",
+                    "content": "@app.route('/status')\ndef status(): return 'ok'\n",
+                },
                 {
                     "path": "backend/database.py",
                     "content": (
@@ -87,6 +90,7 @@ def _valid_output() -> str:
                 },
                 {"path": "backend/requirements.txt", "content": "pytest\n"},
                 {"path": "frontend/index.html", "content": "<main>App</main>"},
+                {"path": "frontend/src/App.js", "content": "export default function App(){}\n"},
                 {"path": "frontend/package.json", "content": '{"scripts":{"build":"echo ok"}}'},
                 {
                     "path": "tests/test_app.py",
@@ -105,7 +109,7 @@ def test_validated_model_files_are_written_to_real_candidate_workspace(
     workspace = _workspace(tmp_path)
     result = generate_model_product(blueprint, FixedModel(_valid_output()), "model-1", workspace)
 
-    assert len(result.files) == 7
+    assert len(result.files) == 8
     assert (workspace.root / "backend" / "database.py").is_file()
     assert result.runtime == "test-runtime"
 
@@ -158,7 +162,7 @@ def test_persistence_inside_backend_module_is_semantically_detected(
         "import sqlite3\n"
         "DB = sqlite3.connect('app.db')\n"
         "DB.execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\n"
-        "def status(): return 'ok'\n"
+        "@app.route('/status')\ndef status(): return 'ok'\n"
     )
     result = generate_model_product(
         derive_blueprint(GOAL, AuthorityMap.load(REPO)),
@@ -242,4 +246,6 @@ def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
         workspace,
     )
     assert (workspace.root / "backend/requirements.txt").read_text() == "Flask==3.1.0\n"
-    assert (workspace.root / "backend/app.py").read_text() == "def status(): return 'ok'\n"
+    assert (workspace.root / "backend/app.py").read_text() == (
+        "@app.route('/status')\ndef status(): return 'ok'\n"
+    )

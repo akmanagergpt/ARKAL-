@@ -9,7 +9,7 @@ from arkali.engineering.factory.product_preflight import inspect_product_files
 def _complete() -> dict[str, str]:
     return {
         "backend/src/service.py": (
-            "import sqlite3\n"
+            "import sqlite3\n@app.route('/records')\n"
             "def connection(): return sqlite3.connect('data.db')\n"
             "def bootstrap():\n"
             "    connection().execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\n"
@@ -80,6 +80,16 @@ def test_react_scripts_requires_real_html_entry() -> None:
     files.pop("frontend/public/index.html")
     report = inspect_product_files(files)
     assert "missing_frontend_entry" in {item.code for item in report.findings}
+
+
+def test_manifest_names_cannot_stand_in_for_persistence_or_api_code() -> None:
+    files = {
+        **_complete(),
+        "backend/src/service.py": "def create_app(): return object()\n",
+        "backend/requirements.txt": "Flask\nSQLAlchemy\n",
+    }
+    codes = {item.code for item in inspect_product_files(files).findings}
+    assert {"missing_persistence_code", "missing_api_routes"} <= codes
 
 
 @pytest.mark.parametrize(
