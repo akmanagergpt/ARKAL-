@@ -57,8 +57,9 @@ def test_backend_process_is_fixed_and_not_frontend_reachable() -> None:
 def test_rust_manifest_has_no_native_capability_plugin() -> None:
     manifest = tomllib.loads((TAURI / "Cargo.toml").read_text(encoding="utf-8"))
     dependencies = manifest["dependencies"]
-    assert set(dependencies) == {"tauri"}
+    assert set(dependencies) == {"tauri", "tauri-plugin-single-instance"}
     assert dependencies["tauri"]["features"] == []
+    assert dependencies["tauri-plugin-single-instance"] == "2"
 
 
 def test_desktop_network_policy_is_loopback_only() -> None:

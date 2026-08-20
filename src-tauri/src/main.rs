@@ -13,6 +13,12 @@ fn main() {
     let backend = Arc::new(Mutex::new(None::<BackendRuntime>));
     let setup_backend = Arc::clone(&backend);
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(move |app| {
             let app_data = app
                 .path()

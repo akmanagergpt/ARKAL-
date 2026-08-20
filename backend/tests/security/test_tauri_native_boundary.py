@@ -30,6 +30,12 @@ def test_no_shell_filesystem_opener_or_credential_plugin_exists() -> None:
         assert forbidden not in manifests
 
 
+def test_single_instance_plugin_focuses_only_the_existing_main_window() -> None:
+    assert "tauri_plugin_single_instance::init" in RUST
+    assert 'get_webview_window("main")' in RUST
+    assert "window.set_focus()" in RUST
+
+
 def test_the_only_process_target_is_the_canonical_python_runtime() -> None:
     commands = re.findall(r"Command::new\(([^)]+)\)", RUST)
     assert commands == ["python"]
@@ -45,4 +51,3 @@ def test_network_and_cors_boundaries_name_only_fixed_loopback_origins() -> None:
     assert "https:" not in csp and "*" not in csp
     backend = (REPO / "backend/arkali/surfaces/command/app.py").read_text(encoding="utf-8")
     assert 'allow_origins=["http://tauri.localhost"]' in backend
-
