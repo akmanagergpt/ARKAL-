@@ -1,0 +1,32 @@
+{
+  "phase_id": "28",
+  "objective": "Host the existing Command Center UI and backend in a real, secure Windows-first Tauri 2 desktop application with a bundled runtime and generic installer proof, without duplicating authorities or closing DEF-009.",
+  "ark_req_ids_closed": ["ARK-REQ-0010", "ARK-REQ-0179"],
+  "files_created": ["src-tauri/Cargo.toml", "src-tauri/build.rs", "src-tauri/tauri.conf.json", "src-tauri/src/main.rs", "src-tauri/src/backend_runtime.rs", "src-tauri/capabilities/default.json", "scripts/build_desktop_backend.py", "scripts/run_desktop_journey.mjs", "frontend/src/app/DesktopBootBoundary.tsx", "frontend/tests/features/desktop-host.test.tsx", "backend/tests/structural/test_tauri_shell.py", "backend/tests/security/test_tauri_native_boundary.py", "backend/tests/surfaces/test_phase_28_applicability.py", "docs/contracts/desktop.md", "docs/acceptance/phase_28_traceability.json", "docs/acceptance/phase_28_report.json"],
+  "files_modified": [".gitignore", "backend/pyproject.toml", "backend/arkali/surfaces/command/app.py", "frontend/package.json", "frontend/package-lock.json", "frontend/src/api/client.ts", "frontend/src/app/App.tsx", "scripts/run_command_center.py"],
+  "public_contracts": [],
+  "migrations": [],
+  "state_machine_capability_changes": "None. No CapabilityNode schema or shipping capability changed. ERR-005 changes only the Phase 28 ARK-REQ-0180 applicability evaluation, and that requirement resolves NOT_APPLICABLE.",
+  "tests_executed": [
+    {"command": "cargo fmt --check && cargo check && cargo test && cargo clippy -- -D warnings (src-tauri/)", "exit_code": 0, "passed": 3, "failed": 0, "summary": "Stable MSVC Rust build and three lifecycle unit tests pass; clippy is warning-free.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "npm run tauri -- build (frontend/)", "exit_code": 0, "passed": 1, "failed": 0, "summary": "Real Tauri release build reused frontend/dist, rebuilt the bundled existing backend, linked with MSVC and emitted one NSIS bundle.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "bundled sidecar health/shutdown probe", "exit_code": 0, "passed": 1, "failed": 0, "summary": "Packaged Python runtime returned status ready at schema revision 0009_workflow_execution, created a real SQLite database and exited 0 after ownership-sentinel removal.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "node scripts/run_desktop_journey.mjs", "exit_code": 0, "passed": 1, "failed": 0, "summary": "REAL DESKTOP USER: native WebView2 release window, all three modes, Project Registry persistence across restart, Expert Workflow Studio, duplicate-instance focus, reload, zero console errors and clean backend shutdown all pass.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "python -m pytest backend/tests/structural/test_tauri_shell.py backend/tests/security/test_tauri_native_boundary.py -q", "exit_code": 0, "passed": 10, "failed": 0, "summary": "Single-UI/native-boundary structural and adversarial controls pass.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "python -m pytest backend/tests/surfaces/test_phase_28_applicability.py -q", "exit_code": 0, "passed": 4, "failed": 0, "summary": "ERR-005 applicability is schema-representable, current shipping capability is NOT_APPLICABLE, and malformed values fail closed.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "npm test -- --reporter=dot (frontend/)", "exit_code": 0, "passed": 31, "failed": 0, "summary": "Frontend unit/integration, including desktop host selection and boot boundary, pass.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "npm run build (frontend/)", "exit_code": 0, "passed": 49, "failed": 0, "summary": "TypeScript typecheck and shared Vite production build pass; 49 modules transformed.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "npm run test:e2e (frontend/)", "exit_code": 0, "passed": 14, "failed": 0, "summary": "WEB REGRESSION: real Chromium, production Vite, live FastAPI and migrated SQLite journeys pass without interception.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "python -m pytest backend/tests -q (with seven established Windows/environment/governance deselections)", "exit_code": 0, "passed": 3347, "failed": 0, "summary": "Full backend regression passed with 13 environment-only skips and 7 established deselections.", "external_result": "NO_EXTERNAL_RESULT"},
+    {"command": "python -m pytest backend/tests/governance/test_architecture_gates.py backend/tests/structural/test_repository_structure.py -q", "exit_code": 0, "passed": 28, "failed": 0, "summary": "Eight live architecture gates and repository structure controls pass.", "external_result": "NO_EXTERNAL_RESULT"}
+  ],
+  "architecture_checks": "8/8 Python architecture gates PASS with 222 live cross-context edges and all 9 numeric budgets. Tauri/Rust is outside that scanner; cargo fmt/check/test/clippy plus dedicated structural and adversarial tests provide its separate evidence.",
+  "duplicate_shadow_check": "PASS. One React/Vite UI, one FastAPI backend, one Project Registry, one workflow authority and the existing PDP/PEP remain. Rust adds only lifecycle hosting and exposes no frontend command.",
+  "security_findings": "NORMAL profile. Empty Tauri capabilities and command surface; no arbitrary shell, process, filesystem, opener, credential or external network access; fixed loopback API, exact health identity and fail-closed port conflict. No external AI/provider was contacted.",
+  "fake_success_scan": "PASS. Desktop renders only the existing real Command Center and persisted backend state. No generation, telemetry or live-preview success was fabricated.",
+  "evidence_created": ["docs/contracts/desktop.md", "docs/acceptance/phase_28_traceability.json", "docs/acceptance/phase_28_report.json"],
+  "limitations": "DEF-009 remains OPEN. Real-product goal-to-running-product and live-preview reachability remain NOT_REACHABLE. The generic NSIS build is Phase 28 bundle evidence, not Phase 29 canonical installer/recovery completion.",
+  "blockers": "None. No HUMAN_GATE applies. ARK-REQ-0180 is honestly NOT_APPLICABLE under the narrowly recorded ERR-005 decision.",
+  "next_exact_action": "Run the canonical Phase 28 candidate gate; if machine-accepted, update the canonical checkpoint, refresh handoff in its own atomic commit, perform Phase 29 discovery only, and stop.",
+  "status": "PASS"
+}

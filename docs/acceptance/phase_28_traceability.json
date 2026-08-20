@@ -1,0 +1,26 @@
+{
+  "phase_id": "28",
+  "note": "Derived from RequirementRegister.for_phase(\"28\"): ARK-REQ-0010 and ARK-REQ-0179 are MANDATORY; ARK-REQ-0180 is CONDITIONAL; all are owned by surfaces.command. Phase 27 is accepted and no HUMAN_GATE applies. ERR-005 narrowly interprets ARK-REQ-0180's nonexistent flat field as the existing capability.runtime_requirements.local_executable field for this requirement, Appendix A evaluation, and Phase 28 only.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0010",
+      "state": "SATISFIED",
+      "implementation": "src-tauri is a minimal Tauri 2 Windows host over the unchanged frontend/dist output. The React/Vite Command Center remains the single UI source and the existing FastAPI composition root remains the single backend. Beginner, Professional and Expert modes, Project Registry and Expert Workflow Studio are preserved without a native business-logic layer.",
+      "evidence": "arch: backend/tests/structural/test_tauri_shell.py and backend/tests/security/test_tauri_native_boundary.py prove a single frontend, an empty native command surface, fixed process target, loopback-only network policy and no shell/filesystem/opener/credential plugin. run: scripts/run_desktop_journey.mjs launched the release Tauri EXE in a real WebView2 window and proved all three modes, Project Registry create/restart persistence, Expert Workflow Studio, reload, single-instance focus, zero console errors and clean shutdown.",
+      "note": "Both register evidence keys (arch, run) are supplied. Rust/Tauri files are outside the Python architecture edge scanner, so cargo checks and dedicated structural/adversarial controls are recorded separately rather than attributed to the eight Python gates."
+    },
+    {
+      "req_id": "ARK-REQ-0179",
+      "state": "SATISFIED",
+      "implementation": "The Windows-first production build packages the existing Python Command Center composition root as a fixed sidecar, stores the migrated SQLite database under Tauri app-data, enforces exact health/port-conflict/single-owner behaviour, shuts down through an ownership sentinel, and emits a generic NSIS bundle using the stable MSVC toolchain and Windows SDK.",
+      "evidence": "run: cargo check/test/clippy and npm run tauri -- build produced target/release/arkali-desktop.exe plus bundle/nsis/ARKALI_0.1.0_x64-setup.exe. The bundled sidecar independently returned ready with schema_revision 0009_workflow_execution, created its app-data database and exited 0 after sentinel removal. The production EXE then passed the real WebView2 journey. frontend browser regression remains 14/14 over the same UI and backend.",
+      "note": "The generic Phase 28 NSIS proof is not claimed as Phase 29's canonical ARKALI_Setup.exe, Recovery Supervisor, deployment, upgrade or recovery implementation."
+    }
+  ],
+  "deferred": [
+    {
+      "req_id": "ARK-REQ-0180",
+      "reason": "NOT_APPLICABLE. ERR-005's authorized Phase-28-only rule is capability.runtime_requirements.local_executable == true. CapabilityNode.runtime_requirements represents the nested field, but the repository's shipping capability constructor does not set local_executable true. backend/tests/surfaces/test_phase_28_applicability.py proves missing, false and non-boolean values fail closed and that the current shipping node is not applicable; it also proves a schema-valid true value would be applicable. No field or capability was invented to force applicability."
+    }
+  ]
+}
