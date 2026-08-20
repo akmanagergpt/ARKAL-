@@ -265,3 +265,26 @@ def test_double_escaped_python_transport_is_normalized_only_when_parseable(
         workspace,
     )
     assert "\\n" not in (workspace.root / "backend/app.py").read_text()
+
+
+def test_react_scripts_entry_is_mechanically_hosted_without_rewriting_ui(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    payload["files"] = [
+        item for item in payload["files"] if item["path"] != "frontend/public/index.html"
+    ]
+    package = next(item for item in payload["files"] if item["path"] == "frontend/package.json")
+    package["content"] = '{"dependencies":{"react-scripts":"5"}}'
+    workspace = _workspace(tmp_path)
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        workspace,
+    )
+    assert "frontend/public/index.html" in result.files
+    assert '<div id="root"></div>' in (workspace.root / "frontend/public/index.html").read_text()
+    assert (workspace.root / "frontend/src/App.js").read_text() == (
+        "export default function App(){}\n"
+    )

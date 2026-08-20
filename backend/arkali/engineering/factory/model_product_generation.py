@@ -77,6 +77,22 @@ def _normalise_python_transport(files: dict[str, str]) -> dict[str, str]:
     return normalized
 
 
+def _normalise_frontend_entry(files: dict[str, str]) -> dict[str, str]:
+    package = files.get("frontend/package.json", "")
+    entry = "frontend/public/index.html"
+    if "react-scripts" not in package or entry in files:
+        return files
+    normalized = dict(files)
+    normalized[entry] = (
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>Generated Product</title></head><body>"
+        '<noscript>JavaScript is required.</noscript><div id="root"></div>'
+        "</body></html>\n"
+    )
+    return normalized
+
+
 def _require_executable_product(files: tuple[GeneratedFile, ...]) -> None:
     persistence_markers = ("sqlite3", "sqlalchemy", "sqlite://")
     has_persistence = any(
@@ -260,16 +276,18 @@ def write_model_product_output(
         raise ModelGenerationError(
             f"model response violates the multi-file contract: {error}"
         ) from error
-    file_map = _normalise_python_transport(
-        _normalise_requirements({item.path: item.content for item in envelope.files})
+    file_map = _normalise_frontend_entry(
+        _normalise_python_transport(
+            _normalise_requirements({item.path: item.content for item in envelope.files})
+        )
     )
     try:
         inspect_product_files(file_map, baseline=baseline).require_pass()
     except ProductSemanticPreflightError as error:
         raise ModelGenerationError(f"model response fails semantic preflight: {error}") from error
-    for item in envelope.files:
-        workspace.write(item.path, file_map[item.path].encode("utf-8"))
-    return tuple(item.path for item in envelope.files)
+    for path, content in file_map.items():
+        workspace.write(path, content.encode("utf-8"))
+    return tuple(file_map)
 
 
 def generate_model_product(
