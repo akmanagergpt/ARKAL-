@@ -24,6 +24,8 @@ from __future__ import annotations
 import argparse
 import pathlib
 import sys
+import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -142,6 +144,14 @@ def main(argv: list[str]) -> int:
             "this process may do the deletion, because only it holds the handle."
         ),
     )
+    parser.add_argument(
+        "--shutdown-sentinel",
+        default=None,
+        help=(
+            "optional fixed desktop-lifecycle sentinel; when its owning desktop "
+            "process removes it, uvicorn completes a graceful shutdown"
+        ),
+    )
     args = parser.parse_args(argv[1:])
 
     database = pathlib.Path(args.db).resolve()
@@ -158,7 +168,25 @@ def main(argv: list[str]) -> int:
         operations_wiring=_operations_wiring(pdp, ROOT), operations_repo_root=ROOT,
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    config = uvicorn.Config(app, host=args.host, port=args.port, log_level="warning")
+    server = uvicorn.Server(config)
+    if args.shutdown_sentinel is not None:
+        sentinel = pathlib.Path(args.shutdown_sentinel).resolve()
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.write_text("ARKALI desktop backend owner\n", encoding="utf-8")
+
+        def watch_desktop_owner() -> None:
+            while sentinel.exists() and not server.should_exit:
+                time.sleep(0.1)
+            if not sentinel.exists():
+                server.should_exit = True
+
+        threading.Thread(
+            target=watch_desktop_owner,
+            name="arkali-desktop-shutdown",
+            daemon=True,
+        ).start()
+    server.run()
     return 0
 
 

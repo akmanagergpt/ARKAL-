@@ -26,6 +26,7 @@ def test_tauri_two_hosts_the_existing_frontend_build() -> None:
 
 def test_native_bridge_is_empty_and_fail_closed() -> None:
     source = (TAURI / "src" / "main.rs").read_text(encoding="utf-8")
+    lifecycle = (TAURI / "src" / "backend_runtime.rs").read_text(encoding="utf-8")
     config = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
     assert "invoke_handler" not in source
     assert "#[tauri::command]" not in source
@@ -34,11 +35,23 @@ def test_native_bridge_is_empty_and_fail_closed() -> None:
         "tauri-plugin-shell",
         "tauri-plugin-fs",
         "tauri-plugin-opener",
-        "std::process::Command",
         "cmd.exe",
         "powershell",
     ):
-        assert forbidden not in source
+        assert forbidden not in source + lifecycle
+
+
+def test_backend_process_is_fixed_and_not_frontend_reachable() -> None:
+    source = (TAURI / "src" / "main.rs").read_text(encoding="utf-8")
+    lifecycle = (TAURI / "src" / "backend_runtime.rs").read_text(encoding="utf-8")
+    assert "std::process::Command" not in source
+    assert "Command::new(python)" in lifecycle
+    assert 'join(".venv").join("Scripts").join("python.exe")' in lifecycle
+    assert 'join("scripts").join("run_command_center.py")' in lifecycle
+    assert '.args(["--host", "127.0.0.1", "--port", "8000", "--db"])' in lifecycle
+    assert "std::env::args" not in lifecycle
+    assert "std::env::var" not in lifecycle
+    assert "invoke_handler" not in source
 
 
 def test_rust_manifest_has_no_native_capability_plugin() -> None:
@@ -54,4 +67,3 @@ def test_desktop_network_policy_is_loopback_only() -> None:
     assert "connect-src 'self' http://127.0.0.1:8000" in csp
     assert "https:" not in csp
     assert "*" not in csp
-
