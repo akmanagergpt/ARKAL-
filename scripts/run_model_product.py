@@ -33,6 +33,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--model", default="qwen2.5-coder:14b")
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--attempts", type=int, default=2)
+    parser.add_argument("--output-tokens", type=int, default=8192)
     parser.add_argument("--workspace-root", default=str(ROOT / "var" / "factory"))
     args = parser.parse_args(argv[1:])
 
@@ -48,7 +49,7 @@ def main(argv: list[str]) -> int:
     blueprint = derive_blueprint(args.goal, AuthorityMap.load(ROOT))
     result = generate_model_product_bounded(
         blueprint,
-        OllamaAdapter(json_mode=True, max_output_tokens=16384),
+        OllamaAdapter(json_mode=True, max_output_tokens=args.output_tokens),
         args.model,
         workspace,
         timeout_seconds=args.timeout,

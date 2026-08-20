@@ -107,6 +107,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--source", required=True)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--model", default="qwen2.5-coder:7b")
+    parser.add_argument("--output-tokens", type=int, default=8192)
     parser.add_argument(
         "--prior-failure",
         help="Exact rejected output from a prior bounded attempt.",
@@ -289,7 +290,7 @@ def main(argv: list[str]) -> int:
         ensure_ascii=False,
     )
     started = time.monotonic()
-    outcome = OllamaAdapter(json_mode=True, max_output_tokens=16384).infer(
+    outcome = OllamaAdapter(json_mode=True, max_output_tokens=args.output_tokens).infer(
         args.model, prompt, timeout_seconds=600
     )
     if outcome.state.value != "PASS":
