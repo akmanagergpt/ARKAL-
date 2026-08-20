@@ -19,7 +19,9 @@ def test_tauri_two_hosts_the_existing_frontend_build() -> None:
     config = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
     assert config["$schema"] == "https://schema.tauri.app/config/2"
     assert config["build"]["frontendDist"] == "../frontend/dist"
-    assert config["build"]["beforeBuildCommand"] == "npm run build"
+    before_build = config["build"]["beforeBuildCommand"]
+    assert before_build.startswith("npm run build && ")
+    assert "scripts\\build_desktop_backend.py" in before_build
     assert not (TAURI / "frontend").exists()
     assert not (TAURI / "ui").exists()
 
@@ -45,9 +47,10 @@ def test_backend_process_is_fixed_and_not_frontend_reachable() -> None:
     source = (TAURI / "src" / "main.rs").read_text(encoding="utf-8")
     lifecycle = (TAURI / "src" / "backend_runtime.rs").read_text(encoding="utf-8")
     assert "std::process::Command" not in source
-    assert "Command::new(python)" in lifecycle
+    assert "Command::new(if use_bundled { bundled } else { python })" in lifecycle
     assert 'join(".venv").join("Scripts").join("python.exe")' in lifecycle
     assert 'join("scripts").join("run_command_center.py")' in lifecycle
+    assert 'resource_dir.join("arkali-backend.exe")' in lifecycle
     assert '.args(["--host", "127.0.0.1", "--port", "8000", "--db"])' in lifecycle
     assert "std::env::args" not in lifecycle
     assert "std::env::var" not in lifecycle

@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev -- --host 127.0.0.1 --port 1420 --strictPort",
     "devUrl": "http://127.0.0.1:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && ..\\.venv\\Scripts\\python.exe ..\\scripts\\build_desktop_backend.py",
     "frontendDist": "../frontend/dist"
   },
   "app": {
@@ -28,7 +28,10 @@
     }
   },
   "bundle": {
-    "active": false,
-    "targets": "all"
+    "active": true,
+    "targets": ["nsis"],
+    "resources": {
+      "binaries/arkali-backend-x86_64-pc-windows-msvc.exe": "arkali-backend.exe"
+    }
   }
 }

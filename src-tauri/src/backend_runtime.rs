@@ -25,7 +25,7 @@ pub struct BackendRuntime {
 }
 
 impl BackendRuntime {
-    pub fn start(repo_root: &Path, app_data: &Path) -> Result<Self, String> {
+    pub fn start(repo_root: &Path, app_data: &Path, resource_dir: &Path) -> Result<Self, String> {
         match probe_backend() {
             Probe::ArkaliReady => {
                 return Ok(Self {
@@ -41,9 +41,11 @@ impl BackendRuntime {
             Probe::Unavailable => {}
         }
 
+        let bundled = resource_dir.join("arkali-backend.exe");
         let python = canonical_python(repo_root);
         let launcher = repo_root.join("scripts").join("run_command_center.py");
-        if !python.is_file() || !launcher.is_file() {
+        let use_bundled = bundled.is_file();
+        if !use_bundled && (!python.is_file() || !launcher.is_file()) {
             return Err("The bundled ARKALI backend runtime is unavailable".to_owned());
         }
 
@@ -53,10 +55,12 @@ impl BackendRuntime {
         let shutdown_sentinel = app_data.join("desktop-backend.owner");
         let _ = fs::remove_file(&shutdown_sentinel);
 
-        let mut command = Command::new(python);
+        let mut command = Command::new(if use_bundled { bundled } else { python });
+        command.current_dir(repo_root);
+        if !use_bundled {
+            command.arg(launcher);
+        }
         command
-            .current_dir(repo_root)
-            .arg(launcher)
             .args(["--host", "127.0.0.1", "--port", "8000", "--db"])
             .arg(database)
             .arg("--shutdown-sentinel")
@@ -209,8 +213,9 @@ mod tests {
         let app_data = std::env::temp_dir().join(unique);
         let _ = fs::remove_dir_all(&app_data);
 
-        let mut runtime = BackendRuntime::start(&repository_root(), &app_data)
-            .expect("real Command Center backend starts");
+        let mut runtime =
+            BackendRuntime::start(&repository_root(), &app_data, Path::new("missing"))
+                .expect("real Command Center backend starts");
         assert_eq!(probe_backend(), Probe::ArkaliReady);
         assert!(app_data.join("command_center.db").is_file());
         runtime.shutdown();

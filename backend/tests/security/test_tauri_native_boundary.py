@@ -38,7 +38,7 @@ def test_single_instance_plugin_focuses_only_the_existing_main_window() -> None:
 
 def test_the_only_process_target_is_the_canonical_python_runtime() -> None:
     commands = re.findall(r"Command::new\(([^)]+)\)", RUST)
-    assert commands == ["python"]
+    assert commands == ["if use_bundled { bundled } else { python }"]
     assert 'join(".venv").join("Scripts").join("python.exe")' in RUST
     assert "std::env::args" not in RUST
     assert "std::env::var" not in RUST

@@ -24,7 +24,11 @@ fn main() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| format!("Cannot resolve ARKALI app data: {error}"))?;
-            let runtime = BackendRuntime::start(&repository_root(), &app_data)?;
+            let resource_dir = app
+                .path()
+                .resource_dir()
+                .map_err(|error| format!("Cannot resolve ARKALI resources: {error}"))?;
+            let runtime = BackendRuntime::start(&repository_root(), &app_data, &resource_dir)?;
             *setup_backend
                 .lock()
                 .map_err(|_| "Backend state lock failed")? = Some(runtime);

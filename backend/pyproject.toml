@@ -55,6 +55,7 @@ dev = [
     "ruff>=0.6",
     "pyyaml>=6.0",
     "httpx2>=2.0.0",
+    "pyinstaller>=6.16,<7",
 ]
 
 [tool.setuptools.packages.find]

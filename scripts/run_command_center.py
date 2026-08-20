@@ -29,7 +29,7 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(getattr(sys, "_MEIPASS", pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(ROOT / "backend"))
 
 import uvicorn  # noqa: E402
