@@ -1,0 +1,13 @@
+{
+  "phase_id": "29",
+  "note": "RequirementRegister.for_phase(\"29\") contains exactly optional ARK-REQ-0181, owned by lifecycle.release with prov evidence. Phase 29's matrix product obligation is the exact ARKALI_Setup.exe plus reuse of Phase 28 Tauri/NSIS and Phase 22B C-32 Recovery Supervisor. Those product obligations are implemented and really exercised. ARK-REQ-0181 itself requires signed air-gapped offline update bundles; no trusted signing credential is configured or fabricated, so it is honestly deferred and is not counted as discharged.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0181",
+      "state": "DEFERRED",
+      "implementation": "Exact current-user NSIS installer, SHA-256 provenance, real upgrade and C-32 recovery composition exist, but no signed offline-update bundle or trust root is configured.",
+      "evidence": "scripts/build_windows_installer.py; artifacts/installer/ARKALI_Setup.provenance.json; scripts/run_phase29_recovery_journey.py; docs/contracts/windows-installer.md",
+      "note": "OPTIONAL is not silently skipped: the unsigned boundary was mechanically inspected and exercised. Claiming SATISFIED without a trusted signing identity would be false. No credential was requested or invented."
+    }
+  ]
+}
