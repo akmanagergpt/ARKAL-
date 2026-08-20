@@ -76,7 +76,7 @@ def _valid_output() -> str:
             "files": [
                 {
                     "path": "backend/app.py",
-                    "content": "@app.route('/status')\ndef status(): return 'ok'\n",
+                    "content": "app = object()\n@app.route('/status')\ndef status(): return 'ok'\n",
                 },
                 {
                     "path": "backend/database.py",
@@ -160,6 +160,7 @@ def test_persistence_inside_backend_module_is_semantically_detected(
     payload["files"] = [item for item in payload["files"] if item["path"] != "backend/database.py"]
     payload["files"][0]["content"] = (
         "import sqlite3\n"
+        "app = object()\n"
         "DB = sqlite3.connect('app.db')\n"
         "DB.execute('CREATE TABLE IF NOT EXISTS records (id INTEGER)')\n"
         "@app.route('/status')\ndef status(): return 'ok'\n"
@@ -247,7 +248,7 @@ def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
     )
     assert (workspace.root / "backend/requirements.txt").read_text() == "Flask==3.1.0\n"
     assert (workspace.root / "backend/app.py").read_text() == (
-        "@app.route('/status')\ndef status(): return 'ok'\n"
+        "app = object()\n@app.route('/status')\ndef status(): return 'ok'\n"
     )
 
 
@@ -319,6 +320,49 @@ def test_flask_sqlalchemy_bootstrap_requires_application_context(
         "db.create_all()\n"
     )
     with pytest.raises(ModelGenerationError, match="schema_bootstrap_outside_app_context"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_undefined_generated_test_fixture_is_rejected(tmp_path: pathlib.Path) -> None:
+    payload = json.loads(_valid_output())
+    test = next(item for item in payload["files"] if item["path"] == "tests/test_app.py")
+    test["content"] = "def test_app(client): assert client is not None\n"
+    with pytest.raises(ModelGenerationError, match="undefined_test_fixture"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_backend_mutation_route_requires_frontend_mutation_call(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] += "@app.route('/items', methods=['POST'])\ndef create(): return 'ok'\n"
+    with pytest.raises(ModelGenerationError, match="frontend_backend_contract_drift"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_app_factory_without_server_entrypoint_is_rejected(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] = "def create_app():\n    return None\n@app.route('/x')\ndef x(): return 'x'\n"
+    with pytest.raises(ModelGenerationError, match="missing_backend_entrypoint"):
         generate_model_product(
             derive_blueprint(GOAL, AuthorityMap.load(REPO)),
             FixedModel(json.dumps(payload)),

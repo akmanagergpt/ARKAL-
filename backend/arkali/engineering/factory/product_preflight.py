@@ -193,6 +193,9 @@ def _test_findings(
                 )
             )
         findings.extend(_import_findings(path, tree, modules, dependencies))
+        from arkali.engineering.factory.test_contract_preflight import fixture_findings
+
+        findings.extend(fixture_findings(path, tree))
     return findings
 
 
@@ -210,20 +213,11 @@ def _declared_dependencies(files: Mapping[str, str]) -> frozenset[str]:
     return frozenset(names)
 
 
-def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    findings: list[SemanticFinding] = []
-    stdlib = sorted(_declared_dependencies(files) & sys.stdlib_module_names)
-    if stdlib:
-        findings.append(
-            SemanticFinding(
-                code="stdlib_dependency",
-                path="backend/requirements.txt",
-                detail=f"standard-library modules are not installable packages: {stdlib!r}",
-            )
-        )
-    requirements = files.get("backend/requirements.txt", "")
+def _dependency_compatibility_findings(requirements: str) -> list[SemanticFinding]:
     lowered = requirements.lower().replace("-", "_")
+    findings: list[SemanticFinding] = []
     flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
+    werkzeug_match = re.search(r"(?m)^werkzeug\s*==\s*(\d+)\.(\d+)", lowered)
     werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
     if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
         findings.append(
@@ -236,6 +230,55 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 ),
             )
         )
+    if (
+        flask_match
+        and werkzeug_match
+        and tuple(map(int, flask_match.groups())) >= (2, 2)
+        and tuple(map(int, werkzeug_match.groups())) < (2, 2)
+    ):
+        findings.append(
+            SemanticFinding(
+                code="incompatible_dependency_range",
+                path="backend/requirements.txt",
+                detail="Flask 2.2 and newer require Werkzeug 2.2 or newer",
+            )
+        )
+    sqlalchemy_extension = re.search(
+        r"(?m)^flask_sqlalchemy\s*==\s*(\d+)\.(\d+)", lowered
+    )
+    sqlalchemy_cap = re.search(r"(?m)^sqlalchemy\s*[^\n]*<\s*2(?:\.0+)?(?:\s|$)", lowered)
+    if (
+        sqlalchemy_extension
+        and tuple(map(int, sqlalchemy_extension.groups())) < (3, 0)
+        and not sqlalchemy_cap
+    ):
+        findings.append(
+            SemanticFinding(
+                code="incompatible_dependency_range",
+                path="backend/requirements.txt",
+                detail=(
+                    "Flask-SQLAlchemy releases before 3 require an explicit "
+                    "SQLAlchemy<2 compatibility bound"
+                ),
+            )
+        )
+    return findings
+
+
+def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    findings: list[SemanticFinding] = []
+    stdlib = sorted(_declared_dependencies(files) & sys.stdlib_module_names)
+    if stdlib:
+        findings.append(
+            SemanticFinding(
+                code="stdlib_dependency",
+                path="backend/requirements.txt",
+                detail=f"standard-library modules are not installable packages: {stdlib!r}",
+            )
+        )
+    findings.extend(
+        _dependency_compatibility_findings(files.get("backend/requirements.txt", ""))
+    )
     package = files.get("frontend/package.json", "")
     if "react-scripts" in package and "frontend/public/index.html" not in files:
         findings.append(
@@ -296,6 +339,43 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="backend source declares no HTTP API route",
             )
         )
+    has_top_level_app = bool(re.search(r"(?m)^app\s*=", backend_text))
+    has_run = ".run(" in backend_text
+    if not has_run and not has_top_level_app:
+        findings.append(
+            SemanticFinding(
+                code="missing_backend_entrypoint",
+                path="backend/",
+                detail="backend has no executable server entrypoint",
+            )
+        )
+    return findings
+
+
+def _frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    backend = "\n".join(
+        source.lower()
+        for path, source in files.items()
+        if path.startswith("backend/") and path.endswith(".py")
+    )
+    frontend = "\n".join(
+        source.lower()
+        for path, source in files.items()
+        if path.startswith("frontend/src/")
+    )
+    findings: list[SemanticFinding] = []
+    for method in ("post", "put", "delete"):
+        if f"'{method}'" not in backend and f'"{method}"' not in backend:
+            continue
+        markers = (f"axios.{method}(", f"method: '{method}'", f'method: "{method}"')
+        if not any(marker in frontend for marker in markers):
+            findings.append(
+                SemanticFinding(
+                    code="frontend_backend_contract_drift",
+                    path="frontend/src/",
+                    detail=f"backend exposes {method.upper()} but frontend has no matching call",
+                )
+            )
     return findings
 
 
@@ -329,6 +409,7 @@ def inspect_product_files(
     modules = _python_modules(files, findings)
     findings.extend(_test_findings(files, modules))
     findings.extend(_persistence_findings(files))
+    findings.extend(_frontend_contract_findings(files))
     findings.extend(_manifest_findings(files))
     findings.extend(_regression_findings(files, baseline))
     return ProductPreflightReport(findings=tuple(findings))
