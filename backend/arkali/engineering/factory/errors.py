@@ -33,3 +33,9 @@ class ProductSemanticPreflightError(ContractViolation):
     """Generated files contradict their own executable/test contracts."""
 
     code = "ARK-ERR-0117"
+
+
+class StageVocabularyError(ContractViolation):
+    """The staged-generation stage vocabulary document is missing or malformed."""
+
+    code = "ARK-ERR-0118"
