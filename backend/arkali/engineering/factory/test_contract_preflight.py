@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import sys
+from collections.abc import Mapping
 
 from arkali.engineering.factory.product_preflight import SemanticFinding
 
@@ -35,6 +37,28 @@ def fixture_findings(path: str, tree: ast.Module) -> list[SemanticFinding]:
     return findings
 
 
+def plain_import_findings(
+    path: str,
+    tree: ast.AST,
+    modules: Mapping[str, object],
+    dependencies: frozenset[str],
+) -> list[SemanticFinding]:
+    findings: list[SemanticFinding] = []
+    for node in (item for item in ast.walk(tree) if isinstance(item, ast.Import)):
+        for alias in node.names:
+            root = alias.name.split(".", 1)[0]
+            if root in sys.stdlib_module_names or root.lower() in dependencies or root in modules:
+                continue
+            findings.append(
+                SemanticFinding(
+                    code="undeclared_test_dependency",
+                    path=path,
+                    detail=f"test imports undeclared dependency {root!r}",
+                )
+            )
+    return findings
+
+
 def _is_fixture(node: ast.expr) -> bool:
     return isinstance(node, ast.Attribute) and node.attr == "fixture"
 
@@ -45,4 +69,4 @@ def _is_test(node: ast.stmt) -> bool:
     )
 
 
-__all__ = ["fixture_findings"]
+__all__ = ["fixture_findings", "plain_import_findings"]

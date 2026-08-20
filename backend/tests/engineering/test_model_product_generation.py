@@ -388,3 +388,39 @@ def test_app_factory_without_server_entrypoint_is_rejected(
             "model-1",
             _workspace(tmp_path),
         )
+
+
+def test_plain_test_import_requires_declared_dependency(tmp_path: pathlib.Path) -> None:
+    payload = json.loads(_valid_output())
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = ""
+    test = next(item for item in payload["files"] if item["path"] == "tests/test_app.py")
+    test["content"] = "import pytest\ndef test_app(): assert pytest is not None\n"
+    with pytest.raises(ModelGenerationError, match="undeclared_test_dependency"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_removed_framework_hook_is_rejected_for_selected_version(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = "Flask==3.0.0\npytest==8.0.0\n"
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] += "@app.before_first_request\ndef bootstrap(): return None\n"
+    with pytest.raises(ModelGenerationError, match="removed_framework_api"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )

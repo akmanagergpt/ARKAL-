@@ -110,6 +110,9 @@ def _import_findings(
     dependencies: frozenset[str],
 ) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
+    from arkali.engineering.factory.test_contract_preflight import plain_import_findings
+
+    findings.extend(plain_import_findings(path, tree, modules, dependencies))
     for node in _nonstdlib_from_imports(tree):
         assert node.module is not None
         if node.module.split(".", 1)[0].lower() in dependencies:
@@ -305,6 +308,25 @@ def _schema_context_findings(backend_text: str) -> list[SemanticFinding]:
     ]
 
 
+def _framework_api_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    requirements = files.get("backend/requirements.txt", "").lower()
+    flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)", requirements)
+    backend = "\n".join(
+        source.lower()
+        for path, source in files.items()
+        if path.startswith("backend/") and path.endswith(".py")
+    )
+    if flask_match and int(flask_match.group(1)) >= 3 and "before_first_request" in backend:
+        return [
+            SemanticFinding(
+                code="removed_framework_api",
+                path="backend/",
+                detail="Flask 3 removed the before_first_request hook",
+            )
+        ]
+    return []
+
+
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend_text = "\n".join(
         source.lower()
@@ -410,6 +432,7 @@ def inspect_product_files(
     modules = _python_modules(files, findings)
     findings.extend(_test_findings(files, modules))
     findings.extend(_persistence_findings(files))
+    findings.extend(_framework_api_findings(files))
     findings.extend(_frontend_contract_findings(files))
     findings.extend(_manifest_findings(files))
     findings.extend(_regression_findings(files, baseline))
