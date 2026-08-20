@@ -310,6 +310,12 @@ export class ArkaliApiClient {
 }
 
 /** The client the application runs against. Configured by Vite at build time. */
+export function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
 export const apiClient = new ArkaliApiClient({
-  baseUrl: import.meta.env.VITE_ARKALI_API_BASE_URL ?? '',
+  baseUrl:
+    import.meta.env.VITE_ARKALI_API_BASE_URL
+    ?? (isTauriRuntime() ? 'http://127.0.0.1:8000' : ''),
 });

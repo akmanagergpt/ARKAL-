@@ -97,6 +97,20 @@ class TestReadinessAndListing:
         # expired the moment a legitimate migration was added.
         assert body["schema_revision"] == head_revision(BACKEND)
 
+    def test_only_the_fixed_tauri_origin_receives_cors_permission(
+        self, client: TestClient
+    ) -> None:
+        desktop = client.get(
+            "/api/health", headers={"Origin": "http://tauri.localhost"}
+        )
+        assert desktop.headers["access-control-allow-origin"] == (
+            "http://tauri.localhost"
+        )
+        foreign = client.get(
+            "/api/health", headers={"Origin": "https://untrusted.example"}
+        )
+        assert "access-control-allow-origin" not in foreign.headers
+
     def test_empty_registry_lists_nothing(self, client: TestClient) -> None:
         assert client.get("/api/projects").json() == {"projects": []}
 

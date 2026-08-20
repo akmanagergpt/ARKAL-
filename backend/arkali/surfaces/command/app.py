@@ -32,6 +32,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+from starlette.middleware.cors import CORSMiddleware
 
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.control.policy.pep import PolicyEnforcementPoint
@@ -145,6 +146,15 @@ def create_app(
     factory = create_session_factory(engine)
     pep = PolicyEnforcementPoint(pdp, SURFACE)
     app = FastAPI(title="ARKALI Command Center", version="0.1.0")
+    # Tauri's production webview has one fixed local origin. This is not a
+    # general CORS relaxation: browsers and arbitrary origins remain refused.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://tauri.localhost"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["Accept", "Content-Type"],
+        allow_credentials=False,
+    )
     app.state.pep = pep
 
     def session_scope() -> Iterator[Session]:

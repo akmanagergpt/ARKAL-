@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "dev.arkali.command-center",
   "build": {
-    "beforeDevCommand": "npm --prefix ../frontend run dev -- --host 127.0.0.1 --port 1420 --strictPort",
+    "beforeDevCommand": "npm run dev -- --host 127.0.0.1 --port 1420 --strictPort",
     "devUrl": "http://127.0.0.1:1420",
-    "beforeBuildCommand": "npm --prefix ../frontend run build",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../frontend/dist"
   },
   "app": {
@@ -32,4 +32,3 @@
     "targets": "all"
   }
 }
-

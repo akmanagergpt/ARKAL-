@@ -19,7 +19,7 @@ def test_tauri_two_hosts_the_existing_frontend_build() -> None:
     config = json.loads((TAURI / "tauri.conf.json").read_text(encoding="utf-8"))
     assert config["$schema"] == "https://schema.tauri.app/config/2"
     assert config["build"]["frontendDist"] == "../frontend/dist"
-    assert "npm --prefix ../frontend run build" in config["build"]["beforeBuildCommand"]
+    assert config["build"]["beforeBuildCommand"] == "npm run build"
     assert not (TAURI / "frontend").exists()
     assert not (TAURI / "ui").exists()
 
