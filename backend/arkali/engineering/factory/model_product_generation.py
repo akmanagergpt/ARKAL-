@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import json
 import pathlib
+import platform
 import sys
 from collections.abc import Mapping
 from typing import Protocol
@@ -239,6 +240,7 @@ def _prompt(blueprint: RequirementBlueprint, prior_failure: str | None = None) -
                 ],
             },
             "blueprint_id": blueprint.blueprint_id,
+            "target_runtime": {"python": platform.python_version()},
             "goal": blueprint.goal.goal_text,
             "derived_requirements": requirements,
             "prior_attempt_failure": prior_failure,

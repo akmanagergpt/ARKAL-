@@ -265,7 +265,23 @@ def _dependency_compatibility_findings(requirements: str) -> list[SemanticFindin
                 ),
             )
         )
+    findings.extend(_target_runtime_findings(lowered))
     return findings
+
+
+def _target_runtime_findings(requirements: str) -> list[SemanticFinding]:
+    httpx_match = re.search(r"(?m)^httpx\s*==\s*(\d+)\.(\d+)", requirements)
+    if sys.version_info < (3, 13) or httpx_match is None:
+        return []
+    if tuple(map(int, httpx_match.groups())) >= (0, 27):
+        return []
+    return [
+        SemanticFinding(
+            code="target_runtime_dependency_incompatible",
+            path="backend/requirements.txt",
+            detail="HTTPX before 0.27 imports cgi, which Python 3.13 removed",
+        )
+    ]
 
 
 def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:

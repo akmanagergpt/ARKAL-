@@ -449,3 +449,18 @@ def test_fastapi_decorators_are_real_routes_and_mutation_contracts(
         _workspace(tmp_path),
     )
     assert "backend/app.py" in result.files
+
+
+def test_dependency_manifest_must_support_target_python(tmp_path: pathlib.Path) -> None:
+    payload = json.loads(_valid_output())
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = "pytest==8.0.0\nhttpx==0.23.0\n"
+    with pytest.raises(ModelGenerationError, match="target_runtime_dependency_incompatible"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
