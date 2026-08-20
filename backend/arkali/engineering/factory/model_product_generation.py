@@ -121,9 +121,10 @@ class ModelProductResult(BaseModel):
     runtime: str
     model_id: str
     files: tuple[str, ...]
+    attempts_used: int = Field(ge=1)
 
 
-def _prompt(blueprint: RequirementBlueprint) -> str:
+def _prompt(blueprint: RequirementBlueprint, prior_failure: str | None = None) -> str:
     requirements = [item.model_dump(mode="json") for item in blueprint.requirements]
     return json.dumps(
         {
@@ -161,6 +162,11 @@ def _prompt(blueprint: RequirementBlueprint) -> str:
             "blueprint_id": blueprint.blueprint_id,
             "goal": blueprint.goal.goal_text,
             "derived_requirements": requirements,
+            "prior_attempt_failure": prior_failure,
+            "convergence_rule": (
+                "When prior_attempt_failure is present, correct that exact structural "
+                "defect while retaining every other output requirement."
+            ),
         },
         ensure_ascii=False,
         separators=(",", ":"),
@@ -200,7 +206,7 @@ def write_model_product_output(
     try:
         inspect_product_files(file_map, baseline=baseline).require_pass()
     except ProductSemanticPreflightError as error:
-        raise ModelGenerationError("model response fails semantic preflight") from error
+        raise ModelGenerationError(f"model response fails semantic preflight: {error}") from error
     for item in envelope.files:
         workspace.write(item.path, item.content.encode("utf-8"))
     return tuple(item.path for item in envelope.files)
@@ -214,20 +220,57 @@ def generate_model_product(
     *,
     timeout_seconds: float = 300.0,
 ) -> ModelProductResult:
-    if not blueprint.is_fully_resolved:
-        raise ModelGenerationError("model generation refuses an unresolved blueprint")
-    outcome = model.infer(model_id, _prompt(blueprint), timeout_seconds=timeout_seconds)
-    if outcome.state is not HonestState.PASS or not outcome.output.strip():
-        raise ModelGenerationError(
-            f"real model inference did not pass: {outcome.state.value}: {outcome.detail}"
-        )
-    files = write_model_product_output(outcome.output, workspace)
-    return ModelProductResult(
-        blueprint_id=blueprint.blueprint_id,
-        runtime=outcome.runtime,
-        model_id=outcome.model_id,
-        files=files,
+    return generate_model_product_bounded(
+        blueprint,
+        model,
+        model_id,
+        workspace,
+        timeout_seconds=timeout_seconds,
+        max_attempts=1,
     )
 
 
-__all__ = ["ModelProductResult", "generate_model_product", "write_model_product_output"]
+def generate_model_product_bounded(
+    blueprint: RequirementBlueprint,
+    model: ModelSource,
+    model_id: str,
+    workspace: WorkspaceTarget,
+    *,
+    timeout_seconds: float = 300.0,
+    max_attempts: int = 2,
+) -> ModelProductResult:
+    if not blueprint.is_fully_resolved:
+        raise ModelGenerationError("model generation refuses an unresolved blueprint")
+    if max_attempts < 1 or max_attempts > 4:
+        raise ModelGenerationError("generation attempt budget must be between 1 and 4")
+    failure: str | None = None
+    for attempt in range(1, max_attempts + 1):
+        outcome = model.infer(
+            model_id, _prompt(blueprint, failure), timeout_seconds=timeout_seconds
+        )
+        if outcome.state is not HonestState.PASS or not outcome.output.strip():
+            failure = f"real model inference did not pass: {outcome.state.value}: {outcome.detail}"
+            continue
+        try:
+            files = write_model_product_output(outcome.output, workspace)
+        except ModelGenerationError as error:
+            failure = str(error)
+            continue
+        return ModelProductResult(
+            blueprint_id=blueprint.blueprint_id,
+            runtime=outcome.runtime,
+            model_id=outcome.model_id,
+            files=files,
+            attempts_used=attempt,
+        )
+    raise ModelGenerationError(
+        f"generation budget exhausted after {max_attempts} attempts: {failure}"
+    )
+
+
+__all__ = [
+    "ModelProductResult",
+    "generate_model_product",
+    "generate_model_product_bounded",
+    "write_model_product_output",
+]

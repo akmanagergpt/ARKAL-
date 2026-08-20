@@ -21,7 +21,7 @@ from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
 from arkali.control.specification.blueprint_engine import derive_blueprint  # noqa: E402
 from arkali.engineering.candidate.workspace import WorkspaceAuthority  # noqa: E402
 from arkali.engineering.factory.model_product_generation import (  # noqa: E402
-    generate_model_product,
+    generate_model_product_bounded,
 )
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 
@@ -32,6 +32,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--goal", required=True)
     parser.add_argument("--model", default="qwen2.5-coder:14b")
     parser.add_argument("--timeout", type=float, default=600.0)
+    parser.add_argument("--attempts", type=int, default=2)
     parser.add_argument("--workspace-root", default=str(ROOT / "var" / "factory"))
     args = parser.parse_args(argv[1:])
 
@@ -45,12 +46,13 @@ def main(argv: list[str]) -> int:
         stable_snapshot=seed,
     )
     blueprint = derive_blueprint(args.goal, AuthorityMap.load(ROOT))
-    result = generate_model_product(
+    result = generate_model_product_bounded(
         blueprint,
         OllamaAdapter(json_mode=True),
         args.model,
         workspace,
         timeout_seconds=args.timeout,
+        max_attempts=args.attempts,
     )
     print(
         json.dumps(

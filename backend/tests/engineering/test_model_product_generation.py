@@ -9,7 +9,10 @@ from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.specification.blueprint_engine import derive_blueprint
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.errors import ModelGenerationError
-from arkali.engineering.factory.model_product_generation import generate_model_product
+from arkali.engineering.factory.model_product_generation import (
+    generate_model_product,
+    generate_model_product_bounded,
+)
 from arkali.engineering.localai.adapter import HonestState, InferenceResult
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -33,6 +36,26 @@ class FixedModel:
             detail="bounded test double",
             output=self.output,
             output_excerpt=self.output[:200],
+        )
+
+
+class SequencedModel:
+    def __init__(self, outputs: list[str]) -> None:
+        self.outputs = outputs
+        self.prompts: list[str] = []
+
+    def infer(
+        self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0
+    ) -> InferenceResult:
+        self.prompts.append(prompt)
+        output = self.outputs[len(self.prompts) - 1]
+        return InferenceResult(
+            runtime="test-runtime",
+            model_id=model_id,
+            state=HonestState.PASS,
+            detail="bounded sequence",
+            output=output,
+            output_excerpt=output[:200],
         )
 
 
@@ -182,3 +205,22 @@ def test_nonpassing_real_model_outcome_cannot_become_artifacts(
             "model-1",
             workspace,
         )
+
+
+def test_bounded_generation_feeds_semantic_failure_to_final_attempt(
+    tmp_path: pathlib.Path,
+) -> None:
+    invalid = json.loads(_valid_output())
+    database = next(item for item in invalid["files"] if item["path"] == "backend/database.py")
+    database["content"] = "import sqlite3\nDB = sqlite3.connect('app.db')\n"
+    model = SequencedModel([json.dumps(invalid), _valid_output()])
+    result = generate_model_product_bounded(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        model,
+        "model-1",
+        _workspace(tmp_path),
+        max_attempts=2,
+    )
+    assert result.attempts_used == 2
+    assert "prior_attempt_failure" in model.prompts[1]
+    assert "model response fails semantic preflight" in model.prompts[1]
