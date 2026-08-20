@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `86afe39799dfc9866ba696fa9c738c23414a9562` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `a30629727583128b49a98bb0136d45587ceda26d` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -156,7 +156,8 @@ repository, the repository wins.
 | Phase 26 | **MACHINE-ACCEPTED** (verdict `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED; `docs/acceptance/phase_26_report.json`, `phase_26_traceability.json`). Release / Supply Chain / Deployment (C-31). C1–C6 PASS; EXTERNAL_RESULT PASS over all 10 recorded runs; **PROTECTED_CORE COMPLETE** (`lifecycle.release` touched — `control.policy` itself untouched this phase; security review 284, adversarial review 56, full regression 3332, all exit 0); RESCORING NOT_APPLICABLE (first submission); DATA_LOSS_RISK PASS; FINDINGS PASS; PREREQ 3/3 (Phases 6, 13, 22B); **HUMAN_GATE NOT_APPLICABLE** — Matrix Gate column is `—`, identical shape to Phase 25 before it; all 8 architecture gates PASS over **222** edges (up **219 → 222** — see "Architecture violations" below). Six atomic packages deliver C-31 under `lifecycle.release`: `ReleaseAuthority`, the first real production caller of the already-declared `Release` machine, composing the unmodified `StableRevisionPointer` read-only, refusing a candidate before any Stable Core revision exists (Package 1, `ARK-REQ-0007` partial); real C-14 provenance registration through an `ArtifactRegistrar` structural Protocol, every VDC §Provenance field populated and re-verified after write (Package 2, `ARK-REQ-0015`/`0350` partial); a real, deterministic SBOM parsed from this repository's own manifests, no network call (Package 3, `ARK-REQ-0124` partial, `ARK-REQ-0369`); a real, local, deterministic suspicious-package review (Package 4, `ARK-REQ-0125`); supply-chain negative/adversarial proofs for the named risks (Package 5); the final manifest composition plus the real `HUMAN_GATE_7` singleton wiring closing "bypassed acceptance"/"bypassed release policy" (Package 6, completing `ARK-REQ-0007`); and the composed VDC journey, `docs/contracts/release_manifest.md`, the C-17 report and traceability record (Package 7, candidate frozen). A genuine mid-Package-6 canonical-discovery correction: an early `release_gate.py` draft built a scoped grant lookup mirroring `HUMAN_GATE_2`/`3`'s own mechanism, discarded once `BUILD_PROTOCOL.md`'s own Canonical HUMAN GATES list and `SINGLETON_GATES` showed Gate 7 ("Final Production Release") is a one-time, unscoped project event like Gate 1 — the real mechanism composes `GovernanceState.accepted_human_gates` unmodified. Two real `max_fan_in_per_module` violations, one real `max_orchestration_depth` violation and one real `max_parameters_per_public_function` violation were found by running the gate and repaired by decomposition/Protocol-decoupling/parameter-grouping, never exception. **6/6 requirements discharged** — 5 MANDATORY (`ARK-REQ-0007`, `0015`, `0124`, `0125`, `0350`) and 1 CONDITIONAL (`ARK-REQ-0369`, genuinely applicable and PASS on this real repository) — taking cumulative verified 209 → **215**. No real deployment (AST-proven: no release function accepts a deployment-target parameter); no real code signing (VDC's own wording is "signing-ready", not "signed"); no live external SBOM query; no live goal-to-product pipeline exists (DEF-009, permanently open, unaffected by this phase's own scope); `HUMAN_GATE_7` has never been recorded in this real repository, so `RELEASED` remains genuinely unreachable in production today. **Phase 27 unlocked** |
 | Phase 27 | **MACHINE-ACCEPTED.** Command Center Consolidation + Skill Modes (C-35). Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. **2/2 MANDATORY requirements discharged** (`ARK-REQ-0176`, `0177`), cumulative verified 215 → **217**. Real-user verification: 14/14 Chromium journeys over the Vite production build, live FastAPI and real SQLite. DEF-009 remains open; no external AI dependency or backend capability was added |
 | Phase 28 | **MACHINE-ACCEPTED.** Tauri Desktop. Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, on the first submission. MANDATORY `ARK-REQ-0010` and `0179` discharged; CONDITIONAL `ARK-REQ-0180` honestly NOT_APPLICABLE under ERR-005. Existing React/Vite UI and FastAPI backend remain single sources; real bundled runtime, WebView2 journey and generic NSIS bundle passed. Cumulative verified 217 → **219**. DEF-009 remains open; no external AI dependency added |
-| Phase 29 | **UNLOCKED — NOT STARTED.** Installer + Recovery Supervisor Integration. `GovernanceState.current_work_phase()` returns `29`; prerequisites 22B, 26 and 28 are accepted; Matrix Gate is `—`. Denominator contains one OPTIONAL requirement (`ARK-REQ-0181`, `lifecycle.release`, `prov`); no Phase 29 implementation begun |
+| Phase 29 | **MACHINE-ACCEPTED.** Installer + Recovery Supervisor Integration. Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, first submission. Exact `ARKALI_Setup.exe`, real clean install/upgrade/persistence/failure/C-32 recovery/uninstall/reinstall passed. Zero requirements discharged and cumulative verified remains 219; OPTIONAL `ARK-REQ-0181` is explicitly DEFERRED because no trusted signing credential exists. DEF-009 remains OPEN |
+| Phase 30 | **UNLOCKED — NOT STARTED.** Golden Product + Golden Repair Verification. `GovernanceState.current_work_phase()` returns `30`; prerequisites 14, 16 and 24 are accepted; denominator is 23 MANDATORY requirements. Canonical discovery only; no Phase 30 implementation begun |
 | Human Gates | `HUMAN_GATE_1` ACCEPTED (project-singular). `HUMAN_GATE_4` GRANTED for the Phase 19 candidate only (`HGR-002`) and separately GRANTED for the Phase 21 candidate only (`HGR-004`) — neither authorizes the other, any other phase, or any modified candidate of either. `HUMAN_GATE_6` GRANTED for the Phase 20 candidate only (`HGR-003`) — no `RUNTIME_OPERATION`-scope grant exists for any real `APPLY_MIGRATION`. `HUMAN_GATE_2` GRANTED for the Phase 23 candidate only (`HGR-005`) — no `RUNTIME_OPERATION`-scope grant exists for any real future `CORE_PROMOTION`. `HUMAN_GATE_3` GRANTED for the Phase 24 candidate only (`HGR-006`) — no `RUNTIME_OPERATION`-scope grant exists for any real future `PROMOTE_CHILD_PRODUCT`. Phase 22 carried no human gate. Gates 5, 7, 8 not reached |
 | ADRs | 9 **ACCEPTED**, 1 PROPOSED (`ADR-0010`, `HUMAN_GATE_3` default-approval-gated policy for child-product promotion — PROPOSED; Phase 24's own acceptance did not itself ratify this ADR, which needs its own separate governance decision) — immutable; supersession needs a new ADR, and Gate 2 for Protected Core ADRs |
 | Requirements | **328** total — 317 MANDATORY / 9 CONDITIONAL / 2 OPTIONAL. 15 new entries (`ARK-REQ-0381`–`0395`, Register Block 8) were added under human governance rulings **D-025**/**D-026**, continuing sequentially from the highest previously allocated id rather than reusing an MS/BP-reserved gap, since neither ruling is MS/BP/VDC-sourced. Phase 22 discharged 2 of its 3 pre-existing entries; Phase 23 discharged all 9 of its own pre-existing entries; Phase 24 discharged all 4 of its own pre-existing entries; Phase 25 discharged all 8 of its own pre-existing entries; Phase 26 discharged all 6 of its own pre-existing entries; none was added, renumbered or removed |
@@ -476,7 +477,12 @@ repository, the repository wins.
 | 295 | `923f7ce` | **PHASE 28 PACKAGE 5** — real Windows/WebView2 user journey and single-instance behaviour |
 | 296 | `760785a` | **PHASE 28 PACKAGE 5B** — bundle the existing Python backend runtime and emit the generic NSIS installer proof |
 | 297 | `228d750` | **PHASE 28 CANDIDATE FREEZE** — desktop contract, C-17 report and traceability; final regressions recorded |
-| 298 | `86afe39` | **RECORD PHASE 28 MACHINE ACCEPTANCE AND UNLOCK THE NEXT PHASE.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED; two MANDATORY requirements discharged, ARK-REQ-0180 NOT_APPLICABLE, cumulative 217 → 219; successor discovery only ← HEAD at generation |
+| 298 | `86afe39` | **RECORD PHASE 28 MACHINE ACCEPTANCE AND UNLOCK THE NEXT PHASE.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED; two MANDATORY requirements discharged, ARK-REQ-0180 NOT_APPLICABLE, cumulative 217 → 219; successor discovery only |
+| 299 | `f328912` | **PHASE 29 PACKAGE 1** — exact `ARKALI_Setup.exe` and SHA-256 provenance from the accepted Tauri/NSIS chain |
+| 300 | `3aaac9f` | **PHASE 29 PACKAGE 2** — installer failure composition through the existing C-32 Recovery Supervisor; no second rollback authority |
+| 301 | `dd1f2d0` | **PHASE 29 PACKAGE 3** — real 0.1.0→0.1.1 upgrade, corrupt-candidate refusal, C-32 recovery reinstall and uninstall/reinstall acceptance runners |
+| 302 | `88ea58a` | **PHASE 29 CANDIDATE FREEZE** — installer contract, one deferred optional claim, C-17 report; final regression 3354 PASS |
+| 303 | `a306297` | **RECORD PHASE 29 MACHINE ACCEPTANCE AND UNLOCK THE SUCCESSOR.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`; zero mandatory requirements and zero discharged requirements, cumulative remains 219; optional signed-bundle requirement remains DEFERRED; successor discovery only ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -564,41 +570,43 @@ No unavailable toolchain may be reported as PASS.
 | Unsigned installer vs SmartScreen on a clean baseline (MEDIUM) | `CLEAN_TEST_BASELINE.md` §7 |
 | Recorded defects retained as permanent evidence — count is held by the file, not mirrored here | `KNOWN_FAILURES.md` |
 
-## 8. Current phase contract — Phase 29
+## 8. Current phase contract — Phase 30
 
 Derived from authoritative artifacts, not from memory.
 
 | Field | Value |
 |---|---|
-| Name | **Installer + Recovery Supervisor Integration** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 29) |
-| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `29`. Discovery only; no Phase 29 implementation exists |
-| Prerequisites | Phases **22B, 26 and 28**, all MACHINE-ACCEPTED |
-| Product / contract | Matrix product is exact `ARKALI_Setup.exe`. No numbered C-contract has implementation phase 29; C-32 Recovery Supervisor/rollback is already owned by Phase 22B and must be integrated, not duplicated |
-| Human gate | Matrix Gate column is `—` — no human gate applies to Phase 29 acceptance |
-| Denominator | Exactly one register entry: OPTIONAL `ARK-REQ-0181` (“Air-gapped signed offline update bundles”), owner `lifecycle.release`, evidence `prov`. There are zero MANDATORY and zero CONDITIONAL Phase 29 requirements |
-| Installer relationship | Phase 28's generic NSIS artifact is build/bundle evidence only. Phase 29 owns the canonical `ARKALI_Setup.exe` product and installer/recovery integration |
-| Recovery Supervisor relationship | Reuse the accepted Phase 22B deterministic Recovery Supervisor and C-32 rollback authority. Do not create a second rollback, stable pointer, PDP/PEP or recovery authority |
-| Product readiness | Shipping/install reachability may increase when implemented; real-product reachability does not, because installer integration cannot supply the missing goal-to-product orchestration |
-| DEF-009 | Remains OPEN. Phase 29 does not own the live worker/orchestrating surface or real AI-driven multi-file product generation |
-| External AI dependency | No dependency is required or authorized by discovery; expected delta remains zero |
-| Architecture facts | 8 gates PASS over **222** Python cross-context edges and all 9 budgets. Phase 28's Rust/Tauri files remain outside that Python scanner and are separately covered by cargo and native-boundary evidence |
+| Name | **Golden Product + Golden Repair Verification** (`IMPLEMENTATION_DEPENDENCY_MATRIX.md` row 30) |
+| Status | **UNLOCKED — NOT STARTED.** `GovernanceState.current_work_phase()` returns `30`. Discovery only; no Phase 30 implementation exists |
+| Prerequisites | Phases **14, 16 and 24**, all MACHINE-ACCEPTED |
+| Product / contract | Matrix product is Golden evidence with an **instantiated corpus**. C-27 is defined at Phase 0B and instantiated at Phase 30; its accepted definition must be reused, not rewritten |
+| Human gate | Matrix Gate column is `—` — no human gate applies to Phase 30 acceptance |
+| Denominator | Exactly **23 requirements**, all MANDATORY. Owners: `acceptance.engine` (12), `engineering.repair` (7), `engineering.factory` (3), `control.architecture` (1). Evidence spans run, e2e, persist, prov, arch, prop and sec |
+| Golden Factory | Five named product families plus unseen-domain generalization must be generated through the normal real pipeline. At least one real provider or working local model must generate real artifacts; absent provider means BLOCKED/NOT_CONFIGURED, never PASS |
+| Real product | Full intent→requirements→specification→architecture→tasks→providers/agents→artifacts→assembly→build→runtime→acceptance→release must be real. Manual products registered as generated are prohibited; multi-file frontend/backend/database artifacts and genuine user journeys are required by the combined evidence obligations |
+| Golden Repair | Instantiate the Phase 0B corpus against an accepted Golden Product revision; declare budgets before every run; prove all repairable defects, zero regression/test weakening, evidence-backed root causes/fingerprints, content hash and terminal ESCALATED for a genuinely unrepairable entry |
+| DEF-009 | Phase 30 owns gap (c), real provider/local-model-driven multi-file product generation. Repository truth still says gaps (a) live worker loop and (b) live orchestrating surface have no canonical owner; discovery must resolve whether the 23 mandatory normal-pipeline/full-flow obligations make them unavoidable before implementation |
+| Real Product Verification | Acceptance requires real L2 execution and applicable L3 clean-Windows evidence, actual running generated apps, browser console/network/dead-control/drift checks, restart/persistence, and real release-bound provenance. Simulation alone cannot PASS |
+| External AI dependency | Unlike Phase 29, a real provider or working local model is a mandatory Golden Factory acceptance precondition. No provider result may be fabricated; cost/credential authority is not implied by discovery |
+| Architecture facts | 8 gates PASS over **222** Python cross-context edges and all 9 budgets. `acceptance.engine` is Protected Core; any implementation change there triggers its governed stronger profile and Stable Core/HUMAN_GATE_2 implications according to repository truth |
 
-**Phase 28 is MACHINE-ACCEPTED.** It discharged two MANDATORY requirements;
-ARK-REQ-0180 was NOT_APPLICABLE and contributed nothing to cumulative coverage.
-**Phase 29 is unlocked, discovery complete, and implementation has not begun.**
+**Phase 29 is MACHINE-ACCEPTED.** It discharged zero requirements; optional
+ARK-REQ-0181 remains DEFERRED and cumulative verified remains 219.
+**Phase 30 is unlocked, discovery complete, and implementation has not begun.**
 
 ## 9. Next exact action
 
-Phase 29 denominator: one requirement, classified OPTIONAL; zero mandatory
-requirements. Before implementation, re-read the canonical Desktop/Offline
-section, Matrix row 29, `ARK-REQ-0181`, Phase 22B's C-32 contract and
-`CLEAN_TEST_BASELINE.md`. Build the canonical `ARKALI_Setup.exe` only in a
-future authorized implementation session, integrating the existing Recovery
-Supervisor without duplicating its authority.
+Phase 30 denominator: 23 requirements, all MANDATORY. Before any implementation,
+re-read the Golden Product, real-provider, execution-level and Golden Repair
+sections; the Phase 0B C-27 corpus definition; DEF-004 and DEF-009; and derive
+the exact Product Plane/orchestration gap against the current shipping call
+graph. A real provider or working local model and real normal-pipeline product
+generation are mandatory; absence is BLOCKED/NOT_CONFIGURED, never PASS.
 
-Do not treat Phase 28's generic `ARKALI_0.1.0_x64-setup.exe` as the canonical
-Phase 29 deliverable. Do not close DEF-009, fabricate product generation or add
-an external AI/provider dependency. This session stops after discovery.
+Do not begin Phase 30 implementation from this checkpoint. Do not manually
+build products and register them as generated, modify the corpus to obtain PASS,
+or treat simulation/unit mocks as production evidence. This session stops after
+canonical discovery.
 
 ## 10. New-session bootstrap protocol
 
@@ -724,7 +732,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: 86afe39799dfc9866ba696fa9c738c23414a9562
+head: a30629727583128b49a98bb0136d45587ceda26d
 branch: main
 working_tree_clean: true
 
@@ -764,11 +772,12 @@ verified_by_phase:
   "26": 6
   "27": 2
   "28": 2
+  "29": 0
 cumulative_verified: 219
 
-accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "22B", "23", "24", "25", "26", "27", "28"]
-unlocked_phase: "29"
-next_exact_action_phase: "29"
+accepted_phases: ["0", "0A", "0B", "1", "2", "3", "4", "5", "6", "7", "8", "9", "9B", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "22B", "23", "24", "25", "26", "27", "28", "29"]
+unlocked_phase: "30"
+next_exact_action_phase: "30"
 
 accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_2", "HUMAN_GATE_3", "HUMAN_GATE_4", "HUMAN_GATE_6"]
 adr_accepted: 9
