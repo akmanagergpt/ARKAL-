@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "record_kind": "PRE_ACCEPTANCE_BOUNDED_REPAIR_TRIAL",
+  "phase": "30",
+  "terminal_state": "ESCALATED",
+  "immutable": true,
+  "corpus_eligibility": "NOT_ELIGIBLE",
+  "eligibility_reason": "GOLDEN_REPAIR_CORPUS_DEFINITION.md section 5 requires injection into an accepted Golden Product revision. golden-work-007 never passed acceptance, so this chain is valuable bounded-repair evidence but is not an ARK-REQ-0187/0188 corpus entry.",
+  "source_candidate": {
+    "id": "golden-work-007",
+    "tree_hash": "sha256:9e641ef2e58cfd2dd629704b25ccecc2cb138a4f0f702f3f89b20aa08e057fc4",
+    "accepted_before_repair": false
+  },
+  "root_causes": [
+    "assembly_import_path_defect",
+    "generated_test_backend_contract_drift",
+    "schema_runtime_mismatch"
+  ],
+  "declared_budget": {
+    "attempts": 2,
+    "ai_calls": 2,
+    "elapsed_seconds": 1200,
+    "cost": "0",
+    "touched_files": 64,
+    "regression_delta": 0
+  },
+  "provider_model": "ollama/qwen2.5-coder:7b",
+  "attempts": [
+    {
+      "attempt": 1,
+      "candidate_id": "golden-work-007-repair-1",
+      "outcome": "REJECTED",
+      "failure": "ModelProductEnvelope rejected the response because config/ was absent"
+    },
+    {
+      "attempt": 2,
+      "candidate_id": "golden-work-007-repair-2",
+      "tree_hash": "sha256:3be88adc0aa32cac4fb2e431753b1de9395d0cb580cc780a7f4a8900759bcaa1",
+      "outcome": "REJECTED",
+      "failure": "Generated pytest collection failed with ModuleNotFoundError for app; db, Work and schema bootstrap remained absent, and get_db_connection regressed"
+    }
+  ],
+  "provenance": {
+    "frozen_failure_and_budget": "sha256:a0f1605c4bbf29e4c86c25ef7c1fbae41de245ff231d9a0866d0345511e3b9a8",
+    "attempt_1_rejection": "sha256:395af6243694906e8965558fcdef44000c1cf6f10c5a6356914011474b018444",
+    "terminal_attempt_2": "sha256:9782e8b12d1c9f96cc6986d04cd58403bba5898735f059cdad52f32e89187883",
+    "evidence_store": "C-14 Artifact Store",
+    "repair_contract": "C-26/1.0.0"
+  },
+  "requirement_reconciliation": {
+    "ARK-REQ-0092": "EVIDENCE_ADVANCED_NOT_DISCHARGED",
+    "ARK-REQ-0094": "EVIDENCE_ADVANCED_NOT_DISCHARGED",
+    "ARK-REQ-0187": "NOT_SATISFIED_ACCEPTED_TARGET_REQUIRED",
+    "ARK-REQ-0188": "NOT_SATISFIED_ACCEPTED_TARGET_REQUIRED"
+  },
+  "mutation_prohibition": "Neither golden-work-007 nor either repair candidate may be mutated or retried. No budget extension is permitted."
+}
