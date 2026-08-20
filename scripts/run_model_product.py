@@ -46,13 +46,22 @@ def main(argv: list[str]) -> int:
     )
     blueprint = derive_blueprint(args.goal, AuthorityMap.load(ROOT))
     result = generate_model_product(
-        blueprint, OllamaAdapter(), args.model, workspace,
+        blueprint,
+        OllamaAdapter(json_mode=True),
+        args.model,
+        workspace,
         timeout_seconds=args.timeout,
     )
-    print(json.dumps({
-        **result.model_dump(mode="json"),
-        "workspace": str(workspace.root),
-    }, ensure_ascii=False, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                **result.model_dump(mode="json"),
+                "workspace": str(workspace.root),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

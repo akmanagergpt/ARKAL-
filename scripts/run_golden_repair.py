@@ -289,7 +289,9 @@ def main(argv: list[str]) -> int:
         ensure_ascii=False,
     )
     started = time.monotonic()
-    outcome = OllamaAdapter().infer(args.model, prompt, timeout_seconds=600)
+    outcome = OllamaAdapter(json_mode=True).infer(
+        args.model, prompt, timeout_seconds=600
+    )
     if outcome.state.value != "PASS":
         raise RuntimeError(
             f"model repair failed: {outcome.state.value}: {outcome.detail}"
