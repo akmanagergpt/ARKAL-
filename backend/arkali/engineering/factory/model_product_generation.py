@@ -148,6 +148,19 @@ def _json_payload(output: str) -> str:
     return stripped
 
 
+def write_model_product_output(
+    output: str, workspace: WorkspaceTarget,
+) -> tuple[str, ...]:
+    """Validate and write model bytes; shared by generation and repair roots."""
+    try:
+        envelope = ModelProductEnvelope.model_validate_json(_json_payload(output))
+    except (ValueError, json.JSONDecodeError) as error:
+        raise ModelGenerationError("model response violates the multi-file contract") from error
+    for item in envelope.files:
+        workspace.write(item.path, item.content.encode("utf-8"))
+    return tuple(item.path for item in envelope.files)
+
+
 def generate_model_product(
     blueprint: RequirementBlueprint,
     model: ModelSource,
@@ -163,18 +176,13 @@ def generate_model_product(
         raise ModelGenerationError(
             f"real model inference did not pass: {outcome.state.value}: {outcome.detail}"
         )
-    try:
-        envelope = ModelProductEnvelope.model_validate_json(_json_payload(outcome.output))
-    except (ValueError, json.JSONDecodeError) as error:
-        raise ModelGenerationError("model response violates the multi-file contract") from error
-    for item in envelope.files:
-        workspace.write(item.path, item.content.encode("utf-8"))
+    files = write_model_product_output(outcome.output, workspace)
     return ModelProductResult(
         blueprint_id=blueprint.blueprint_id,
         runtime=outcome.runtime,
         model_id=outcome.model_id,
-        files=tuple(item.path for item in envelope.files),
+        files=files,
     )
 
 
-__all__ = ["ModelProductResult", "generate_model_product"]
+__all__ = ["ModelProductResult", "generate_model_product", "write_model_product_output"]
