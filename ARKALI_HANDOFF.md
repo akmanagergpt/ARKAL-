@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `c7481fae82252f2d101bfae129a144763ffac3b9` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `099d2ed8b255b41fa3b4b34ba5445c524bbb52ba` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -457,7 +457,13 @@ repository, the repository wins.
 | 277 | `c5ec180` | **PHASE 26 PACKAGE 5** — supply-chain negative/adversarial proofs against Packages 1-4: artifact tampering/digest mismatch, stale/forged candidate, wrong provenance, dependency substitution, release replay, secret leakage, direct Stable mutation (AST), wrong target/environment (AST), unsigned/unverified package, rollback to unverified revision, package/version identity collision. Not a phase acceptance; no requirement discharged |
 | 278 | `41d2821` | **PHASE 26 PACKAGE 6** (`ARK-REQ-0007` completing) — `release_composition.py`: final manifest artifact with real parent edges to provenance/SBOM/review; `verify_evidence_complete` re-checks all four artifacts on every call. `release_gate.py`: the real `HUMAN_GATE_7` singleton wiring, closing "bypassed acceptance"/"bypassed release policy". A genuine mid-package canonical-discovery correction: an early scoped-grant design (mirroring `HUMAN_GATE_2`/`3`) was discarded once `SINGLETON_GATES` showed Gate 7 is a one-time, unscoped event like Gate 1 — the real mechanism composes `GovernanceState.accepted_human_gates` unmodified. Not a phase acceptance; no requirement discharged |
 | 279 | `4d0de8b` | **PHASE 26 PACKAGE 7 — COMPOSED VDC JOURNEY, C-31 CONTRACT, C-17 REPORT, TRACEABILITY, CANDIDATE FROZEN.** `docs/contracts/release_manifest.md`, `phase_26_report.json`, `phase_26_traceability.json` committed. `test_release_journey.py`'s composed end-to-end proof: a real Stable Core promotion, a real release candidate reaching `SIGNED_READY`, `RELEASED` genuinely refused without a real `HUMAN_GATE_7` grant and genuinely reachable once one exists in a temporary `HUMAN_GATE_RECORDS.md` copy. Not a phase acceptance; candidate frozen at this commit |
-| 280 | `c7481fa` | **RECORD PHASE 26 ACCEPTANCE AND UNLOCK THE NEXT PHASE.** `BUILD_STATE.md`'s Phase 26 row flips to MACHINE-ACCEPTED following the real, official gate run (`python scripts/run_phase_gate.py 26 27`, exit 0, first submission); returns `PHASE_ACCEPTED_BY_MACHINE`. 6/6 requirements discharged, 5 MANDATORY and 1 CONDITIONAL — `ARK-REQ-0007`, `0015`, `0124`, `0125`, `0350`, `0369` — taking cumulative verified 209 → 215. The newly-unlocked phase, Command Center Consolidation + Skill Modes (C-35, denominator 2, both MANDATORY — no human gate, prerequisites resolve to Phases 5/25 already MACHINE-ACCEPTED), gains its status row so `GovernanceState.current_work_phase()` resolves past 26. `ARKALI_HANDOFF.md` Sections 3/8/9 rewritten to match; Section 4 ledger gains rows 273–280. No further implementation was begun ← HEAD at generation |
+| 280 | `c7481fa` | **RECORD PHASE 26 ACCEPTANCE AND UNLOCK THE NEXT PHASE.** `BUILD_STATE.md`'s Phase 26 row flips to MACHINE-ACCEPTED following the real, official gate run (`python scripts/run_phase_gate.py 26 27`, exit 0, first submission); returns `PHASE_ACCEPTED_BY_MACHINE`. 6/6 requirements discharged, 5 MANDATORY and 1 CONDITIONAL — `ARK-REQ-0007`, `0015`, `0124`, `0125`, `0350`, `0369` — taking cumulative verified 209 → 215. The newly-unlocked phase, Command Center Consolidation + Skill Modes (C-35, denominator 2, both MANDATORY — no human gate, prerequisites resolve to Phases 5/25 already MACHINE-ACCEPTED), gains its status row so `GovernanceState.current_work_phase()` resolves past 26. `ARKALI_HANDOFF.md` Sections 3/8/9 rewritten to match; Section 4 ledger gains rows 273–280. No further implementation was begun |
+| 281 | `018c56c` | **PHASE 27 PACKAGE 1** — professional Command Center shell and fourteen canonical named areas; existing real slices retained; unavailable surfaces disabled honestly |
+| 282 | `f150645` | **PHASE 27 PACKAGE 2** — Beginner/Professional/Expert presentation modes; Workflow Studio confined to Expert; no backend capability created |
+| 283 | `bac753e` | **PHASE 27 PACKAGE 3** — Project Registry UX consolidation with progressive disclosure of internal identifiers |
+| 284 | `40bfa8a` | **PHASE 27 PACKAGE 4** — real Chromium journeys updated for Expert Workflow integration; 14/14 over production build, live FastAPI and real SQLite |
+| 285 | `3728a74` | **PHASE 27 PACKAGE 5 / CANDIDATE FREEZE** — C-35 contract, two-claim traceability and C-17 report; full regression 3332 PASS |
+| 286 | `099d2ed` | **RECORD PHASE 27 MACHINE ACCEPTANCE AND UNLOCK PHASE 28.** Official gate returned `PHASE_ACCEPTED_BY_MACHINE`, progression PERMITTED, first submission; 2/2 MANDATORY requirements discharged, cumulative 215 → 217; Phase 28 canonical discovery recorded and implementation not begun ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -845,7 +851,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: c7481fae82252f2d101bfae129a144763ffac3b9
+head: 099d2ed8b255b41fa3b4b34ba5445c524bbb52ba
 branch: main
 working_tree_clean: true
 
