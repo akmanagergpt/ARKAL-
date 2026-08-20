@@ -428,6 +428,9 @@ def inspect_product_files(
     findings: list[SemanticFinding] = []
     modules = _python_modules(files, findings)
     findings.extend(_test_findings(files, modules))
+    from arkali.engineering.factory.test_contract_preflight import lifecycle_findings
+
+    findings.extend(lifecycle_findings(files))
     findings.extend(_persistence_findings(files))
     findings.extend(_framework_api_findings(files))
     from arkali.engineering.factory.http_contract_preflight import (

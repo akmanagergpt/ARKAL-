@@ -59,6 +59,31 @@ def plain_import_findings(
     return findings
 
 
+def lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    backend = "\n".join(
+        source
+        for path, source in files.items()
+        if path.startswith("backend/") and path.endswith(".py")
+    )
+    tests = "\n".join(
+        source
+        for path, source in files.items()
+        if path.startswith("tests/") and path.endswith(".py")
+    )
+    has_startup_schema = "on_event(" in backend and "create table" in backend.lower()
+    global_client = "client = TestClient(app)" in tests
+    context_client = "with TestClient(app)" in tests
+    if has_startup_schema and global_client and not context_client:
+        return [
+            SemanticFinding(
+                code="test_skips_application_lifecycle",
+                path="tests/",
+                detail="TestClient must enter a context when schema bootstrap runs at startup",
+            )
+        ]
+    return []
+
+
 def _is_fixture(node: ast.expr) -> bool:
     return isinstance(node, ast.Attribute) and node.attr == "fixture"
 
@@ -69,4 +94,4 @@ def _is_test(node: ast.stmt) -> bool:
     )
 
 
-__all__ = ["fixture_findings", "plain_import_findings"]
+__all__ = ["fixture_findings", "lifecycle_findings", "plain_import_findings"]

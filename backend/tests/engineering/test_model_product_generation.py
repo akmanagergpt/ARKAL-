@@ -464,3 +464,44 @@ def test_dependency_manifest_must_support_target_python(tmp_path: pathlib.Path) 
             "model-1",
             _workspace(tmp_path),
         )
+
+
+def test_generated_tests_must_enter_required_application_lifecycle(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] += "@app.on_event('startup')\ndef boot(): DB.execute('CREATE TABLE x')\n"
+    test = next(item for item in payload["files"] if item["path"] == "tests/test_app.py")
+    test["content"] = (
+        "from app import app\nfrom fastapi.testclient import TestClient\n"
+        "client = TestClient(app)\ndef test_app(): assert client is not None\n"
+    )
+    requirements = next(
+        item for item in payload["files"] if item["path"] == "backend/requirements.txt"
+    )
+    requirements["content"] = "fastapi==0.115.0\npytest==8.0.0\n"
+    with pytest.raises(ModelGenerationError, match="test_skips_application_lifecycle"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )
+
+
+def test_separate_frontend_origin_requires_backend_cors_policy(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    frontend = next(
+        item for item in payload["files"] if item["path"] == "frontend/src/App.js"
+    )
+    frontend["content"] = "fetch('http://localhost:8000/items');\n"
+    with pytest.raises(ModelGenerationError, match="missing_browser_origin_boundary"):
+        generate_model_product(
+            derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+            FixedModel(json.dumps(payload)),
+            "model-1",
+            _workspace(tmp_path),
+        )

@@ -20,6 +20,14 @@ def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding
         if path.startswith("frontend/src/")
     )
     findings: list[SemanticFinding] = []
+    if "http://localhost:" in frontend and "corsmiddleware" not in backend:
+        findings.append(
+            SemanticFinding(
+                code="missing_browser_origin_boundary",
+                path="backend/",
+                detail="frontend uses a separate localhost origin but backend has no CORS policy",
+            )
+        )
     for method in ("post", "put", "delete"):
         if not _exposes(backend, method):
             continue
