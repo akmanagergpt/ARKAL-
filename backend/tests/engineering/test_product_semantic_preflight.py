@@ -21,6 +21,7 @@ def _complete() -> dict[str, str]:
         ),
         "frontend/src/App.js": "export default function App(){return null}\n",
         "config/README.md": "run\n",
+        "backend/requirements.txt": "pytest\n",
     }
 
 
@@ -35,6 +36,18 @@ def test_unittest_assertion_methods_are_meaningful() -> None:
             "import unittest\nfrom service import connection\n"
             "class TestService(unittest.TestCase):\n"
             "    def test_connection(self): self.assertIsNotNone(connection())\n"
+        ),
+    }
+    assert inspect_product_files(files).passed
+
+
+def test_declared_third_party_import_is_not_misclassified_as_local() -> None:
+    files = {
+        **_complete(),
+        "backend/requirements.txt": "Flask==3.1.0\npytest>=8\n",
+        "tests/backend/test_service.py": (
+            "from flask import Flask\nfrom service import connection\n"
+            "def test_connection(): assert Flask and connection()\n"
         ),
     }
     assert inspect_product_files(files).passed

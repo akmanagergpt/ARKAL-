@@ -89,11 +89,16 @@ def _python_modules(
 
 
 def _import_findings(
-    path: str, tree: ast.AST, modules: Mapping[str, tuple[str, set[str]]]
+    path: str,
+    tree: ast.AST,
+    modules: Mapping[str, tuple[str, set[str]]],
+    dependencies: frozenset[str],
 ) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
     for node in _nonstdlib_from_imports(tree):
         assert node.module is not None
+        if node.module.split(".", 1)[0].lower() in dependencies:
+            continue
         target = modules.get(node.module)
         if target is None:
             findings.append(
@@ -146,6 +151,7 @@ def _test_findings(
     files: Mapping[str, str], modules: Mapping[str, tuple[str, set[str]]]
 ) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
+    dependencies = _declared_dependencies(files)
     for path, source in files.items():
         if not path.startswith("tests/") or not path.endswith(".py"):
             continue
@@ -171,8 +177,22 @@ def _test_findings(
                     detail="Python test files require a test function and an assertion",
                 )
             )
-        findings.extend(_import_findings(path, tree, modules))
+        findings.extend(_import_findings(path, tree, modules, dependencies))
     return findings
+
+
+def _declared_dependencies(files: Mapping[str, str]) -> frozenset[str]:
+    names: set[str] = set()
+    requirements = files.get("backend/requirements.txt", "")
+    for line in requirements.splitlines():
+        declared = line.split("#", 1)[0].strip()
+        if not declared or declared.startswith(("-", ".")):
+            continue
+        name = declared.split("[", 1)[0]
+        for marker in ("==", ">=", "<=", "~=", "!=", ">", "<"):
+            name = name.split(marker, 1)[0]
+        names.add(name.strip().replace("-", "_").lower())
+    return frozenset(names)
 
 
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
