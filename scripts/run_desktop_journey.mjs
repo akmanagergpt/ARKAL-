@@ -8,11 +8,14 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
-const EXE = path.join(REPO, 'src-tauri', 'target', 'release', 'arkali-desktop.exe');
+const EXE = process.env.ARKALI_DESKTOP_EXE
+  ? path.resolve(process.env.ARKALI_DESKTOP_EXE)
+  : path.join(REPO, 'src-tauri', 'target', 'release', 'arkali-desktop.exe');
 const requireFromFrontend = createRequire(path.join(REPO, 'frontend', 'package.json'));
 const { chromium, expect } = requireFromFrontend('@playwright/test');
-const PROJECT_ID = `desktop-${Date.now().toString(36)}`;
-const PROJECT_NAME = `Desktop Journey ${PROJECT_ID}`;
+const EXISTING_PROJECT_ID = process.env.ARKALI_EXISTING_PROJECT_ID;
+const PROJECT_ID = EXISTING_PROJECT_ID ?? `desktop-${Date.now().toString(36)}`;
+const PROJECT_NAME = process.env.ARKALI_EXISTING_PROJECT_NAME ?? `Desktop Journey ${PROJECT_ID}`;
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -100,10 +103,12 @@ try {
   await first.page.getByRole('button', { name: 'Profesyonel', exact: true }).click();
   await expect(first.page.getByRole('button', { name: 'Profesyonel' })).toHaveAttribute('aria-pressed', 'true');
   await openExpertProjects(first.page);
-  await first.page.getByLabel(/project identifier/i).fill(PROJECT_ID);
-  await first.page.getByLabel(/project name/i).fill(PROJECT_NAME);
-  await first.page.getByRole('button', { name: /register project/i }).click();
-  await expect(first.page.getByText(/registered in DRAFT/i)).toBeVisible();
+  if (!EXISTING_PROJECT_ID) {
+    await first.page.getByLabel(/project identifier/i).fill(PROJECT_ID);
+    await first.page.getByLabel(/project name/i).fill(PROJECT_NAME);
+    await first.page.getByRole('button', { name: /register project/i }).click();
+    await expect(first.page.getByText(/registered in DRAFT/i)).toBeVisible();
+  }
 
   const duplicate = spawn(EXE, [], { cwd: REPO, stdio: 'ignore' });
   await waitFor(() => duplicate.exitCode !== null, 'duplicate instance refusal', 10_000);
@@ -128,6 +133,7 @@ try {
     result: 'PASS',
     executable: EXE,
     projectId: PROJECT_ID,
+    projectOperation: EXISTING_PROJECT_ID ? 'preserved existing project' : 'created project',
     backend: 'real FastAPI + Alembic + SQLite app-data',
     nativeWindow: true,
     modes: ['BEGINNER', 'PROFESSIONAL', 'EXPERT'],

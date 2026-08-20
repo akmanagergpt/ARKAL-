@@ -169,6 +169,8 @@ src-tauri/WixTools/
 src-tauri/binaries/*.exe
 artifacts/installer/*.exe
 artifacts/installer/*.json
+artifacts/phase29-real-install/
+artifacts/phase29-recovery/
 
 
 # ----------------------------------------------------------------------------
