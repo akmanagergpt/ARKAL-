@@ -201,7 +201,9 @@ def write_model_product_output(
     try:
         envelope = ModelProductEnvelope.model_validate_json(_json_payload(output))
     except (ValueError, json.JSONDecodeError) as error:
-        raise ModelGenerationError("model response violates the multi-file contract") from error
+        raise ModelGenerationError(
+            f"model response violates the multi-file contract: {error}"
+        ) from error
     file_map = {item.path: item.content for item in envelope.files}
     try:
         inspect_product_files(file_map, baseline=baseline).require_pass()
