@@ -249,3 +249,19 @@ def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
     assert (workspace.root / "backend/app.py").read_text() == (
         "@app.route('/status')\ndef status(): return 'ok'\n"
     )
+
+
+def test_double_escaped_python_transport_is_normalized_only_when_parseable(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] = app["content"].replace("\n", "\\n")
+    workspace = _workspace(tmp_path)
+    generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        workspace,
+    )
+    assert "\\n" not in (workspace.root / "backend/app.py").read_text()

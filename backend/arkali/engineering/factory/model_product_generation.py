@@ -8,6 +8,7 @@ and strict response validation required before any model bytes become files.
 
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
 import sys
@@ -54,6 +55,25 @@ def _normalise_requirements(files: dict[str, str]) -> dict[str, str]:
         retained.append(line)
     normalized = dict(files)
     normalized[path] = "\n".join(retained).rstrip() + "\n"
+    return normalized
+
+
+def _normalise_python_transport(files: dict[str, str]) -> dict[str, str]:
+    normalized = dict(files)
+    for path, content in files.items():
+        if not path.endswith(".py") or "\\n" not in content:
+            continue
+        try:
+            ast.parse(content)
+            continue
+        except SyntaxError:
+            candidate = content.replace("\\r\\n", "\n").replace("\\n", "\n")
+            candidate = candidate.replace("\\t", "\t")
+        try:
+            ast.parse(candidate)
+        except SyntaxError:
+            continue
+        normalized[path] = candidate
     return normalized
 
 
@@ -240,7 +260,9 @@ def write_model_product_output(
         raise ModelGenerationError(
             f"model response violates the multi-file contract: {error}"
         ) from error
-    file_map = _normalise_requirements({item.path: item.content for item in envelope.files})
+    file_map = _normalise_python_transport(
+        _normalise_requirements({item.path: item.content for item in envelope.files})
+    )
     try:
         inspect_product_files(file_map, baseline=baseline).require_pass()
     except ProductSemanticPreflightError as error:
