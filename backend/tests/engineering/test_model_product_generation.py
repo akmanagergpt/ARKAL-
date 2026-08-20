@@ -356,6 +356,25 @@ def test_backend_mutation_route_requires_frontend_mutation_call(
         )
 
 
+def test_fetch_mutation_method_satisfies_frontend_backend_contract(
+    tmp_path: pathlib.Path,
+) -> None:
+    payload = json.loads(_valid_output())
+    app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
+    app["content"] += "@app.route('/items', methods=['PUT'])\ndef update(): return 'ok'\n"
+    frontend = next(
+        item for item in payload["files"] if item["path"] == "frontend/src/App.js"
+    )
+    frontend["content"] = "export const save = () => fetch('/items',{method:'PUT'});\n"
+    result = generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        _workspace(tmp_path),
+    )
+    assert "frontend/src/App.js" in result.files
+
+
 def test_app_factory_without_server_entrypoint_is_rejected(
     tmp_path: pathlib.Path,
 ) -> None:

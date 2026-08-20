@@ -367,8 +367,9 @@ def _frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFindin
     for method in ("post", "put", "delete"):
         if f"'{method}'" not in backend and f'"{method}"' not in backend:
             continue
-        markers = (f"axios.{method}(", f"method: '{method}'", f'method: "{method}"')
-        if not any(marker in frontend for marker in markers):
+        direct_call = f"axios.{method}(" in frontend
+        fetch_option = re.search(rf"method\s*:\s*['\"]{method}['\"]", frontend)
+        if not direct_call and fetch_option is None:
             findings.append(
                 SemanticFinding(
                     code="frontend_backend_contract_drift",
