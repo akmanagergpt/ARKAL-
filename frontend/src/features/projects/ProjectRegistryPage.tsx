@@ -6,17 +6,16 @@ import { ProjectDetail } from './ProjectDetail';
 import { ProjectList } from './ProjectList';
 import { useProjectRegistry } from './useProjectRegistry';
 
-export function ProjectRegistryPage({ client }: { client: ArkaliApiClient }) {
+export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliApiClient; showTechnical: boolean }) {
   const registry = useProjectRegistry(client);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Project Registry</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Projeler</h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Every project below is read from the ARKALI registry through the Command Center
-          API. Lifecycle state, revisions and the legality of any transition are decided
-          there.
+          Projeleriniz doğrudan ARKALI kayıt sisteminden okunur. Durum ve sürüm bilgileri
+          bu ekranda yeniden üretilmez.
         </p>
       </div>
 
@@ -29,6 +28,7 @@ export function ProjectRegistryPage({ client }: { client: ArkaliApiClient }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ProjectList
+            showTechnical={showTechnical}
             projects={registry.projects}
             selectedId={registry.selected?.project_id ?? null}
             loading={registry.loadingList}
@@ -45,6 +45,7 @@ export function ProjectRegistryPage({ client }: { client: ArkaliApiClient }) {
           />
         </div>
         <ProjectDetail
+          showTechnical={showTechnical}
           project={registry.selected}
           lifecycleStates={registry.lifecycleStates}
           loading={registry.loadingDetail}

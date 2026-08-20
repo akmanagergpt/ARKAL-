@@ -29,7 +29,7 @@ export function App({ client }: { client: ArkaliApiClient }) {
   }
 
   const content = area === 'products'
-    ? <ProjectRegistryPage client={client} />
+    ? <ProjectRegistryPage client={client} showTechnical={mode === 'expert'} />
     : area === 'workflow'
       ? <WorkflowStudioPage client={client} />
       : <CommandCenterHome navigate={setArea} mode={mode} />;

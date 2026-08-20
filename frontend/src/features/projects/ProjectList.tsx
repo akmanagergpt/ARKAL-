@@ -8,6 +8,7 @@ export function ProjectList({
   failure,
   onSelect,
   onReload,
+  showTechnical,
 }: {
   projects: readonly ProjectResponse[];
   selectedId: string | null;
@@ -15,6 +16,7 @@ export function ProjectList({
   failure: { code: string; message: string } | null;
   onSelect: (projectId: string) => void;
   onReload: () => void;
+  showTechnical: boolean;
 }) {
   return (
     <Panel
@@ -60,9 +62,7 @@ export function ProjectList({
                     <span className="block text-sm font-medium text-slate-900">
                       {project.name}
                     </span>
-                    <span className="block font-mono text-xs text-slate-500">
-                      {project.project_id}
-                    </span>
+                    {showTechnical ? <span className="block font-mono text-xs text-slate-500">{project.project_id}</span> : null}
                   </span>
                   <StateBadge state={project.lifecycle_state} />
                 </button>

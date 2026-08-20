@@ -66,7 +66,7 @@ describe('Project Registry page', () => {
     });
 
     expect(await screen.findByText('Alpha Programme')).toBeInTheDocument();
-    expect(screen.getByText('prj-alpha')).toBeInTheDocument();
+    expect(screen.queryByText('prj-alpha')).not.toBeInTheDocument();
     expect(screen.getByText('DRAFT')).toBeInTheDocument();
   });
 
@@ -154,7 +154,7 @@ describe('Project Registry page', () => {
     await user.click(await screen.findByText('Alpha Programme'));
 
     expect(await screen.findByRole('table')).toBeInTheDocument();
-    expect(screen.getByText('rev-1')).toBeInTheDocument();
+    expect(screen.getByText('Sürüm 1')).toBeInTheDocument();
   });
 
   it('offers every declared state and lets the backend decide legality', async () => {

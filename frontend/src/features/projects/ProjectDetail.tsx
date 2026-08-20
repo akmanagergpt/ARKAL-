@@ -25,6 +25,7 @@ export function ProjectDetail({
   failure,
   onTransition,
   onCreateRevision,
+  showTechnical,
 }: {
   project: ProjectDetailResponse | null;
   lifecycleStates: readonly string[];
@@ -33,6 +34,7 @@ export function ProjectDetail({
   failure: { code: string; message: string } | null;
   onTransition: (projectId: string, target: string) => Promise<void>;
   onCreateRevision: (projectId: string, revisionId: string) => Promise<void>;
+  showTechnical: boolean;
 }) {
   const [target, setTarget] = useState('');
   const [revisionId, setRevisionId] = useState('');
@@ -72,10 +74,10 @@ export function ProjectDetail({
             <dt className="text-xs uppercase tracking-wide text-slate-500">Name</dt>
             <dd className="text-sm font-medium text-slate-900">{project.name}</dd>
           </div>
-          <div>
+          {showTechnical ? <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">Identifier</dt>
             <dd className="font-mono text-sm text-slate-900">{project.project_id}</dd>
-          </div>
+          </div> : null}
           <div>
             <dt className="text-xs uppercase tracking-wide text-slate-500">Registered</dt>
             <dd className="text-sm text-slate-700">{formatTimestamp(project.created_at)}</dd>
@@ -114,11 +116,11 @@ export function ProjectDetail({
                   {project.revisions.map((revision) => (
                     <tr key={revision.revision_id}>
                       <td className="py-2 pr-4 font-mono text-slate-500">{revision.sequence}</td>
-                      <td className="py-2 pr-4 font-mono text-slate-900">{revision.revision_id}</td>
+                      <td className={`py-2 pr-4 ${showTechnical ? 'font-mono text-slate-900' : 'text-slate-700'}`}>{showTechnical ? revision.revision_id : `Sürüm ${revision.sequence}`}</td>
                       <td className="py-2 pr-4 text-slate-700">
                         {formatTimestamp(revision.created_at)}
                       </td>
-                      <td className="py-2 text-slate-700">{revision.provenance_ref ?? '—'}</td>
+                      <td className="py-2 text-slate-700">{showTechnical ? (revision.provenance_ref ?? '—') : 'ARKALI tarafından kaydedildi'}</td>
                     </tr>
                   ))}
                 </tbody>
