@@ -52,6 +52,18 @@ def _module_name(path: str) -> str | None:
     return ".".join(relative) if relative else None
 
 
+def _module_aliases(path: str) -> tuple[str, ...]:
+    short = _module_name(path)
+    if short is None:
+        return ()
+    qualified = pathlib.PurePosixPath(path).with_suffix("")
+    parts = list(qualified.parts)
+    if parts[-1] == "__init__":
+        parts.pop()
+    full = ".".join(parts)
+    return tuple(dict.fromkeys((short, full)))
+
+
 def _exports(source: str) -> set[str]:
     tree = ast.parse(source)
     names = {
@@ -74,11 +86,13 @@ def _python_modules(
 ) -> dict[str, tuple[str, set[str]]]:
     modules: dict[str, tuple[str, set[str]]] = {}
     for path, source in files.items():
-        module = _module_name(path)
-        if module is None:
+        aliases = _module_aliases(path)
+        if not aliases:
             continue
         try:
-            modules[module] = (path, _exports(source))
+            exported = _exports(source)
+            for alias in aliases:
+                modules[alias] = (path, exported)
         except SyntaxError as error:
             findings.append(
                 SemanticFinding(

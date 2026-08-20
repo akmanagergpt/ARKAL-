@@ -53,6 +53,17 @@ def test_declared_third_party_import_is_not_misclassified_as_local() -> None:
     assert inspect_product_files(files).passed
 
 
+def test_package_qualified_generated_module_import_resolves() -> None:
+    files = {
+        **_complete(),
+        "tests/backend/test_service.py": (
+            "from backend.src.service import connection\n"
+            "def test_connection(): assert connection()\n"
+        ),
+    }
+    assert inspect_product_files(files).passed
+
+
 @pytest.mark.parametrize(
     "mutation, expected",
     [
