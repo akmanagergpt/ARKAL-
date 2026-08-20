@@ -1,0 +1,20 @@
+{
+  "phase_id": "27",
+  "note": "Derived from RequirementRegister.for_phase(\"27\"): exactly two MANDATORY requirements, both owned by surfaces.command. Phase 27 consolidates the real Project Registry and Workflow Studio browser slices under C-35; it creates no backend capability and leaves DEF-009 open.",
+  "claims": [
+    {
+      "req_id": "ARK-REQ-0176",
+      "state": "SATISFIED",
+      "implementation": "frontend/src/app/App.tsx and areas.ts present the fourteen canonical Command Center areas and Beginner/Professional/Expert presentation modes. Beginner is the default; Project Registry remains available; Workflow Studio is reachable only in Expert; unavailable areas are disabled and labelled honestly.",
+      "evidence": "e2e: frontend/tests/e2e/project-registry.spec.ts and workflow-studio.spec.ts run 14 real Chromium journeys over the production build, live FastAPI surface and real SQLite database; frontend/tests/features/command-center.test.tsx directly proves default Beginner, Expert-only Workflow Studio, and safe lowering of complexity.",
+      "note": "The register's single e2e evidence key is supplied. Detailed mode behaviour is an engineering/product decision under canonical silence, documented in docs/contracts/command_api.md, not presented as additional canonical text."
+    },
+    {
+      "req_id": "ARK-REQ-0177",
+      "state": "SATISFIED",
+      "implementation": "Every production-visible project and workflow state continues to originate in the unchanged existing surfaces.command backend routes. The frontend inventory exposes only Project Registry and Expert Workflow Studio as actionable; all other named areas are disabled and render no fabricated state. Project transition legality and workflow approval remain backend decisions and their real refusals remain visible.",
+      "evidence": "e2e: 14/14 Playwright tests prove create/read/revision/transition refusal/persistence and workflow compose/publish/execution approval against the real backend and database. integ: 29/29 Vitest tests exercise the production ArkaliApiClient and real response contracts; backend full regression 3332/3332 passed, including surfaces.command integration and structural anti-fabrication controls.",
+      "note": "Both register evidence keys (e2e, integ) are supplied. No mock route or decorative telemetry exists in shipping source."
+    }
+  ]
+}
