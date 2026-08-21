@@ -117,6 +117,10 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
             "function App() { fetchWorks(); return 'loading error'; }\n"
             "export default App;\n"
         ),
+        "frontend/src/index.js": (
+            "import App from './App';\n"
+            "ReactDOM.render(App, document.getElementById('root'));\n"
+        ),
     },
     "frontend_tests_config": {
         "frontend/package.json": '{"name": "app"}\n',
@@ -306,6 +310,19 @@ def test_frontend_ui_findings_passes_on_real_wiring() -> None:
         **HAPPY_PATH_FILES["frontend_ui"],
     }
     assert _frontend_ui_findings(files) == []
+
+
+def test_frontend_ui_findings_requires_an_entry_point() -> None:
+    """golden-work-061 (session evidence, frozen): manifests' own reduced
+    context never sees the real component file name, so it cannot write
+    a correct index.js — this must be required (and satisfiable) here,
+    at the stage that actually knows what it just wrote."""
+    files = {
+        **HAPPY_PATH_FILES["frontend_client"],
+        "frontend/src/App.js": HAPPY_PATH_FILES["frontend_ui"]["frontend/src/App.js"],
+    }
+    findings = _frontend_ui_findings(files)
+    assert any(f.code == "missing_frontend_entry_point" for f in findings)
 
 
 def test_backend_implementation_findings_catches_real_python_syntax_errors() -> None:

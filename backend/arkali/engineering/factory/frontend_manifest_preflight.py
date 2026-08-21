@@ -16,15 +16,22 @@ golden-work-059 (session evidence, frozen) then fixed that gap for real —
 second, different real reason: `Could not find a required file. Name:
 index.js. Searched in: frontend/src`. `react-scripts build`'s webpack
 config hard-codes `src/index.js` as the entry point (not configurable
-without ejecting); no stage's rule or validator had ever required it,
-mirroring exactly the same gap class `_manifest_findings`'s existing
-`missing_frontend_entry` check already closed for `public/index.html`
-under this same react-scripts condition — `index.js` is the other half
-of the identical CRA convention.
+without ejecting). Requiring it at `manifests` (mirroring the working
+`public/index.html` check) seemed consistent — but golden-work-061
+(session evidence, frozen) exhausted `manifests`'s full budget on
+exactly this finding, unchanged, every attempt: `manifests`' own reduced
+context (`manifest_context.py`) deliberately strips real local file
+names to keep its prompt small (the golden-046 timeout fix), so the
+model at that stage cannot know which component to import into
+`index.js` — a structurally different requirement from
+`public/index.html`, which needs no local-file knowledge at all. Moved
+to `frontend_ui`'s own stage validator instead
+(`component_generation._frontend_ui_findings`), where the model has full
+visibility into the exact component file it just wrote in the same call.
 
-GENERAL, NOT GOLDEN-SPECIFIC. Both checks look at the real, parsed JSON
-structure or the real declared file set — never any specific script
-command text, component name or app name.
+GENERAL, NOT GOLDEN-SPECIFIC. Checks the real, parsed JSON structure or
+the real declared file set — never any specific script command text,
+component name or app name.
 """
 
 from __future__ import annotations
@@ -62,14 +69,22 @@ def _missing_frontend_scripts_findings(files: Mapping[str, str]) -> list[Semanti
 
 
 def _missing_frontend_entry_point_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    package_json = files.get("frontend/package.json", "")
-    if "react-scripts" not in package_json or "frontend/src/index.js" in files:
+    """Unconditional — checked at `frontend_ui`, which has no visibility
+    into `package.json`/`react-scripts` yet (that is declared later, at
+    `frontend_tests_config`/`manifests`). Every real candidate this
+    session has produced a react-scripts frontend, and any React app
+    needs some entry point mounting a component into the DOM regardless
+    of exact build-tool choice, so this does not wait to confirm
+    react-scripts specifically."""
+    if "frontend/src/index.js" in files:
         return []
     return [SemanticFinding(
         code="missing_frontend_entry_point", path="frontend/src/index.js",
         detail=(
-            "react-scripts is declared but frontend/src/index.js does not "
-            "exist — react-scripts build hard-codes this exact path as its "
-            "webpack entry point and fails outright without it"
+            "no frontend/src/index.js exists — react-scripts build hard-codes "
+            "this exact path as its webpack entry point and fails outright "
+            "without it; import the real component this stage just wrote and "
+            "mount it with ReactDOM.render(<Component />, "
+            "document.getElementById('root'))"
         ),
     )]

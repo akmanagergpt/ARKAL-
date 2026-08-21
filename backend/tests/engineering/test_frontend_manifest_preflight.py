@@ -55,25 +55,21 @@ def test_is_silent_when_package_json_is_absent() -> None:
     assert _missing_frontend_scripts_findings({}) == []
 
 
-def test_flags_missing_index_js_when_react_scripts_is_declared() -> None:
+def test_flags_missing_index_js() -> None:
     """golden-work-059 (session evidence, frozen): real npm install and
     real npm run build both ran for the first time (row 354's scripts fix
     confirmed working), then react-scripts build failed outright with
     "Could not find a required file. Name: index.js." -- its webpack
-    config hard-codes this exact path as the entry point."""
-    package = json.dumps({"dependencies": {"react-scripts": "4.0.3"}})
-    findings = _missing_frontend_entry_point_findings({"frontend/package.json": package})
+    config hard-codes this exact path as the entry point. Unconditional,
+    not gated on react-scripts (golden-work-061, session evidence,
+    frozen): checked at frontend_ui, which has no visibility into
+    package.json yet -- that is declared later, at manifests."""
+    findings = _missing_frontend_entry_point_findings({"frontend/src/App.js": "x"})
     assert len(findings) == 1
     assert findings[0].code == "missing_frontend_entry_point"
     assert findings[0].path == "frontend/src/index.js"
 
 
 def test_entry_point_check_is_silent_when_index_js_exists() -> None:
-    package = json.dumps({"dependencies": {"react-scripts": "4.0.3"}})
-    files = {"frontend/package.json": package, "frontend/src/index.js": "ReactDOM.render(1,2);"}
+    files = {"frontend/src/App.js": "x", "frontend/src/index.js": "ReactDOM.render(1,2);"}
     assert _missing_frontend_entry_point_findings(files) == []
-
-
-def test_entry_point_check_is_silent_when_react_scripts_is_not_declared() -> None:
-    package = json.dumps({"name": "vanilla-app"})
-    assert _missing_frontend_entry_point_findings({"frontend/package.json": package}) == []

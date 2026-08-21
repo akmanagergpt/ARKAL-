@@ -44,12 +44,13 @@ from collections.abc import Callable, Mapping
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
-from arkali.engineering.factory.route_response_preflight import _missing_generated_id_findings, _raw_row_jsonify_findings
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.frontend_manifest_preflight import _missing_frontend_entry_point_findings
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
 from arkali.engineering.factory.manifest_context import _manifest_context
+from arkali.engineering.factory.route_response_preflight import _missing_generated_id_findings, _raw_row_jsonify_findings
 from arkali.engineering.factory.model_product_generation import (
     GeneratedFile,
     ModelProductResult,
@@ -58,11 +59,8 @@ from arkali.engineering.factory.model_product_generation import (
     _json_payload,
 )
 from arkali.engineering.factory.product_preflight import (
-    SemanticFinding,
-    _manifest_findings,
-    _manifests_stage_findings,
-    _persistence_findings,
-    _schema_context_findings,
+    SemanticFinding, _manifest_findings, _manifests_stage_findings,
+    _persistence_findings, _schema_context_findings,
 )
 from arkali.engineering.factory.stage_prompting import _stage_prompt
 from arkali.engineering.factory.test_contract_preflight import (
@@ -191,9 +189,13 @@ def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
 
 
 def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """`frontend_ui`'s own narrow rule: it calls the client and renders states."""
+    """`frontend_ui`'s own narrow rule: it calls the client, renders states,
+    and (golden-work-061, session evidence, frozen) provides the real
+    entry point mounting its own component — required here, not at
+    `manifests`, since only this stage actually knows the component's
+    real file name."""
     client, ui = _split_client_and_ui(files)
-    return _unused_client_export_findings(client, ui) + _missing_ui_state_findings(ui)
+    return _unused_client_export_findings(client, ui) + _missing_ui_state_findings(ui) + _missing_frontend_entry_point_findings(files)
 
 
 def _backend_text(files: Mapping[str, str]) -> str:

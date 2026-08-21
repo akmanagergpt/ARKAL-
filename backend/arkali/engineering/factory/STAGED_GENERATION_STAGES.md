@@ -102,7 +102,15 @@ consecutive attempts).
 ### 7. frontend_ui
 Inputs: frontend_client
 Rule: the UI calls every function frontend_client exports and renders
-loading, empty and error states.
+loading, empty and error states. Also declare frontend/src/index.js that
+imports the real component this stage just wrote and mounts it with
+ReactDOM.render(<Component />, document.getElementById('root')) — no
+other stage can write this correctly. golden-work-059 (session evidence,
+frozen) found react-scripts build hard-codes src/index.js as its webpack
+entry point and fails outright without it; golden-work-061 (session
+evidence, frozen) then showed requiring it at manifests does not work —
+manifests' own reduced context never sees this stage's real component
+file name, only this stage does.
 
 ### 8. frontend_tests_config
 Inputs: frontend_client, frontend_ui
