@@ -74,10 +74,16 @@ def _output(files: dict[str, str]) -> str:
 
 
 HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
+    # This exact shape is what a real qwen2.5-coder:14b produced unprompted
+    # for this stage's rule (golden-work-045, frozen evidence
+    # sha256:aabfc2e5f44758724d4941869eaccff28f3bfba18d76a5f39c044c32b7962eb5)
+    # -- codified as the expected contract instead of a Python-decorator guess.
     "backend_contract": {
-        "backend/main.py": (
-            "app = object()\n@app.get('/works')\ndef list_works():\n    pass\n"
-            "class WorkRecord(object):\n    pass\n"
+        "backend/routes/task_routes.json": json.dumps([
+            {"path": "/works", "method": "GET", "model_fields": ["id", "title"]},
+        ]),
+        "backend/models/task_model.json": json.dumps(
+            {"table_name": "works", "fields": {"id": {"type": "integer"}, "title": {"type": "string"}}}
         ),
     },
     "backend_schema": {

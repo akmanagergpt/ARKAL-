@@ -13,20 +13,32 @@ chain from a document instead of hard-coding it).
 ### 1. backend_contract
 Inputs: none
 Rule: every route and data model implied by the blueprint's requirements is
-declared as a signature only — path, method, model fields — with no route
-body implemented yet.
+declared as a machine-readable schema, not Python code — no route body,
+no app instance, no decorator yet. Declare at least one JSON file under
+backend/ whose content is a JSON array of route objects, each carrying
+"path" and "method" ("GET"/"POST"/"PUT"/"DELETE"/"PATCH"); and at least
+one JSON file under backend/ whose content is a JSON object describing a
+data model, carrying a "fields" key. This is the real shape a real local
+model produced unprompted for this exact rule (golden-work-045, frozen
+evidence sha256:aabfc2e5f44758724d4941869eaccff28f3bfba18d76a5f39c044c32b7962eb5) —
+codified here rather than fought, since a schema-first contract is not a
+worse design than inline decorator stubs, only a different one this
+pipeline had not yet declared explicitly.
 
 ### 2. backend_schema
 Inputs: backend_contract
-Rule: a real, executable SQLite schema or migration exists and is wired
-into the application's real startup lifecycle, not a bare `CREATE TABLE`
-left outside any lifecycle hook.
+Rule: a real, executable SQLite schema or migration exists, generated from
+backend_contract's data-model JSON, and is wired into the application's
+real startup lifecycle, not a bare `CREATE TABLE` left outside any
+lifecycle hook. This stage does not yet declare routes or an app
+instance — that is backend_implementation's job, not this one's.
 
 ### 3. backend_implementation
 Inputs: backend_contract, backend_schema
-Rule: every route declared in backend_contract has a real executable body
-that uses the schema from backend_schema; every import resolves; the
-backend exposes an executable server entrypoint.
+Rule: a real application instance exists; every route declared in
+backend_contract's route JSON has a real executable body that uses the
+schema from backend_schema; every import resolves; the backend exposes an
+executable server entrypoint.
 
 ### 4. backend_tests
 Inputs: backend_implementation, backend_schema

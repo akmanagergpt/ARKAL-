@@ -96,23 +96,55 @@ class _StageEnvelope(BaseModel):
         return self
 
 
-def _backend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """`backend_contract`'s own narrow rule: routes and models are declared."""
-    backend = "\n".join(
-        source for path, source in files.items()
-        if path.startswith("backend/") and path.endswith(".py")
+_HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
+
+
+def _backend_contract_json_files(files: Mapping[str, str]) -> list[object]:
+    parsed: list[object] = []
+    for path, source in files.items():
+        if not (path.startswith("backend/") and path.endswith(".json")):
+            continue
+        try:
+            parsed.append(json.loads(source))
+        except json.JSONDecodeError:
+            continue
+    return parsed
+
+
+def _declares_routes(parsed_files: list[object]) -> bool:
+    for document in parsed_files:
+        if not isinstance(document, list):
+            continue
+        if any(
+            isinstance(item, dict) and "path" in item
+            and str(item.get("method", "")).lower() in _HTTP_METHODS
+            for item in document
+        ):
+            return True
+    return False
+
+
+def _declares_a_model(parsed_files: list[object]) -> bool:
+    return any(
+        isinstance(document, dict) and "fields" in document for document in parsed_files
     )
+
+
+def _backend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """`backend_contract`'s own narrow rule: a machine-readable route and data
+    model schema is declared (JSON, not Python — see
+    STAGED_GENERATION_STAGES.md#1)."""
+    parsed = _backend_contract_json_files(files)
     findings: list[SemanticFinding] = []
-    route_markers = ("@app.route", "@app.get", "@app.post", "@app.put", "@app.delete", "@router.")
-    if not any(marker in backend for marker in route_markers):
+    if not _declares_routes(parsed):
         findings.append(SemanticFinding(
             code="backend_contract_no_routes", path="backend/",
-            detail="backend_contract declares no route signature",
+            detail="no backend/*.json file declares a route array with path+method",
         ))
-    if not re.search(r"class\s+\w+\s*\(", backend):
+    if not _declares_a_model(parsed):
         findings.append(SemanticFinding(
             code="backend_contract_no_models", path="backend/",
-            detail="backend_contract declares no data model class",
+            detail="no backend/*.json file declares a data model with a 'fields' key",
         ))
     return findings
 
@@ -158,12 +190,49 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return _unused_client_export_findings(client, ui) + _missing_ui_state_findings(ui)
 
 
-def _backend_schema_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    backend_text = "\n".join(
+def _backend_text(files: Mapping[str, str]) -> str:
+    return "\n".join(
         source.lower() for path, source in files.items()
         if path.startswith("backend/") and path.endswith(".py")
     )
-    return _persistence_findings(files) + _schema_context_findings(backend_text)
+
+
+def _schema_only_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Schema/persistence only — no route or entrypoint requirement.
+
+    backend_contract no longer declares any Python (see
+    STAGED_GENERATION_STAGES.md#1), so `product_preflight._persistence_findings`
+    (which bundles schema together with route markers and an entrypoint check)
+    cannot pass at this stage by construction — those belong to
+    backend_implementation, not backend_schema. This duplicates
+    `_persistence_findings`'s own sqlite/schema pair (not its route/entrypoint
+    half) rather than promoting a fourth product_preflight helper to public:
+    the real architecture-budget gate already measured this context at its
+    40/40 public-surface ceiling once this session (see this module's own
+    docstring) and every net-new promotion was reverted for exactly that
+    reason.
+    """
+    backend_text = _backend_text(files)
+    findings: list[SemanticFinding] = []
+    uses_sqlite = "sqlite3" in backend_text or "sqlite://" in backend_text
+    creates_schema = "create table" in backend_text or "create_all(" in backend_text
+    if not uses_sqlite:
+        findings.append(SemanticFinding(
+            code="missing_persistence_code", path="backend/",
+            detail="backend Python source contains no executable SQLite persistence",
+        ))
+    elif not creates_schema:
+        findings.append(SemanticFinding(
+            code="missing_schema_bootstrap", path="backend/",
+            detail="SQLite is selected but no schema creation or migration is present",
+        ))
+    findings.extend(_schema_context_findings(backend_text))
+    return findings
+
+
+def _backend_implementation_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Full persistence+routes+entrypoint — routes are expected by now."""
+    return _persistence_findings(files) + _schema_context_findings(_backend_text(files))
 
 
 def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -182,8 +251,8 @@ def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFind
 #: `inspect_product_files` gate still applies to every stage's output.
 _STAGE_VALIDATORS: dict[str, Callable[[Mapping[str, str]], list[SemanticFinding]]] = {
     "backend_contract": _backend_contract_findings,
-    "backend_schema": _backend_schema_stage_findings,
-    "backend_implementation": _backend_schema_stage_findings,
+    "backend_schema": _schema_only_findings,
+    "backend_implementation": _backend_implementation_stage_findings,
     "backend_tests": _backend_tests_stage_findings,
     "frontend_client": frontend_contract_findings,
     "frontend_ui": _frontend_ui_findings,
