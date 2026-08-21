@@ -95,6 +95,37 @@ def test_flags_a_raw_fetchone_tuple_passed_straight_to_jsonify() -> None:
     assert "get_task" in findings[0].detail
 
 
+def test_flags_dict_conversion_without_row_factory() -> None:
+    """golden-work-057 (session evidence, frozen): a real qwen2.5-coder:14b
+    wrapped raw fetchone()/fetchall() rows in dict(row) — a real fix for
+    the golden-work-056 gap — but never set conn.row_factory =
+    sqlite3.Row, so dict() on a plain tuple itself raised a real
+    TypeError and every affected route returned HTTP 500. dict(...)
+    alone must not be treated as proof of correctness."""
+    source = (
+        "def get_task(id):\n"
+        "    cursor = conn.cursor()\n"
+        "    task = cursor.fetchone()\n"
+        "    return jsonify(dict(task))\n"
+    )
+    findings = _raw_row_jsonify_findings({"backend/app.py": source})
+    assert len(findings) == 1
+    assert findings[0].code == "raw_sqlite_row_passed_to_jsonify"
+
+
+def test_flags_a_fetchall_comprehension_wrapped_in_dict_without_row_factory() -> None:
+    """Real, frozen golden-work-057 evidence: [dict(row) for row in tasks]
+    where tasks = cursor.fetchall(), with no row_factory anywhere."""
+    source = (
+        "def get_tasks():\n"
+        "    cursor = conn.cursor()\n"
+        "    tasks = cursor.fetchall()\n"
+        "    return jsonify([dict(row) for row in tasks])\n"
+    )
+    findings = _raw_row_jsonify_findings({"backend/app.py": source})
+    assert [f.code for f in findings] == ["raw_sqlite_row_passed_to_jsonify"]
+
+
 def test_raw_row_check_is_silent_when_row_factory_is_used() -> None:
     source = (
         "def get_task(id):\n"

@@ -49,8 +49,13 @@ plus dict(row), or an explicit column-name mapping) before passing it to
 jsonify — a bare tuple serializes as a JSON array, not an object with
 named fields (golden-work-056, session evidence, frozen: a real model's
 own generated test asserted a named field on exactly this shape and got
-a real TypeError). Cross-origin access is not this stage's concern —
-that is backend_cors_boundary's job, immediately after this one.
+a real TypeError). dict(row) alone does not fix this: without
+conn.row_factory = sqlite3.Row set on the connection first, dict() on a
+plain tuple raises its own TypeError (golden-work-057, session evidence,
+frozen: a real model wrapped every raw row in dict(row) but never set
+row_factory, and every affected route returned HTTP 500). Cross-origin
+access is not this stage's concern — that is backend_cors_boundary's
+job, immediately after this one.
 
 ### 4. backend_cors_boundary
 Inputs: backend_implementation
