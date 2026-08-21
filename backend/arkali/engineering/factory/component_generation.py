@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import ast
 import json
+import platform
 import re
 from collections.abc import Callable, Mapping
 
@@ -60,6 +61,7 @@ from arkali.engineering.factory.product_preflight import (
     _persistence_findings,
     _schema_context_findings,
 )
+from arkali.engineering.factory.stage_prompting import _stage_prompt
 from arkali.engineering.factory.test_contract_preflight import (
     fixture_findings,
     lifecycle_findings,
@@ -343,33 +345,6 @@ def _stage_findings(stage_name: str, files: Mapping[str, str]) -> list[SemanticF
     return validator(files) if validator is not None else []
 
 
-def _stage_prompt(
-    declaration: StageDeclaration, blueprint: RequirementBlueprint,
-    visible_files: Mapping[str, str], prior_failure: str | None,
-) -> str:
-    return json.dumps({
-        "role": "You are one bounded stage of a multi-stage software factory.",
-        "stage": declaration.name,
-        "task": declaration.rule,
-        "output_contract": {
-            "format": "one JSON object only; no markdown or commentary",
-            "schema": {"files": [{"path": "relative/posix/path", "content": "complete text"}]},
-            "json_encoding_rule": (
-                "Every file content is a JSON string. Escape newlines as \\n and "
-                "all other control characters per RFC 8259."
-            ),
-        },
-        "goal": blueprint.goal.goal_text,
-        "requirements": [item.statement for item in blueprint.requirements],
-        "visible_prior_files": visible_files,
-        "prior_attempt_failure": prior_failure,
-        "convergence_rule": (
-            "When prior_attempt_failure is present, correct that exact defect "
-            "while retaining everything else already correct."
-        ),
-    }, ensure_ascii=False, separators=(",", ":"))
-
-
 def _generate_one_stage(
     declaration: StageDeclaration,
     blueprint: RequirementBlueprint,
@@ -379,30 +354,48 @@ def _generate_one_stage(
     *,
     timeout_seconds: float,
     max_attempts: int,
+    target_runtime: str | None = None,
 ) -> dict[str, str]:
     from arkali.kernel.contracts.honest_state import HonestState
 
     failure: str | None = None
+    previous_failure: str | None = None
     last_raw_output: str = ""
-    for _ in range(1, max_attempts + 1):
-        prompt = _stage_prompt(declaration, blueprint, visible_files, failure)
+    for attempt_number in range(1, max_attempts + 1):
+        prompt = _stage_prompt(declaration, blueprint, visible_files, failure, target_runtime)
         outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
         last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
-            continue
-        try:
-            envelope = _StageEnvelope.model_validate_json(_json_payload(outcome.output))
-        except (ValueError, json.JSONDecodeError) as error:
-            failure = f"stage response violates the contract: {error}"
-            continue
-        stage_files = {item.path: item.content for item in envelope.files}
-        merged = {**visible_files, **stage_files}
-        findings = _stage_findings(declaration.name, merged)
-        if findings:
-            failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
-            continue
-        return stage_files
+        else:
+            try:
+                envelope = _StageEnvelope.model_validate_json(_json_payload(outcome.output))
+            except (ValueError, json.JSONDecodeError) as error:
+                failure = f"stage response violates the contract: {error}"
+            else:
+                stage_files = {item.path: item.content for item in envelope.files}
+                merged = {**visible_files, **stage_files}
+                findings = _stage_findings(declaration.name, merged)
+                if not findings:
+                    return stage_files
+                failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
+        # ANTI-LOOP, generic across every stage: two consecutive attempts
+        # rejected for the identical normalized reason (same code, path
+        # and detail) will not resolve on a blind third/fourth retry —
+        # golden-work-047's manifests stage exhausted its full budget on
+        # exactly this class of repeat, and this pipeline never even
+        # detected it, since nothing before this compared attempts to one
+        # another. This does not raise the bounded maximum; it stops
+        # before spending it on a call already proven to repeat.
+        if failure == previous_failure and attempt_number < max_attempts:
+            error = ModelGenerationError(
+                f"stage {declaration.name!r} repeated the identical failure fingerprint "
+                f"on attempts {attempt_number - 1} and {attempt_number}, stopping before "
+                f"exhausting the remaining bounded attempts: {failure}"
+            )
+            error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
+            raise error
+        previous_failure = failure
     # The raw last-attempt output is retained on the exception (not just the
     # mechanical failure summary) so a caller can freeze real diagnostic
     # evidence — golden-work-043 and the first golden-work-045 stage failure
@@ -456,14 +449,20 @@ def generate_staged_model_product(
         for input_name in declaration.inputs:
             for path in written_by_stage[input_name]:
                 visible[path] = all_files[path]
+        target_runtime: str | None = None
         if declaration.name == "manifests":
             # Only this stage's context is reduced; every other stage still
             # sees the real, full bytes of exactly its declared inputs.
             visible = _manifest_context(visible)
+            # Only this stage's declared rule depends on the target
+            # runtime (STAGED_GENERATION_STAGES.md); golden-work-047
+            # (session evidence) showed the model was never told it.
+            target_runtime = platform.python_version()
         model, model_id = model_factory(declaration.name)
         stage_files = _generate_one_stage(
             declaration, blueprint, model, model_id, visible,
             timeout_seconds=timeout_seconds, max_attempts=per_stage_max_attempts,
+            target_runtime=target_runtime,
         )
         for path, content in stage_files.items():
             workspace.write(path, content.encode("utf-8"))

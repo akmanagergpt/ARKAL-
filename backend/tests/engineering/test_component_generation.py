@@ -260,6 +260,71 @@ def test_budget_exhaustion_retains_the_last_raw_model_output(
     assert excinfo.value.last_raw_output == always_bad  # type: ignore[attr-defined]
 
 
+def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-047 (session evidence, frozen): the manifests stage
+    exhausted its full 4-attempt budget on the identical dependency-
+    compatibility class every time, and nothing in this pipeline ever
+    detected the repeat. Two consecutive attempts rejected for the exact
+    identical reason must stop before spending the remaining bounded
+    attempts on a call already proven to repeat."""
+    queues = _happy_path_queues()
+    always_bad = _output({"backend/main.py": "app = object()\n"})
+    queues["backend_contract"] = [(HonestState.PASS, always_bad)] * 4
+    with pytest.raises(ModelGenerationError, match="repeated the identical failure fingerprint"):
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path),
+            vocabulary=StageVocabulary.load(REPO),
+        )
+
+
+def test_anti_loop_does_not_trigger_when_findings_genuinely_differ(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A stage that fails for a different reason on each attempt is not a
+    repeat, and must still be allowed to spend its full bounded budget —
+    the anti-loop check must never mistake ordinary bounded retry for a
+    stuck loop."""
+    queues = _happy_path_queues()
+    no_routes = _output({"backend/main.py": "app = object()\n"})
+    no_model = _output({
+        "backend/routes/task_routes.json": json.dumps([
+            {"path": "/works", "method": "GET", "model_fields": ["id"]},
+        ]),
+    })
+    good = queues["backend_contract"][0]
+    queues["backend_contract"] = [
+        (HonestState.PASS, no_routes), (HonestState.PASS, no_model),
+        (HonestState.PASS, no_routes), good,
+    ]
+    result = generate_staged_model_product(
+        _blueprint(), _factory(queues), _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 9
+
+
+def test_manifests_stage_prompt_carries_the_real_target_python_version(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-047 (session evidence, frozen): the model was never told
+    what Python version its declared dependencies had to run on. Only the
+    `manifests` stage's own declared rule (STAGED_GENERATION_STAGES.md)
+    depends on it; every other stage's prompt is unaffected."""
+    import platform
+
+    factory = _factory(_happy_path_queues())
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    manifests_prompt = factory.models["manifests"].prompts[0]  # type: ignore[attr-defined]
+    assert f'"target_runtime":{{"python":"{platform.python_version()}"}}' in manifests_prompt
+    backend_contract_prompt = factory.models["backend_contract"].prompts[0]  # type: ignore[attr-defined]
+    assert "target_runtime" not in backend_contract_prompt
+
+
 def test_unresolved_blueprint_refuses(tmp_path: pathlib.Path) -> None:
     unresolved = derive_blueprint("fast", AuthorityMap.load(REPO))
     assert not unresolved.is_fully_resolved

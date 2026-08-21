@@ -15,6 +15,12 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict
 
+from arkali.engineering.factory.dependency_resolution import (
+    _DependencyResolutionOutcome,
+    _missing_compatibility_cap_findings,
+    _offline_dependency_compatibility_findings,
+    _resolve_backend_dependency_contract,
+)
 from arkali.engineering.factory.errors import ProductSemanticPreflightError
 
 
@@ -217,54 +223,36 @@ def _declared_dependencies(files: Mapping[str, str]) -> frozenset[str]:
 
 
 def _dependency_compatibility_findings(requirements: str) -> list[SemanticFinding]:
+    """General, real dependency-compatibility ground truth: `pip`'s own
+    resolver (`_resolve_backend_dependency_contract`) is the primary
+    check, since it generalizes to any package the model declares, not
+    just the pairs this repository happens to have hardcoded. It runs
+    alongside, never instead of, `_missing_compatibility_cap_findings` —
+    a real, verified, narrower class of gap (an under-declared upper
+    bound in a package's own published metadata) that a metadata-only
+    resolver can never see (see `dependency_resolution`'s module
+    docstring). Only when the resolver itself is genuinely unavailable
+    does this fall back entirely to `_offline_dependency_compatibility_
+    findings`'s fuller table — never a silent pass on an unavailable
+    toolchain."""
     lowered = requirements.lower().replace("-", "_")
     findings: list[SemanticFinding] = []
-    flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
-    werkzeug_match = re.search(r"(?m)^werkzeug\s*==\s*(\d+)\.(\d+)", lowered)
-    werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
-    if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
-        findings.append(
-            SemanticFinding(
-                code="incompatible_dependency_range",
-                path="backend/requirements.txt",
-                detail=(
-                    "Flask releases before 2.2 require an explicit Werkzeug<3 "
-                    "compatibility bound"
-                ),
+    result = _resolve_backend_dependency_contract(requirements)
+    if result.outcome is _DependencyResolutionOutcome.NOT_CONFIGURED:
+        offline = _offline_dependency_compatibility_findings(lowered)
+    else:
+        if result.outcome is _DependencyResolutionOutcome.CONFLICT:
+            findings.append(
+                SemanticFinding(
+                    code="incompatible_dependency_range",
+                    path="backend/requirements.txt",
+                    detail=result.detail,
+                )
             )
-        )
-    if (
-        flask_match
-        and werkzeug_match
-        and tuple(map(int, flask_match.groups())) >= (2, 2)
-        and tuple(map(int, werkzeug_match.groups())) < (2, 2)
-    ):
-        findings.append(
-            SemanticFinding(
-                code="incompatible_dependency_range",
-                path="backend/requirements.txt",
-                detail="Flask 2.2 and newer require Werkzeug 2.2 or newer",
-            )
-        )
-    sqlalchemy_extension = re.search(
-        r"(?m)^flask_sqlalchemy\s*==\s*(\d+)\.(\d+)", lowered
+        offline = _missing_compatibility_cap_findings(lowered)
+    findings.extend(
+        SemanticFinding(code=code, path=path, detail=detail) for code, path, detail in offline
     )
-    sqlalchemy_cap = re.search(r"(?m)^sqlalchemy\s*[^\n]*<\s*2(?:\.0+)?(?:\s|$)", lowered)
-    if (
-        sqlalchemy_extension
-        and tuple(map(int, sqlalchemy_extension.groups())) < (3, 0)
-        and not sqlalchemy_cap
-    ):
-        findings.append(
-            SemanticFinding(
-                code="incompatible_dependency_range",
-                path="backend/requirements.txt",
-                detail=(
-                    "Flask-SQLAlchemy releases before 3 require an explicit "
-                    "SQLAlchemy<2 compatibility bound"
-                ),
-            )
-        )
     findings.extend(_target_runtime_findings(lowered))
     return findings
 
