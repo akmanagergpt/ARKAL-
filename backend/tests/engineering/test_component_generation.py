@@ -187,9 +187,10 @@ def test_a_stage_only_sees_its_declared_inputs_real_bytes(tmp_path: pathlib.Path
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    # frontend_ui declares only frontend_client as an input.
+    # frontend_ui declares frontend_client and backend_contract as inputs.
     ui_prompt = factory.models["frontend_ui"].prompts[0]  # type: ignore[attr-defined]
     assert "fetchWorks" in ui_prompt  # frontend_client's real export, visible
+    assert "title" in ui_prompt  # backend_contract's real declared field, visible
     assert "list_works" not in ui_prompt  # backend_implementation's content, not declared
 
 

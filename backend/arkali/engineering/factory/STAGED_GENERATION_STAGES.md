@@ -100,10 +100,16 @@ property per route, never an actual invocation — identically on two
 consecutive attempts).
 
 ### 7. frontend_ui
-Inputs: frontend_client
+Inputs: frontend_client, backend_contract
 Rule: the UI calls every function frontend_client exports and renders
-loading, empty and error states. Also declare frontend/src/index.js that
-imports the real component this stage just wrote and mounts it with
+loading, empty and error states. Render only field names backend_contract's
+own data-model JSON actually declares (its "fields" object) — never invent
+or guess one (golden-work-062, session evidence, frozen: a real model
+rendered task.name in a JSX list item when the real declared model has no
+"name" field, only "title" — every task rendered as a real, visibly empty
+list item in a real browser, confirmed with a real running backend
+returning real data). Also declare frontend/src/index.js that imports the
+real component this stage just wrote and mounts it with
 ReactDOM.render(<Component />, document.getElementById('root')) — no
 other stage can write this correctly. golden-work-059 (session evidence,
 frozen) found react-scripts build hard-codes src/index.js as its webpack
