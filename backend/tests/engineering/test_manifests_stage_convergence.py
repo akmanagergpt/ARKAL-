@@ -52,6 +52,39 @@ def test_manifests_self_heals_a_missing_werkzeug_cap_without_a_retry(
     assert "Werkzeug<3" in written.read_text(encoding="utf-8")
 
 
+def test_repair_applies_even_when_an_unrelated_finding_also_remains(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-060 (session evidence, frozen): manifests exhausted all
+    4 attempts reporting BOTH the Werkzeug-cap gap and a real, unrelated
+    missing frontend/src/index.js finding on every single attempt — real
+    evidence the repair's first version only accepted itself when EVERY
+    finding disappeared at once, so a real, unrelated second finding
+    silently discarded a working repair every time, and feedback kept
+    misreporting an already-fixed defect instead of the one real
+    remaining blocker. The repair must apply regardless of what else is
+    still wrong, and the next attempt's feedback must name only what is
+    genuinely still wrong."""
+    queues = _happy_path_queues()
+    broken = _output({
+        "backend/requirements.txt": "flask==2.1.3\nflask_cors==3.0.10",
+        # config/README.md deliberately omitted: a second, unrelated
+        # finding present alongside the repairable dependency-cap gap.
+    })
+    good = queues["manifests"][0]
+    queues["manifests"] = [(HonestState.PASS, broken), good]
+    factory = _factory(queues)
+    result = generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 9
+    prompts = factory.models["manifests"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 2
+    assert "incompatible_dependency_range" not in prompts[1]
+    assert "missing_startup_documentation" in prompts[1]
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:

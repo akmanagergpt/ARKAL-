@@ -388,18 +388,25 @@ def _generate_one_stage(
                 failure = f"stage response violates the contract: {error}"
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
+                # DETERMINISTIC REPAIR, not another blind model guess:
+                # golden-work-050/051 (frozen evidence) both exhausted their
+                # budget on the same fixable dependency-cap gap even once
+                # told the exact fix. golden-work-060 (frozen evidence) then
+                # exposed a real bug in this repair's own first version: it
+                # only accepted the repair when it made EVERY finding
+                # disappear, so a real, unrelated second finding (missing
+                # frontend/src/index.js) silently discarded a working
+                # repair every attempt, and prior_attempt_failure kept
+                # misreporting the already-fixed Werkzeug gap instead of
+                # the one real remaining blocker. Applied unconditionally,
+                # before findings are computed, so feedback always reflects
+                # only what is genuinely still wrong.
+                repaired = _apply_missing_compatibility_cap_repair(stage_files)
+                if repaired is not None:
+                    stage_files = repaired
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
                     return stage_files
-                # DETERMINISTIC REPAIR, not another blind model guess:
-                # golden-work-050/051 (frozen evidence) both exhausted
-                # their budget on the same fixable dependency-cap gap even
-                # once told the exact fix — apply it, re-validate.
-                repaired = _apply_missing_compatibility_cap_repair(stage_files)
-                if repaired is not None:
-                    merged = {**visible_files, **repaired}
-                    if not _stage_findings(declaration.name, merged):
-                        return repaired
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
         # ANTI-LOOP, generic across every stage: two consecutive attempts
         # rejected for the identical normalized reason (same code, path
