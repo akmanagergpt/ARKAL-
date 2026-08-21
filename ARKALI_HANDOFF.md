@@ -28,7 +28,7 @@
 | Mission | A local-first professional **Engineering Control Fabric**: converts natural-language goals into canonical requirements, orchestrates specialised engineering agents over multiple AI providers, executes work in isolated durable environments, and independently verifies results with executable evidence |
 | Repository root | `C:\Users\lenovo\Desktop\ARKALI` (path is environment-specific; the repository itself is portable) |
 | Branch | `main` |
-| Generated at commit | `f298bb23e6fb33ccf35314c99ea34f7ac791e75b` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
+| Generated at commit | `739fbb87d32e2b4e11527d6f0b0daa46919799d5` — the `head:` claim in the §12 block. A derived control refuses any other commit in this section, so this row cannot rot the way it did before F-0047 |
 | Canonical stack | Python 3.13 · FastAPI · Pydantic v2 · SQLAlchemy 2.x · Alembic · pytest — React · TypeScript · Vite · Tailwind — Tauri 2.x — SQLite+WAL local-first, PostgreSQL-ready abstractions |
 
 ## 2. Authoritative source index
@@ -487,7 +487,7 @@ repository, the repository wins.
 | 305 | `d1ebaf1` | Refresh §12 after D-027; no production behavior |
 | 306 | `97c0e38` | **PHASE 30 PACKAGE 1** — shipping goal intake composes canonical blueprint derivation, D-026 routing and C-19 durable submission through a narrow factory service and Command Center delegation route; unresolved/unconfigured paths fail closed |
 | 307 | `113fe35` | Refresh §12 after Phase 30 Package 1; no production behavior |
-| 308 | `f298bb2` | **PHASE 30 PACKAGE 2** — real loopback Ollama generation through `qwen2.5-coder:7b`; strict bounded multi-file validator and isolated candidate writer; first real candidate generated but build/test defects remain, so no acceptance claimed ← HEAD at generation |
+| 308 | `f298bb2` | **PHASE 30 PACKAGE 2** — real loopback Ollama generation through `qwen2.5-coder:7b`; strict bounded multi-file validator and isolated candidate writer; first real candidate generated but build/test defects remain, so no acceptance claimed |
 | 309 | `072d305` | Refresh §12 after Phase 30 Package 2 — found genuinely **incomplete** on arrival at this consolidated refresh: added this row but never updated the `head:`/marker fields, and the required second "advance the marker" commit never followed. Both are completed now, in this same refresh |
 | 310 | `6205294` | `feat(repair): derive generated product root causes` — `analyze_python_product_failure`: real AST import/export diff plus sqlite/schema-usage detection, later reused directly by `scripts/run_golden_repair.py` |
 | 311 | `3692551` | `phase30: run bounded golden repair` |
@@ -522,6 +522,7 @@ repository, the repository wins.
 | 340 | `c6c64fd` | **PHASE 30 — real syntax checking + CORS moved to the owning stage.** A live run's "passing" `backend/app.py` (stages 1–4 all genuinely passed for the first time — a real Flask+SQLite CRUD backend) had an actual `SyntaxError` no existing check had ever caught, since none of them called `ast.parse`. Added `_python_syntax_findings`, wired into every Python-emitting stage. Also found CORS was being discovered two stages too late, at `frontend_client`, which does not own `backend/app.py` and cannot fix it — moved the requirement to `backend_implementation`, which does |
 | 341 | `22a99dc` | **PHASE 30 — CORS split into its own stage (9 stages total).** Even stated explicitly in `backend_implementation`'s own rule, the same real model reliably produced routes+schema+entrypoint together but did not reliably add CORS in the same bounded attempt, twice in a row (real evidence, not assumed). Split into `backend_cors_boundary`, whose sole job is CORS middleware on the existing app instance; every downstream stage now points at it instead of `backend_implementation` directly, so no frontend stage can begin before CORS is independently, narrowly verified |
 | 342 | `5daba4a` | **PHASE 30 — root-caused and fixed a real `manifests`-stage timeout.** A fresh proof run reached 8/9 stages for real (genuine Flask+SQLite CRUD backend, CORS, tests, wired frontend) and failed only at the final stage on an HTTP-level timeout, 4/4 attempts — `manifests` declares all 8 prior stages as inputs, so its prompt carried every route/test/UI file this pipeline produced. Read `product_preflight._manifest_findings`'s own source to confirm it only ever reads `backend/requirements.txt`, `frontend/package.json`, and whether `frontend/public/index.html` exists. Added `manifest_context.py`: for `manifests` only, replaces the other 8 stages' full bytes with those exact real paths (when present) plus two mechanically-extracted, never-invented signals — real third-party Python imports, real npm imports. Split into its own module rather than requesting a `GATE 8` exception once this pushed `component_generation.py` to 452 logical lines against its 400 ceiling |
+| 343 | `739fbb8` | Refresh §12 after the Phase 30 staged-generation checkpoint (rows 309–342); no production behavior ← HEAD at generation |
 
 Rejected candidates are preserved unamended. They are evidence, not noise.
 
@@ -813,7 +814,7 @@ no governed value that the repository does not already hold.
 # against truth derived from Git and the accepted governance artifacts.
 # These are CLAIMS, not authority: on disagreement the repository wins.
 schema_version: ARKALI-HANDOFF-V1
-head: f298bb23e6fb33ccf35314c99ea34f7ac791e75b
+head: 739fbb87d32e2b4e11527d6f0b0daa46919799d5
 branch: main
 working_tree_clean: true
 
