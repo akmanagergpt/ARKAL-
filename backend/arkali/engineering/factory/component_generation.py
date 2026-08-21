@@ -46,6 +46,7 @@ from arkali.control.specification.blueprint_contracts import RequirementBlueprin
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+from arkali.engineering.factory.manifest_context import _manifest_context
 from arkali.engineering.factory.model_product_generation import (
     GeneratedFile,
     ModelProductResult,
@@ -455,6 +456,10 @@ def generate_staged_model_product(
         for input_name in declaration.inputs:
             for path in written_by_stage[input_name]:
                 visible[path] = all_files[path]
+        if declaration.name == "manifests":
+            # Only this stage's context is reduced; every other stage still
+            # sees the real, full bytes of exactly its declared inputs.
+            visible = _manifest_context(visible)
         model, model_id = model_factory(declaration.name)
         stage_files = _generate_one_stage(
             declaration, blueprint, model, model_id, visible,

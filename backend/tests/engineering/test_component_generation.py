@@ -189,6 +189,26 @@ def test_a_stage_only_sees_its_declared_inputs_real_bytes(tmp_path: pathlib.Path
     assert "list_works" not in ui_prompt  # backend_implementation's content, not declared
 
 
+def test_manifests_stage_prompt_is_reduced_not_the_whole_candidate(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-046 (session evidence): sending every prior stage's full
+    bytes to manifests caused a real HTTP-level timeout, 4/4 attempts."""
+    factory = _factory(_happy_path_queues())
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    manifests_prompt = factory.models["manifests"].prompts[0]  # type: ignore[attr-defined]
+    # None of the other 8 stages' real route/UI/test source bytes appear.
+    assert "list_works" not in manifests_prompt
+    assert "fetchWorks" not in manifests_prompt
+    assert "test_placeholder" not in manifests_prompt
+    # The mechanically-extracted signal (backend/requirements.txt's real
+    # declared dependency) is still there, since manifests genuinely needs it.
+    assert "flask" in manifests_prompt
+
+
 def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
     tmp_path: pathlib.Path,
 ) -> None:

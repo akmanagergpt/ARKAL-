@@ -83,4 +83,14 @@ and consistent with frontend_client and frontend_ui.
 Inputs: backend_contract, backend_schema, backend_implementation, backend_cors_boundary, backend_tests, frontend_client, frontend_ui, frontend_tests_config
 Rule: declared backend and frontend dependencies are compatible with each
 other and with the target runtime, and the startup path is complete end to
-end.
+end. This stage does not see the other stages' full source — sending all
+eight stages' complete bytes here caused a real HTTP-level timeout, 4/4
+attempts (golden-work-046). It receives instead: the real bytes of any
+backend/requirements.txt, backend/pyproject.toml or frontend/package.json
+already written, whether frontend/public/index.html already exists, and
+two mechanically-extracted (not full-file) lists — every real third-party
+package backend/*.py actually imports, and every real npm package
+frontend/src/* actually imports. Declare backend/requirements.txt (or
+pyproject.toml) covering every extracted backend import, and reconcile
+frontend/package.json against the extracted frontend imports; do not
+invent a dependency absent from either extracted list.
