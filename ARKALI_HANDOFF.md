@@ -711,8 +711,25 @@ gap class now applies the already-verified fix directly and re-validates
 before accepting it, rather than a third blind retry. `golden-work-051`
 is frozen as evidence, not retried; it never reached real execution.
 
-The next real step is an eighth staged proof run, on a fresh candidate id
-(`golden-work-052`), against the now-current pipeline. If it reaches a full
+`golden-work-052` (session evidence, frozen, not yet a ledger row — no
+production code changed investigating it) reached STAGED_GENERATION_PASS;
+its `backend/requirements.txt` confirms the row-348 deterministic repair
+firing for real on a live run (model again declared `flask==2.1.3`, no
+Werkzeug line; `Werkzeug<3` appended automatically, one model call, no
+retry). A real isolated venv then installed cleanly for the first time
+ever. Running the real generated tests — the second of the sixteen
+real-execution obligations, reached for the first time — found 2 of 4
+genuinely ERROR: `backend/app.py`'s `create_task` returns the client-
+submitted body verbatim (`jsonify(data), 201`), never the row id SQLite
+actually assigned, while the test asserts the response includes `'id'`.
+A real cross-file (test vs. implementation) consistency gap no stage
+validator currently checks — first occurrence, not yet a repeated
+pattern the way the dependency-pin gap was, so not speculatively patched;
+flagged for separate investigation instead. `golden-work-052` is frozen
+as evidence, not hand-corrected, not retried.
+
+The next real step is a ninth staged proof run, on a fresh candidate id
+(`golden-work-053`), against the unchanged pipeline. If it reaches a full
 `inspect_product_files` PASS on the assembled candidate, the obligation is
 still only real-execution proof for **that one candidate** — isolated
 dependency install, generated tests, backend runtime, SQLite/schema
