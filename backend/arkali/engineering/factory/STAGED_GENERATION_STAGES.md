@@ -43,8 +43,14 @@ JSON must include that row's own database-generated id (e.g.
 cursor.lastrowid) in the response, not only the submitted request body
 (golden-work-052/053, session evidence, frozen: a real model's own
 generated test asserted the response includes an id its own create route
-never returned). Cross-origin access is not this stage's concern — that
-is backend_cors_boundary's job, immediately after this one.
+never returned). A route that fetches a single row with cursor.fetchone()
+must convert it to a keyed object (e.g. conn.row_factory = sqlite3.Row
+plus dict(row), or an explicit column-name mapping) before passing it to
+jsonify — a bare tuple serializes as a JSON array, not an object with
+named fields (golden-work-056, session evidence, frozen: a real model's
+own generated test asserted a named field on exactly this shape and got
+a real TypeError). Cross-origin access is not this stage's concern —
+that is backend_cors_boundary's job, immediately after this one.
 
 ### 4. backend_cors_boundary
 Inputs: backend_implementation

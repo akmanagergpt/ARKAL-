@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from arkali.engineering.factory.create_route_preflight import _missing_generated_id_findings
+from arkali.engineering.factory.route_response_preflight import (
+    _missing_generated_id_findings,
+    _raw_row_jsonify_findings,
+)
 
 
 def test_flags_a_create_route_that_never_references_lastrowid() -> None:
@@ -71,3 +74,66 @@ def test_real_golden_work_053_evidence_is_flagged() -> None:
     )
     findings = _missing_generated_id_findings({"backend/app.py": source})
     assert [f.code for f in findings] == ["missing_generated_id_in_create_response"]
+
+
+def test_flags_a_raw_fetchone_tuple_passed_straight_to_jsonify() -> None:
+    """golden-work-056 (session evidence, frozen): a real qwen2.5-coder:14b
+    get_task handler called cursor.fetchone() and passed that exact tuple
+    straight to jsonify() — a real Flask+sqlite3 footgun (a bare tuple
+    serializes as a JSON array, not a keyed object) — while its own
+    generated test asserted response['id'] and got a real TypeError."""
+    source = (
+        "def get_task(id):\n"
+        "    cursor = conn.cursor()\n"
+        "    cursor.execute('SELECT * FROM tasks WHERE id = ?', (id,))\n"
+        "    task = cursor.fetchone()\n"
+        "    return jsonify(task)\n"
+    )
+    findings = _raw_row_jsonify_findings({"backend/app.py": source})
+    assert len(findings) == 1
+    assert findings[0].code == "raw_sqlite_row_passed_to_jsonify"
+    assert "get_task" in findings[0].detail
+
+
+def test_raw_row_check_is_silent_when_row_factory_is_used() -> None:
+    source = (
+        "def get_task(id):\n"
+        "    conn.row_factory = sqlite3.Row\n"
+        "    cursor = conn.cursor()\n"
+        "    task = cursor.fetchone()\n"
+        "    return jsonify(dict(task))\n"
+    )
+    assert _raw_row_jsonify_findings({"backend/app.py": source}) == []
+
+
+def test_raw_row_check_is_silent_when_manually_converted_to_a_dict() -> None:
+    source = (
+        "def get_task(id):\n"
+        "    cursor = conn.cursor()\n"
+        "    task = cursor.fetchone()\n"
+        "    return jsonify({'id': task[0], 'title': task[1]})\n"
+    )
+    assert _raw_row_jsonify_findings({"backend/app.py": source}) == []
+
+
+def test_raw_row_check_is_silent_when_fetchone_result_is_unused() -> None:
+    source = "def get_tasks():\n    cursor.execute('SELECT * FROM tasks')\n    return jsonify(cursor.fetchall())\n"
+    assert _raw_row_jsonify_findings({"backend/app.py": source}) == []
+
+
+def test_raw_row_check_catches_the_real_golden_work_056_evidence() -> None:
+    """Real, frozen evidence — not a hand-constructed stand-in."""
+    source = (
+        "@app.route('/tasks/<int:id>', methods=['GET'])\n"
+        "def get_task(id):\n"
+        "    conn = sqlite3.connect(DB_NAME)\n"
+        "    cursor = conn.cursor()\n"
+        "    cursor.execute('SELECT * FROM tasks WHERE id = ?', (id,))\n"
+        "    task = cursor.fetchone()\n"
+        "    conn.close()\n"
+        "    if task is None:\n"
+        "        return jsonify({'error': 'Task not found'}), 404\n"
+        "    return jsonify(task)\n"
+    )
+    findings = _raw_row_jsonify_findings({"backend/app.py": source})
+    assert [f.code for f in findings] == ["raw_sqlite_row_passed_to_jsonify"]

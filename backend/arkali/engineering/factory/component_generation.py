@@ -44,7 +44,7 @@ from collections.abc import Callable, Mapping
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
-from arkali.engineering.factory.create_route_preflight import _missing_generated_id_findings
+from arkali.engineering.factory.route_response_preflight import _missing_generated_id_findings, _raw_row_jsonify_findings
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
@@ -285,7 +285,7 @@ def _backend_implementation_stage_findings(files: Mapping[str, str]) -> list[Sem
     syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
     if syntax_findings:
         return syntax_findings
-    return _persistence_findings(files) + _schema_context_findings(_backend_text(files)) + _missing_generated_id_findings(files)
+    return _persistence_findings(files) + _schema_context_findings(_backend_text(files)) + _missing_generated_id_findings(files) + _raw_row_jsonify_findings(files)
 
 
 def _cors_boundary_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
