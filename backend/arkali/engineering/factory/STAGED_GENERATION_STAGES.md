@@ -59,10 +59,16 @@ narrow validation passes.
 
 ### 5. backend_tests
 Inputs: backend_cors_boundary, backend_schema
-Rule: tests import only symbols backend_cors_boundary's application
-actually exports, declare every fixture they consume, enter the real
-application lifecycle context required by startup hooks, and contain at
-least one real assertion.
+Rule: at least one test file exists under the top-level tests/ path (not
+backend/tests/ — the whole-product gate's required_roots checks the
+top-level path segment, and golden-work-048 (session evidence, frozen)
+reached that gate for the first time ever and failed it on exactly this:
+a real qwen2.5-coder:14b placed its tests under backend/tests/test_app.py,
+a reasonable Flask convention this rule never ruled out). Tests import
+only symbols backend_cors_boundary's application actually exports,
+declare every fixture they consume, enter the real application lifecycle
+context required by startup hooks, and contain at least one real
+assertion.
 
 ### 6. frontend_client
 Inputs: backend_cors_boundary
@@ -93,4 +99,9 @@ package backend/*.py actually imports, and every real npm package
 frontend/src/* actually imports. Declare backend/requirements.txt (or
 pyproject.toml) covering every extracted backend import, and reconcile
 frontend/package.json against the extracted frontend imports; do not
-invent a dependency absent from either extracted list.
+invent a dependency absent from either extracted list. Also declare
+config/README.md with the exact real steps to install and start the
+backend and frontend this pipeline actually produced — no other stage
+owns this file, and golden-work-048 (session evidence, frozen) reached
+the final whole-product gate for the first time ever and failed it on,
+among other things, no config/README.md ever having been written.

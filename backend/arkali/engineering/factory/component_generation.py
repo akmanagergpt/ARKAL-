@@ -58,6 +58,7 @@ from arkali.engineering.factory.model_product_generation import (
 from arkali.engineering.factory.product_preflight import (
     SemanticFinding,
     _manifest_findings,
+    _manifests_stage_findings,
     _persistence_findings,
     _schema_context_findings,
 )
@@ -308,11 +309,25 @@ def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFind
     syntax_findings = _python_syntax_findings(files, path_prefix="tests/")
     if syntax_findings:
         return syntax_findings
+    test_paths = [
+        path for path in files if path.startswith("tests/") and path.endswith(".py")
+    ]
+    if not test_paths:
+        # ANTI-VACUITY. golden-work-048 (session evidence, frozen): a real
+        # qwen2.5-coder:14b placed its tests under backend/tests/test_app.py
+        # instead — a reasonable convention this stage's rule never ruled
+        # out — and this check, only ever iterating paths that already
+        # start with tests/, silently found nothing to reject. The
+        # whole-product gate's required_roots checks the top-level path
+        # segment; failing here, at the stage that owns it, is cheaper and
+        # more specific than only discovering it at the final gate.
+        return [SemanticFinding(
+            code="backend_tests_missing_top_level_path", path="tests/",
+            detail="no test file exists under the top-level tests/ path",
+        )]
     findings: list[SemanticFinding] = []
-    for path, source in files.items():
-        if not (path.startswith("tests/") and path.endswith(".py")):
-            continue
-        tree = ast.parse(source)
+    for path in test_paths:
+        tree = ast.parse(files[path])
         findings.extend(fixture_findings(path, tree))
         findings.extend(lifecycle_findings(files))
     return findings
@@ -330,7 +345,7 @@ _STAGE_VALIDATORS: dict[str, Callable[[Mapping[str, str]], list[SemanticFinding]
     "frontend_client": frontend_contract_findings,
     "frontend_ui": _frontend_ui_findings,
     "frontend_tests_config": _manifest_findings,
-    "manifests": _manifest_findings,
+    "manifests": _manifests_stage_findings,
 }
 
 

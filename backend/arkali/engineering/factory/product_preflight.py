@@ -298,6 +298,22 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
+def _manifests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """`manifests`'s own rule: `_manifest_findings` plus `config/README.md`
+    — the one thing only `manifests`, never `frontend_tests_config` (which
+    runs first and reuses `_manifest_findings` unchanged), is responsible
+    for. golden-work-048 (session evidence, frozen): no stage's validator
+    had ever required it, so the whole-product gate's required_roots check
+    caught the absence first, instead of the stage that owns it."""
+    findings = list(_manifest_findings(files))
+    if not files.get("config/README.md", "").strip():
+        findings.append(SemanticFinding(
+            code="missing_startup_documentation", path="config/README.md",
+            detail="no stage ever wrote config/README.md with real startup steps",
+        ))
+    return findings
+
+
 def _schema_context_findings(backend_text: str) -> list[SemanticFinding]:
     if "flask_sqlalchemy" not in backend_text or "create_all(" not in backend_text:
         return []

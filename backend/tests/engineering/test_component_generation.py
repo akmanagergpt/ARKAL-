@@ -11,8 +11,10 @@ from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
     _backend_contract_findings,
     _backend_implementation_stage_findings,
+    _backend_tests_stage_findings,
     _cors_boundary_stage_findings,
     _frontend_ui_findings,
+    _manifests_stage_findings,
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError
@@ -351,6 +353,40 @@ def test_backend_contract_findings_flags_missing_routes_and_models() -> None:
 
 def test_backend_contract_findings_passes_on_real_route_and_model() -> None:
     findings = _backend_contract_findings(HAPPY_PATH_FILES["backend_contract"])
+    assert findings == []
+
+
+def test_backend_tests_findings_rejects_tests_nested_under_backend() -> None:
+    """golden-work-048 (session evidence, frozen): a real qwen2.5-coder:14b
+    placed its tests under backend/tests/test_app.py, and the check — only
+    ever iterating paths that already started with tests/ — silently
+    accepted it, so staged generation reached the final whole-product
+    gate's required_roots check for the first time ever and failed there
+    instead of at the stage that owns the defect."""
+    findings = _backend_tests_stage_findings({
+        "backend/tests/test_app.py": "def test_x():\n    assert True\n",
+    })
+    assert [f.code for f in findings] == ["backend_tests_missing_top_level_path"]
+
+
+def test_backend_tests_findings_passes_on_a_real_top_level_test() -> None:
+    findings = _backend_tests_stage_findings(HAPPY_PATH_FILES["backend_tests"])
+    assert findings == []
+
+
+def test_manifests_findings_requires_config_readme() -> None:
+    """golden-work-048 (session evidence, frozen): no stage's own validator
+    had ever required config/README.md, so staged generation reached the
+    final whole-product gate's required_roots check for the first time
+    ever and failed there instead of at the stage that owns it."""
+    files = {**HAPPY_PATH_FILES["manifests"]}
+    del files["config/README.md"]
+    findings = _manifests_stage_findings(files)
+    assert [f.code for f in findings] == ["missing_startup_documentation"]
+
+
+def test_manifests_findings_passes_with_a_real_readme() -> None:
+    findings = _manifests_stage_findings(HAPPY_PATH_FILES["manifests"])
     assert findings == []
 
 
