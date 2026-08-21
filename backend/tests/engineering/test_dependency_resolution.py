@@ -141,6 +141,17 @@ def test_missing_compatibility_cap_fires_for_unpinned_werkzeug_on_old_flask() ->
     assert any(code == "incompatible_dependency_range" for code, _, _ in findings)
 
 
+def test_missing_compatibility_cap_feedback_is_actionable() -> None:
+    """golden-work-050 (session evidence, frozen): a real qwen2.5-coder:14b
+    declared flask==2.1.3 with no Werkzeug line at all, was fed the prior
+    abstract wording ('require an explicit... compatibility bound') as
+    feedback on every retry, and never added one across all 4 attempts.
+    The finding must name the exact concrete fix, not just describe the
+    requirement."""
+    _, _, detail = _missing_compatibility_cap_findings("flask==2.1.3\n")[0]
+    assert "Werkzeug<3" in detail
+
+
 def test_missing_compatibility_cap_is_silent_when_a_cap_is_declared() -> None:
     findings = _missing_compatibility_cap_findings("flask==2.0.1\nwerkzeug<3\n")
     assert findings == []

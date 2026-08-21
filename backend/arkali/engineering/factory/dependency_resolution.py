@@ -206,9 +206,17 @@ def _missing_compatibility_cap_findings(lowered: str) -> list[_OfflineFinding]:
     flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
     werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
     if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
+        # ACTIONABLE, not just diagnostic. golden-work-050 (session
+        # evidence, frozen): the model declared flask==2.1.3 with no
+        # Werkzeug line at all, was told the abstract requirement
+        # ("require an explicit... compatibility bound") on every retry,
+        # and still never added one across all 4 attempts — real evidence
+        # the abstract phrasing alone is not actionable enough. Now names
+        # the exact concrete fix.
         findings.append((
             "incompatible_dependency_range", "backend/requirements.txt",
-            "Flask releases before 2.2 require an explicit Werkzeug<3 compatibility bound",
+            "add a line 'Werkzeug<3' to backend/requirements.txt, or change the "
+            "flask line to 'flask>=2.2'",
         ))
     sqlalchemy_extension = re.search(r"(?m)^flask_sqlalchemy\s*==\s*(\d+)\.(\d+)", lowered)
     sqlalchemy_cap = re.search(r"(?m)^sqlalchemy\s*[^\n]*<\s*2(?:\.0+)?(?:\s|$)", lowered)
@@ -219,8 +227,8 @@ def _missing_compatibility_cap_findings(lowered: str) -> list[_OfflineFinding]:
     ):
         findings.append((
             "incompatible_dependency_range", "backend/requirements.txt",
-            "Flask-SQLAlchemy releases before 3 require an explicit SQLAlchemy<2 "
-            "compatibility bound",
+            "add a line 'SQLAlchemy<2' to backend/requirements.txt, or change the "
+            "flask_sqlalchemy line to 'flask_sqlalchemy>=3'",
         ))
     return findings
 
