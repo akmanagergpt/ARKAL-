@@ -5,10 +5,14 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from arkali.engineering.factory.javascript_syntax_preflight import _javascript_syntax_findings
 from arkali.engineering.factory.product_preflight import SemanticFinding
 
 
 def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    syntax_findings = _javascript_syntax_findings(files, path_prefix="frontend/src/")
+    if syntax_findings:
+        return syntax_findings
     backend = "\n".join(
         source.lower()
         for path, source in files.items()
