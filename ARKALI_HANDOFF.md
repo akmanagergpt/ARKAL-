@@ -804,22 +804,59 @@ mismatch (`task.name` rendered against a model with only `title`). Now
 fixed by giving `frontend_ui` real visibility into the backend's
 declared fields. `golden-work-062` is frozen as evidence, not retried.
 
-The next real step is a nineteenth staged proof run, on a fresh candidate id
-(`golden-work-063`), against the unchanged pipeline. If it reaches a full
-`inspect_product_files` PASS on the assembled candidate, the obligation is
-still only real-execution proof for **that one candidate** — isolated
-dependency install, generated tests, backend runtime, SQLite/schema
-bootstrap, CRUD, restart/persistence, frontend build/runtime, and a real
-browser/user journey — never simulated, never hand-completed. Reaching that
-is still not Phase 30 acceptance: the five named Golden Product families
-(`ARK-REQ-0072`, MS §116-121 — Task/Work Management; Student/Fee Management;
-Property/Facility/Document Workflow; Inventory/Stock/Transactions;
-AI-Native Self-Evolving Product — plus an unseen-domain generalization
-test), an actually-accepted Golden Product, a successful Golden Repair
-against that accepted parent, and a genuinely-unrepairable accepted-parent
-case terminating ESCALATED all remain separately open. Do not create a
-second repair, candidate, acceptance or release authority; simulation/unit
-mocks cannot provide Level-4 evidence.
+**`golden-work-063` (session evidence, frozen — generation-side evidence
+via the real `_freeze()` blob the script itself records; the
+real-execution verification below is this session's own direct evidence,
+not yet passed through any separate ARKALI-owned freezing mechanism,
+since none currently exists for that half) reached full real-execution
+PASS on every one of the sixteen obligations, for the first time ever:**
+reached STAGED_GENERATION_PASS with `frontend/src/TaskList.js` rendering
+`{task.title}` — row 358's field-visibility fix confirmed working. A real
+isolated venv installed the backend cleanly; all 4 real generated backend
+tests passed. `npm install` succeeded; a real production build succeeded
+(`NODE_OPTIONS=--openssl-legacy-provider`, the same host-toolchain
+workaround as row 358, not a candidate defect). The real build was served
+and driven in a real browser against a real running backend: real list
+items rendered with the **real, correct data** (`"Updated Test Task"`,
+`"Test Task"` ×2, `"Updated via curl"`), zero console errors, zero failed
+network requests. On this exact candidate's own backend (not inherited
+from any other candidate's evidence): a real CRUD cycle over real `curl`
+(POST/GET/PUT), a real process kill and restart, and the created/updated
+row still present afterward — real persistence, verified. No UI controls
+exist to test as dead, since the real goal text's own requirement is only
+"the frontend must display a task list within 1 screen" — a read-only
+list satisfies it; this is not a gap.
+
+This is exactly the package's own stated real milestone (§9 SUCCESS
+CONDITION, as originally framed): one fresh staged Golden Product, real
+local model generated, multi-file, 9/9 stages, full preflight PASS,
+install PASS, tests PASS, backend RUN, SQLite persistence PASS, frontend
+build/run PASS, browser journey PASS — **all now genuinely true for
+`golden-work-063`, mechanically verified, not asserted.**
+
+**This is not yet Phase 30 acceptance**, and no acceptance is claimed or
+self-granted here. What remains, unchanged from before this session
+began: `golden-work-063` itself has not been formally frozen through any
+ARKALI-owned real-execution evidence mechanism (this session's
+verification was direct, manual tool use — real, but not yet captured by
+a repository-owned freezing/acceptance authority); the five named Golden
+Product families (`ARK-REQ-0072`, MS §116-121 — Task/Work Management;
+Student/Fee Management; Property/Facility/Document Workflow;
+Inventory/Stock/Transactions; AI-Native Self-Evolving Product — plus an
+unseen-domain generalization test) each need their own such candidate;
+an actual acceptance decision against the real 23-requirement Phase 30
+denominator; a successful Golden Repair against an accepted parent; and a
+genuinely-unrepairable accepted-parent case terminating ESCALATED. Do not
+create a second repair, candidate, acceptance or release authority;
+simulation/unit mocks cannot provide Level-4 evidence. **The next real
+step is deciding, with the human acceptance authority, how `golden-work-063`'s
+real-execution evidence should be formally captured/accepted before
+continuing to the next Golden Product family** — a genuine
+CANONICAL_AMBIGUITY: no existing script or mechanism currently owns
+"freeze real-execution (not just generation) evidence for a staged
+candidate," and inventing one without a ruling would risk exactly the
+kind of unowned, ad hoc authority this repository's own governance
+culture refuses to allow.
 
 ## 10. New-session bootstrap protocol
 
