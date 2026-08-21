@@ -10,6 +10,7 @@ from arkali.control.specification.blueprint_engine import derive_blueprint
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
     _backend_contract_findings,
+    _backend_implementation_stage_findings,
     _frontend_ui_findings,
     generate_staged_model_product,
 )
@@ -94,7 +95,8 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     },
     "backend_implementation": {
         "backend/main.py": (
-            "app = object()\n@app.get('/works')\ndef list_works():\n    return []\n"
+            "from flask_cors import CORS\n"
+            "app = object()\nCORS(app)\n@app.get('/works')\ndef list_works():\n    return []\n"
             "class WorkRecord(object):\n    pass\n"
         ),
     },
@@ -274,3 +276,38 @@ def test_frontend_ui_findings_passes_on_real_wiring() -> None:
         **HAPPY_PATH_FILES["frontend_ui"],
     }
     assert _frontend_ui_findings(files) == []
+
+
+def test_backend_implementation_findings_catches_real_python_syntax_errors() -> None:
+    """golden-work-045's real output (session evidence): an unterminated
+    multi-line string inside a single-quoted CREATE TABLE call — passed
+    every substring check that existed before this test."""
+    broken = {
+        "backend/app.py": (
+            "app = object()\n"
+            "@app.get('/works')\n"
+            "def list_works():\n"
+            "    x = ('CREATE TABLE works (\n"
+            "      id INTEGER\n"
+            "    )')\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(broken)
+    assert [f.code for f in findings] == ["python_syntax"]
+
+
+def test_backend_implementation_findings_requires_cors() -> None:
+    files = dict(HAPPY_PATH_FILES["backend_schema"])
+    files.update({
+        "backend/main.py": (
+            "app = object()\n@app.get('/works')\ndef list_works():\n    return []\n"
+            "class WorkRecord(object):\n    pass\n"
+        ),
+    })
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "missing_browser_origin_boundary" for f in findings)
+
+
+def test_backend_implementation_findings_passes_with_flask_cors() -> None:
+    files = {**HAPPY_PATH_FILES["backend_schema"], **HAPPY_PATH_FILES["backend_implementation"]}
+    assert _backend_implementation_stage_findings(files) == []

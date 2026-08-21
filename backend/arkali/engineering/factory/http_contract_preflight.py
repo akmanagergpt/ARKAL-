@@ -19,15 +19,7 @@ def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding
         for path, source in files.items()
         if path.startswith("frontend/src/")
     )
-    findings: list[SemanticFinding] = []
-    if "http://localhost:" in frontend and "corsmiddleware" not in backend:
-        findings.append(
-            SemanticFinding(
-                code="missing_browser_origin_boundary",
-                path="backend/",
-                detail="frontend uses a separate localhost origin but backend has no CORS policy",
-            )
-        )
+    findings: list[SemanticFinding] = [*_cors_findings(backend, frontend)]
     for method in ("post", "put", "delete"):
         if not _exposes(backend, method):
             continue
@@ -42,6 +34,27 @@ def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding
                 )
             )
     return findings
+
+
+#: FastAPI/Starlette (`CORSMiddleware`) and Flask (`flask_cors`/`CORS(app)`) -
+#: real evidence this session (golden-work-045) showed a genuine Flask CORS
+#: gap; the marker set covers Flask's own idiom too, not just FastAPI's, so a
+#: correctly-CORS'd Flask backend is not flagged as if it were the same defect.
+_CORS_MARKERS = ("corsmiddleware", "flask_cors", "cors(app")
+
+
+def _cors_findings(backend: str, frontend: str) -> list[SemanticFinding]:
+    if "http://localhost:" not in frontend:
+        return []
+    if any(marker in backend for marker in _CORS_MARKERS):
+        return []
+    return [
+        SemanticFinding(
+            code="missing_browser_origin_boundary",
+            path="backend/",
+            detail="frontend uses a separate localhost origin but backend has no CORS policy",
+        )
+    ]
 
 
 def _exposes(backend: str, method: str) -> bool:

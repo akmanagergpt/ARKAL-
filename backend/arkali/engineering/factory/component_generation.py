@@ -197,6 +197,31 @@ def _backend_text(files: Mapping[str, str]) -> str:
     )
 
 
+def _python_syntax_findings(files: Mapping[str, str], *, path_prefix: str) -> list[SemanticFinding]:
+    """Real `ast.parse` on every `.py` file under `path_prefix`.
+
+    golden-work-045's real backend_implementation output (session evidence)
+    passed every substring/regex check here while containing an actual
+    `SyntaxError` (an unterminated multi-line string) — none of the checks
+    below ever parse the code they inspect. This is the gap that closes;
+    same finding code (`python_syntax`) `product_preflight.python_modules`
+    already uses for the same defect at the final whole-product gate, so a
+    caller sees one vocabulary either way.
+    """
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith(path_prefix) and path.endswith(".py")):
+            continue
+        try:
+            ast.parse(source)
+        except SyntaxError as error:
+            findings.append(SemanticFinding(
+                code="python_syntax", path=path,
+                detail=f"line {error.lineno}: {error.msg}",
+            ))
+    return findings
+
+
 def _schema_only_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """Schema/persistence only — no route or entrypoint requirement.
 
@@ -212,6 +237,9 @@ def _schema_only_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     docstring) and every net-new promotion was reverted for exactly that
     reason.
     """
+    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
+    if syntax_findings:
+        return syntax_findings
     backend_text = _backend_text(files)
     findings: list[SemanticFinding] = []
     uses_sqlite = "sqlite3" in backend_text or "sqlite://" in backend_text
@@ -230,12 +258,40 @@ def _schema_only_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
+#: Same marker set `http_contract_preflight.frontend_contract_findings` checks
+#: for (FastAPI/Starlette's CORSMiddleware, Flask's flask_cors/CORS(app)).
+#: Duplicated here (3 short strings) rather than imported, since that
+#: function's own marker tuple is a local, unexported detail — promoting it
+#: to module level there would cost another public-surface symbol this
+#: context has no room for.
+_CORS_MARKERS = ("corsmiddleware", "flask_cors", "cors(app")
+
+
 def _backend_implementation_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Full persistence+routes+entrypoint — routes are expected by now."""
-    return _persistence_findings(files) + _schema_context_findings(_backend_text(files))
+    """Full persistence+routes+entrypoint+CORS — routes and cross-origin
+    access are expected by now. CORS is checked unconditionally here (not
+    "only if a frontend already exists") because backend_implementation
+    owns backend/app.py and no later stage does — golden-work-045 (session
+    evidence) discovered this gap only at frontend_client, two stages after
+    the one file that could still fix it.
+    """
+    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
+    if syntax_findings:
+        return syntax_findings
+    findings = _persistence_findings(files) + _schema_context_findings(_backend_text(files))
+    backend_text = _backend_text(files)
+    if not any(marker in backend_text for marker in _CORS_MARKERS):
+        findings.append(SemanticFinding(
+            code="missing_browser_origin_boundary", path="backend/",
+            detail="backend declares no CORS middleware for its separate-origin frontend",
+        ))
+    return findings
 
 
 def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    syntax_findings = _python_syntax_findings(files, path_prefix="tests/")
+    if syntax_findings:
+        return syntax_findings
     findings: list[SemanticFinding] = []
     for path, source in files.items():
         if not (path.startswith("tests/") and path.endswith(".py")):

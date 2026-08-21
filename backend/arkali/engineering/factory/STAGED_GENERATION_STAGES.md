@@ -38,7 +38,12 @@ Inputs: backend_contract, backend_schema
 Rule: a real application instance exists; every route declared in
 backend_contract's route JSON has a real executable body that uses the
 schema from backend_schema; every import resolves; the backend exposes an
-executable server entrypoint.
+executable server entrypoint; the backend declares real CORS middleware
+(e.g. flask_cors's CORS(app), or FastAPI/Starlette's CORSMiddleware) since
+the frontend is always served from a separate origin during development —
+this stage owns backend/app.py, frontend_client (stage 5) does not, so
+CORS must land here, not be discovered two stages later with no file left
+that can still fix it (real gap found this session, golden-work-045).
 
 ### 4. backend_tests
 Inputs: backend_implementation, backend_schema
