@@ -262,6 +262,33 @@ def test_budget_exhaustion_retains_the_last_raw_model_output(
     assert excinfo.value.last_raw_output == always_bad  # type: ignore[attr-defined]
 
 
+def test_manifests_self_heals_a_missing_werkzeug_cap_without_a_retry(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-050/051 (session evidence, frozen): the same real model
+    declared flask==2.1.3 with no Werkzeug line across 8 combined attempts
+    over two separate runs and never fixed it, even once told the exact
+    line to add. The deterministic repair must accept this on the FIRST
+    attempt — one model call, not a second retry hoping for luck — since
+    the fix is unambiguous and does not need the model's judgment."""
+    queues = _happy_path_queues()
+    broken = _output({
+        "backend/requirements.txt": "flask==2.1.3\nflask_cors==3.0.10",
+        "config/README.md": "run instructions\n",
+    })
+    queues["manifests"] = [(HonestState.PASS, broken)]
+    factory = _factory(queues)
+    result = generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 9
+    prompts = factory.models["manifests"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 1
+    written = (tmp_path / "candidates" / "staged-1" / "backend" / "requirements.txt")
+    assert "Werkzeug<3" in written.read_text(encoding="utf-8")
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:

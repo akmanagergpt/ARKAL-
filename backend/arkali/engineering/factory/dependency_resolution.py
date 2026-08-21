@@ -48,6 +48,7 @@ import functools
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 
 _PIP_TIMEOUT_SECONDS = 45.0
 _CONFLICT_MARKER = "ResolutionImpossible"
@@ -194,27 +195,17 @@ def _resolve_backend_dependency_contract(
     return _resolve_specifiers(tuple(sorted(specifiers)))
 
 
-def _missing_compatibility_cap_findings(lowered: str) -> list[_OfflineFinding]:
-    """Real, verified ecosystem gaps a metadata-only resolver structurally
-    cannot see (see module docstring): a package's own published metadata
-    under-declares its true compatible upper bound. Always runs alongside
-    the real resolver, independent of its availability or verdict.
-    `lowered` is `requirements.txt`'s text, already lowercased with `-`
-    normalized to `_`, matching `product_preflight._declared_dependencies`'s
-    own convention."""
-    findings: list[_OfflineFinding] = []
+#: (exact patch line to append, actionable finding detail) — one entry
+#: per verified ecosystem gap. Shared by the finding function and the
+#: deterministic repair below so both stay in sync with the same real,
+#: verified detection logic rather than two independent copies.
+def _needed_compatibility_cap_patches(lowered: str) -> list[tuple[str, str]]:
+    patches: list[tuple[str, str]] = []
     flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
     werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
     if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
-        # ACTIONABLE, not just diagnostic. golden-work-050 (session
-        # evidence, frozen): the model declared flask==2.1.3 with no
-        # Werkzeug line at all, was told the abstract requirement
-        # ("require an explicit... compatibility bound") on every retry,
-        # and still never added one across all 4 attempts — real evidence
-        # the abstract phrasing alone is not actionable enough. Now names
-        # the exact concrete fix.
-        findings.append((
-            "incompatible_dependency_range", "backend/requirements.txt",
+        patches.append((
+            "Werkzeug<3",
             "add a line 'Werkzeug<3' to backend/requirements.txt, or change the "
             "flask line to 'flask>=2.2'",
         ))
@@ -225,12 +216,69 @@ def _missing_compatibility_cap_findings(lowered: str) -> list[_OfflineFinding]:
         and tuple(map(int, sqlalchemy_extension.groups())) < (3, 0)
         and not sqlalchemy_cap
     ):
-        findings.append((
-            "incompatible_dependency_range", "backend/requirements.txt",
+        patches.append((
+            "SQLAlchemy<2",
             "add a line 'SQLAlchemy<2' to backend/requirements.txt, or change the "
             "flask_sqlalchemy line to 'flask_sqlalchemy>=3'",
         ))
-    return findings
+    return patches
+
+
+def _missing_compatibility_cap_findings(lowered: str) -> list[_OfflineFinding]:
+    """Real, verified ecosystem gaps a metadata-only resolver structurally
+    cannot see (see module docstring): a package's own published metadata
+    under-declares its true compatible upper bound. Always runs alongside
+    the real resolver, independent of its availability or verdict.
+    `lowered` is `requirements.txt`'s text, already lowercased with `-`
+    normalized to `_`, matching `product_preflight._declared_dependencies`'s
+    own convention. ACTIONABLE, not just diagnostic (golden-work-050,
+    session evidence, frozen: the model was told the requirement
+    abstractly and never added the fix across 4 attempts)."""
+    return [
+        ("incompatible_dependency_range", "backend/requirements.txt", detail)
+        for _, detail in _needed_compatibility_cap_patches(lowered)
+    ]
+
+
+def _repair_missing_compatibility_cap(requirements_text: str) -> str | None:
+    """Deterministic, mechanical repair for exactly the gap class
+    `_missing_compatibility_cap_findings` verified is both necessary and
+    sufficient — never a guess, never a version invented. golden-work-050
+    and golden-work-051 (session evidence, frozen): the same real model
+    failed to add this itself across 8 combined attempts over two
+    separate runs, even after being told the exact line to add
+    (golden-work-051's own last attempt is byte-identical to
+    golden-work-050's). Per D-027's own separation of "the model declares
+    what it needs" from "ARKALI's deterministic layer produces the
+    validated contract": once the exact, unambiguous fix for a real,
+    verified defect is known, applying it and re-validating is more
+    honest than another blind model retry against a budget already shown
+    not to converge. Returns the patched text, or None if no known
+    ecosystem-gap repair applies — never patches a real cross-package
+    `pip` conflict, which has no single unambiguous fix."""
+    lowered = requirements_text.lower().replace("-", "_")
+    patches = _needed_compatibility_cap_patches(lowered)
+    if not patches:
+        return None
+    addition = "\n".join(line for line, _ in patches)
+    return requirements_text.rstrip("\n") + "\n" + addition + "\n"
+
+
+def _apply_missing_compatibility_cap_repair(
+    stage_files: Mapping[str, str],
+) -> dict[str, str] | None:
+    """`_repair_missing_compatibility_cap` for one stage's own new output:
+    repairs only `backend/requirements.txt`, and only when THIS stage
+    just wrote it. Does not validate the result — the caller re-runs its
+    own real stage check over the repaired files before trusting it,
+    exactly as it already does for the model's own unrepaired output."""
+    requirements = stage_files.get("backend/requirements.txt")
+    if requirements is None:
+        return None
+    patched = _repair_missing_compatibility_cap(requirements)
+    if patched is None:
+        return None
+    return {**stage_files, "backend/requirements.txt": patched}
 
 
 def _offline_dependency_compatibility_findings(lowered: str) -> list[_OfflineFinding]:

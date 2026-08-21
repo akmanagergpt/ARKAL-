@@ -44,6 +44,7 @@ from collections.abc import Callable, Mapping
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
+from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
@@ -309,9 +310,7 @@ def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFind
     syntax_findings = _python_syntax_findings(files, path_prefix="tests/")
     if syntax_findings:
         return syntax_findings
-    test_paths = [
-        path for path in files if path.startswith("tests/") and path.endswith(".py")
-    ]
+    test_paths = [p for p in files if p.startswith("tests/") and p.endswith(".py")]
     if not test_paths:
         # ANTI-VACUITY. golden-work-048 (session evidence, frozen): a real
         # qwen2.5-coder:14b placed its tests under backend/tests/test_app.py
@@ -323,8 +322,7 @@ def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFind
         # more specific than only discovering it at the final gate.
         return [SemanticFinding(
             code="backend_tests_missing_top_level_path", path="tests/",
-            detail="no test file exists under the top-level tests/ path",
-        )]
+            detail="no test file exists under the top-level tests/ path")]
     findings: list[SemanticFinding] = []
     for path in test_paths:
         tree = ast.parse(files[path])
@@ -389,10 +387,18 @@ def _generate_one_stage(
                 failure = f"stage response violates the contract: {error}"
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
-                merged = {**visible_files, **stage_files}
-                findings = _stage_findings(declaration.name, merged)
+                findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
                     return stage_files
+                # DETERMINISTIC REPAIR, not another blind model guess:
+                # golden-work-050/051 (frozen evidence) both exhausted
+                # their budget on the same fixable dependency-cap gap even
+                # once told the exact fix — apply it, re-validate.
+                repaired = _apply_missing_compatibility_cap_repair(stage_files)
+                if repaired is not None:
+                    merged = {**visible_files, **repaired}
+                    if not _stage_findings(declaration.name, merged):
+                        return repaired
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
         # ANTI-LOOP, generic across every stage: two consecutive attempts
         # rejected for the identical normalized reason (same code, path
