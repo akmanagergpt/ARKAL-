@@ -77,8 +77,16 @@ assertion.
 
 ### 6. frontend_client
 Inputs: backend_cors_boundary
-Rule: a frontend API client exists with one call for every route
-backend_cors_boundary's application actually exposes.
+Rule: a frontend API client exists with one real invokable function for
+every route backend_cors_boundary's application actually exposes — each
+function must itself send a real HTTP request (fetch or axios) using
+that route's method, e.g. a function calling
+`fetch(url, {method: 'POST', ...})` or `axios.post(url, ...)`. A route
+descriptor or a route-to-string mapping object is not a call and does
+not satisfy this rule (golden-work-054, session evidence, frozen: a real
+qwen2.5-coder:14b wrote `{"createTask": "POST /tasks"}` — one JSON
+property per route, never an actual invocation — identically on two
+consecutive attempts).
 
 ### 7. frontend_ui
 Inputs: frontend_client
