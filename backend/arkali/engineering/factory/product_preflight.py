@@ -312,9 +312,10 @@ def _manifests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]
             detail="no stage ever wrote config/README.md with real startup steps",
         ))
     from arkali.engineering.factory.frontend_manifest_preflight import (
-        _missing_frontend_scripts_findings,
+        _missing_frontend_entry_point_findings, _missing_frontend_scripts_findings,
     )
     findings.extend(_missing_frontend_scripts_findings(files))
+    findings.extend(_missing_frontend_entry_point_findings(files))
     return findings
 
 

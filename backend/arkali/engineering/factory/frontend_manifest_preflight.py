@@ -1,4 +1,4 @@
-"""Real, general check that a react-scripts frontend can actually run.
+"""Real, general checks that a react-scripts frontend can actually build.
 
 Owner: `engineering.factory`. golden-work-058 (session evidence, frozen):
 reached STAGED_GENERATION_PASS, all 4 real backend tests passed, real
@@ -11,9 +11,20 @@ has always explicitly required "runnable build and start scripts"; the
 staged `manifests` stage rule never carried that requirement over, and
 no validator ever checked for it.
 
-GENERAL, NOT GOLDEN-SPECIFIC. This checks the real, parsed JSON structure
-— whether `scripts.build` and `scripts.start` exist and are non-empty —
-never any specific script command text or app name.
+golden-work-059 (session evidence, frozen) then fixed that gap for real —
+`npm install` succeeded, `npm run build` actually ran — and failed for a
+second, different real reason: `Could not find a required file. Name:
+index.js. Searched in: frontend/src`. `react-scripts build`'s webpack
+config hard-codes `src/index.js` as the entry point (not configurable
+without ejecting); no stage's rule or validator had ever required it,
+mirroring exactly the same gap class `_manifest_findings`'s existing
+`missing_frontend_entry` check already closed for `public/index.html`
+under this same react-scripts condition — `index.js` is the other half
+of the identical CRA convention.
+
+GENERAL, NOT GOLDEN-SPECIFIC. Both checks look at the real, parsed JSON
+structure or the real declared file set — never any specific script
+command text, component name or app name.
 """
 
 from __future__ import annotations
@@ -46,5 +57,19 @@ def _missing_frontend_scripts_findings(files: Mapping[str, str]) -> list[Semanti
             f"missing {missing!r} — react-scripts requires "
             "'\"scripts\": {\"start\": \"react-scripts start\", "
             "\"build\": \"react-scripts build\"}' (or equivalent) to be runnable"
+        ),
+    )]
+
+
+def _missing_frontend_entry_point_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    package_json = files.get("frontend/package.json", "")
+    if "react-scripts" not in package_json or "frontend/src/index.js" in files:
+        return []
+    return [SemanticFinding(
+        code="missing_frontend_entry_point", path="frontend/src/index.js",
+        detail=(
+            "react-scripts is declared but frontend/src/index.js does not "
+            "exist — react-scripts build hard-codes this exact path as its "
+            "webpack entry point and fails outright without it"
         ),
     )]
