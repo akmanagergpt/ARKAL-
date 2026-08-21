@@ -38,8 +38,13 @@ Inputs: backend_contract, backend_schema
 Rule: a real application instance exists; every route declared in
 backend_contract's route JSON has a real executable body that uses the
 schema from backend_schema; every import resolves; the backend exposes an
-executable server entrypoint. Cross-origin access is not this stage's
-concern — that is backend_cors_boundary's job, immediately after this one.
+executable server entrypoint. A route that inserts a new row and returns
+JSON must include that row's own database-generated id (e.g.
+cursor.lastrowid) in the response, not only the submitted request body
+(golden-work-052/053, session evidence, frozen: a real model's own
+generated test asserted the response includes an id its own create route
+never returned). Cross-origin access is not this stage's concern — that
+is backend_cors_boundary's job, immediately after this one.
 
 ### 4. backend_cors_boundary
 Inputs: backend_implementation

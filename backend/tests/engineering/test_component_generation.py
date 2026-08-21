@@ -464,6 +464,23 @@ def test_backend_implementation_findings_does_not_require_cors() -> None:
     assert _backend_implementation_stage_findings(files) == []
 
 
+def test_backend_implementation_findings_catches_a_create_route_missing_the_generated_id() -> None:
+    """golden-work-052/053 (session evidence, frozen, byte-identical
+    across two separate real runs): a create route returned the request
+    body verbatim instead of the row id SQLite actually assigned."""
+    files = {
+        "backend/app.py": (
+            "from flask import jsonify\n"
+            "def create_task():\n"
+            "    cursor.execute('INSERT INTO tasks (title) VALUES (?)', (data['title'],))\n"
+            "    conn.commit()\n"
+            "    return jsonify(data), 201\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "missing_generated_id_in_create_response" for f in findings)
+
+
 def test_cors_boundary_findings_requires_cors() -> None:
     findings = _cors_boundary_stage_findings(HAPPY_PATH_FILES["backend_implementation"])
     assert any(f.code == "missing_browser_origin_boundary" for f in findings)
