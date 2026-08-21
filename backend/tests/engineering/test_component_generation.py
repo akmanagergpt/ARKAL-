@@ -11,6 +11,7 @@ from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
     _backend_contract_findings,
     _backend_implementation_stage_findings,
+    _cors_boundary_stage_findings,
     _frontend_ui_findings,
     generate_staged_model_product,
 )
@@ -95,6 +96,12 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     },
     "backend_implementation": {
         "backend/main.py": (
+            "app = object()\n@app.get('/works')\ndef list_works():\n    return []\n"
+            "class WorkRecord(object):\n    pass\n"
+        ),
+    },
+    "backend_cors_boundary": {
+        "backend/main.py": (
             "from flask_cors import CORS\n"
             "app = object()\nCORS(app)\n@app.get('/works')\ndef list_works():\n    return []\n"
             "class WorkRecord(object):\n    pass\n"
@@ -129,7 +136,7 @@ def _happy_path_queues() -> dict[str, list[tuple[HonestState, str]]]:
     }
 
 
-def test_all_eight_stages_pass_and_are_written_to_the_real_workspace(
+def test_all_nine_stages_pass_and_are_written_to_the_real_workspace(
     tmp_path: pathlib.Path,
 ) -> None:
     workspace = _workspace(tmp_path)
@@ -137,13 +144,16 @@ def test_all_eight_stages_pass_and_are_written_to_the_real_workspace(
         _blueprint(), _factory(_happy_path_queues()), workspace,
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 8
+    assert result.attempts_used == 9
     written = set(result.files)
     assert written == {
         path for files in HAPPY_PATH_FILES.values() for path in files
     }
     assert (workspace.root / "backend" / "schema.py").is_file()
     assert (workspace.root / "frontend" / "src" / "App.js").is_file()
+    # backend_cors_boundary overwrote backend/main.py; the CORS-added
+    # version, not backend_implementation's pre-CORS one, is what's on disk.
+    assert "CORS(app)" in (workspace.root / "backend" / "main.py").read_text(encoding="utf-8")
 
 
 def test_the_real_model_id_is_passed_to_every_stage_not_the_stage_name(
@@ -191,7 +201,7 @@ def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 8
+    assert result.attempts_used == 9
     prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
     assert len(prompts) == 2
     assert "backend_contract_no_routes" in prompts[1]
@@ -296,18 +306,35 @@ def test_backend_implementation_findings_catches_real_python_syntax_errors() -> 
     assert [f.code for f in findings] == ["python_syntax"]
 
 
-def test_backend_implementation_findings_requires_cors() -> None:
-    files = dict(HAPPY_PATH_FILES["backend_schema"])
-    files.update({
-        "backend/main.py": (
-            "app = object()\n@app.get('/works')\ndef list_works():\n    return []\n"
-            "class WorkRecord(object):\n    pass\n"
-        ),
-    })
-    findings = _backend_implementation_stage_findings(files)
+def test_backend_implementation_findings_does_not_require_cors() -> None:
+    """CORS is backend_cors_boundary's job now, not backend_implementation's
+    — real evidence (golden-work-045) showed the model reliably produces
+    routes+schema+entrypoint together but did not reliably add CORS in the
+    same bounded attempt even when this stage's rule explicitly required
+    both; splitting the concern is the fix."""
+    files = {**HAPPY_PATH_FILES["backend_schema"], **HAPPY_PATH_FILES["backend_implementation"]}
+    assert _backend_implementation_stage_findings(files) == []
+
+
+def test_cors_boundary_findings_requires_cors() -> None:
+    findings = _cors_boundary_stage_findings(HAPPY_PATH_FILES["backend_implementation"])
     assert any(f.code == "missing_browser_origin_boundary" for f in findings)
 
 
-def test_backend_implementation_findings_passes_with_flask_cors() -> None:
-    files = {**HAPPY_PATH_FILES["backend_schema"], **HAPPY_PATH_FILES["backend_implementation"]}
-    assert _backend_implementation_stage_findings(files) == []
+def test_cors_boundary_findings_passes_with_flask_cors() -> None:
+    assert _cors_boundary_stage_findings(HAPPY_PATH_FILES["backend_cors_boundary"]) == []
+
+
+def test_cors_boundary_findings_catches_real_python_syntax_errors() -> None:
+    broken = {
+        "backend/main.py": (
+            "app = object()\n"
+            "@app.get('/works')\n"
+            "def list_works():\n"
+            "    x = ('CREATE TABLE works (\n"
+            "      id INTEGER\n"
+            "    )')\n"
+        ),
+    }
+    findings = _cors_boundary_stage_findings(broken)
+    assert [f.code for f in findings] == ["python_syntax"]

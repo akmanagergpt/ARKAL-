@@ -268,24 +268,37 @@ _CORS_MARKERS = ("corsmiddleware", "flask_cors", "cors(app")
 
 
 def _backend_implementation_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Full persistence+routes+entrypoint+CORS — routes and cross-origin
-    access are expected by now. CORS is checked unconditionally here (not
-    "only if a frontend already exists") because backend_implementation
-    owns backend/app.py and no later stage does — golden-work-045 (session
-    evidence) discovered this gap only at frontend_client, two stages after
-    the one file that could still fix it.
+    """Full persistence+routes+entrypoint — CORS is not this stage's concern
+    (see backend_cors_boundary, immediately after). A real local model
+    reliably produced routes+schema+entrypoint together but did not
+    reliably add CORS in the same bounded attempt even when this stage's
+    own rule explicitly required it (golden-work-045, two consecutive real
+    runs) — narrowed to its own stage instead of raised attempts or
+    repeated whole-stage retries on the same combined requirement.
     """
     syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
     if syntax_findings:
         return syntax_findings
-    findings = _persistence_findings(files) + _schema_context_findings(_backend_text(files))
+    return _persistence_findings(files) + _schema_context_findings(_backend_text(files))
+
+
+def _cors_boundary_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """backend_cors_boundary's sole narrow rule: real CORS middleware exists.
+
+    Checked unconditionally (not "only if a frontend already exists"): this
+    stage runs before any frontend stage, by design, so no frontend bytes
+    are available yet to condition on.
+    """
+    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
+    if syntax_findings:
+        return syntax_findings
     backend_text = _backend_text(files)
-    if not any(marker in backend_text for marker in _CORS_MARKERS):
-        findings.append(SemanticFinding(
-            code="missing_browser_origin_boundary", path="backend/",
-            detail="backend declares no CORS middleware for its separate-origin frontend",
-        ))
-    return findings
+    if any(marker in backend_text for marker in _CORS_MARKERS):
+        return []
+    return [SemanticFinding(
+        code="missing_browser_origin_boundary", path="backend/",
+        detail="backend declares no CORS middleware for its separate-origin frontend",
+    )]
 
 
 def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -309,6 +322,7 @@ _STAGE_VALIDATORS: dict[str, Callable[[Mapping[str, str]], list[SemanticFinding]
     "backend_contract": _backend_contract_findings,
     "backend_schema": _schema_only_findings,
     "backend_implementation": _backend_implementation_stage_findings,
+    "backend_cors_boundary": _cors_boundary_stage_findings,
     "backend_tests": _backend_tests_stage_findings,
     "frontend_client": frontend_contract_findings,
     "frontend_ui": _frontend_ui_findings,
