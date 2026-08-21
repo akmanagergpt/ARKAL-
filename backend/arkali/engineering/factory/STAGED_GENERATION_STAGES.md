@@ -128,4 +128,11 @@ config/README.md with the exact real steps to install and start the
 backend and frontend this pipeline actually produced — no other stage
 owns this file, and golden-work-048 (session evidence, frozen) reached
 the final whole-product gate for the first time ever and failed it on,
-among other things, no config/README.md ever having been written.
+among other things, no config/README.md ever having been written. When
+frontend/package.json declares react-scripts, it must also declare a
+scripts object with runnable "start" and "build" entries (e.g.
+"react-scripts start" / "react-scripts build") — react-scripts alone as
+a dependency is not runnable without them (golden-work-058, session
+evidence, frozen: real "npm install" succeeded, then "npm run build"
+failed outright with "Missing script: build", since package.json
+declared no scripts object at all).

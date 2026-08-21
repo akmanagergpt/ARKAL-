@@ -311,6 +311,10 @@ def _manifests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]
             code="missing_startup_documentation", path="config/README.md",
             detail="no stage ever wrote config/README.md with real startup steps",
         ))
+    from arkali.engineering.factory.frontend_manifest_preflight import (
+        _missing_frontend_scripts_findings,
+    )
+    findings.extend(_missing_frontend_scripts_findings(files))
     return findings
 
 
