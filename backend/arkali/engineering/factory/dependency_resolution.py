@@ -51,7 +51,25 @@ import sys
 
 _PIP_TIMEOUT_SECONDS = 45.0
 _CONFLICT_MARKER = "ResolutionImpossible"
+_NONEXISTENT_VERSION_MARKERS = (
+    "Could not find a version that satisfies the requirement",
+    "No matching distribution found",
+)
+#: Genuine infrastructure/network unavailability — never misreported as a
+#: dependency-contract defect. golden-work-049 (session evidence, frozen):
+#: `flask_cors==3.1.1` was pinned to a version that has never existed on
+#: PyPI; pip's real, reachable-index error for that ("Could not find a
+#: version that satisfies...", populated version list, exit 1, no
+#: `ResolutionImpossible`) must be distinguished from the same-shaped
+#: message pip emits when it cannot reach the index at all.
+_INFRA_FAILURE_MARKERS = (
+    "Failed to establish a new connection", "Max retries exceeded",
+    "Temporary failure in name resolution", "getaddrinfo failed",
+    "Read timed out", "Connection timed out", "ConnectionError", "SSLError",
+    "(from versions: none)", "(from versions: )",
+)
 _CAUSE_LINE = re.compile(r"(?m)^\s{4}\S.*$")
+_ERROR_LINE = re.compile(r"(?m)^ERROR: .*$")
 
 #: (code, path, detail) — mirrors `product_preflight.SemanticFinding`'s own
 #: three fields without importing that class here (product_preflight.py
@@ -100,6 +118,16 @@ def _extract_conflict_reason(pip_output: str) -> str:
     return "; ".join(lines) if lines else tail.strip()[:400]
 
 
+def _extract_error_lines(pip_output: str) -> str:
+    """`pip`'s own real `ERROR:` lines, verbatim — used for a failure that
+    is a genuine unsatisfiable requirement (a pinned version that does not
+    exist) but is not shaped like a `ResolutionImpossible` cross-package
+    conflict, so `_extract_conflict_reason`'s marker-anchored parse would
+    find nothing."""
+    lines = [match.group(0).strip() for match in _ERROR_LINE.finditer(pip_output)]
+    return "; ".join(lines) if lines else pip_output.strip()[:400]
+
+
 @functools.lru_cache(maxsize=256)
 def _resolve_specifiers(specifiers: tuple[str, ...]) -> _DependencyResolutionResult:
     """The real subprocess call, memoized by its exact specifier set —
@@ -126,9 +154,24 @@ def _resolve_specifiers(specifiers: tuple[str, ...]) -> _DependencyResolutionRes
     if completed.returncode == 0:
         return _DependencyResolutionResult(_DependencyResolutionOutcome.COMPATIBLE, "")
     output = completed.stderr or completed.stdout
+    if any(marker in output for marker in _INFRA_FAILURE_MARKERS):
+        return _DependencyResolutionResult(
+            _DependencyResolutionOutcome.NOT_CONFIGURED,
+            f"dependency resolver could not reach its package index: {output.strip()[:400]}",
+        )
     if _CONFLICT_MARKER in output:
         return _DependencyResolutionResult(
             _DependencyResolutionOutcome.CONFLICT, _extract_conflict_reason(output),
+        )
+    if any(marker in output for marker in _NONEXISTENT_VERSION_MARKERS):
+        # golden-work-049 (session evidence, frozen): flask_cors==3.1.1 was
+        # pinned to a version that has never existed on PyPI — a real,
+        # reachable-index `pip` failure (populated version list in the
+        # message), not a cross-package `ResolutionImpossible` conflict,
+        # so it needs its own classification rather than falling through
+        # to NOT_CONFIGURED and being silently unreported.
+        return _DependencyResolutionResult(
+            _DependencyResolutionOutcome.CONFLICT, _extract_error_lines(output),
         )
     return _DependencyResolutionResult(
         _DependencyResolutionOutcome.NOT_CONFIGURED,

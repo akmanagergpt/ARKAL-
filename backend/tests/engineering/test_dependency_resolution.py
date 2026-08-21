@@ -87,15 +87,50 @@ def test_resolver_reports_not_configured_on_timeout(monkeypatch) -> None:  # noq
 
 
 def test_resolver_reports_not_configured_on_an_unrecognized_pip_failure(monkeypatch) -> None:  # noqa: ANN001
-    """A non-zero exit that is not a real ResolutionImpossible conflict
-    (e.g. a network error) must not be misreported as a dependency
-    conflict — it degrades to NOT_CONFIGURED, triggering the offline
+    """A non-zero exit that names none of the recognized shapes (a real
+    conflict or a real unreachable index) must not be misreported as
+    either — it degrades to NOT_CONFIGURED, triggering the offline
     fallback, not a fabricated finding."""
     monkeypatch.setattr(
-        subprocess, "run", lambda *a, **k: _completed(1, stderr="Could not find a version")
+        subprocess, "run", lambda *a, **k: _completed(1, stderr="something unexpected happened")
     )
     result = _resolve_backend_dependency_contract("flask==2.2.0\n")
     assert result.outcome is _DependencyResolutionOutcome.NOT_CONFIGURED
+
+
+def test_resolver_reports_not_configured_when_the_index_is_truly_unreachable(
+    monkeypatch,  # noqa: ANN001
+) -> None:
+    """The same 'Could not find a version' message shape pip uses for a
+    real nonexistent pin also appears when the index cannot be reached at
+    all (empty version list) — that must stay NOT_CONFIGURED, not a
+    fabricated dependency-conflict finding."""
+    stderr = "ERROR: Could not find a version that satisfies the requirement flask==2.2.0 (from versions: none)\n"
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(1, stderr=stderr))
+    result = _resolve_backend_dependency_contract("flask==2.2.0\n")
+    assert result.outcome is _DependencyResolutionOutcome.NOT_CONFIGURED
+
+
+def test_resolver_reports_a_conflict_for_a_pinned_version_that_does_not_exist(
+    monkeypatch,  # noqa: ANN001
+) -> None:
+    """golden-work-049 (session evidence, frozen): `flask_cors==3.1.1` was
+    pinned to a version that has never existed on PyPI. This is a real,
+    reachable-index `pip` failure — not shaped like `ResolutionImpossible`
+    (no cross-package conflict), but still a real, mechanical 'this
+    declared dependency set is not installable as declared' verdict, and
+    must not fall through to NOT_CONFIGURED and go unreported."""
+    stderr = (
+        "ERROR: Ignored the following yanked versions: 0.0.0.dev3\n"
+        "ERROR: Could not find a version that satisfies the requirement "
+        "flask_cors==3.1.1 (from versions: 1.0, 3.0.10, 4.0.0)\n"
+        "ERROR: No matching distribution found for flask_cors==3.1.1\n"
+    )
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _completed(1, stderr=stderr))
+    result = _resolve_backend_dependency_contract("flask==2.3.2\nflask_cors==3.1.1\n")
+    assert result.outcome is _DependencyResolutionOutcome.CONFLICT
+    assert "flask_cors==3.1.1" in result.detail
+    assert "No matching distribution found" in result.detail
 
 
 def test_missing_compatibility_cap_fires_for_unpinned_werkzeug_on_old_flask() -> None:
@@ -173,3 +208,13 @@ def test_real_pip_reports_the_golden_work_047_conflict() -> None:
 def test_real_pip_reports_a_genuinely_compatible_pair() -> None:
     result = _resolve_backend_dependency_contract("flask==2.2.0\nWerkzeug==2.2.0\n")
     assert result.outcome is _DependencyResolutionOutcome.COMPATIBLE
+
+
+def test_real_pip_reports_the_golden_work_049_nonexistent_version() -> None:
+    """golden-work-049 (session evidence, frozen): `flask_cors==3.1.1` was
+    the real model's real declared pin; it has never existed on PyPI. The
+    real (unfaked) `pip` call must classify this as CONFLICT, not
+    NOT_CONFIGURED, or this defect class goes unreported again."""
+    result = _resolve_backend_dependency_contract("flask==2.3.2\nflask_cors==3.1.1\n")
+    assert result.outcome is _DependencyResolutionOutcome.CONFLICT
+    assert "flask_cors==3.1.1" in result.detail
