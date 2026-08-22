@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _shadowed_route_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
     _unreachable_module_findings,
@@ -234,3 +235,64 @@ def test_g_a_genuinely_single_purpose_product_is_not_forced_into_a_shell() -> No
     assert _ux_spec_shell_findings(files) == []
     assert _ux_spec_mutation_findings(files) == []
     assert _unreachable_module_findings(files) == []
+
+
+def test_a_broader_route_declared_first_shadows_a_more_specific_one() -> None:
+    """golden-work-068 (real repository evidence, real qwen2.5-coder:14b,
+    frozen): frontend_ui wrote `<Route path='/students'>` with no
+    `exact`; frontend_forms then added `<Route path='/students/create'>`
+    after it in the same <Switch>. A real browser navigated to
+    `/students/create` and got the students LIST every time -- the real,
+    present CreateStudentForm component never rendered at all."""
+    files = {
+        "frontend/src/App.js": (
+            "<Switch>"
+            "<Route path='/students'><h2>Students</h2></Route>"
+            "<Route path='/students/create'><h2>Create Student</h2></Route>"
+            "</Switch>"
+        ),
+    }
+    findings = _shadowed_route_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_ui_route_shadowed"
+    assert "/students" in findings[0].detail
+    assert "/students/create" in findings[0].detail
+
+
+def test_is_silent_when_the_broader_route_is_marked_exact() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "<Switch>"
+            "<Route exact path='/students'><h2>Students</h2></Route>"
+            "<Route path='/students/create'><h2>Create Student</h2></Route>"
+            "</Switch>"
+        ),
+    }
+    assert _shadowed_route_findings(files) == []
+
+
+def test_is_silent_when_the_specific_route_is_declared_first() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "<Switch>"
+            "<Route path='/students/create'><h2>Create Student</h2></Route>"
+            "<Route path='/students'><h2>Students</h2></Route>"
+            "</Switch>"
+        ),
+    }
+    assert _shadowed_route_findings(files) == []
+
+
+def test_shadowed_route_findings_runs_unconditionally_without_a_ux_spec() -> None:
+    """A general react-router correctness rule, not gated on product_ux_spec
+    -- must still fire against a candidate with no spec artifact at all
+    (e.g. the one-shot generation path)."""
+    files = {
+        "frontend/src/App.js": (
+            "<Switch>"
+            "<Route path='/students'><h2>Students</h2></Route>"
+            "<Route path='/students/create'><h2>Create Student</h2></Route>"
+            "</Switch>"
+        ),
+    }
+    assert any(f.code == "frontend_ui_route_shadowed" for f in _ux_spec_mutation_findings(files))

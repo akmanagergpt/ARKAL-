@@ -192,8 +192,19 @@ declared "delete" action fires, when product_ux_spec requires one; add a
 visible success/feedback marker after a mutation completes. Return the
 complete, updated frontend source — frontend_ui's own navigation,
 dashboard and read-only rendering already work and are not this stage's
-concern; add the missing mutation UI onto them, do not rewrite them.
-Split out as its own stage (real evidence, golden-work-065): a real
+concern; add the missing mutation UI onto them, do not rewrite them. A
+new route this stage adds under an existing broader route (e.g. adding
+`/students/create` under frontend_ui's existing `/students`) must be
+reachable, not silently shadowed: in a react-router v5 `<Switch>`, a
+`<Route path='/students'>` with no `exact` matches `/students/create`
+too and, being declared first, wins — the new route added under it never
+renders. Either mark the broader existing route `exact` or place every
+new, more specific route before it in the `<Switch>` (real evidence this
+session, golden-work-068: `/students/create` and `/payments/create` were
+both real, present routes rendering a real form component, and both were
+completely unreachable in a real browser — `<Switch>` always rendered the
+parent list route instead, on every navigation, silently). Split out as
+its own stage (real evidence, golden-work-065): a real
 qwen2.5-coder:14b reliably produced a genuine multi-module shell —
 react-router navigation, a dashboard with real KPIs, loading/empty/error
 states — but never once added product_ux_spec's declared create/edit/
