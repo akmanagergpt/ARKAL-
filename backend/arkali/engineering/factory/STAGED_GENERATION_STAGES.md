@@ -255,11 +255,18 @@ attempts (golden-work-046). It receives instead: the real bytes of any
 backend/requirements.txt, backend/pyproject.toml or frontend/package.json
 already written, whether frontend/public/index.html already exists, and
 two mechanically-extracted (not full-file) lists — every real third-party
-package backend/*.py actually imports, and every real npm package
-frontend/src/* actually imports. Declare backend/requirements.txt (or
-pyproject.toml) covering every extracted backend import, and reconcile
-frontend/package.json against the extracted frontend imports; do not
-invent a dependency absent from either extracted list. Also declare
+package backend/*.py **and tests/*.py together** actually import, and
+every real npm package frontend/src/* actually imports. Declare
+backend/requirements.txt (or pyproject.toml) covering every extracted
+import from that combined backend+tests list — a package a test file
+alone imports (e.g. `pytest`) still needs declaring here; there is no
+separate test-requirements file (golden-work-072, session evidence,
+frozen: a real, genuinely idiomatic pytest test file wrote `import
+pytest` and real `@pytest.fixture` usage; the real whole-product gate
+refused the candidate outright with `tests/test_app.py imports
+undeclared dependency 'pytest'`, since nothing had ever declared it) —
+and reconcile frontend/package.json against the extracted frontend
+imports; do not invent a dependency absent from either extracted list. Also declare
 config/README.md with the exact real steps to install and start the
 backend and frontend this pipeline actually produced — no other stage
 owns this file, and golden-work-048 (session evidence, frozen) reached

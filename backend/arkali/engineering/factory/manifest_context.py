@@ -17,7 +17,10 @@ not assumed) only ever reads three things: `backend/requirements.txt`,
 never route/test/UI bytes. Everything this module returns instead of
 those bytes is a mechanically-extracted signal, never a paraphrase and
 never invented: real top-level package names actually imported by the
-real source, nothing else.
+real source (both `backend/*.py` and `tests/*.py` — golden-work-072,
+session evidence, frozen: a real test file's own `import pytest` was
+invisible to manifests until this covered `tests/*.py` too), nothing
+else.
 """
 
 from __future__ import annotations
@@ -30,13 +33,24 @@ from collections.abc import Mapping
 _LOCAL_PACKAGE_ROOTS = frozenset({"backend", "frontend", "tests"})
 
 
-def _third_party_python_imports(files: Mapping[str, str]) -> frozenset[str]:
-    """Real top-level package names imported by backend/*.py, minus stdlib
-    and this candidate's own local roots — a mechanical signal of what
-    manifests should declare, not the source that imports them."""
+def _third_party_python_imports(files: Mapping[str, str], *, path_prefix: str) -> frozenset[str]:
+    """Real top-level package names imported by `path_prefix`'s own *.py
+    files, minus stdlib and this candidate's own local roots — a
+    mechanical signal of what manifests should declare, not the source
+    that imports them.
+
+    golden-work-072 (session evidence, frozen): this only ever scanned
+    `backend/*.py` — `tests/test_app.py` wrote real `import pytest` and
+    real `@pytest.fixture` usage, a genuinely idiomatic real pytest test
+    file, and manifests had no way to know a test file needed anything
+    declared at all, since its own reduced context never saw tests/*.py
+    imports in any form. The real whole-product gate refused the
+    candidate outright: `tests/test_app.py imports undeclared dependency
+    'pytest'`.
+    """
     names: set[str] = set()
     for path, source in files.items():
-        if not (path.startswith("backend/") and path.endswith(".py")):
+        if not (path.startswith(path_prefix) and path.endswith(".py")):
             continue
         try:
             tree = ast.parse(source)
@@ -106,9 +120,10 @@ def _manifest_context(visible_files: Mapping[str, str]) -> dict[str, str]:
             reduced[path] = visible_files[path]
     if "frontend/public/index.html" in visible_files:
         reduced["frontend/public/index.html"] = visible_files["frontend/public/index.html"]
-    reduced["_extracted/backend_third_party_imports.txt"] = "\n".join(
-        sorted(_third_party_python_imports(visible_files))
-    )
+    python_imports = _third_party_python_imports(
+        visible_files, path_prefix="backend/"
+    ) | _third_party_python_imports(visible_files, path_prefix="tests/")
+    reduced["_extracted/backend_third_party_imports.txt"] = "\n".join(sorted(python_imports))
     reduced["_extracted/frontend_import_targets.txt"] = "\n".join(
         sorted(_frontend_import_targets(visible_files))
     )

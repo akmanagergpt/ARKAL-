@@ -17,17 +17,20 @@ def test_third_party_python_imports_excludes_stdlib_and_local_roots() -> None:
             "from backend.migrate import migrate\n"
         ),
     }
-    assert _third_party_python_imports(files) == frozenset({"flask", "flask_cors"})
+    assert _third_party_python_imports(files, path_prefix="backend/") == frozenset(
+        {"flask", "flask_cors"}
+    )
 
 
-def test_third_party_python_imports_ignores_non_backend_files() -> None:
+def test_third_party_python_imports_respects_the_path_prefix() -> None:
     files = {"tests/test_app.py": "import pytest\n"}
-    assert _third_party_python_imports(files) == frozenset()
+    assert _third_party_python_imports(files, path_prefix="backend/") == frozenset()
+    assert _third_party_python_imports(files, path_prefix="tests/") == frozenset({"pytest"})
 
 
 def test_third_party_python_imports_skips_unparseable_files_without_raising() -> None:
     files = {"backend/broken.py": "def f(:\n"}
-    assert _third_party_python_imports(files) == frozenset()
+    assert _third_party_python_imports(files, path_prefix="backend/") == frozenset()
 
 
 def test_frontend_import_targets_excludes_relative_imports() -> None:
