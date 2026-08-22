@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from arkali.engineering.factory.manifest_context import (
+    _backend_entrypoint_module,
     _frontend_import_targets,
     _manifest_context,
     _third_party_python_imports,
@@ -75,3 +76,38 @@ def test_manifest_context_on_empty_input_still_has_extraction_keys() -> None:
     assert reduced["_extracted/backend_third_party_imports.txt"] == ""
     assert reduced["_extracted/frontend_import_targets.txt"] == ""
     assert "backend/requirements.txt" not in reduced
+    assert "_extracted/backend_entrypoint_module.txt" not in reduced
+
+
+def test_backend_entrypoint_module_finds_the_real_main_guard() -> None:
+    """golden-work-067/068 (session evidence, frozen): a real backend used
+    `import backend.db` / `from backend.db import init_db` -- legal,
+    resolving Python that only resolves when the project root is on
+    sys.path. manifests must name the real entrypoint module so
+    config/README.md can document module invocation (`python -m
+    backend.app`), not direct script invocation (`python backend/app.py`),
+    which does not put the project root on sys.path."""
+    files = {
+        "backend/db.py": "import sqlite3\ndef init_db(): pass\n",
+        "backend/app.py": (
+            "from flask import Flask\napp = Flask(__name__)\n"
+            "if __name__ == '__main__':\n    app.run(debug=True)\n"
+        ),
+    }
+    assert _backend_entrypoint_module(files) == "backend.app"
+
+
+def test_backend_entrypoint_module_is_none_without_a_real_main_guard() -> None:
+    files = {"backend/app.py": "from flask import Flask\napp = Flask(__name__)\n"}
+    assert _backend_entrypoint_module(files) is None
+
+
+def test_manifest_context_surfaces_the_real_entrypoint_module() -> None:
+    files = {
+        "backend/app.py": (
+            "from flask import Flask\napp = Flask(__name__)\n"
+            "if __name__ == '__main__':\n    app.run(debug=True)\n"
+        ),
+    }
+    reduced = _manifest_context(files)
+    assert reduced["_extracted/backend_entrypoint_module.txt"] == "backend.app"

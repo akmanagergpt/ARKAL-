@@ -50,6 +50,31 @@ def _third_party_python_imports(files: Mapping[str, str]) -> frozenset[str]:
     return frozenset(names - sys.stdlib_module_names - _LOCAL_PACKAGE_ROOTS)
 
 
+def _backend_entrypoint_module(files: Mapping[str, str]) -> str | None:
+    """The real backend/*.py file carrying a `if __name__ == '__main__':`
+    guard, as its dotted module path (e.g. `backend/app.py` -> `backend.app`)
+    — the same real signal `product_preflight._persistence_findings`
+    already uses to detect a runnable entrypoint exists at all, here named
+    rather than only detected.
+
+    golden-work-067/068 (session evidence, frozen): a real
+    qwen2.5-coder:14b's own real backend_implementation output used
+    absolute `from backend.db import init_db` / `import backend.db`
+    imports — legal, resolving Python (`backend_import_preflight.py` now
+    proves it) — that only resolve when the project root is on `sys.path`.
+    `python backend/app.py` (direct script invocation) does not put it
+    there; `python -m backend.app` (module invocation) does. manifests
+    cannot know the real entrypoint's filename from its own reduced
+    context otherwise — nothing before this extracted it.
+    """
+    for path, source in files.items():
+        if not (path.startswith("backend/") and path.endswith(".py")):
+            continue
+        if re.search(r"""(?m)^if\s+__name__\s*==\s*['"]__main__['"]\s*:""", source):
+            return path[: -len(".py")].replace("/", ".")
+    return None
+
+
 _JS_IMPORT_TARGET = re.compile(r"""(?:from|require\()\s*['"]([^'"]+)['"]""")
 
 
@@ -70,9 +95,10 @@ def _frontend_import_targets(files: Mapping[str, str]) -> frozenset[str]:
 def _manifest_context(visible_files: Mapping[str, str]) -> dict[str, str]:
     """The reduced context manifests actually needs: real bytes for the
     exact paths its own validator reads, plus mechanically-extracted
-    (never full-file) import signals for everything else — not the whole
-    accumulated candidate. Nothing about the other 8 stages' own contracts
-    or contexts changes; this applies to manifests only.
+    (never full-file) import and entrypoint signals for everything else —
+    not the whole accumulated candidate. Nothing about the other 10
+    stages' own contracts or contexts changes; this applies to manifests
+    only.
     """
     reduced: dict[str, str] = {}
     for path in ("backend/requirements.txt", "backend/pyproject.toml", "frontend/package.json"):
@@ -86,4 +112,7 @@ def _manifest_context(visible_files: Mapping[str, str]) -> dict[str, str]:
     reduced["_extracted/frontend_import_targets.txt"] = "\n".join(
         sorted(_frontend_import_targets(visible_files))
     )
+    entrypoint = _backend_entrypoint_module(visible_files)
+    if entrypoint is not None:
+        reduced["_extracted/backend_entrypoint_module.txt"] = entrypoint
     return reduced

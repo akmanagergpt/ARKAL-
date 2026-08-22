@@ -229,6 +229,15 @@ backend and frontend this pipeline actually produced — no other stage
 owns this file, and golden-work-048 (session evidence, frozen) reached
 the final whole-product gate for the first time ever and failed it on,
 among other things, no config/README.md ever having been written. When
+`_extracted/backend_entrypoint_module.txt` is present, config/README.md's
+backend startup step must run it as a module from the project root using
+that exact real name (e.g. `python -m backend.app`), never as a direct
+script (`python backend/app.py`) — golden-work-067/068 (session evidence,
+frozen): a real qwen2.5-coder:14b's own real backend used absolute
+`backend.`-prefixed imports (`import backend.db`), legal, resolving
+Python, that only resolve when the project root is on `sys.path`; direct
+script invocation does not put it there and fails outright with
+`ModuleNotFoundError`, module invocation does. When
 frontend/package.json declares react-scripts, it must also declare a
 scripts object with runnable "start" and "build" entries (e.g.
 "react-scripts start" / "react-scripts build") — react-scripts alone as
