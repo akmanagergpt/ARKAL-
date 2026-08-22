@@ -53,7 +53,7 @@ def plain_import_findings(
                 SemanticFinding(
                     code="undeclared_test_dependency",
                     path=path,
-                    detail=f"test imports undeclared dependency {root!r}",
+                    detail=f"{path} imports undeclared dependency {root!r}",
                 )
             )
     return findings

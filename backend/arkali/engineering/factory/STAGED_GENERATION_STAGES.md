@@ -31,13 +31,27 @@ Rule: a real, executable SQLite schema or migration exists, generated from
 backend_contract's data-model JSON, and is wired into the application's
 real startup lifecycle, not a bare `CREATE TABLE` left outside any
 lifecycle hook. This stage does not yet declare routes or an app
-instance — that is backend_implementation's job, not this one's.
+instance — that is backend_implementation's job, not this one's. Every
+import in the file you write must resolve to a real Python module —
+backend_contract's own JSON files (e.g. `backend/data_model.json`) are
+schema *documents*, never Python modules, and must never be `import`ed;
+read their real field names directly out of your own visible context and
+write them as literal column/field names in real Python code
+(golden-work-067, session evidence, frozen: a real qwen2.5-coder:14b
+wrote `from backend.data_model import data_model` in `backend/db.py` —
+never used anywhere in the file — and the real, first `pytest`
+collection of this real candidate failed outright with
+`ModuleNotFoundError: No module named 'backend.data_model'`).
 
 ### 3. backend_implementation
 Inputs: backend_contract, backend_schema
 Rule: a real application instance exists; every route declared in
 backend_contract's route JSON has a real executable body that uses the
-schema from backend_schema; every import resolves; the backend exposes an
+schema from backend_schema; every import resolves — backend_contract's
+own JSON files are schema documents, never Python modules, and must
+never be `import`ed (golden-work-067, session evidence, frozen: the
+identical real defect as backend_schema's own rule cites, independently
+repeated in `backend/app.py`) — the backend exposes an
 executable server entrypoint. A route that inserts a new row and returns
 JSON must include that row's own database-generated id (e.g.
 cursor.lastrowid) in the response, not only the submitted request body

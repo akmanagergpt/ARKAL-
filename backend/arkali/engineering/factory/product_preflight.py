@@ -129,7 +129,7 @@ def _import_findings(
                 SemanticFinding(
                     code="missing_local_module",
                     path=path,
-                    detail=f"test imports unavailable module {node.module!r}",
+                    detail=f"{path} imports unavailable module {node.module!r}",
                 )
             )
             continue
@@ -141,7 +141,7 @@ def _import_findings(
                 SemanticFinding(
                     code="missing_imported_symbols",
                     path=target[0],
-                    detail=f"test requires {missing!r} from {node.module!r}",
+                    detail=f"{path} requires {missing!r} from {node.module!r}",
                 )
             )
     return findings
@@ -418,6 +418,9 @@ def inspect_product_files(
 
     findings.extend(lifecycle_findings(files))
     findings.extend(_persistence_findings(files))
+    from arkali.engineering.factory.backend_import_preflight import _backend_import_findings
+
+    findings.extend(_backend_import_findings(files, modules))
     findings.extend(_framework_api_findings(files))
     from arkali.engineering.factory.http_contract_preflight import (
         frontend_contract_findings,
