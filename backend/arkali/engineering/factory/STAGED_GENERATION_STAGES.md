@@ -108,6 +108,14 @@ against a fresh database genuinely gets id 1 (golden-work-070, session
 evidence, frozen: three of eight real generated tests each independently
 assumed their own freshly-created row was id 1; the alphabetically-first
 of them passed, the other two failed a real 404 the exact same way).
+Every name a test calls (e.g. `init_db()`) must be imported, defined or
+assigned somewhere in that same test file — a real function existing
+elsewhere in the codebase is not enough on its own (golden-work-071,
+session evidence, frozen: `setUp()` called `init_db()`, a real function
+genuinely defined in `backend/db.py`, but the file's own imports never
+named it; real pytest collection failed all 8 tests outright with
+`NameError: name 'init_db' is not defined`, the first thing every one of
+them did).
 
 ### 6. product_ux_spec
 Inputs: backend_contract

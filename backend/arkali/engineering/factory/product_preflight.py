@@ -202,9 +202,13 @@ def _test_findings(
                 )
             )
         findings.extend(_import_findings(path, tree, modules, dependencies))
-        from arkali.engineering.factory.test_contract_preflight import fixture_findings
+        from arkali.engineering.factory.test_contract_preflight import (
+            fixture_findings,
+            _undefined_call_findings,
+        )
 
         findings.extend(fixture_findings(path, tree))
+        findings.extend(_undefined_call_findings(path, tree))
     return findings
 
 

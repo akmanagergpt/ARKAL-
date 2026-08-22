@@ -22,6 +22,7 @@ from arkali.engineering.factory.product_preflight import (
     _declared_dependencies,
     _import_findings,
 )
+from arkali.engineering.factory.test_contract_preflight import _undefined_call_findings
 
 
 def _backend_import_findings(
@@ -59,6 +60,7 @@ def _backend_import_findings(
         except SyntaxError:
             continue  # a python_syntax finding elsewhere already covers this
         findings.extend(_import_findings(path, tree, modules, dependencies))
+        findings.extend(_undefined_call_findings(path, tree))
     return findings
 
 
