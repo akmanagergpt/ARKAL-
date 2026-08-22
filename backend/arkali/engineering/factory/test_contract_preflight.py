@@ -47,7 +47,20 @@ def plain_import_findings(
     for node in (item for item in ast.walk(tree) if isinstance(item, ast.Import)):
         for alias in node.names:
             root = alias.name.split(".", 1)[0]
-            if root in sys.stdlib_module_names or root.lower() in dependencies or root in modules:
+            # golden-work-068 (session evidence, frozen): `import backend.db`
+            # (`alias.name` == "backend.db") was flagged as an undeclared
+            # dependency on the bare package root "backend" -- real,
+            # resolvable local package import, wrongly rejected, because
+            # only `root` (the first dotted segment) was ever checked
+            # against `modules`, never the full dotted name a real local
+            # sub-module actually registers under (`_module_aliases`
+            # already keys `modules` by both "db" and "backend.db").
+            if (
+                root in sys.stdlib_module_names
+                or root.lower() in dependencies
+                or root in modules
+                or alias.name in modules
+            ):
                 continue
             findings.append(
                 SemanticFinding(

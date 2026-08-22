@@ -194,3 +194,23 @@ def test_a_backend_module_importing_a_real_sibling_module_is_silent() -> None:
     }
     report = inspect_product_files(files)
     assert "missing_local_module" not in {item.code for item in report.findings}
+
+
+def test_a_bare_import_of_a_real_local_submodule_is_silent() -> None:
+    """golden-work-068 (real repository evidence, real qwen2.5-coder:14b,
+    frozen): `backend/app.py` wrote `import backend.db` (a real,
+    resolvable local package import -- backend/db.py genuinely exists)
+    and the whole-product gate refused the real candidate outright with
+    `undeclared_test_dependency:backend/app.py: ... imports undeclared
+    dependency 'backend'`. Only the bare first dotted segment ("backend")
+    was ever checked against the module registry, never the full dotted
+    name a real local sub-module actually registers under."""
+    files = {
+        "backend/db.py": "import sqlite3\ndef init_db():\n    return sqlite3.connect('x.db')\n",
+        "backend/app.py": (
+            "import backend.db\napp = object()\n"
+            "@app.route('/x')\ndef list_x(): return backend.db.init_db()\n"
+        ),
+    }
+    report = inspect_product_files(files)
+    assert "undeclared_test_dependency" not in {item.code for item in report.findings}
