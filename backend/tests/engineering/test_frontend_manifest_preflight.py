@@ -45,6 +45,35 @@ def test_is_silent_when_react_scripts_is_not_declared() -> None:
     assert _missing_frontend_scripts_findings({"frontend/package.json": package}) == []
 
 
+def test_flags_scripts_referencing_react_scripts_with_no_such_dependency() -> None:
+    """golden-work-070 (session evidence, frozen): package.json's own
+    scripts called "react-scripts build"/"react-scripts start", but
+    react-scripts was declared in neither dependencies nor
+    devDependencies. npm install silently installed only
+    react/react-dom/react-router-dom (19 packages, not the ~1800
+    react-scripts pulls in) and the real npm run build failed outright:
+    "'react-scripts' is not recognized as an internal or external
+    command". The old check's bare substring test on the raw file text
+    never caught this -- the scripts commands themselves already contain
+    the substring "react-scripts"."""
+    package = json.dumps({
+        "dependencies": {"react": "^17.0.2", "react-dom": "^17.0.2"},
+        "scripts": {"start": "react-scripts start", "build": "react-scripts build"},
+    })
+    findings = _missing_frontend_scripts_findings({"frontend/package.json": package})
+    assert len(findings) == 1
+    assert findings[0].code == "missing_react_scripts_dependency"
+
+
+def test_is_silent_when_react_scripts_is_a_real_dev_dependency() -> None:
+    package = json.dumps({
+        "dependencies": {"react": "^17.0.2"},
+        "devDependencies": {"react-scripts": "4.0.3"},
+        "scripts": {"start": "react-scripts start", "build": "react-scripts build"},
+    })
+    assert _missing_frontend_scripts_findings({"frontend/package.json": package}) == []
+
+
 def test_is_silent_on_unparseable_json() -> None:
     """A JSON-syntax defect belongs to a different check; this one must
     not raise or fabricate a finding for it."""

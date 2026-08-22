@@ -272,4 +272,13 @@ scripts object with runnable "start" and "build" entries (e.g.
 a dependency is not runnable without them (golden-work-058, session
 evidence, frozen: real "npm install" succeeded, then "npm run build"
 failed outright with "Missing script: build", since package.json
-declared no scripts object at all).
+declared no scripts object at all). The reverse must also hold: if
+scripts calls "react-scripts start"/"react-scripts build",
+"react-scripts" itself must be a real declared dependency or
+devDependency, not merely referenced in the scripts commands
+(golden-work-070, session evidence, frozen: scripts called
+"react-scripts build" while "react-scripts" appeared in neither
+dependencies nor devDependencies — real "npm install" silently installed
+only the other three declared packages, and real "npm run build" failed
+outright: "'react-scripts' is not recognized as an internal or external
+command").
