@@ -187,9 +187,17 @@ Inputs: frontend_client, frontend_ui, product_ux_spec
 Rule: add real, labelled form UI, wired to frontend_client's real
 create/update calls, for every module product_ux_spec declares a
 "create" or "edit" action for, with a visible validation marker (never a
-bare unlabelled input); add a real confirmation step before a module's
-declared "delete" action fires, when product_ux_spec requires one; add a
-visible success/feedback marker after a mutation completes. Return the
+bare unlabelled input); for every module product_ux_spec declares a
+"delete" action for, add a real delete control (e.g. a button) wired to
+frontend_client's real delete call — this stage owns that control, not
+just its confirmation step, since nothing upstream writes one — gated
+behind a real confirmation step before it fires, when product_ux_spec
+requires one (golden-work-069, session evidence, frozen: a real
+qwen2.5-coder:14b's own real output for a module with a declared
+"delete" action added no delete control of any kind, on two consecutive
+real attempts — not a missing confirmation on an existing control, a
+missing control); add a visible success/feedback marker after a
+mutation completes. Return the
 complete, updated frontend source — frontend_ui's own navigation,
 dashboard and read-only rendering already work and are not this stage's
 concern; add the missing mutation UI onto them, do not rewrite them. A
