@@ -6,11 +6,32 @@ from arkali.engineering.factory.frontend_ux_preflight import (
     _unreachable_module_findings,
     _ux_spec_reconciliation_findings,
 )
-from tests.engineering.test_product_ux_spec import _valid_spec_files
+from tests.engineering.test_product_ux_spec import (
+    _GOLDEN_WORK_064_DATA_MODEL,
+    _valid_spec_files,
+)
 
 _STUDENT_MODEL = json.dumps({"table_name": "students", "fields": {"id": {"type": "integer"}}})
 _COURSE_MODEL = json.dumps({"table_name": "courses", "fields": {"id": {"type": "integer"}}})
 _PAYMENT_MODEL = json.dumps({"table_name": "payments", "fields": {"id": {"type": "integer"}}})
+
+
+def test_flags_a_bare_list_against_the_real_nested_multi_model_shape() -> None:
+    """golden-work-064 (session evidence, frozen): before the fix, this
+    exact real backend shape -- one data_model.json nesting three real
+    models -- counted as one model (`len(models) < 2`), so the bare-list
+    gate silently never fired for it at all."""
+    files = {
+        "backend/data_model.json": _GOLDEN_WORK_064_DATA_MODEL,
+        "frontend/src/StudentList.js": (
+            "const StudentList = () => (<ul>{students.map(s => "
+            "<li key={s.id}>{s.name}</li>)}</ul>);"
+        ),
+    }
+    findings = _unreachable_module_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_ui_unreachable_modules"
+    assert "students" in findings[0].detail
 
 
 def test_flags_a_bare_list_when_backend_declares_multiple_unreachable_models() -> None:

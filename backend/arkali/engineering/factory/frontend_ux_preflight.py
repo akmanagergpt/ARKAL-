@@ -38,11 +38,10 @@ checks, not a design-quality score).
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 
 from arkali.engineering.factory.product_preflight import SemanticFinding
-from arkali.engineering.factory.product_ux_spec import _parse_ux_spec
+from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
 
 _NAVIGATION_MARKERS = (
     "react-router", "<link", "<navlink", "<nav ", "<nav>", "usenavigate",
@@ -56,20 +55,6 @@ _CONFIRM_MARKERS = ("confirm(", "are you sure", "window.confirm")
 #: whether its forms validate anything, which would make this check pass
 #: vacuously every time.
 _VALIDATION_MARKERS = ("required", "invalid")
-
-
-def _declared_backend_model_names(files: Mapping[str, str]) -> set[str]:
-    names: set[str] = set()
-    for path, source in files.items():
-        if not (path.startswith("backend/") and path.endswith(".json")):
-            continue
-        try:
-            parsed = json.loads(source)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict) and "fields" in parsed:
-            names.add(parsed.get("table_name") or path)
-    return names
 
 
 def _frontend_source_text(files: Mapping[str, str]) -> str:
@@ -89,7 +74,7 @@ def _unreachable_module_findings(files: Mapping[str, str]) -> list[SemanticFindi
     with or without a `product_ux_spec` artifact, since it needs nothing but
     `backend_contract`'s own JSON.
     """
-    models = _declared_backend_model_names(files)
+    models = _backend_declared_models(files)
     if len(models) < 2:
         return []
     frontend = _frontend_source_text(files)

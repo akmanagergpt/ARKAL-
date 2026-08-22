@@ -52,7 +52,10 @@ def _valid_spec_files() -> dict[str, str]:
             _module("orders", ["create", "delete", "view"], forms=[{"name": "OrderForm", "fields": ["item"]}]),
         ],
         "navigation_destinations": ["Products", "Categories", "Orders", "Dashboard"],
-        "dashboard": {"navigation_label": "Dashboard", "purpose": "overview", "kpis": ["Total Orders"]},
+        "dashboard": {
+            "navigation_label": "Dashboard", "purpose": "overview",
+            "kpis": [{"name": "Total Orders", "metric": "count_orders"}],
+        },
         "design_system": _DESIGN_SYSTEM,
         "destructive_action_confirmation": True,
     }
@@ -148,3 +151,91 @@ def test_a_genuinely_single_purpose_product_needs_no_dashboard() -> None:
     spec_obj, parse_findings = _parse_ux_spec(files)
     assert parse_findings == []
     assert spec_obj is not None and spec_obj.dashboard is None
+
+
+#: golden-work-064 (session evidence, frozen): the real first attempt at a
+#: fresh Student/Fee Management candidate. A real qwen2.5-coder:14b wrote
+#: exactly this shape -- one backend/data_model.json with three models
+#: nested under its own single "fields" key, not three separate files.
+_GOLDEN_WORK_064_DATA_MODEL = json.dumps({
+    "fields": {
+        "students": {"id": "integer", "name": "string", "email": "string"},
+        "courses": {"id": "integer", "name": "string", "description": "string"},
+        "payments": {"id": "integer", "student_id": "integer", "amount": "float", "due_date": "date"},
+    },
+})
+_GOLDEN_WORK_064_ROUTES = json.dumps([
+    {"path": "/students", "method": "GET"},
+    {"path": "/students", "method": "POST"},
+    {"path": "/students/{id}", "method": "GET"},
+    {"path": "/students/{id}", "method": "PUT"},
+    {"path": "/students/{id}", "method": "DELETE"},
+    {"path": "/courses", "method": "GET"},
+    {"path": "/payments", "method": "POST"},
+    {"path": "/payments", "method": "GET"},
+])
+
+
+def test_a_real_nested_multi_model_file_yields_three_real_models() -> None:
+    """The bug this regression-proves: `_backend_declared_models` used to
+    assume one backend/*.json file declared exactly one model (by its own
+    top-level table_name), so this real file -- one file, three real
+    nested models -- silently counted as one model named after the file
+    itself."""
+    from arkali.engineering.factory.product_ux_spec import _backend_declared_models
+
+    files = {"backend/data_model.json": _GOLDEN_WORK_064_DATA_MODEL}
+    assert _backend_declared_models(files) == {"students", "courses", "payments"}
+
+
+def test_a_spec_reconciling_against_the_real_nested_shape_passes() -> None:
+    spec = {
+        "product_title": "Student Fee Manager", "primary_roles": ["staff"],
+        "modules": [
+            _module("students", ["create", "edit", "delete", "view"],
+                    forms=[{"name": "StudentForm", "fields": ["name", "email"]}]),
+            _module("courses", ["view"]),
+            _module("payments", ["create", "view"],
+                    forms=[{"name": "PaymentForm", "fields": ["amount", "due_date"]}]),
+        ],
+        "navigation_destinations": ["Students", "Courses", "Payments", "Dashboard"],
+        "dashboard": {
+            "navigation_label": "Dashboard", "purpose": "overview",
+            "kpis": [{"name": "Total Students", "metric": "count_students"}],
+        },
+        "design_system": {**_DESIGN_SYSTEM, "responsive": True},
+    }
+    files = {
+        "backend/data_model.json": _GOLDEN_WORK_064_DATA_MODEL,
+        "backend/routes.json": _GOLDEN_WORK_064_ROUTES,
+        "product/ux_spec.json": json.dumps(spec),
+    }
+    assert _ux_spec_stage_findings(files) == []
+
+
+def test_a_kpi_object_and_a_boolean_responsive_flag_both_parse() -> None:
+    """golden-work-064 (session evidence, frozen): a real qwen2.5-coder:14b
+    wrote kpis as {"name": ..., "metric": ...} objects, never bare
+    strings, and wrote responsive as a bare boolean, never the
+    "desktop-first" strategy string this stage's rule text used to imply
+    without ever actually requiring. Both real shapes must parse."""
+    spec = {
+        "product_title": "Student Fee Manager", "primary_roles": ["staff"],
+        "modules": [_module("students", ["view"])],
+        "navigation_destinations": ["Students", "Dashboard"],
+        "dashboard": {
+            "navigation_label": "Dashboard", "purpose": "overview",
+            "kpis": [
+                {"name": "Total Students", "metric": "count_students"},
+                {"name": "Average Payment", "metric": "average_payment_amount"},
+            ],
+        },
+        "design_system": {**_DESIGN_SYSTEM, "responsive": True},
+    }
+    files = {"product/ux_spec.json": json.dumps(spec)}
+    spec_obj, findings = _parse_ux_spec(files)
+    assert findings == []
+    assert spec_obj is not None
+    assert spec_obj.dashboard is not None
+    assert spec_obj.dashboard.kpis[0].metric == "count_students"
+    assert spec_obj.design_system.responsive is True

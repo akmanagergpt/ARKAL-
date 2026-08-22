@@ -95,12 +95,26 @@ class _UxModuleSpec(BaseModel):
     states: _UxStateCoverage = _UxStateCoverage()
 
 
+class _UxKpiSpec(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str = Field(min_length=1)
+    #: What the KPI counts/aggregates (e.g. "count_students") — real
+    #: evidence this session (golden-work-064, frozen): a real
+    #: qwen2.5-coder:14b's own unprompted shape for a KPI was never a bare
+    #: string ("Total Students") but a {"name": ..., "metric": ...} object;
+    #: codified as the real schema rather than fought, the same rule
+    #: STAGED_GENERATION_STAGES.md#1 already states for backend_contract's
+    #: own schema-first shape.
+    metric: str = Field(min_length=1)
+
+
 class _UxDashboardSpec(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     navigation_label: str = Field(min_length=1, default="Dashboard")
     purpose: str = Field(min_length=1)
-    kpis: tuple[str, ...] = ()
+    kpis: tuple[_UxKpiSpec, ...] = ()
 
 
 class _UxDesignSystemSpec(BaseModel):
@@ -109,7 +123,13 @@ class _UxDesignSystemSpec(BaseModel):
     typography_scale: tuple[str, ...] = Field(min_length=1)
     spacing_scale: tuple[str, ...] = Field(min_length=1)
     component_conventions: tuple[str, ...] = Field(min_length=1)
-    responsive: str = "desktop-first"
+    #: golden-work-064 (session evidence, frozen): this stage's own rule
+    #: text named "responsive" with no declared type, and a real
+    #: qwen2.5-coder:14b reasonably read it as a yes/no flag (`true`), not
+    #: a strategy string ("desktop-first") — a real prompt ambiguity this
+    #: introduced, not a model defect. Accepts both real shapes rather
+    #: than forcing one arbitrary format choice.
+    responsive: bool | str = True
     accessible_focus_contrast: bool = True
 
 
@@ -171,13 +191,40 @@ def _backend_json_documents(files: Mapping[str, str]) -> list[tuple[str, object]
     return documents
 
 
+def _is_multi_model_field_map(fields: object) -> bool:
+    """True for `{"students": {"id": "integer", ...}, "courses": {...}}` —
+    one file's "fields" key holding several models keyed by name — false
+    for one model's own `{"id": {"type": "integer"}, ...}` field map.
+
+    golden-work-064 (session evidence, frozen): backend_contract's own
+    rule (`STAGED_GENERATION_STAGES.md#1`) only ever required "a JSON
+    object ... carrying a 'fields' key" — it never ruled out nesting
+    several models under that one key, and a real qwen2.5-coder:14b wrote
+    exactly one `backend/data_model.json` with three models nested this
+    way. `_backend_declared_models` below silently saw one model (this
+    file's own path stem) instead of three real ones — blind to exactly
+    the shape `frontend_ux_preflight._unreachable_module_findings`'s own
+    len(models) >= 2 gate exists to catch.
+    """
+    if not isinstance(fields, dict) or not fields:
+        return False
+    return all(isinstance(value, dict) and "type" not in value for value in fields.values())
+
+
+def _model_names_in_document(path: str, parsed: object) -> set[str]:
+    if not (isinstance(parsed, dict) and "fields" in parsed):
+        return set()
+    fields = parsed["fields"]
+    if _is_multi_model_field_map(fields):
+        return set(fields.keys())
+    table_name = parsed.get("table_name")
+    return {str(table_name) if table_name else _path_stem(path)}
+
+
 def _backend_declared_models(files: Mapping[str, str]) -> set[str]:
     names: set[str] = set()
     for path, parsed in _backend_json_documents(files):
-        if not (isinstance(parsed, dict) and "fields" in parsed):
-            continue
-        table_name = parsed.get("table_name")
-        names.add(str(table_name) if table_name else _path_stem(path))
+        names |= _model_names_in_document(path, parsed)
     return names
 
 
@@ -305,4 +352,4 @@ def _ux_spec_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
-__all__ = ["_parse_ux_spec", "_ux_spec_stage_findings"]
+__all__ = ["_parse_ux_spec", "_ux_spec_stage_findings", "_backend_declared_models"]

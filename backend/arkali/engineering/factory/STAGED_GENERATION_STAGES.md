@@ -107,13 +107,23 @@ PUT/PATCH must declare "edit", DELETE must declare "delete"), `forms`
 action); `navigation_destinations` (every module's `navigation_label`, and
 the dashboard's if one is declared); `dashboard` (optional — omit entirely
 for a genuinely single-purpose product with nothing worth summarising;
-when declared, carries `navigation_label`, `purpose` and `kpis`); and
-`design_system` (`typography_scale`, `spacing_scale`,
+when declared, carries `navigation_label`, `purpose` and `kpis`, each kpi
+an object with `name` and `metric`, e.g.
+`{"name": "Total Students", "metric": "count_students"}` — never a bare
+string); and `design_system` (`typography_scale`, `spacing_scale`,
 `component_conventions`, each a non-empty list of real conventions this
-product's own frontend will use, plus `responsive` and
-`accessible_focus_contrast`). Do not force a dashboard or a multi-surface
-shell onto a real single-module product — `dashboard` is optional and one
-module is a legal, complete `modules` list.
+product's own frontend will use, plus `responsive` — true/false for
+whether the layout must adapt to viewport width, or a named strategy
+string such as "desktop-first" — and `accessible_focus_contrast`). Do not
+force a dashboard or a multi-surface shell onto a real single-module
+product — `dashboard` is optional and one module is a legal, complete
+`modules` list. A backend-declared data model may be written either as
+its own file (`{"table_name": "students", "fields": {...}}`) or nested
+inside one file's `fields` object alongside others
+(`{"fields": {"students": {...}, "courses": {...}}}`) — both are real,
+already-observed backend_contract shapes (golden-work-064, session
+evidence, frozen); a module must exist for every real model either shape
+declares.
 
 ### 7. frontend_client
 Inputs: backend_cors_boundary
