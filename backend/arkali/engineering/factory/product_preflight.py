@@ -426,9 +426,11 @@ def inspect_product_files(
     findings.extend(frontend_contract_findings(files))
     from arkali.engineering.factory.frontend_ux_preflight import (
         _unreachable_module_findings,
+        _ux_spec_reconciliation_findings,
     )
 
     findings.extend(_unreachable_module_findings(files))
+    findings.extend(_ux_spec_reconciliation_findings(files))
     findings.extend(_manifest_findings(files))
     from arkali.engineering.factory.regression_preflight import _regression_findings
 

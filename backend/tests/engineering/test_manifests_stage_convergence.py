@@ -45,7 +45,7 @@ def test_manifests_self_heals_a_missing_werkzeug_cap_without_a_retry(
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 9
+    assert result.attempts_used == 10
     prompts = factory.models["manifests"].prompts  # type: ignore[attr-defined]
     assert len(prompts) == 1
     written = (tmp_path / "candidates" / "staged-1" / "backend" / "requirements.txt")
@@ -78,7 +78,7 @@ def test_repair_applies_even_when_an_unrelated_finding_also_remains(
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 9
+    assert result.attempts_used == 10
     prompts = factory.models["manifests"].prompts  # type: ignore[attr-defined]
     assert len(prompts) == 2
     assert "incompatible_dependency_range" not in prompts[1]
@@ -127,7 +127,7 @@ def test_anti_loop_does_not_trigger_when_findings_genuinely_differ(
         _blueprint(), _factory(queues), _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 9
+    assert result.attempts_used == 10
 
 
 def test_manifests_stage_prompt_carries_the_real_target_python_version(

@@ -5,12 +5,12 @@ Owner: `engineering.factory`. Split out of `component_generation.py`
 pushed that module to 452 logical lines against its 400 ceiling, measured
 by the real architecture-budget gate, not assumed.
 
-WHY THIS EXISTS. `manifests` declares all 8 prior stages as inputs —
-every route, test, and UI file this pipeline produces — because
-reconciling dependencies genuinely needs to know what every stage
-actually imports. Sending all of it as full file bytes caused a real
-HTTP-level timeout, 4/4 attempts, at exactly this stage (the largest
-prompt of the nine) — session evidence, golden-work-046.
+WHY THIS EXISTS. `manifests` declares all 9 prior stages as inputs —
+every route, test, UI and UX-planning file this pipeline produces —
+because reconciling dependencies genuinely needs to know what every
+stage actually imports. Sending all of it as full file bytes caused a
+real HTTP-level timeout, 4/4 attempts, at exactly this stage (the
+largest prompt of the ten) — session evidence, golden-work-046.
 `product_preflight._manifest_findings` (verified by reading its source,
 not assumed) only ever reads three things: `backend/requirements.txt`,
 `frontend/package.json`, and whether `frontend/public/index.html` exists —

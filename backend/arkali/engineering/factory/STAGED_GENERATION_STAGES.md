@@ -86,7 +86,36 @@ declare every fixture they consume, enter the real application lifecycle
 context required by startup hooks, and contain at least one real
 assertion.
 
-### 6. frontend_client
+### 6. product_ux_spec
+Inputs: backend_contract
+Rule: derive a machine-readable product UX specification at
+`product/ux_spec.json` from backend_contract's own real declared routes
+and data models — never a hard-coded product domain, never Dershane- or
+Golden-Product-specific names. It is a planning artifact, not application
+source: no JSX, no CSS, no component code. It must declare, as one JSON
+object: `product_title`; `primary_roles` (at least one); `modules` (at
+least one, one per backend_contract-declared data model — every declared
+model must appear, and no module may name a model backend_contract never
+declared), each with `name` (the model's own table name), `navigation_label`,
+`presentation` (one of "table"/"card"/"list"), `actions` (the subset of
+"create"/"edit"/"delete"/"view" the module's own backend resource really
+supports — a module whose resource exposes POST must declare "create",
+PUT/PATCH must declare "edit", DELETE must declare "delete"), `forms`
+(required, each with `name` and `fields`, whenever `actions` includes
+"create" or "edit"), `search_filter` (boolean), and `states` (`loading`,
+`empty`, `error` booleans, plus `success` when the module has a mutating
+action); `navigation_destinations` (every module's `navigation_label`, and
+the dashboard's if one is declared); `dashboard` (optional — omit entirely
+for a genuinely single-purpose product with nothing worth summarising;
+when declared, carries `navigation_label`, `purpose` and `kpis`); and
+`design_system` (`typography_scale`, `spacing_scale`,
+`component_conventions`, each a non-empty list of real conventions this
+product's own frontend will use, plus `responsive` and
+`accessible_focus_contrast`). Do not force a dashboard or a multi-surface
+shell onto a real single-module product — `dashboard` is optional and one
+module is a legal, complete `modules` list.
+
+### 7. frontend_client
 Inputs: backend_cors_boundary
 Rule: a frontend API client exists with one real invokable function for
 every route backend_cors_boundary's application actually exposes — each
@@ -99,8 +128,8 @@ qwen2.5-coder:14b wrote `{"createTask": "POST /tasks"}` — one JSON
 property per route, never an actual invocation — identically on two
 consecutive attempts).
 
-### 7. frontend_ui
-Inputs: frontend_client, backend_contract
+### 8. frontend_ui
+Inputs: frontend_client, backend_contract, product_ux_spec
 Rule: the UI calls every function frontend_client exports and renders
 loading, empty and error states. Render only field names backend_contract's
 own data-model JSON actually declares (its "fields" object) — never invent
@@ -116,24 +145,28 @@ frozen) found react-scripts build hard-codes src/index.js as its webpack
 entry point and fails outright without it; golden-work-061 (session
 evidence, frozen) then showed requiring it at manifests does not work —
 manifests' own reduced context never sees this stage's real component
-file name, only this stage does. When backend_contract declares two or
-more distinct data models, every one of them must be reachable through a
-real navigation element (e.g. react-router, a <Link>/<NavLink>, a <nav>)
-or a real interactive control (a form, input, button or select) — never
-render only a single bare list as the product's entire UI with the rest
-of backend_contract's declared models unreachable (real evidence this
-session, dershane-demo-003: backend_contract declared student, course
-and payment models; the shipped frontend was one component rendering one
-<ul> of student names, with no way to reach the other two anywhere in
-the UI).
+file name, only this stage does. Implement product_ux_spec faithfully:
+every declared navigation destination (including the dashboard's, if one
+is declared) must be reachable through a real navigation element or a
+real interactive control; every module whose actions include "create" or
+"edit" needs real, labelled form UI with a visible validation marker
+(never a bare unlabelled input); a module with a "delete" action needs a
+real confirmation step before it fires when product_ux_spec requires one;
+and a mutating action needs a visible success/feedback marker afterward.
+Never render only a single bare list as the product's entire UI with the
+rest of backend_contract's declared models unreachable (real evidence
+this session, dershane-demo-003: backend_contract declared student,
+course and payment models; the shipped frontend was one component
+rendering one <ul> of student names, with no way to reach the other two
+anywhere in the UI).
 
-### 8. frontend_tests_config
+### 9. frontend_tests_config
 Inputs: frontend_client, frontend_ui
 Rule: frontend tests, `package.json` and `config/README.md` are complete
 and consistent with frontend_client and frontend_ui.
 
-### 9. manifests
-Inputs: backend_contract, backend_schema, backend_implementation, backend_cors_boundary, backend_tests, frontend_client, frontend_ui, frontend_tests_config
+### 10. manifests
+Inputs: backend_contract, backend_schema, backend_implementation, backend_cors_boundary, backend_tests, product_ux_spec, frontend_client, frontend_ui, frontend_tests_config
 Rule: declared backend and frontend dependencies are compatible with each
 other and with the target runtime, and the startup path is complete end to
 end. This stage does not see the other stages' full source — sending all

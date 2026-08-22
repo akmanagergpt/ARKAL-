@@ -48,10 +48,14 @@ from arkali.engineering.factory.backend_contract_preflight import _backend_contr
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_manifest_preflight import _missing_frontend_entry_point_findings
-from arkali.engineering.factory.frontend_ux_preflight import _unreachable_module_findings
+from arkali.engineering.factory.frontend_ux_preflight import (
+    _unreachable_module_findings,
+    _ux_spec_reconciliation_findings,
+)
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
 from arkali.engineering.factory.manifest_context import _manifest_context
+from arkali.engineering.factory.product_ux_spec import _ux_spec_stage_findings
 from arkali.engineering.factory.route_response_preflight import _missing_generated_id_findings, _raw_row_jsonify_findings
 from arkali.engineering.factory.model_product_generation import (
     GeneratedFile,
@@ -126,8 +130,12 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
 
 
 def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
+    # "empty" was named in this stage's own rule text (STAGED_GENERATION_STAGES.md#8:
+    # "renders loading, empty and error states") but never actually checked here —
+    # a real gap in this check, not the rule; fixed alongside this session's wider
+    # UX-reconciliation work rather than left to drift further from its own rule.
     lowered = ui.lower()
-    missing = [state for state in ("loading", "error") if state not in lowered]
+    missing = [state for state in ("loading", "empty", "error") if state not in lowered]
     return [
         SemanticFinding(
             code="frontend_ui_missing_state", path="frontend/src/",
@@ -149,6 +157,7 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _missing_ui_state_findings(ui)
         + _missing_frontend_entry_point_findings(files)
         + _unreachable_module_findings(files)
+        + _ux_spec_reconciliation_findings(files)
     )
 
 
@@ -297,6 +306,7 @@ _STAGE_VALIDATORS: dict[str, Callable[[Mapping[str, str]], list[SemanticFinding]
     "backend_implementation": _backend_implementation_stage_findings,
     "backend_cors_boundary": _cors_boundary_stage_findings,
     "backend_tests": _backend_tests_stage_findings,
+    "product_ux_spec": _ux_spec_stage_findings,
     "frontend_client": frontend_contract_findings,
     "frontend_ui": _frontend_ui_findings,
     "frontend_tests_config": _manifest_findings,

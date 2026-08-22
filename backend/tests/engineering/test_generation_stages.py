@@ -15,8 +15,8 @@ def test_loads_the_real_document() -> None:
     stages = vocabulary.stages()
     assert [s.name for s in stages] == [
         "backend_contract", "backend_schema", "backend_implementation",
-        "backend_cors_boundary", "backend_tests", "frontend_client",
-        "frontend_ui", "frontend_tests_config", "manifests",
+        "backend_cors_boundary", "backend_tests", "product_ux_spec",
+        "frontend_client", "frontend_ui", "frontend_tests_config", "manifests",
     ]
 
 

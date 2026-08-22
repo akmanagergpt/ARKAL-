@@ -108,13 +108,37 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
         ),
     },
     "backend_tests": {"tests/test_works.py": "def test_placeholder():\n    assert True\n"},
+    "product_ux_spec": {
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Work Tracker",
+            "primary_roles": ["user"],
+            "modules": [{
+                "name": "works",
+                "navigation_label": "Works",
+                "presentation": "list",
+                "actions": ["view"],
+                "forms": [],
+                "search_filter": False,
+                "states": {"loading": True, "empty": True, "error": True, "success": False},
+            }],
+            "navigation_destinations": ["Works"],
+            "design_system": {
+                "typography_scale": ["base"],
+                "spacing_scale": ["sm"],
+                "component_conventions": ["list"],
+                "responsive": "desktop-first",
+                "accessible_focus_contrast": True,
+            },
+            "destructive_action_confirmation": True,
+        }),
+    },
     "frontend_client": {
         "frontend/src/client.js": "export function fetchWorks() { return fetch('/works'); }\n",
     },
     "frontend_ui": {
         "frontend/src/App.js": (
             "import { fetchWorks } from './client';\n"
-            "function App() { fetchWorks(); return 'loading error'; }\n"
+            "function App() { fetchWorks(); return 'loading empty error works'; }\n"
             "export default App;\n"
         ),
         "frontend/src/index.js": (
@@ -140,7 +164,7 @@ def _happy_path_queues() -> dict[str, list[tuple[HonestState, str]]]:
     }
 
 
-def test_all_nine_stages_pass_and_are_written_to_the_real_workspace(
+def test_all_ten_stages_pass_and_are_written_to_the_real_workspace(
     tmp_path: pathlib.Path,
 ) -> None:
     workspace = _workspace(tmp_path)
@@ -148,7 +172,7 @@ def test_all_nine_stages_pass_and_are_written_to_the_real_workspace(
         _blueprint(), _factory(_happy_path_queues()), workspace,
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 9
+    assert result.attempts_used == 10
     written = set(result.files)
     assert written == {
         path for files in HAPPY_PATH_FILES.values() for path in files
@@ -187,10 +211,11 @@ def test_a_stage_only_sees_its_declared_inputs_real_bytes(tmp_path: pathlib.Path
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    # frontend_ui declares frontend_client and backend_contract as inputs.
+    # frontend_ui declares frontend_client, backend_contract and product_ux_spec as inputs.
     ui_prompt = factory.models["frontend_ui"].prompts[0]  # type: ignore[attr-defined]
     assert "fetchWorks" in ui_prompt  # frontend_client's real export, visible
     assert "title" in ui_prompt  # backend_contract's real declared field, visible
+    assert "navigation_label" in ui_prompt  # product_ux_spec's real content, visible
     assert "list_works" not in ui_prompt  # backend_implementation's content, not declared
 
 
@@ -205,7 +230,7 @@ def test_manifests_stage_prompt_is_reduced_not_the_whole_candidate(
         vocabulary=StageVocabulary.load(REPO),
     )
     manifests_prompt = factory.models["manifests"].prompts[0]  # type: ignore[attr-defined]
-    # None of the other 8 stages' real route/UI/test source bytes appear.
+    # None of the other 9 stages' real route/UI/test source bytes appear.
     assert "list_works" not in manifests_prompt
     assert "fetchWorks" not in manifests_prompt
     assert "test_placeholder" not in manifests_prompt
@@ -226,7 +251,7 @@ def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 9
+    assert result.attempts_used == 10
     prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
     assert len(prompts) == 2
     assert "backend_contract_no_routes" in prompts[1]
@@ -303,6 +328,22 @@ def test_frontend_ui_findings_flags_unused_export_and_missing_states() -> None:
     codes = {f.code for f in findings}
     assert "frontend_ui_client_unused" in codes
     assert "frontend_ui_missing_state" in codes
+
+
+def test_frontend_ui_findings_flags_a_missing_empty_state_specifically() -> None:
+    """STAGED_GENERATION_STAGES.md#8 has always named "loading, empty and
+    error states"; the check only ever compared against ("loading", "error")
+    -- a real gap between the rule's own text and its check, not the rule,
+    fixed alongside this session's wider UX-reconciliation work."""
+    files = {
+        "frontend/src/client.js": "export function fetchWorks() { return fetch('/works'); }\n",
+        "frontend/src/App.js": (
+            "function App() { fetchWorks(); return 'loading error'; }\nexport default App;\n"
+        ),
+    }
+    findings = _frontend_ui_findings(files)
+    state_findings = [f for f in findings if f.code == "frontend_ui_missing_state"]
+    assert any("empty" in f.detail for f in state_findings)
 
 
 def test_frontend_ui_findings_passes_on_real_wiring() -> None:
