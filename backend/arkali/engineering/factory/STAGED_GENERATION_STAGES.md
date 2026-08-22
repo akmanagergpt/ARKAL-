@@ -98,7 +98,16 @@ a reasonable Flask convention this rule never ruled out). Tests import
 only symbols backend_cors_boundary's application actually exports,
 declare every fixture they consume, enter the real application lifecycle
 context required by startup hooks, and contain at least one real
-assertion.
+assertion. A test that creates a row and later reads, updates or deletes
+it by id must use the real id the create response actually returned
+(e.g. `response.json['id']`), never a hardcoded literal such as `1` —
+when a table's schema declares `AUTOINCREMENT` (backend_schema's own
+common real choice), SQLite never reuses an id even after every row is
+deleted between tests, so only the very first test that ever runs
+against a fresh database genuinely gets id 1 (golden-work-070, session
+evidence, frozen: three of eight real generated tests each independently
+assumed their own freshly-created row was id 1; the alphabetically-first
+of them passed, the other two failed a real 404 the exact same way).
 
 ### 6. product_ux_spec
 Inputs: backend_contract
