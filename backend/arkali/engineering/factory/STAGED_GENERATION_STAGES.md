@@ -296,4 +296,14 @@ devDependency, not merely referenced in the scripts commands
 dependencies nor devDependencies — real "npm install" silently installed
 only the other three declared packages, and real "npm run build" failed
 outright: "'react-scripts' is not recognized as an internal or external
-command").
+command"). A pinned backend version must be one that genuinely exists —
+`flask_cors`'s own real version numbering is independent of Flask's and
+must never be assumed to track it (golden-work-073, session evidence,
+frozen: real pip refused `flask_cors==3.1.1` outright — "Could not find
+a version that satisfies the requirement" — no such release has ever
+existed; the real available versions top out in the 6.0.x series).
+Whenever the exact real latest version is not genuinely known, declare a
+minimum-version bound (e.g. `flask_cors>=3.0`) rather than an invented
+exact pin — pip's own resolver, which this stage's own real dependency
+check runs, will select and verify a real installable release either
+way, and a bound cannot name a version that was never published.
