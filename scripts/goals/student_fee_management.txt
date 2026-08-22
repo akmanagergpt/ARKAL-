@@ -1,0 +1,8 @@
+1. The system must persist student, course and payment records using SQLite with at least 3 tables.
+2. The backend must expose at least 8 REST API endpoints covering students, courses and payments.
+3. The backend must support creating, listing, updating and deleting student records through at least 4 dedicated endpoints.
+4. The backend must record at least 1 payment transaction per student with an associated amount and a due date.
+5. The frontend must display a dashboard presenting at least 1 summary metric derived from the persisted student and payment records.
+6. The frontend must provide navigation reaching at least 3 distinct sections covering students, courses and payments.
+7. The backend must respond within 500 ms for a single record request under normal load.
+8. The system must retain persisted student and payment data across at least 1 backend restart.

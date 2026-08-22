@@ -53,6 +53,10 @@ from arkali.kernel.persistence.session import (  # noqa: E402
     unit_of_work,
 )
 
+#: Default goal (Golden Product family 1, Task/Work Management) -- kept
+#: unchanged so a bare `--candidate-id` invocation reproduces exactly what
+#: it always has. `--goal-file` overrides it for any other Golden Product
+#: family without touching this default.
 GOAL = """1. The system must persist task records using SQLite with at least 1 table.
 2. The backend must expose at least 4 REST API endpoints for task management.
 3. The frontend must display a task list within 1 screen.
@@ -97,9 +101,15 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--max-output-tokens", type=int, default=4096)
     parser.add_argument("--timeout-seconds", type=float, default=300.0)
     parser.add_argument("--per-stage-max-attempts", type=int, default=4)
+    parser.add_argument(
+        "--goal-file", type=pathlib.Path, default=None,
+        help="path to a real goal-text file (one requirement per numbered line); "
+             "defaults to this script's own built-in Task/Work Management GOAL",
+    )
     args = parser.parse_args(argv[1:])
 
-    blueprint = derive_blueprint(GOAL, AuthorityMap.load(ROOT))
+    goal_text = args.goal_file.read_text(encoding="utf-8") if args.goal_file else GOAL
+    blueprint = derive_blueprint(goal_text, AuthorityMap.load(ROOT))
     vocabulary = StageVocabulary.load(ROOT)
 
     candidates_root = ROOT / "var" / "factory" / "candidates"
