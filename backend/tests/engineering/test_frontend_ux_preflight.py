@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _ux_spec_mutation_findings,
+    _ux_spec_shell_findings,
     _unreachable_module_findings,
-    _ux_spec_reconciliation_findings,
 )
 from tests.engineering.test_product_ux_spec import (
     _GOLDEN_WORK_064_DATA_MODEL,
@@ -142,7 +143,7 @@ def test_b_navigation_present_but_a_declared_module_is_unreachable() -> None:
             "</nav>); }"
         ),
     }
-    findings = _ux_spec_reconciliation_findings(files)
+    findings = _ux_spec_shell_findings(files)
     codes = {f.code for f in findings}
     assert "frontend_ui_navigation_destination_unreachable" in codes
     unreachable_finding = next(
@@ -169,7 +170,7 @@ def test_c_backend_has_create_capability_but_frontend_has_no_mutation_ui() -> No
             "</nav>); }"
         ),
     }
-    findings = _ux_spec_reconciliation_findings(files)
+    findings = _ux_spec_mutation_findings(files)
     assert any(f.code == "frontend_ui_missing_mutation_ui" for f in findings)
 
 
@@ -183,7 +184,7 @@ def test_d_form_exists_with_no_label_and_no_validation_marker() -> None:
             )
         ),
     }
-    findings = _ux_spec_reconciliation_findings(files)
+    findings = _ux_spec_mutation_findings(files)
     codes = {f.code for f in findings}
     assert "frontend_ui_form_missing_labels" in codes
     assert "frontend_ui_form_missing_validation" in codes
@@ -196,7 +197,8 @@ def test_f_a_professional_multi_module_shell_structurally_passes() -> None:
     control proving these checks do not merely reject, they let a real,
     complete implementation through."""
     files = {**_valid_spec_files(), "frontend/src/App.js": _PROFESSIONAL_SHELL_JS}
-    assert _ux_spec_reconciliation_findings(files) == []
+    assert _ux_spec_shell_findings(files) == []
+    assert _ux_spec_mutation_findings(files) == []
     assert _unreachable_module_findings(files) == []
 
 
@@ -229,5 +231,6 @@ def test_g_a_genuinely_single_purpose_product_is_not_forced_into_a_shell() -> No
         **backend, "product/ux_spec.json": json.dumps(spec),
         "frontend/src/NotesList.js": "<ul>{notes.map(n => <li>{n.title}</li>)}</ul> notes",
     }
-    assert _ux_spec_reconciliation_findings(files) == []
+    assert _ux_spec_shell_findings(files) == []
+    assert _ux_spec_mutation_findings(files) == []
     assert _unreachable_module_findings(files) == []

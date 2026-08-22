@@ -50,7 +50,8 @@ from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_manifest_preflight import _missing_frontend_entry_point_findings
 from arkali.engineering.factory.frontend_ux_preflight import (
     _unreachable_module_findings,
-    _ux_spec_reconciliation_findings,
+    _ux_spec_mutation_findings,
+    _ux_spec_shell_findings,
 )
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
@@ -129,13 +130,27 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
     )]
 
 
+#: golden-work-065 (session evidence, frozen): a real qwen2.5-coder:14b
+#: implemented a genuine empty-state branch three times over
+#: (`students.length === 0 ? <p>No students found</p> : ...`) and every
+#: one was a real false positive against a bare `"empty" in text`
+#: check — the literal word never appears, only real, more specific
+#: phrasing. Loading/error stay single-marker: real output overwhelmingly
+#: uses those exact words, and no real evidence yet shows otherwise.
+_EMPTY_STATE_MARKERS = ("empty", "no results", "nothing found", ".length === 0", ".length==0")
+
+
 def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
     # "empty" was named in this stage's own rule text (STAGED_GENERATION_STAGES.md#8:
     # "renders loading, empty and error states") but never actually checked here —
     # a real gap in this check, not the rule; fixed alongside this session's wider
     # UX-reconciliation work rather than left to drift further from its own rule.
     lowered = ui.lower()
-    missing = [state for state in ("loading", "empty", "error") if state not in lowered]
+    missing = [state for state in ("loading", "error") if state not in lowered]
+    if not any(marker in lowered for marker in _EMPTY_STATE_MARKERS) and not re.search(
+        r"no\s+\w+\s+found", lowered
+    ):
+        missing.append("empty")
     return [
         SemanticFinding(
             code="frontend_ui_missing_state", path="frontend/src/",
@@ -150,15 +165,25 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     and (golden-work-061, session evidence, frozen) provides the real
     entry point mounting its own component — required here, not at
     `manifests`, since only this stage actually knows the component's
-    real file name."""
+    real file name. Mutation UI is `frontend_forms`'s own concern
+    (golden-work-065, session evidence, frozen), not checked here."""
     client, ui = _split_client_and_ui(files)
     return (
         _unused_client_export_findings(client, ui)
         + _missing_ui_state_findings(ui)
         + _missing_frontend_entry_point_findings(files)
         + _unreachable_module_findings(files)
-        + _ux_spec_reconciliation_findings(files)
+        + _ux_spec_shell_findings(files)
     )
+
+
+def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """`frontend_forms`'s own narrow rule: real, labelled, validated
+    mutation UI for every product_ux_spec-declared create/edit action, a
+    confirmation step before delete, and success feedback after a
+    mutation. Split out from `frontend_ui` (golden-work-065, session
+    evidence, frozen) — see `STAGED_GENERATION_STAGES.md#9`."""
+    return _ux_spec_mutation_findings(files)
 
 
 def _backend_text(files: Mapping[str, str]) -> str:
@@ -309,6 +334,7 @@ _STAGE_VALIDATORS: dict[str, Callable[[Mapping[str, str]], list[SemanticFinding]
     "product_ux_spec": _ux_spec_stage_findings,
     "frontend_client": frontend_contract_findings,
     "frontend_ui": _frontend_ui_findings,
+    "frontend_forms": _frontend_forms_findings,
     "frontend_tests_config": _manifest_findings,
     "manifests": _manifests_stage_findings,
 }

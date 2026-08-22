@@ -146,6 +146,18 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
             "ReactDOM.render(App, document.getElementById('root'));\n"
         ),
     },
+    # The happy-path ux_spec's one module declares only "view" -- no
+    # create/edit/delete -- so frontend_forms has nothing to add and
+    # returns frontend_ui's own file back unchanged (STAGED_GENERATION_
+    # STAGES.md#9: "needs no change here -- return frontend_ui's own
+    # files unchanged rather than inventing one").
+    "frontend_forms": {
+        "frontend/src/App.js": (
+            "import { fetchWorks } from './client';\n"
+            "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+            "export default App;\n"
+        ),
+    },
     "frontend_tests_config": {
         "frontend/package.json": '{"name": "app"}\n',
         "frontend/tests/App.test.js": "test('x', () => {});\n",
@@ -164,7 +176,7 @@ def _happy_path_queues() -> dict[str, list[tuple[HonestState, str]]]:
     }
 
 
-def test_all_ten_stages_pass_and_are_written_to_the_real_workspace(
+def test_all_eleven_stages_pass_and_are_written_to_the_real_workspace(
     tmp_path: pathlib.Path,
 ) -> None:
     workspace = _workspace(tmp_path)
@@ -172,7 +184,7 @@ def test_all_ten_stages_pass_and_are_written_to_the_real_workspace(
         _blueprint(), _factory(_happy_path_queues()), workspace,
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 10
+    assert result.attempts_used == 11
     written = set(result.files)
     assert written == {
         path for files in HAPPY_PATH_FILES.values() for path in files
@@ -230,7 +242,7 @@ def test_manifests_stage_prompt_is_reduced_not_the_whole_candidate(
         vocabulary=StageVocabulary.load(REPO),
     )
     manifests_prompt = factory.models["manifests"].prompts[0]  # type: ignore[attr-defined]
-    # None of the other 9 stages' real route/UI/test source bytes appear.
+    # None of the other 10 stages' real route/UI/test source bytes appear.
     assert "list_works" not in manifests_prompt
     assert "fetchWorks" not in manifests_prompt
     assert "test_placeholder" not in manifests_prompt
@@ -251,7 +263,7 @@ def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
         _blueprint(), factory, _workspace(tmp_path),
         vocabulary=StageVocabulary.load(REPO),
     )
-    assert result.attempts_used == 10
+    assert result.attempts_used == 11
     prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
     assert len(prompts) == 2
     assert "backend_contract_no_routes" in prompts[1]

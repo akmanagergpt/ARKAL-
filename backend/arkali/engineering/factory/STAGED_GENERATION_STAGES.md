@@ -155,28 +155,48 @@ frozen) found react-scripts build hard-codes src/index.js as its webpack
 entry point and fails outright without it; golden-work-061 (session
 evidence, frozen) then showed requiring it at manifests does not work —
 manifests' own reduced context never sees this stage's real component
-file name, only this stage does. Implement product_ux_spec faithfully:
-every declared navigation destination (including the dashboard's, if one
-is declared) must be reachable through a real navigation element or a
-real interactive control; every module whose actions include "create" or
-"edit" needs real, labelled form UI with a visible validation marker
-(never a bare unlabelled input); a module with a "delete" action needs a
-real confirmation step before it fires when product_ux_spec requires one;
-and a mutating action needs a visible success/feedback marker afterward.
-Never render only a single bare list as the product's entire UI with the
-rest of backend_contract's declared models unreachable (real evidence
-this session, dershane-demo-003: backend_contract declared student,
-course and payment models; the shipped frontend was one component
-rendering one <ul> of student names, with no way to reach the other two
-anywhere in the UI).
+file name, only this stage does. Implement product_ux_spec's navigation
+faithfully: every declared navigation destination (including the
+dashboard's, if one is declared) must be reachable through a real
+navigation element or a real interactive control. Never render only a
+single bare list as the product's entire UI with the rest of
+backend_contract's declared models unreachable (real evidence this
+session, dershane-demo-003: backend_contract declared student, course
+and payment models; the shipped frontend was one component rendering one
+<ul> of student names, with no way to reach the other two anywhere in
+the UI). Mutating forms, delete confirmation and post-mutation feedback
+are not this stage's concern — that is frontend_forms's job, immediately
+after this one.
 
-### 9. frontend_tests_config
-Inputs: frontend_client, frontend_ui
+### 9. frontend_forms
+Inputs: frontend_client, frontend_ui, product_ux_spec
+Rule: add real, labelled form UI, wired to frontend_client's real
+create/update calls, for every module product_ux_spec declares a
+"create" or "edit" action for, with a visible validation marker (never a
+bare unlabelled input); add a real confirmation step before a module's
+declared "delete" action fires, when product_ux_spec requires one; add a
+visible success/feedback marker after a mutation completes. Return the
+complete, updated frontend source — frontend_ui's own navigation,
+dashboard and read-only rendering already work and are not this stage's
+concern; add the missing mutation UI onto them, do not rewrite them.
+Split out as its own stage (real evidence, golden-work-065): a real
+qwen2.5-coder:14b reliably produced a genuine multi-module shell —
+react-router navigation, a dashboard with real KPIs, loading/empty/error
+states — but never once added product_ux_spec's declared create/edit/
+delete forms in the same bounded attempt, across all 4 real attempts;
+narrowing the stage to exactly the mutation-UI concern is the fix, the
+same shape backend_cors_boundary's own split answered for backend
+routes+schema-vs-CORS. A product whose product_ux_spec declares no
+create/edit/delete action anywhere needs no change here — return
+frontend_ui's own files unchanged rather than inventing one.
+
+### 10. frontend_tests_config
+Inputs: frontend_client, frontend_ui, frontend_forms
 Rule: frontend tests, `package.json` and `config/README.md` are complete
-and consistent with frontend_client and frontend_ui.
+and consistent with frontend_client, frontend_ui and frontend_forms.
 
-### 10. manifests
-Inputs: backend_contract, backend_schema, backend_implementation, backend_cors_boundary, backend_tests, product_ux_spec, frontend_client, frontend_ui, frontend_tests_config
+### 11. manifests
+Inputs: backend_contract, backend_schema, backend_implementation, backend_cors_boundary, backend_tests, product_ux_spec, frontend_client, frontend_ui, frontend_forms, frontend_tests_config
 Rule: declared backend and frontend dependencies are compatible with each
 other and with the target runtime, and the startup path is complete end to
 end. This stage does not see the other stages' full source — sending all

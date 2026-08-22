@@ -13,18 +13,20 @@ kind reaching the other two backend-declared models. It needs nothing but
 `backend_contract`'s own JSON, so it runs on every candidate regardless of
 which generation path produced it (staged or one-shot).
 
-`_ux_spec_reconciliation_findings` is the deeper check, reconciling the
-rendered frontend against the real `product_ux_spec` stage artifact
-(`product_ux_spec.py`) when one exists: every declared navigation
-destination must be reachable, every declared mutating action must have real
-form UI, forms must carry labels and a validation marker, declared states
-must be present, a declared dashboard must be reachable, and a declared
-delete action must be confirmed before it fires. It is silent (returns no
-findings, never a `ux_spec_missing` failure) when no `product/ux_spec.json`
-exists — the one-shot generation path (`model_product_generation.py`) has no
-such stage and must not be penalized for a stage it never runs; `product_ux_spec`'s
-own stage validator, not this whole-product-gate layer, is what refuses a
-missing or invalid spec on the staged path.
+`_ux_spec_shell_findings` and `_ux_spec_mutation_findings` are the deeper,
+real `product_ux_spec` reconciliation, split along the same seam
+`frontend_ui`/`frontend_forms` are split along (golden-work-065, session
+evidence, frozen — see `STAGED_GENERATION_STAGES.md#9`): the shell slice
+checks every declared navigation destination is reachable and no raw JSON
+is dumped as primary content; the mutation slice checks every declared
+create/edit action has real, labelled, validated form UI, a declared
+delete action is confirmed before it fires, and a mutation leaves visible
+success feedback. Both are silent (no findings, never a `ux_spec_missing`
+failure) when no `product/ux_spec.json` exists — the one-shot generation
+path (`model_product_generation.py`) has no such stage and must not be
+penalized for a stage it never runs; `product_ux_spec`'s own stage
+validator, not this whole-product-gate layer, is what refuses a missing
+or invalid spec on the staged path.
 
 DELIBERATELY NARROW, NOT A DESIGN-QUALITY GATE. Both layers check
 reachability and structural completeness — whether a real control exists to
@@ -183,24 +185,44 @@ def _raw_json_dump_findings(frontend: str) -> list[SemanticFinding]:
     )]
 
 
-def _ux_spec_reconciliation_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Reconcile the rendered frontend against the real `product_ux_spec`
-    artifact. Silent when no spec exists — this is not the layer that
-    refuses a missing/invalid spec (`product_ux_spec._ux_spec_stage_findings`
-    is), so a candidate from a pipeline with no such stage is never
-    penalized here."""
+def _parsed_spec_and_frontend(files: Mapping[str, str]) -> tuple[object, str] | tuple[None, None]:
     spec, _parse_findings = _parse_ux_spec(files)
     frontend = _frontend_source_text(files)
     if spec is None or not frontend:
+        return None, None
+    return spec, frontend
+
+
+def _ux_spec_shell_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """`frontend_ui`'s own reconciliation slice: navigation reachability and
+    no-raw-JSON, never the mutation-UI concerns `frontend_forms` owns.
+    Silent when no spec exists — this is not the layer that refuses a
+    missing/invalid spec (`product_ux_spec._ux_spec_stage_findings` is), so
+    a candidate from a pipeline with no such stage is never penalized
+    here."""
+    spec, frontend = _parsed_spec_and_frontend(files)
+    if spec is None:
+        return []
+    return _navigation_reconciliation_findings(spec, frontend) + _raw_json_dump_findings(frontend)
+
+
+def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """`frontend_forms`'s own reconciliation slice: real mutation UI for
+    every declared create/edit action, labelled and validated, a
+    confirmation step before delete, and success feedback after a
+    mutation. Split out from the shell checks above (golden-work-065,
+    session evidence, frozen) alongside the stage split itself — see
+    `STAGED_GENERATION_STAGES.md#9`'s own rule text for the real evidence.
+    Silent when no spec exists, for the same reason the shell slice is."""
+    spec, frontend = _parsed_spec_and_frontend(files)
+    if spec is None:
         return []
     return (
-        _navigation_reconciliation_findings(spec, frontend)
-        + _action_ui_findings(spec, frontend)
+        _action_ui_findings(spec, frontend)
         + _form_quality_findings(frontend)
         + _state_coverage_findings(spec, frontend)
         + _destructive_confirmation_findings(spec, frontend)
-        + _raw_json_dump_findings(frontend)
     )
 
 
-__all__ = ["_unreachable_module_findings", "_ux_spec_reconciliation_findings"]
+__all__ = ["_unreachable_module_findings", "_ux_spec_shell_findings", "_ux_spec_mutation_findings"]
