@@ -44,9 +44,11 @@ from collections.abc import Callable, Mapping
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
+from arkali.engineering.factory.backend_contract_preflight import _backend_contract_findings
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_manifest_preflight import _missing_frontend_entry_point_findings
+from arkali.engineering.factory.frontend_ux_preflight import _unreachable_module_findings
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
 from arkali.engineering.factory.manifest_context import _manifest_context
@@ -100,59 +102,6 @@ class _StageEnvelope(BaseModel):
         return self
 
 
-_HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
-
-
-def _backend_contract_json_files(files: Mapping[str, str]) -> list[object]:
-    parsed: list[object] = []
-    for path, source in files.items():
-        if not (path.startswith("backend/") and path.endswith(".json")):
-            continue
-        try:
-            parsed.append(json.loads(source))
-        except json.JSONDecodeError:
-            continue
-    return parsed
-
-
-def _declares_routes(parsed_files: list[object]) -> bool:
-    for document in parsed_files:
-        if not isinstance(document, list):
-            continue
-        if any(
-            isinstance(item, dict) and "path" in item
-            and str(item.get("method", "")).lower() in _HTTP_METHODS
-            for item in document
-        ):
-            return True
-    return False
-
-
-def _declares_a_model(parsed_files: list[object]) -> bool:
-    return any(
-        isinstance(document, dict) and "fields" in document for document in parsed_files
-    )
-
-
-def _backend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """`backend_contract`'s own narrow rule: a machine-readable route and data
-    model schema is declared (JSON, not Python — see
-    STAGED_GENERATION_STAGES.md#1)."""
-    parsed = _backend_contract_json_files(files)
-    findings: list[SemanticFinding] = []
-    if not _declares_routes(parsed):
-        findings.append(SemanticFinding(
-            code="backend_contract_no_routes", path="backend/",
-            detail="no backend/*.json file declares a route array with path+method",
-        ))
-    if not _declares_a_model(parsed):
-        findings.append(SemanticFinding(
-            code="backend_contract_no_models", path="backend/",
-            detail="no backend/*.json file declares a data model with a 'fields' key",
-        ))
-    return findings
-
-
 def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:
     client_paths = [
         path for path in files if path.startswith("frontend/src/") and "client" in path.lower()
@@ -195,7 +144,12 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     `manifests`, since only this stage actually knows the component's
     real file name."""
     client, ui = _split_client_and_ui(files)
-    return _unused_client_export_findings(client, ui) + _missing_ui_state_findings(ui) + _missing_frontend_entry_point_findings(files)
+    return (
+        _unused_client_export_findings(client, ui)
+        + _missing_ui_state_findings(ui)
+        + _missing_frontend_entry_point_findings(files)
+        + _unreachable_module_findings(files)
+    )
 
 
 def _backend_text(files: Mapping[str, str]) -> str:

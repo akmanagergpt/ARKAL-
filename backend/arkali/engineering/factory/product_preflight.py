@@ -407,28 +407,6 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
-def _regression_findings(
-    files: Mapping[str, str], baseline: Mapping[str, str] | None
-) -> list[SemanticFinding]:
-    findings: list[SemanticFinding] = []
-    for path, original in (baseline or {}).items():
-        if _module_name(path) is None or path not in files:
-            continue
-        try:
-            removed = sorted(_exports(original) - _exports(files[path]))
-        except SyntaxError:
-            continue
-        if removed:
-            findings.append(
-                SemanticFinding(
-                    code="removed_parent_symbols",
-                    path=path,
-                    detail=f"candidate removed existing symbols {removed!r}",
-                )
-            )
-    return findings
-
-
 def inspect_product_files(
     files: Mapping[str, str], *, baseline: Mapping[str, str] | None = None
 ) -> ProductPreflightReport:
@@ -446,7 +424,14 @@ def inspect_product_files(
     )
 
     findings.extend(frontend_contract_findings(files))
+    from arkali.engineering.factory.frontend_ux_preflight import (
+        _unreachable_module_findings,
+    )
+
+    findings.extend(_unreachable_module_findings(files))
     findings.extend(_manifest_findings(files))
+    from arkali.engineering.factory.regression_preflight import _regression_findings
+
     findings.extend(_regression_findings(files, baseline))
     return ProductPreflightReport(findings=tuple(findings))
 

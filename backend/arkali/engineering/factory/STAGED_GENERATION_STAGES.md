@@ -116,7 +116,16 @@ frozen) found react-scripts build hard-codes src/index.js as its webpack
 entry point and fails outright without it; golden-work-061 (session
 evidence, frozen) then showed requiring it at manifests does not work —
 manifests' own reduced context never sees this stage's real component
-file name, only this stage does.
+file name, only this stage does. When backend_contract declares two or
+more distinct data models, every one of them must be reachable through a
+real navigation element (e.g. react-router, a <Link>/<NavLink>, a <nav>)
+or a real interactive control (a form, input, button or select) — never
+render only a single bare list as the product's entire UI with the rest
+of backend_contract's declared models unreachable (real evidence this
+session, dershane-demo-003: backend_contract declared student, course
+and payment models; the shipped frontend was one component rendering one
+<ul> of student names, with no way to reach the other two anywhere in
+the UI).
 
 ### 8. frontend_tests_config
 Inputs: frontend_client, frontend_ui
