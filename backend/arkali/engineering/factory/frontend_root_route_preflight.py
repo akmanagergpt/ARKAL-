@@ -31,7 +31,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _ROUTE_OR_REDIRECT_TAG = re.compile(r"<(Route|Redirect)\b([^>]*)/?>")
 _PATH_ATTR = re.compile(r"""\bpath=["']([^"']+)["']""")

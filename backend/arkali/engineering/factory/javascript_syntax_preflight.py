@@ -27,7 +27,7 @@ import subprocess
 import tempfile
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _NODE_TIMEOUT_SECONDS = 15.0
 #: The real `node --check` output for a syntax error always names the exact

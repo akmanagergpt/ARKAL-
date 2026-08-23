@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _HTTP_METHODS = frozenset({"get", "post", "put", "delete", "patch"})
 

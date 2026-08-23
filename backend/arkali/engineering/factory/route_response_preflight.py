@@ -38,7 +38,7 @@ from __future__ import annotations
 import ast
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 
 def _backend_python_functions(files: Mapping[str, str]):

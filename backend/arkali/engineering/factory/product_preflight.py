@@ -22,14 +22,7 @@ from arkali.engineering.factory.dependency_resolution import (
     _resolve_backend_dependency_contract,
 )
 from arkali.engineering.factory.errors import ProductSemanticPreflightError
-
-
-class SemanticFinding(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    code: str
-    path: str
-    detail: str
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 
 class ProductPreflightReport(BaseModel):

@@ -65,6 +65,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _repair_react_router_version_mismatch,
 )
 from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
+from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
     _missing_ui_state_findings,
     _split_client_and_ui,
@@ -226,6 +227,7 @@ def _apply_deterministic_repairs(
         lambda sf: _repair_react_router_version_mismatch({**visible_files, **sf}, sf),
         lambda sf: _repair_missing_react_router_imports(sf),
         lambda sf: _repair_missing_client_call_imports({**visible_files, **sf}, sf),
+        lambda sf: _repair_shadowed_routes(sf),
     )
     for repair_fn in repair_fns:
         repaired = repair_fn(stage_files)

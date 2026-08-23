@@ -49,7 +49,8 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _route_component_missing_props_findings,
 )
 from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.frontend_route_shadowing_preflight import _shadowed_route_findings
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
 
 _NAVIGATION_MARKERS = (
@@ -374,58 +375,6 @@ def _destructive_confirmation_findings(spec: object, frontend: str) -> list[Sema
         detail="product_ux_spec requires destructive-action confirmation and a module "
                "declares a delete action, but the frontend shows no confirmation marker",
     )]
-
-
-#: react-router v5's <Switch> picks the FIRST matching Route in
-#: declaration order; a Route with no `exact` matches any longer path
-#: sharing its prefix. Text-level, not a real JSX parse -- deliberately
-#: coarse, the same tolerance every other check in this module accepts.
-_ROUTE_TAG = re.compile(r"<Route\s[^>]*?path=[\"']([^\"']+)[\"'][^>]*>")
-_EXACT_ATTR = re.compile(r"(?<![\w-])exact(?![\w-])")
-
-
-def _shadowed_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """A more specific route added under an existing broader one must
-    actually be reachable.
-
-    golden-work-068 (real repository evidence, real qwen2.5-coder:14b,
-    frozen): frontend_ui wrote `<Route path='/students'>` with no
-    `exact`; frontend_forms then added `<Route path='/students/create'>`
-    and `<Route path='/students/edit/:id'>` after it in the same
-    `<Switch>`. A real browser navigated to `/students/create` and
-    `/payments/create` and rendered the parent list route both times —
-    react-router's `<Switch>` always matches the broader, un-exact route
-    first, so the real, present form component behind it never rendered
-    at all, silently. Runs unconditionally (no `product_ux_spec`
-    dependency) — a general react-router correctness rule, not specific
-    to the staged pipeline.
-    """
-    findings: list[SemanticFinding] = []
-    for path, source in files.items():
-        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
-            continue
-        routes = [
-            (match.group(1), bool(_EXACT_ATTR.search(match.group(0))))
-            for match in _ROUTE_TAG.finditer(source)
-        ]
-        for index, (route_path, exact) in enumerate(routes):
-            if exact:
-                continue
-            prefix = route_path.rstrip("/") + "/"
-            shadowed = next(
-                (later for later, _ in routes[index + 1:] if later.startswith(prefix)), None,
-            )
-            if shadowed is not None:
-                findings.append(SemanticFinding(
-                    code="frontend_ui_route_shadowed", path=path,
-                    detail=(
-                        f"<Route path={route_path!r}> has no 'exact' and is declared "
-                        f"before <Route path={shadowed!r}> in the same <Switch> — "
-                        "react-router always matches the broader route first, so the "
-                        "more specific route never renders"
-                    ),
-                ))
-    return findings
 
 
 #: golden-work-088 (session evidence, frozen): frontend/src/index.js

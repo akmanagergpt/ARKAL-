@@ -11,6 +11,7 @@ from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
     DEFAULT_MAX_OUTPUT_TOKENS,
     DEFAULT_TIMEOUT_SECONDS,
+    _apply_deterministic_repairs,
     _backend_contract_findings,
     _backend_implementation_stage_findings,
     _cors_boundary_stage_findings,
@@ -272,6 +273,27 @@ def test_parse_stage_envelope_reports_the_original_error_when_no_repair_applies(
     envelope, failure = _parse_stage_envelope("frontend_ui", json.dumps(flat_spec))
     assert envelope is None
     assert failure is not None and "violates the contract" in failure
+
+
+def test_apply_deterministic_repairs_fixes_a_shadowed_route() -> None:
+    """golden-work-096 (session evidence, frozen): a real qwen2.5-coder:14b
+    reproduced this exact, already-clearly-explained route-shadowing
+    defect unchanged across all 4 real frontend_forms attempts, exhausting
+    the stage's full attempt budget -- proof the fix belonged to a
+    deterministic repair. Proves the real sequencing function every stage
+    attempt actually calls (`_apply_deterministic_repairs`, not just the
+    standalone repair function in isolation) applies it."""
+    stage_files = {
+        "frontend/src/App.js": (
+            "<Switch>"
+            "<Route path='/works'><h2>Works</h2></Route>"
+            "<Route path='/works/create'><h2>Create Work</h2></Route>"
+            "</Switch>"
+        ),
+    }
+    repaired = _apply_deterministic_repairs({}, stage_files)
+    assert "<Route exact path='/works'>" in repaired["frontend/src/App.js"]
+    assert "<Route path='/works/create'>" in repaired["frontend/src/App.js"]
 
 
 def test_a_flat_ux_spec_response_is_deterministically_repaired(tmp_path: pathlib.Path) -> None:

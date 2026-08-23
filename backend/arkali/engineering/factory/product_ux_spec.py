@@ -49,7 +49,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _ACTIONS = Literal["create", "edit", "delete", "view"]
 _PRESENTATIONS = Literal["table", "card", "list"]

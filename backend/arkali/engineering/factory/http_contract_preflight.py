@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.javascript_syntax_preflight import _javascript_syntax_findings
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 
 def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:

@@ -65,7 +65,7 @@ import posixpath
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _REQUIRED_SCRIPTS = ("start", "build")
 #: Mechanical, not a full JS parser: matches a real ES-module import of

@@ -42,7 +42,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _CLIENT_INLINE_EXPORT = re.compile(r"export\s+(?:const|function)\s+(\w+)")
 _CLIENT_GROUPED_EXPORT = re.compile(r"export\s*\{([^}]*)\}")

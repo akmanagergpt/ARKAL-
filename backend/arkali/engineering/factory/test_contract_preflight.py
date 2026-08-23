@@ -7,7 +7,7 @@ import builtins
 import sys
 from collections.abc import Mapping
 
-from arkali.engineering.factory.product_preflight import SemanticFinding
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _BUILTIN_NAMES = frozenset(dir(builtins))
 
