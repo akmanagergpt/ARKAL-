@@ -52,9 +52,10 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _repair_react_router_version_mismatch,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
-    _exported_js_names,
-    _MUTATION_EXPORT_NAME,
+    _react_router_missing_import_findings,
+    _split_client_and_ui,
     _unreachable_module_findings,
+    _unused_client_export_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
 )
@@ -130,49 +131,6 @@ class _StageEnvelope(BaseModel):
         return self
 
 
-def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:
-    client_paths = [
-        path for path in files if path.startswith("frontend/src/") and "client" in path.lower()
-    ]
-    ui_paths = [
-        path for path in files if path.startswith("frontend/src/") and "client" not in path.lower()
-    ]
-    client = "\n".join(files[path] for path in client_paths)
-    ui = "\n".join(files[path] for path in ui_paths)
-    return client, ui
-
-
-def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding]:
-    # golden-work-081 (session evidence, frozen): every real candidate
-    # this session's own frontend_client output has actually declared
-    # every function as a plain top-level function and exported all of
-    # them together in one grouped `export { name, ... };` statement at
-    # the file's end -- the inline `export function name(...)` shape a
-    # bare regex here originally assumed matched zero real names on every
-    # one of them, so this check has been silently vacuous the entire
-    # time it has run against real generated output.
-    #
-    # golden-work-082 (session evidence, frozen): fixing that extraction
-    # bug made this check enforce STAGED_GENERATION_STAGES.md#8's literal
-    # wording ("the UI calls every function frontend_client exports") for
-    # the first time ever, and it immediately exhausted frontend_ui's
-    # full attempt budget on every declared create/update/delete export
-    # -- wiring those is frontend_forms's job, per #9 and this module's
-    # own `_frontend_ui_findings` docstring, and frontend_forms has not
-    # run yet at this point. Only a non-mutating (read) export can
-    # genuinely be "uncalled" here; #8's own text is corrected alongside
-    # this fix.
-    exported = _exported_js_names(client)
-    read_only_exports = {name for name in exported if not _MUTATION_EXPORT_NAME.match(name)}
-    uncalled = sorted(name for name in read_only_exports if name not in ui)
-    if not uncalled:
-        return []
-    return [SemanticFinding(
-        code="frontend_ui_client_unused", path="frontend/src/",
-        detail=f"frontend_ui never calls client export(s) {uncalled!r}",
-    )]
-
-
 #: golden-work-065 (session evidence, frozen): a real qwen2.5-coder:14b
 #: implemented a genuine empty-state branch three times over
 #: (`students.length === 0 ? <p>No students found</p> : ...`) and every
@@ -216,6 +174,7 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _missing_ui_state_findings(ui)
         + _missing_frontend_entry_point_findings(files)
         + _unreachable_module_findings(files)
+        + _react_router_missing_import_findings(files)
         + _ux_spec_shell_findings(files)
     )
 

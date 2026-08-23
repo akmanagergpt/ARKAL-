@@ -104,6 +104,8 @@ def _exported_js_names(client_text: str) -> frozenset[str]:
             if local_name:
                 names.add(local_name)
     return frozenset(names)
+
+
 #: Deliberately excludes "error" -- an async-fetch error state (already
 #: required by `_state_coverage_findings`/`_missing_ui_state_findings`) is
 #: legitimately present in almost every real component regardless of
@@ -112,19 +114,62 @@ def _exported_js_names(client_text: str) -> frozenset[str]:
 _VALIDATION_MARKERS = ("required", "invalid")
 
 
+def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:
+    """A `*client*`-named file versus every other real `frontend/src/*`
+    file -- moved here from `component_generation.py` (ADR-0008
+    decomposition, not a GATE 8 exception: that module reached its
+    400-logical-line ceiling, measured live by the real architecture
+    gate, not assumed) to sit alongside every other real check that
+    already needs this exact same split (`_frontend_ui_only_text`,
+    `_update_like_client_exports`)."""
+    client_paths = [
+        path for path in files if path.startswith("frontend/src/") and "client" in path.lower()
+    ]
+    ui_paths = [
+        path for path in files if path.startswith("frontend/src/") and "client" not in path.lower()
+    ]
+    client = "\n".join(files[path] for path in client_paths)
+    ui = "\n".join(files[path] for path in ui_paths)
+    return client, ui
+
+
+def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding]:
+    # golden-work-081 (session evidence, frozen): every real candidate
+    # this session's own frontend_client output has actually declared
+    # every function as a plain top-level function and exported all of
+    # them together in one grouped `export { name, ... };` statement at
+    # the file's end -- the inline `export function name(...)` shape a
+    # bare regex here originally assumed matched zero real names on every
+    # one of them, so this check has been silently vacuous the entire
+    # time it has run against real generated output.
+    #
+    # golden-work-082 (session evidence, frozen): fixing that extraction
+    # bug made this check enforce STAGED_GENERATION_STAGES.md#8's literal
+    # wording ("the UI calls every function frontend_client exports") for
+    # the first time ever, and it immediately exhausted frontend_ui's
+    # full attempt budget on every declared create/update/delete export
+    # -- wiring those is frontend_forms's job, per #9 and
+    # `component_generation._frontend_ui_findings`'s own docstring, and
+    # frontend_forms has not run yet at this point. Only a non-mutating
+    # (read) export can genuinely be "uncalled" here; #8's own text is
+    # corrected alongside this fix.
+    exported = _exported_js_names(client)
+    read_only_exports = {name for name in exported if not _MUTATION_EXPORT_NAME.match(name)}
+    uncalled = sorted(name for name in read_only_exports if name not in ui)
+    if not uncalled:
+        return []
+    return [SemanticFinding(
+        code="frontend_ui_client_unused", path="frontend/src/",
+        detail=f"frontend_ui never calls client export(s) {uncalled!r}",
+    )]
+
+
 def _frontend_ui_only_text(files: Mapping[str, str]) -> str:
-    """The same client/UI split `component_generation._split_client_and_ui`
-    performs, duplicated rather than imported: that module already imports
-    from this one (`_ux_spec_shell_findings`/`_ux_spec_mutation_findings`),
-    so importing back would cycle -- the same shape as this file's own
-    `_CORS_MARKERS`-style duplication elsewhere in this pipeline. Needed
-    because a `*client*` file's own function DEFINITION (e.g. `async
-    function updateStudent(...)`) would otherwise satisfy a regex looking
-    for a real UI-side CALL to it."""
-    return "\n".join(
-        source.lower() for path, source in files.items()
-        if path.startswith("frontend/src/") and "client" not in path.lower()
-    )
+    """Lowercased UI-only source (client files excluded) -- needed because
+    a `*client*` file's own function DEFINITION (e.g. `async function
+    updateStudent(...)`) would otherwise satisfy a regex looking for a
+    real UI-side reference to it."""
+    return _split_client_and_ui(files)[1].lower()
 
 
 def _update_like_client_exports(files: Mapping[str, str]) -> frozenset[str]:
@@ -343,6 +388,60 @@ def _shadowed_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
+#: golden-work-083 (session evidence, frozen): `frontend/src/index.js`
+#: imported only `BrowserRouter as Router` from 'react-router-dom' and
+#: then used `<Route path="/students" component={Students} />` directly
+#: -- a real, hard `ReferenceError: Route is not defined` at runtime,
+#: blanking the entire real production build in a real browser. `node
+#: --check` (javascript_syntax_preflight.py) cannot see this: an
+#: undefined identifier is syntactically legal JS, only a real
+#: ReferenceError at execution. Scoped to the v5 API this pipeline's
+#: package.json is pinned to (STAGED_GENERATION_STAGES.md#11); deliberately
+#: excludes Router/BrowserRouter/HashRouter, which real evidence shows are
+#: routinely imported under an alias (`BrowserRouter as Router`) --
+#: checking those would need to resolve the alias back to its real export
+#: name, a real but distinct concern this narrow check does not yet cover.
+_REACT_ROUTER_DOM_IDENTIFIERS = (
+    "Route", "Switch", "Link", "NavLink", "Redirect",
+    "useHistory", "useParams", "useLocation", "useRouteMatch",
+)
+_REACT_ROUTER_IMPORT_BLOCK = re.compile(r"import\s*\{([^}]*)\}\s*from\s*['\"]react-router-dom['\"]")
+
+
+def _react_router_missing_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Every real react-router-dom identifier a file actually uses
+    (`<Route`, `useHistory(`, ...) must be locally imported in that same
+    file -- checked per file, not on the whole frontend joined together,
+    since an import in one component never brings a name into scope in
+    another. Runs unconditionally (no `product_ux_spec` dependency), the
+    same shape `_shadowed_route_findings` already uses -- a general
+    react-router correctness rule, not specific to the staged pipeline."""
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        imported_locals: set[str] = set()
+        for block in _REACT_ROUTER_IMPORT_BLOCK.findall(source):
+            for part in block.split(","):
+                local_name = part.strip().split(" as ")[-1].strip()
+                if local_name:
+                    imported_locals.add(local_name)
+        missing = sorted(
+            name for name in _REACT_ROUTER_DOM_IDENTIFIERS
+            if name not in imported_locals and re.search(rf"\b{name}\b", source)
+        )
+        if missing:
+            findings.append(SemanticFinding(
+                code="frontend_missing_react_router_import", path=path,
+                detail=(
+                    f"{path} uses {missing!r} but never imports them from "
+                    "'react-router-dom' in this same file -- a real runtime "
+                    "ReferenceError, not a syntax error `node --check` can see"
+                ),
+            ))
+    return findings
+
+
 def _raw_json_dump_findings(frontend: str) -> list[SemanticFinding]:
     if "{json.stringify(" not in frontend:
         return []
@@ -384,7 +483,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
     split itself — see `STAGED_GENERATION_STAGES.md#9`'s own rule text
     for the real evidence. The spec-dependent checks are silent when no
     spec exists, for the same reason the shell slice is."""
-    findings = _shadowed_route_findings(files)
+    findings = _shadowed_route_findings(files) + _react_router_missing_import_findings(files)
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:
         return findings

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _react_router_missing_import_findings,
     _shadowed_route_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
@@ -381,3 +382,57 @@ def test_shadowed_route_findings_runs_unconditionally_without_a_ux_spec() -> Non
         ),
     }
     assert any(f.code == "frontend_ui_route_shadowed" for f in _ux_spec_mutation_findings(files))
+
+
+def test_flags_a_used_react_router_identifier_never_imported() -> None:
+    """golden-work-083 (session evidence, frozen): frontend/src/index.js
+    imported only `BrowserRouter as Router` and then used `<Route
+    path="/students" component={Students} />` directly -- a real, hard
+    `ReferenceError: Route is not defined` at runtime, blanking the
+    entire real production build in a real browser. `node --check`
+    cannot see this: an undefined identifier is syntactically legal JS,
+    only a real ReferenceError at execution."""
+    files = {
+        "frontend/src/index.js": (
+            "import { BrowserRouter as Router } from 'react-router-dom';\n"
+            "import Students from './Students';\n"
+            "ReactDOM.render(<Router><Route path='/students' component={Students} /></Router>, "
+            "document.getElementById('root'));\n"
+        ),
+    }
+    findings = _react_router_missing_import_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_missing_react_router_import"
+    assert "Route" in findings[0].detail
+
+
+def test_is_silent_when_every_used_react_router_identifier_is_imported() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "import { Route, Switch, Link, useHistory } from 'react-router-dom';\n"
+            "function App() { const history = useHistory(); return (<Switch>"
+            "<Route path='/students'><Link to='/x'>x</Link></Route></Switch>); }\n"
+        ),
+    }
+    assert _react_router_missing_import_findings(files) == []
+
+
+def test_react_router_import_check_does_not_cross_file_boundaries() -> None:
+    """An import in one component never brings a name into scope in a
+    different file -- each file is checked against only its own imports."""
+    files = {
+        "frontend/src/App.js": "import { Route } from 'react-router-dom';\nfunction App() { return null; }\n",
+        "frontend/src/Other.js": "function Other() { return <Route path='/x' />; }\n",
+    }
+    findings = _react_router_missing_import_findings(files)
+    assert len(findings) == 1
+    assert findings[0].path == "frontend/src/Other.js"
+
+
+def test_react_router_import_check_runs_unconditionally_without_a_ux_spec() -> None:
+    files = {
+        "frontend/src/index.js": "ReactDOM.render(<Route path='/x' />, document.getElementById('root'));\n",
+    }
+    assert any(
+        f.code == "frontend_missing_react_router_import" for f in _ux_spec_mutation_findings(files)
+    )
