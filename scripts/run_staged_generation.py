@@ -28,6 +28,8 @@ from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.specification.blueprint_engine import derive_blueprint  # noqa: E402
 from arkali.engineering.candidate.workspace import WorkspaceAuthority  # noqa: E402
 from arkali.engineering.factory.component_generation import (  # noqa: E402
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_TIMEOUT_SECONDS,
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError  # noqa: E402
@@ -98,8 +100,8 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--model", default="qwen2.5-coder:14b")
-    parser.add_argument("--max-output-tokens", type=int, default=4096)
-    parser.add_argument("--timeout-seconds", type=float, default=300.0)
+    parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS)
+    parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--per-stage-max-attempts", type=int, default=4)
     parser.add_argument(
         "--goal-file", type=pathlib.Path, default=None,

@@ -77,6 +77,24 @@ from arkali.engineering.factory.test_contract_preflight import (
 
 MAX_STAGE_ATTEMPTS = 4
 
+#: Real measured floor throughput for `qwen2.5-coder:14b` (Q4_K_M) against
+#: this project's real development host (an 8GB-VRAM laptop GPU): two
+#: independent, live, non-streaming `/api/generate` calls both measured
+#: ~7.1 tokens/second (298 tokens/42.1s, then 424 tokens/59.4s). Real
+#: evidence, not assumed: `golden-work-075` and `golden-work-076`, two
+#: fresh candidates with ordinary-sized prior stage output, both genuinely
+#: timed out at the `frontend_ui` stage -- the stage most likely to need a
+#: generation close to `DEFAULT_MAX_OUTPUT_TOKENS` (it writes the most
+#: files of any stage) -- because the prior default timeout (300s) could
+#: not cover one full-budget generation at this real, hardware-bound
+#: floor. Never lower `_MEASURED_MIN_TOKENS_PER_SECOND` without a new real
+#: measurement on this same host.
+_MEASURED_MIN_TOKENS_PER_SECOND = 7.0
+DEFAULT_MAX_OUTPUT_TOKENS = 4096
+#: One full generation at the measured floor, plus a 50% margin for
+#: prompt evaluation and real host variance (thermal, background load).
+DEFAULT_TIMEOUT_SECONDS = (DEFAULT_MAX_OUTPUT_TOKENS / _MEASURED_MIN_TOKENS_PER_SECOND) * 1.5
+
 
 class _StageEnvelope(BaseModel):
     """One stage's own output: a small file set, not a whole product.
@@ -435,7 +453,7 @@ def generate_staged_model_product(
     workspace: WorkspaceTarget,
     *,
     vocabulary: StageVocabulary,
-    timeout_seconds: float = 300.0,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     per_stage_max_attempts: int = MAX_STAGE_ATTEMPTS,
 ) -> ModelProductResult:
     """Generate a candidate as a sequence of small, bounded, contract-checked

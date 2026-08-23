@@ -9,6 +9,8 @@ from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.specification.blueprint_engine import derive_blueprint
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
+    DEFAULT_MAX_OUTPUT_TOKENS,
+    DEFAULT_TIMEOUT_SECONDS,
     _backend_contract_findings,
     _backend_implementation_stage_findings,
     _cors_boundary_stage_findings,
@@ -429,3 +431,19 @@ def test_cors_boundary_findings_catches_real_python_syntax_errors() -> None:
     }
     findings = _cors_boundary_stage_findings(broken)
     assert [f.code for f in findings] == ["python_syntax"]
+
+
+def test_default_timeout_covers_default_output_budget_at_measured_floor() -> None:
+    """`golden-work-075` and `golden-work-076` (real evidence, frozen): two
+    fresh candidates with ordinary-sized prior-stage output both genuinely
+    timed out at `frontend_ui`, identically, because the prior default
+    timeout (300s) could not cover one full `DEFAULT_MAX_OUTPUT_TOKENS`
+    generation at this real host's measured floor throughput (~7.1
+    tokens/second, two independent live `/api/generate` calls). This does
+    not re-measure that floor — it structurally refuses a future change
+    that raises `DEFAULT_MAX_OUTPUT_TOKENS` or lowers
+    `DEFAULT_TIMEOUT_SECONDS` without preserving the real margin that
+    closed this defect."""
+    measured_floor_tokens_per_second = 7.0
+    worst_case_generation_seconds = DEFAULT_MAX_OUTPUT_TOKENS / measured_floor_tokens_per_second
+    assert DEFAULT_TIMEOUT_SECONDS >= worst_case_generation_seconds * 1.5
