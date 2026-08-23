@@ -210,6 +210,37 @@ def test_manifests_self_heals_a_react_router_version_mismatch_it_introduces_itse
     assert patched["dependencies"]["react-router-dom"] == "^5.3.4"
 
 
+def test_frontend_forms_is_rejected_for_reintroducing_a_local_import_gap(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-086/087 (session evidence, frozen): golden-work-086
+    exposed App.js importing a real './Courses' module that was never
+    generated, fixed by wiring `_frontend_local_import_findings` at
+    `frontend_ui`. golden-work-087 then reproduced the identical real
+    defect through a *different* stage: `frontend_forms` rewrote App.js
+    (to wire in its own create/edit routes) and reintroduced the exact
+    same unresolved import, undetected, because the check had only been
+    wired at `frontend_ui` -- the same "wrong stage" class this session's
+    own manifests-context lesson already named once. No deterministic
+    repair exists for this (the real fix is either writing the missing
+    file or removing the reference, both real application decisions), so
+    this proves the real retry loop genuinely rejects and exhausts
+    rather than self-healing."""
+    broken_app = (
+        "import { fetchWorks } from './client';\n"
+        "import Missing from './Missing';\n"
+        "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+        "export default App;\n"
+    )
+    queues = _happy_path_queues()
+    queues["frontend_forms"] = [(HonestState.PASS, _output({"frontend/src/App.js": broken_app}))] * 4
+    with pytest.raises(ModelGenerationError, match="frontend_local_import_unresolved"):
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path),
+            vocabulary=StageVocabulary.load(REPO),
+        )
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:

@@ -44,6 +44,7 @@ import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.frontend_manifest_preflight import (
+    _frontend_local_import_findings,
     _react_router_missing_import_findings,
     _route_component_missing_props_findings,
 )
@@ -471,6 +472,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
         _shadowed_route_findings(files)
         + _react_router_missing_import_findings(files)
         + _route_component_missing_props_findings(files)
+        + _frontend_local_import_findings(files)
     )
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:
