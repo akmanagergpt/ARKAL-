@@ -151,6 +151,35 @@ def test_a_backend_declared_model_missing_from_the_spec_is_refused() -> None:
     assert any(f.code == "ux_spec_missing_module" for f in findings)
 
 
+def test_missing_module_feedback_names_the_real_backend_name_not_the_normalized_form() -> None:
+    """golden-work-095 (session evidence, frozen): a real qwen2.5-coder:14b
+    declared a module named "tasks" against a real backend model whose own
+    real name was "task_model" (normalized to "taskmodel" for
+    case/separator-insensitive comparison). The finding this stage's own
+    retry feedback showed back to the model was the ALREADY-NORMALIZED
+    string ("['taskmodel']") -- not a real, literal name the model could
+    copy verbatim, since normalization strips the underscore/case it would
+    naturally reintroduce. Two consecutive retries reproduced the
+    identical mismatch and exhausted the anti-loop budget. The detail must
+    now show the real backend-declared name so a corrected module's own
+    "name" field has something literal to copy."""
+    files = {
+        "backend/task_model.json": json.dumps(
+            {"table_name": "task_model", "fields": {"id": {"type": "integer"}}}
+        ),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Tasks", "primary_roles": ["user"],
+            "modules": [_module("tasks", ["view"])],
+            "navigation_destinations": ["Tasks"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    missing = next(f for f in findings if f.code == "ux_spec_missing_module")
+    assert "task_model" in missing.detail
+    assert "taskmodel" not in missing.detail
+
+
 def test_a_module_under_declaring_a_real_backend_action_is_refused() -> None:
     """The backend exposes POST /products (real create capability); a spec
     that only declares "view" for the products module under-claims it."""

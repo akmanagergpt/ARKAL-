@@ -270,18 +270,40 @@ _METHOD_TO_ACTION = {"POST": "create", "PUT": "edit", "PATCH": "edit", "DELETE":
 
 def _module_parity_findings(spec: _ProductUxSpec, files: Mapping[str, str]) -> list[SemanticFinding]:
     """Every backend-declared data model has a corresponding module, and no
-    module names one the backend never declared."""
-    backend_models = {_normalize(name) for name in _backend_declared_models(files)}
+    module names one the backend never declared.
+
+    golden-work-095 (session evidence, frozen): a real qwen2.5-coder:14b
+    declared a module named "tasks" against a real backend-declared model
+    whose own real name was "task_model" -- normalized to "taskmodel" for
+    comparison (case/separator-insensitive matching is deliberate: real
+    candidates routinely spell the same concept "Students"/"students"/
+    "student_model"). The finding detail this stage's own retry feedback
+    showed back to the model, though, was ALREADY-NORMALIZED
+    ("['taskmodel']") -- not a real, usable module-name string the model
+    could copy verbatim, since normalization strips underscores/case the
+    model would naturally reintroduce when writing one. Two consecutive
+    real retries reproduced the identical mismatch byte-for-byte and
+    exhausted the anti-loop budget: the model had no way to guess which
+    exact literal string would satisfy a check whose own normalization
+    rule was never disclosed. `missing` now reports the real backend name
+    (the exact string a corrected module's own "name" field should use);
+    `invented` still reports the model's own already-real, self-declared
+    name -- it never needed to guess that half."""
+    normalized_to_real = {_normalize(name): name for name in _backend_declared_models(files)}
     module_names = {_normalize(module.name) for module in spec.modules}
     findings: list[SemanticFinding] = []
-    missing = sorted(backend_models - module_names)
+    missing = sorted(normalized_to_real[key] for key in normalized_to_real if key not in module_names)
     if missing:
         findings.append(SemanticFinding(
             code="ux_spec_missing_module", path=_UX_SPEC_PATH,
             detail=f"backend_contract declares data model(s) {missing!r} with no "
-                   "corresponding module in product_ux_spec",
+                   "corresponding module in product_ux_spec -- add a module whose "
+                   "\"name\" field matches one of these real backend-declared names",
         ))
-    invented = sorted(module_names - backend_models)
+    invented = sorted({
+        module.name for module in spec.modules
+        if _normalize(module.name) not in normalized_to_real
+    })
     if invented:
         findings.append(SemanticFinding(
             code="ux_spec_invented_module", path=_UX_SPEC_PATH,
