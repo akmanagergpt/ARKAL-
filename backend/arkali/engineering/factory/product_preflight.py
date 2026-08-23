@@ -299,6 +299,20 @@ def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="react-scripts requires a public HTML entry document",
             )
         )
+    # golden-work-079 (session evidence, frozen): checked here, not only in
+    # `_manifests_stage_findings`, because `manifests`' own real context
+    # (`manifest_context._manifest_context`) deliberately strips
+    # `frontend/src/*` down to an extracted import-name list -- never full
+    # file text -- so a check that needs to see a real `Switch` import
+    # (not just that `react-router-dom` was imported at all) is
+    # structurally blind by the time `manifests` runs. `frontend_tests_
+    # config` (this function's other, unreduced caller) sees full
+    # `frontend/src/*` text and runs first, so this fires there for real
+    # instead of silently never firing.
+    from arkali.engineering.factory.frontend_manifest_preflight import (
+        _react_router_version_mismatch_findings,
+    )
+    findings.extend(_react_router_version_mismatch_findings(files))
     return findings
 
 
@@ -317,10 +331,8 @@ def _manifests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]
         ))
     from arkali.engineering.factory.frontend_manifest_preflight import (
         _missing_frontend_scripts_findings,
-        _react_router_version_mismatch_findings,
     )
     findings.extend(_missing_frontend_scripts_findings(files))
-    findings.extend(_react_router_version_mismatch_findings(files))
     return findings
 
 

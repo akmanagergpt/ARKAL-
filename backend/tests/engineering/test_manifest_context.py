@@ -80,6 +80,26 @@ def test_manifest_context_on_empty_input_still_has_extraction_keys() -> None:
     assert reduced["_extracted/frontend_import_targets.txt"] == ""
     assert "backend/requirements.txt" not in reduced
     assert "_extracted/backend_entrypoint_module.txt" not in reduced
+    assert "_extracted/frontend_uses_react_router_v5_switch.txt" not in reduced
+
+
+def test_manifest_context_extracts_the_real_router_v5_switch_signal() -> None:
+    """golden-work-079 (session evidence, frozen): a check needing to know
+    whether frontend source uses react-router v5's real `Switch` API is
+    structurally blind at `manifests` unless this reduction extracts that
+    one fact — `frontend/src/*`'s full bytes never reach this stage."""
+    files = {
+        "frontend/src/App.js": "import { Route, Switch } from 'react-router-dom';\n",
+    }
+    reduced = _manifest_context(files)
+    assert reduced["_extracted/frontend_uses_react_router_v5_switch.txt"] == "true"
+    assert "frontend/src/App.js" not in reduced
+
+
+def test_manifest_context_omits_the_router_signal_when_switch_is_not_used() -> None:
+    files = {"frontend/src/App.js": "import { Routes, Route } from 'react-router-dom';\n"}
+    reduced = _manifest_context(files)
+    assert "_extracted/frontend_uses_react_router_v5_switch.txt" not in reduced
 
 
 def test_backend_entrypoint_module_finds_the_real_main_guard() -> None:

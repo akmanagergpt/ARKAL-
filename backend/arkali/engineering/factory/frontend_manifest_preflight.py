@@ -154,7 +154,20 @@ def _missing_frontend_entry_point_findings(files: Mapping[str, str]) -> list[Sem
     )]
 
 
+#: The exact extracted-signal path `manifest_context._manifest_context`
+#: writes when it detects real v5 `Switch` usage in the full source it
+#: receives before reducing it away — golden-work-079 (session evidence,
+#: frozen): this check's own first version depended on raw
+#: `frontend/src/*` text, which `manifests`' real reduced context never
+#: carries, so it silently never fired there even though it worked in
+#: isolation against full files. Shared by both sides (the extractor and
+#: this reader) so they cannot drift to different path strings.
+FRONTEND_USES_REACT_ROUTER_V5_SWITCH_MARKER = "_extracted/frontend_uses_react_router_v5_switch.txt"
+
+
 def _uses_react_router_v5_switch(files: Mapping[str, str]) -> bool:
+    if files.get(FRONTEND_USES_REACT_ROUTER_V5_SWITCH_MARKER) == "true":
+        return True
     return any(
         _V5_SWITCH_IMPORT.search(content)
         for path, content in files.items()

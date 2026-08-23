@@ -12,15 +12,23 @@ what every stage actually imports. Sending all of it as full file bytes
 caused a real HTTP-level timeout, 4/4 attempts, at exactly this stage
 (the largest prompt of the eleven) — session evidence, golden-work-046.
 `product_preflight._manifest_findings` (verified by reading its source,
-not assumed) only ever reads three things: `backend/requirements.txt`,
-`frontend/package.json`, and whether `frontend/public/index.html` exists —
-never route/test/UI bytes. Everything this module returns instead of
-those bytes is a mechanically-extracted signal, never a paraphrase and
-never invented: real top-level package names actually imported by the
-real source (both `backend/*.py` and `tests/*.py` — golden-work-072,
-session evidence, frozen: a real test file's own `import pytest` was
-invisible to manifests until this covered `tests/*.py` too), nothing
-else.
+not assumed) mostly reads only `backend/requirements.txt`,
+`frontend/package.json`, and whether `frontend/public/index.html`
+exists — never route/test/UI bytes. Everything this module returns
+instead of those bytes is a mechanically-extracted signal, never a
+paraphrase and never invented: real top-level package names actually
+imported by the real source (both `backend/*.py` and `tests/*.py` —
+golden-work-072, session evidence, frozen: a real test file's own
+`import pytest` was invisible to manifests until this covered
+`tests/*.py` too); and, since golden-work-079 (session evidence,
+frozen), one narrow boolean signal — whether frontend source uses
+react-router v5's `Switch` API — because `_manifest_findings` gained a
+real check needing exactly that fact (a real `manifests` run declared
+`react-router-dom: ^6.11.2` against source that genuinely used `Switch`,
+v6 removed entirely, and a real production build failed outright) and,
+without this extraction, that check is silently blind here the same way
+it would be blind reading raw route/test/UI bytes -- this module reduces
+`manifests`' context, it must not also blind its validator.
 """
 
 from __future__ import annotations
@@ -29,6 +37,11 @@ import ast
 import re
 import sys
 from collections.abc import Mapping
+
+from arkali.engineering.factory.frontend_manifest_preflight import (
+    FRONTEND_USES_REACT_ROUTER_V5_SWITCH_MARKER,
+    _uses_react_router_v5_switch,
+)
 
 _LOCAL_PACKAGE_ROOTS = frozenset({"backend", "frontend", "tests"})
 
@@ -127,6 +140,8 @@ def _manifest_context(visible_files: Mapping[str, str]) -> dict[str, str]:
     reduced["_extracted/frontend_import_targets.txt"] = "\n".join(
         sorted(_frontend_import_targets(visible_files))
     )
+    if _uses_react_router_v5_switch(visible_files):
+        reduced[FRONTEND_USES_REACT_ROUTER_V5_SWITCH_MARKER] = "true"
     entrypoint = _backend_entrypoint_module(visible_files)
     if entrypoint is not None:
         reduced["_extracted/backend_entrypoint_module.txt"] = entrypoint

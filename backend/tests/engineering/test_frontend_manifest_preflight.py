@@ -164,6 +164,23 @@ def test_router_version_repair_pins_a_real_v5_release() -> None:
     assert _react_router_version_mismatch_findings({**merged, **repaired}) == []
 
 
+def test_flags_the_mismatch_from_the_extracted_marker_alone() -> None:
+    """golden-work-079 (session evidence, frozen): manifests' own real
+    context (manifest_context._manifest_context) never carries
+    frontend/src/*'s full bytes, only the extracted boolean marker this
+    check must also recognize -- proven here with no frontend/src/* key
+    present at all, exactly what manifests' own reduced view looks like."""
+    files = {
+        "_extracted/frontend_uses_react_router_v5_switch.txt": "true",
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^6.11.2"},
+        }),
+    }
+    findings = _react_router_version_mismatch_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "react_router_version_mismatch"
+
+
 def test_router_version_repair_is_a_noop_when_stage_did_not_write_package_json() -> None:
     merged = {"frontend/src/App.js": _V5_APP_SOURCE, "frontend/package.json": json.dumps({
         "dependencies": {"react-router-dom": "^6.11.2"},

@@ -85,6 +85,98 @@ def test_repair_applies_even_when_an_unrelated_finding_also_remains(
     assert "missing_startup_documentation" in prompts[1]
 
 
+def test_frontend_tests_config_self_heals_a_react_router_version_mismatch(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-078/079 (session evidence, frozen): frontend_ui/
+    frontend_forms wrote real v5-API source (`import { Route, Switch }
+    from 'react-router-dom'`) and frontend_tests_config then declared
+    `react-router-dom: ^6.11.2` — a real, current, installable version
+    whose own real breaking change (v6 removed Switch entirely) let a
+    real production build fail outright. golden-work-079 (this session's
+    first fix attempt) proved this check must live in `_manifest_findings`
+    and fire at `frontend_tests_config`, not only at `manifests`:
+    `manifests`' own real context (`manifest_context._manifest_context`)
+    deliberately strips `frontend/src/*` to an extracted import-name list,
+    so a check that depends on seeing a real `Switch` import is
+    structurally blind by the time `manifests` runs — this test exercises
+    the real end-to-end pipeline, `manifest_context` reduction included,
+    specifically so a check wired to the wrong stage fails it."""
+    v5_app = (
+        "import { fetchWorks } from './client';\n"
+        "import { Route, Switch } from 'react-router-dom';\n"
+        "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+        "export default App;\n"
+    )
+    queues = _happy_path_queues()
+    queues["frontend_ui"] = [(HonestState.PASS, _output({
+        **HAPPY_PATH_FILES["frontend_ui"], "frontend/src/App.js": v5_app,
+    }))]
+    queues["frontend_forms"] = [(HonestState.PASS, _output({"frontend/src/App.js": v5_app}))]
+    queues["frontend_tests_config"] = [(HonestState.PASS, _output({
+        **HAPPY_PATH_FILES["frontend_tests_config"],
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^6.11.2"},
+        }),
+    }))]
+    factory = _factory(queues)
+    result = generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 11
+    prompts = factory.models["frontend_tests_config"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 1
+    written = tmp_path / "candidates" / "staged-1" / "frontend" / "package.json"
+    patched = json.loads(written.read_text(encoding="utf-8"))
+    assert patched["dependencies"]["react-router-dom"] == "^5.3.4"
+
+
+def test_manifests_self_heals_a_react_router_version_mismatch_it_introduces_itself(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-079's second, real failure mode: `frontend_tests_config`
+    leaves `react-router-dom` undeclared (a real, legal intermediate
+    state — HAPPY_PATH's own happy-path package.json is just
+    `{"name": "app"}`) and `manifests` itself is the one that adds
+    `react-router-dom: ^6.11.2` while reconciling against the extracted
+    frontend import list. This is `manifests`' own REDUCED context
+    (`manifest_context._manifest_context`), the exact context that would
+    have hidden the mismatch from a check depending on raw
+    `frontend/src/*` text — this test exercises the real end-to-end
+    retry loop specifically to prove the extracted
+    `_extracted/frontend_uses_react_router_v5_switch.txt` marker closes
+    that gap for real."""
+    v5_app = (
+        "import { fetchWorks } from './client';\n"
+        "import { Route, Switch } from 'react-router-dom';\n"
+        "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+        "export default App;\n"
+    )
+    queues = _happy_path_queues()
+    queues["frontend_ui"] = [(HonestState.PASS, _output({
+        **HAPPY_PATH_FILES["frontend_ui"], "frontend/src/App.js": v5_app,
+    }))]
+    queues["frontend_forms"] = [(HonestState.PASS, _output({"frontend/src/App.js": v5_app}))]
+    queues["manifests"] = [(HonestState.PASS, _output({
+        **HAPPY_PATH_FILES["manifests"],
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^6.11.2"},
+        }),
+    }))]
+    factory = _factory(queues)
+    result = generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 11
+    prompts = factory.models["manifests"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 1
+    written = tmp_path / "candidates" / "staged-1" / "frontend" / "package.json"
+    patched = json.loads(written.read_text(encoding="utf-8"))
+    assert patched["dependencies"]["react-router-dom"] == "^5.3.4"
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:
