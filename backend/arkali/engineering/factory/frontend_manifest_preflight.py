@@ -253,3 +253,115 @@ def _repair_react_router_version_mismatch(
         if isinstance(section, dict) and "react-router-dom" in section:
             patched[key] = {**section, "react-router-dom": _REACT_ROUTER_V5_PIN}
     return {**stage_files, "frontend/package.json": json.dumps(patched, indent=2) + "\n"}
+
+
+#: golden-work-083 (session evidence, frozen): `frontend/src/index.js`
+#: imported only `BrowserRouter as Router` from 'react-router-dom' and
+#: then used `<Route path="/students" component={Students} />` directly
+#: -- a real, hard `ReferenceError: Route is not defined` at runtime,
+#: blanking the entire real production build in a real browser. `node
+#: --check` (javascript_syntax_preflight.py) cannot see this: an
+#: undefined identifier is syntactically legal JS, only a real
+#: ReferenceError at execution. Scoped to the v5 API this pipeline's
+#: package.json is pinned to (STAGED_GENERATION_STAGES.md#11); deliberately
+#: excludes Router/BrowserRouter/HashRouter, which real evidence shows are
+#: routinely imported under an alias (`BrowserRouter as Router`) --
+#: checking those would need to resolve the alias back to its real export
+#: name, a real but distinct concern this narrow check does not yet cover.
+#: Lives here, not `frontend_ux_preflight.py`, alongside every other
+#: real react-router correctness concern this module already owns
+#: (ADR-0008: `frontend_ux_preflight.py` reached its own 400-logical-line
+#: ceiling).
+_REACT_ROUTER_DOM_IDENTIFIERS = (
+    "Route", "Switch", "Link", "NavLink", "Redirect",
+    "useHistory", "useParams", "useLocation", "useRouteMatch",
+)
+_REACT_ROUTER_IMPORT_BLOCK = re.compile(r"import\s*\{([^}]*)\}\s*from\s*['\"]react-router-dom['\"]")
+
+
+def _react_router_missing_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Every real react-router-dom identifier a file actually uses
+    (`<Route`, `useHistory(`, ...) must be locally imported in that same
+    file -- checked per file, not on the whole frontend joined together,
+    since an import in one component never brings a name into scope in
+    another. Runs unconditionally (no `product_ux_spec` dependency), the
+    same shape `frontend_ux_preflight._shadowed_route_findings` already
+    uses -- a general react-router correctness rule, not specific to the
+    staged pipeline."""
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        imported_locals: set[str] = set()
+        for block in _REACT_ROUTER_IMPORT_BLOCK.findall(source):
+            for part in block.split(","):
+                local_name = part.strip().split(" as ")[-1].strip()
+                if local_name:
+                    imported_locals.add(local_name)
+        missing = sorted(
+            name for name in _REACT_ROUTER_DOM_IDENTIFIERS
+            if name not in imported_locals and re.search(rf"\b{name}\b", source)
+        )
+        if missing:
+            findings.append(SemanticFinding(
+                code="frontend_missing_react_router_import", path=path,
+                detail=(
+                    f"{path} uses {missing!r} but never imports them from "
+                    "'react-router-dom' in this same file -- a real runtime "
+                    "ReferenceError, not a syntax error `node --check` can see"
+                ),
+            ))
+    return findings
+
+
+def _repair_missing_imports_in_source(source: str) -> str | None:
+    """One file's own repair: merges into an existing `react-router-dom`
+    import statement when one exists, or adds a new one at the top when
+    it does not. Returns `None` when nothing is missing. Extracted from
+    `_repair_missing_react_router_imports` (ADR-0008 decomposition, not a
+    GATE 8 exception: that function's own measured complexity exceeded
+    its ceiling) so the per-file decision logic is measured on its own."""
+    imported_locals: set[str] = set()
+    import_match = _REACT_ROUTER_IMPORT_BLOCK.search(source)
+    if import_match:
+        for part in import_match.group(1).split(","):
+            local_name = part.strip().split(" as ")[-1].strip()
+            if local_name:
+                imported_locals.add(local_name)
+    missing = sorted(
+        name for name in _REACT_ROUTER_DOM_IDENTIFIERS
+        if name not in imported_locals and re.search(rf"\b{name}\b", source)
+    )
+    if not missing:
+        return None
+    if import_match is None:
+        return "import { " + ", ".join(missing) + " } from 'react-router-dom';\n" + source
+    existing_names = [n.strip() for n in import_match.group(1).split(",") if n.strip()]
+    new_import = "import { " + ", ".join(existing_names + missing) + " } from 'react-router-dom'"
+    return source[:import_match.start()] + new_import + source[import_match.end():]
+
+
+def _repair_missing_react_router_imports(stage_files: Mapping[str, str]) -> dict[str, str] | None:
+    """Deterministic repair mirroring this module's own `Werkzeug<3`-style
+    repairs (golden-work-050/051's own lesson: once the exact, unambiguous
+    fix for a real, verified defect is known, applying it and
+    re-validating is more honest than another blind model retry).
+    golden-work-084 (session evidence, frozen): a real qwen2.5-coder:14b
+    reproduced golden-work-083's own exact defect byte-for-byte-similar,
+    then exhausted all 4 real `frontend_forms` attempts on the identical
+    class -- `frontend/src/index.js` always missing `Route` from its
+    existing `{ BrowserRouter as Router }` import -- even once told
+    exactly which file and which names. Never patches any other file or
+    invents a name this same check did not itself already prove is used
+    and missing."""
+    patched: dict[str, str] | None = None
+    for path, source in stage_files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        repaired_source = _repair_missing_imports_in_source(source)
+        if repaired_source is None:
+            continue
+        if patched is None:
+            patched = dict(stage_files)
+        patched[path] = repaired_source
+    return patched

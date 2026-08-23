@@ -43,6 +43,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from arkali.engineering.factory.frontend_manifest_preflight import _react_router_missing_import_findings
 from arkali.engineering.factory.product_preflight import SemanticFinding
 from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
 
@@ -385,60 +386,6 @@ def _shadowed_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                         "more specific route never renders"
                     ),
                 ))
-    return findings
-
-
-#: golden-work-083 (session evidence, frozen): `frontend/src/index.js`
-#: imported only `BrowserRouter as Router` from 'react-router-dom' and
-#: then used `<Route path="/students" component={Students} />` directly
-#: -- a real, hard `ReferenceError: Route is not defined` at runtime,
-#: blanking the entire real production build in a real browser. `node
-#: --check` (javascript_syntax_preflight.py) cannot see this: an
-#: undefined identifier is syntactically legal JS, only a real
-#: ReferenceError at execution. Scoped to the v5 API this pipeline's
-#: package.json is pinned to (STAGED_GENERATION_STAGES.md#11); deliberately
-#: excludes Router/BrowserRouter/HashRouter, which real evidence shows are
-#: routinely imported under an alias (`BrowserRouter as Router`) --
-#: checking those would need to resolve the alias back to its real export
-#: name, a real but distinct concern this narrow check does not yet cover.
-_REACT_ROUTER_DOM_IDENTIFIERS = (
-    "Route", "Switch", "Link", "NavLink", "Redirect",
-    "useHistory", "useParams", "useLocation", "useRouteMatch",
-)
-_REACT_ROUTER_IMPORT_BLOCK = re.compile(r"import\s*\{([^}]*)\}\s*from\s*['\"]react-router-dom['\"]")
-
-
-def _react_router_missing_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Every real react-router-dom identifier a file actually uses
-    (`<Route`, `useHistory(`, ...) must be locally imported in that same
-    file -- checked per file, not on the whole frontend joined together,
-    since an import in one component never brings a name into scope in
-    another. Runs unconditionally (no `product_ux_spec` dependency), the
-    same shape `_shadowed_route_findings` already uses -- a general
-    react-router correctness rule, not specific to the staged pipeline."""
-    findings: list[SemanticFinding] = []
-    for path, source in files.items():
-        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
-            continue
-        imported_locals: set[str] = set()
-        for block in _REACT_ROUTER_IMPORT_BLOCK.findall(source):
-            for part in block.split(","):
-                local_name = part.strip().split(" as ")[-1].strip()
-                if local_name:
-                    imported_locals.add(local_name)
-        missing = sorted(
-            name for name in _REACT_ROUTER_DOM_IDENTIFIERS
-            if name not in imported_locals and re.search(rf"\b{name}\b", source)
-        )
-        if missing:
-            findings.append(SemanticFinding(
-                code="frontend_missing_react_router_import", path=path,
-                detail=(
-                    f"{path} uses {missing!r} but never imports them from "
-                    "'react-router-dom' in this same file -- a real runtime "
-                    "ReferenceError, not a syntax error `node --check` can see"
-                ),
-            ))
     return findings
 
 

@@ -85,6 +85,39 @@ def test_repair_applies_even_when_an_unrelated_finding_also_remains(
     assert "missing_startup_documentation" in prompts[1]
 
 
+def test_frontend_forms_self_heals_a_missing_react_router_import_without_a_retry(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-084 (session evidence, frozen): a real qwen2.5-coder:14b
+    reproduced golden-work-083's own exact defect byte-for-byte-similar,
+    then exhausted all 4 real frontend_forms attempts on the identical
+    class -- frontend/src/index.js always missing Route from its
+    existing `{ BrowserRouter as Router }` import -- even once told
+    exactly which file and names. The deterministic repair must accept
+    this on the FIRST attempt, the same shape the Werkzeug<3 and
+    react-router-version repairs already prove."""
+    broken_index = (
+        "import App from './App';\n"
+        "import { BrowserRouter as Router } from 'react-router-dom';\n"
+        "ReactDOM.render(<Router><Route path='/x'><App /></Route></Router>, "
+        "document.getElementById('root'));\n"
+    )
+    queues = _happy_path_queues()
+    queues["frontend_forms"] = [(HonestState.PASS, _output({
+        **HAPPY_PATH_FILES["frontend_forms"], "frontend/src/index.js": broken_index,
+    }))]
+    factory = _factory(queues)
+    result = generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 11
+    prompts = factory.models["frontend_forms"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 1
+    written = tmp_path / "candidates" / "staged-1" / "frontend" / "src" / "index.js"
+    assert "BrowserRouter as Router, Route" in written.read_text(encoding="utf-8")
+
+
 def test_frontend_tests_config_self_heals_a_react_router_version_mismatch(
     tmp_path: pathlib.Path,
 ) -> None:

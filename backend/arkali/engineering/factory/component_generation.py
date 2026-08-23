@@ -49,10 +49,11 @@ from arkali.engineering.factory.dependency_resolution import _apply_missing_comp
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
+    _react_router_missing_import_findings,
+    _repair_missing_react_router_imports,
     _repair_react_router_version_mismatch,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
-    _react_router_missing_import_findings,
     _split_client_and_ui,
     _unreachable_module_findings,
     _unused_client_export_findings,
@@ -353,6 +354,32 @@ def _stage_findings(stage_name: str, files: Mapping[str, str]) -> list[SemanticF
     return validator(files) if validator is not None else []
 
 
+def _apply_deterministic_repairs(
+    visible_files: Mapping[str, str], stage_files: dict[str, str],
+) -> dict[str, str]:
+    """Every deterministic repair this pipeline knows, applied in sequence
+    before findings are computed — never another blind model guess once
+    the exact, unambiguous fix for a real, verified defect is known
+    (golden-work-050/051's own lesson). Extracted from `_generate_one_stage`
+    itself (ADR-0008 decomposition, not a GATE 8 exception: adding a third
+    repair pushed that function's own measured complexity over its
+    ceiling) — each repair still owns its own real evidence citation and
+    reasoning in its own module; this only sequences them. golden-work-060
+    (frozen evidence): a real, unrelated second finding must never
+    silently discard a working repair, so every repair here runs
+    unconditionally regardless of what the others found."""
+    repair_fns = (
+        lambda sf: _apply_missing_compatibility_cap_repair(sf),
+        lambda sf: _repair_react_router_version_mismatch({**visible_files, **sf}, sf),
+        lambda sf: _repair_missing_react_router_imports(sf),
+    )
+    for repair_fn in repair_fns:
+        repaired = repair_fn(stage_files)
+        if repaired is not None:
+            stage_files = repaired
+    return stage_files
+
+
 def _generate_one_stage(
     declaration: StageDeclaration,
     blueprint: RequirementBlueprint,
@@ -382,34 +409,7 @@ def _generate_one_stage(
                 failure = f"stage response violates the contract: {error}"
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
-                # DETERMINISTIC REPAIR, not another blind model guess:
-                # golden-work-050/051 (frozen evidence) both exhausted their
-                # budget on the same fixable dependency-cap gap even once
-                # told the exact fix. golden-work-060 (frozen evidence) then
-                # exposed a real bug in this repair's own first version: it
-                # only accepted the repair when it made EVERY finding
-                # disappear, so a real, unrelated second finding (missing
-                # frontend/src/index.js) silently discarded a working
-                # repair every attempt, and prior_attempt_failure kept
-                # misreporting the already-fixed Werkzeug gap instead of
-                # the one real remaining blocker. Applied unconditionally,
-                # before findings are computed, so feedback always reflects
-                # only what is genuinely still wrong.
-                repaired = _apply_missing_compatibility_cap_repair(stage_files)
-                if repaired is not None:
-                    stage_files = repaired
-                # Same deterministic-repair shape as the Werkzeug<3 cap
-                # above, for a different real ecosystem gap golden-work-078
-                # found: `manifests` picked a real, current react-router-dom
-                # 6.x while `frontend_ui`/`frontend_forms` had already
-                # written real v5-API source. The proving signal lives in
-                # an earlier stage's output, so this checks the merged view
-                # rather than `stage_files` alone.
-                router_repaired = _repair_react_router_version_mismatch(
-                    {**visible_files, **stage_files}, stage_files,
-                )
-                if router_repaired is not None:
-                    stage_files = router_repaired
+                stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
                     return stage_files

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 
-from arkali.engineering.factory.frontend_ux_preflight import (
+from arkali.engineering.factory.frontend_manifest_preflight import (
     _react_router_missing_import_findings,
+    _repair_missing_react_router_imports,
+)
+from arkali.engineering.factory.frontend_ux_preflight import (
     _shadowed_route_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
@@ -436,3 +439,42 @@ def test_react_router_import_check_runs_unconditionally_without_a_ux_spec() -> N
     assert any(
         f.code == "frontend_missing_react_router_import" for f in _ux_spec_mutation_findings(files)
     )
+
+
+def test_repair_merges_a_missing_name_into_an_existing_react_router_import() -> None:
+    """golden-work-084 (session evidence, frozen): a real qwen2.5-coder:14b
+    reproduced golden-work-083's own exact defect byte-for-byte-similar,
+    then exhausted all 4 real frontend_forms attempts on the identical
+    class -- frontend/src/index.js always missing Route from its
+    existing `{ BrowserRouter as Router }` import -- even once told
+    exactly which file and names."""
+    files = {
+        "frontend/src/index.js": (
+            "import { BrowserRouter as Router } from 'react-router-dom';\n"
+            "ReactDOM.render(<Router><Route path='/x' /></Router>, "
+            "document.getElementById('root'));\n"
+        ),
+    }
+    repaired = _repair_missing_react_router_imports(files)
+    assert repaired is not None
+    assert "BrowserRouter as Router, Route" in repaired["frontend/src/index.js"]
+    assert _react_router_missing_import_findings(repaired) == []
+
+
+def test_repair_adds_a_new_import_when_none_exists() -> None:
+    files = {"frontend/src/App.js": "function App() { return <Route path='/x' />; }\n"}
+    repaired = _repair_missing_react_router_imports(files)
+    assert repaired is not None
+    assert repaired["frontend/src/App.js"].startswith(
+        "import { Route } from 'react-router-dom';\n"
+    )
+    assert _react_router_missing_import_findings(repaired) == []
+
+
+def test_repair_is_a_noop_when_nothing_is_missing() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "import { Route } from 'react-router-dom';\nfunction App() { return <Route path='/x' />; }\n"
+        ),
+    }
+    assert _repair_missing_react_router_imports(files) is None
