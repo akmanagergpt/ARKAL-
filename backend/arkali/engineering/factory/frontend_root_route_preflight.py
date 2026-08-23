@@ -87,3 +87,73 @@ def _missing_root_route_findings(files: Mapping[str, str]) -> list[SemanticFindi
             ),
         ))
     return findings
+
+
+#: golden-work-097 (session evidence, frozen): `frontend/src/App.js`
+#: declared a real, fully correct `<Router><Switch>` with all four real
+#: routes wired (create/edit/delete/list, even a `/` -> `/tasks` redirect)
+#: -- but `frontend/src/index.js` never imported or mounted `App` at all;
+#: it rendered `<TaskList />` directly. A real production build compiled
+#: successfully and a real browser, tied to that exact build's own script
+#: hash, crashed outright with a real react-router `Invariant failed`
+#: (`<Link>` used with no `<Router>` ancestor anywhere in the real render
+#: tree) -- the entire app rendered nothing, and every route App.js
+#: declared (the whole create/edit/delete feature set) was unreachable
+#: dead code.
+_ROUTER_TAG = re.compile(r"<(?:Router|BrowserRouter|HashRouter)\b")
+_RENDER_ROOT_TAG = re.compile(r"ReactDOM\.render\(\s*(?:<React\.StrictMode>\s*)?<(\w+)")
+
+
+def _module_stem(path: str) -> str:
+    name = path.rsplit("/", 1)[-1]
+    for suffix in (".jsx", ".js"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _router_root_path(files: Mapping[str, str]) -> str | None:
+    return next(
+        (
+            path for path, source in files.items()
+            if path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))
+            and path != "frontend/src/index.js"
+            and _ROUTER_TAG.search(source)
+        ),
+        None,
+    )
+
+
+def _orphaned_router_root_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Fires only when some OTHER file (never index.js itself -- a router
+    declared inline in index.js is `_missing_root_route_findings`'s own
+    concern, not this one) declares a real
+    `<Router>`/`<BrowserRouter>`/`<HashRouter>` and index.js's own
+    `ReactDOM.render(...)` call never mounts that exact component. No
+    deterministic repair exists (unlike a version pin or a missing
+    import, the correct fix requires knowing which component is
+    genuinely the app's real root -- a mechanical guess could as easily
+    paper over a real, different mistake) -- finding-only, the same shape
+    `_missing_root_route_findings` already uses."""
+    index_source = files.get("frontend/src/index.js")
+    if index_source is None:
+        return []
+    router_root_path = _router_root_path(files)
+    if router_root_path is None:
+        return []
+    router_root_name = _module_stem(router_root_path)
+    match = _RENDER_ROOT_TAG.search(index_source)
+    if match is not None and match.group(1) == router_root_name:
+        return []
+    return [SemanticFinding(
+        code="frontend_router_root_orphaned", path="frontend/src/index.js",
+        detail=(
+            f"{router_root_path} declares a real <Router>/<Switch> but "
+            f"frontend/src/index.js never mounts {router_root_name!r} -- every "
+            "route it declares is unreachable dead code, and any react-router "
+            "component/hook used elsewhere without that Router ancestor throws a "
+            f"real runtime crash. Import and mount <{router_root_name} /> in "
+            "index.js instead of a leaf component that bypasses the app's own "
+            "routing tree"
+        ),
+    )]

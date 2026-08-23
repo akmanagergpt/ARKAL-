@@ -48,7 +48,10 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _react_router_missing_import_findings,
     _route_component_missing_props_findings,
 )
-from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
+from arkali.engineering.factory.frontend_root_route_preflight import (
+    _missing_root_route_findings,
+    _orphaned_router_root_findings,
+)
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _shadowed_route_findings
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
@@ -482,6 +485,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
         + _frontend_local_import_findings(files)
         + _unreachable_parameterized_route_findings(files)
         + _missing_root_route_findings(files)
+        + _orphaned_router_root_findings(files)
     )
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:

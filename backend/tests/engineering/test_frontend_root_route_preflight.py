@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
+from arkali.engineering.factory.frontend_root_route_preflight import (
+    _missing_root_route_findings,
+    _orphaned_router_root_findings,
+)
 
 #: golden-work-092 (session evidence, frozen), verbatim real frontend/src/index.js.
 _UNREACHABLE_ROOT_INDEX_JS = """
@@ -78,3 +81,116 @@ def test_is_silent_when_no_router_is_used_at_all() -> None:
     not this defect."""
     source = "ReactDOM.render(<App />, document.getElementById('root'));\n"
     assert _missing_root_route_findings({"frontend/src/index.js": source}) == []
+
+
+#: golden-work-097 (session evidence, frozen): App.js's own real content.
+_REAL_APP_JS_WITH_ROUTER = """
+import React from 'react';
+import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
+import TaskList from './TaskList';
+import TaskCreate from './TaskCreate';
+import TaskEdit from './TaskEdit';
+import TaskDelete from './TaskDelete';
+
+const App = () => {
+  return (
+    <Router>
+      <Switch>
+        <Route exact path="/">
+          <Redirect to="/tasks" />
+        </Route>
+        <Route exact path="/tasks" component={TaskList} />
+        <Route path="/tasks/create" component={TaskCreate} />
+        <Route path="/tasks/edit/:id" component={TaskEdit} />
+        <Route path="/tasks/delete/:id" component={TaskDelete} />
+      </Switch>
+    </Router>
+  );
+};
+
+export default App;
+"""
+
+
+def test_flags_index_js_orphaning_a_real_router_root() -> None:
+    """golden-work-097 (session evidence, frozen): frontend/src/App.js
+    declared a real, fully correct <Router><Switch> with all four real
+    routes wired -- but frontend/src/index.js never imported or mounted
+    App at all; it rendered <TaskList /> directly. A real production
+    build compiled successfully and a real browser, tied to that exact
+    build's own script hash, crashed outright with a real react-router
+    "Invariant failed" (<Link> used with no <Router> ancestor anywhere in
+    the real render tree) -- the entire app rendered nothing, and every
+    route App.js declared was unreachable dead code."""
+    files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": (
+            "import React from 'react';\n"
+            "import ReactDOM from 'react-dom';\n"
+            "import TaskList from './TaskList';\n\n"
+            "ReactDOM.render(<TaskList />, document.getElementById('root'));\n"
+        ),
+    }
+    findings = _orphaned_router_root_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_router_root_orphaned"
+    assert findings[0].path == "frontend/src/index.js"
+    assert "App" in findings[0].detail
+
+
+def test_is_silent_when_index_js_correctly_mounts_the_router_root() -> None:
+    files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": (
+            "import React from 'react';\n"
+            "import ReactDOM from 'react-dom';\n"
+            "import App from './App';\n\n"
+            "ReactDOM.render(<App />, document.getElementById('root'));\n"
+        ),
+    }
+    assert _orphaned_router_root_findings(files) == []
+
+
+def test_is_silent_when_index_js_mounts_the_router_root_wrapped_in_strict_mode() -> None:
+    files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": (
+            "import React from 'react';\n"
+            "import ReactDOM from 'react-dom';\n"
+            "import App from './App';\n\n"
+            "ReactDOM.render(\n"
+            "  <React.StrictMode>\n"
+            "    <App />\n"
+            "  </React.StrictMode>,\n"
+            "  document.getElementById('root')\n"
+            ");\n"
+        ),
+    }
+    assert _orphaned_router_root_findings(files) == []
+
+
+def test_is_silent_when_no_other_file_declares_a_router() -> None:
+    """No real router root exists anywhere else -- a single, ordinary
+    component mounted directly is not this defect."""
+    files = {
+        "frontend/src/index.js": (
+            "import App from './App';\nReactDOM.render(<App />, document.getElementById('root'));\n"
+        ),
+        "frontend/src/App.js": "const App = () => <div>Hello</div>;\nexport default App;\n",
+    }
+    assert _orphaned_router_root_findings(files) == []
+
+
+def test_is_silent_when_the_router_is_declared_inline_in_index_js() -> None:
+    """A router declared inline in index.js itself (no separate router-
+    root file) is `_missing_root_route_findings`'s own concern, not this
+    one -- index.js can never orphan a router it IS."""
+    files = {
+        "frontend/src/index.js": (
+            "import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';\n"
+            "ReactDOM.render(<Router><Switch>"
+            "<Route exact path='/'><h2>Home</h2></Route>"
+            "</Switch></Router>, document.getElementById('root'));\n"
+        ),
+    }
+    assert _orphaned_router_root_findings(files) == []

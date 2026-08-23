@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
+    _phantom_client_import_findings,
     _repair_missing_client_call_imports,
 )
 
@@ -123,3 +124,64 @@ def test_repair_is_a_noop_when_the_stage_did_not_write_the_calling_file() -> Non
         ),
     }
     assert _repair_missing_client_call_imports(merged, {}) is None
+
+
+def test_flags_an_imported_name_the_client_module_never_exports() -> None:
+    """golden-work-097 (session evidence, frozen): TaskDelete.js wrote
+    `import { deleteTask } from './apiClient'` and called
+    `deleteTask(id)` inside a real onClick handler -- apiClient.js's own
+    grouped export statement (`export { getTasks, createTask, getTask,
+    updateTask };`) never named `deleteTask` at all. A real `npm run
+    build` compiled successfully (a named ES-module import of a name the
+    target module never exports is not a build-time error); only a real
+    click in a real browser would throw `TypeError: deleteTask is not a
+    function`."""
+    files = {
+        "frontend/src/apiClient.js": (
+            "async function getTasks() { return fetch('/tasks'); }\n"
+            "async function createTask(t) { return fetch('/tasks', {method: 'POST'}); }\n"
+            "async function getTask(id) { return fetch('/tasks/' + id); }\n"
+            "async function updateTask(id, t) { return fetch('/tasks/' + id, {method: 'PUT'}); }\n"
+            "export { getTasks, createTask, getTask, updateTask };\n"
+        ),
+        "frontend/src/TaskDelete.js": (
+            "import { deleteTask } from './apiClient';\n"
+            "function TaskDelete({ id }) { return "
+            "<button onClick={() => deleteTask(id)}>Delete</button>; }\n"
+        ),
+    }
+    findings = _phantom_client_import_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_phantom_client_import"
+    assert findings[0].path == "frontend/src/TaskDelete.js"
+    assert "deleteTask" in findings[0].detail
+
+
+def test_is_silent_when_every_imported_name_is_a_real_export() -> None:
+    files = {
+        "frontend/src/apiClient.js": _API_CLIENT,
+        "frontend/src/StudentForm.js": (
+            "import { getStudent, createStudent } from './apiClient';\n"
+            "function StudentForm() { getStudent(1); createStudent('x'); }\n"
+        ),
+    }
+    assert _phantom_client_import_findings(files) == []
+
+
+def test_phantom_import_check_is_silent_when_no_client_file_exists_yet() -> None:
+    files = {
+        "frontend/src/TaskDelete.js": "import { deleteTask } from './apiClient';\ndeleteTask(1);\n",
+    }
+    assert _phantom_client_import_findings(files) == []
+
+
+def test_phantom_import_check_does_not_flag_the_client_file_itself() -> None:
+    """A client file importing from another client-like file is not this
+    defect's concern -- only real UI-side phantom imports are checked."""
+    files = {
+        "frontend/src/apiClient.js": _API_CLIENT,
+        "frontend/src/otherClient.js": (
+            "import { deleteTask } from './apiClient';\nexport { deleteTask };\n"
+        ),
+    }
+    assert _phantom_client_import_findings(files) == []

@@ -55,6 +55,7 @@ from arkali.engineering.factory.dependency_resolution import _apply_missing_comp
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
+    _phantom_client_import_findings,
     _repair_missing_client_call_imports,
 )
 from arkali.engineering.factory.frontend_manifest_preflight import (
@@ -64,7 +65,10 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _repair_missing_react_router_imports,
     _repair_react_router_version_mismatch,
 )
-from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
+from arkali.engineering.factory.frontend_root_route_preflight import (
+    _missing_root_route_findings,
+    _orphaned_router_root_findings,
+)
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
     _missing_ui_state_findings,
@@ -166,6 +170,7 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _react_router_missing_import_findings(files)
         + _frontend_local_import_findings(files)
         + _missing_root_route_findings(files)
+        + _orphaned_router_root_findings(files)
         + _ux_spec_shell_findings(files)
     )
 
@@ -176,7 +181,11 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     confirmation step before delete, and success feedback after a
     mutation. Split out from `frontend_ui` (golden-work-065, session
     evidence, frozen) — see `STAGED_GENERATION_STAGES.md#9`."""
-    return _ux_spec_mutation_findings(files) + _client_call_missing_import_findings(files)
+    return (
+        _ux_spec_mutation_findings(files)
+        + _client_call_missing_import_findings(files)
+        + _phantom_client_import_findings(files)
+    )
 
 
 #: One handler per stage that has its own narrow rule. A stage absent here

@@ -29,6 +29,20 @@ react-router-version repairs (golden-work-050/051's own lesson): merge
 the missing name(s) into whichever import statement in the same file
 already names a `*client*`-matching source path.
 
+golden-work-097 (session evidence, frozen): the mirror image of
+golden-work-090/091 -- `TaskDelete.js` wrote a real
+`import { deleteTask } from './apiClient'` and called `deleteTask(id)`
+inside a real onClick handler, but `apiClient.js`'s own grouped export
+statement never named `deleteTask` at all. A real `npm run build`
+compiled successfully (an ES-module named import of something the
+target module never exports is not a build-time error, it resolves to
+`undefined`); only a real click in a real browser would throw
+`TypeError: deleteTask is not a function`. No deterministic repair
+exists for this direction (unlike the missing-import case, deciding
+whether `apiClient.js` should gain a real `deleteTask` calling a real
+backend route, or `TaskDelete.js`'s own call should not exist at all,
+is real application logic only the model can decide) -- finding-only.
+
 Duplicates a small export-name extractor rather than importing
 `frontend_ux_preflight._exported_js_names`: that module already imports
 from `frontend_manifest_preflight.py`, and this module sits alongside it,
@@ -112,6 +126,70 @@ def _client_call_missing_import_findings(files: Mapping[str, str]) -> list[Seman
                     "ReferenceError, not a syntax error `node --check` can see"
                 ),
             ))
+    return findings
+
+
+def _phantom_imports_in_file(
+    path: str, source: str, exported: frozenset[str],
+) -> list[SemanticFinding]:
+    """One file's own scan: every `*client*`-matching import statement it
+    declares, checked for names the client module never actually
+    exports. Extracted from `_phantom_client_import_findings` (ADR-0008
+    decomposition, not a GATE 8 exception: that function's own measured
+    complexity exceeded its ceiling) so the per-file decision logic is
+    measured on its own."""
+    findings: list[SemanticFinding] = []
+    for match in _NAMED_IMPORT.finditer(source):
+        if "client" not in match.group(2).lower():
+            continue
+        imported_names = [
+            part.strip().split(" as ")[-1].strip()
+            for part in match.group(1).split(",") if part.strip()
+        ]
+        phantom = sorted(name for name in imported_names if name and name not in exported)
+        if phantom:
+            findings.append(SemanticFinding(
+                code="frontend_phantom_client_import", path=path,
+                detail=(
+                    f"{path} imports {phantom!r} from {match.group(2)!r} but that "
+                    "module never exports them -- a real runtime TypeError "
+                    "('is not a function') the moment this is called, not a "
+                    "build-time or syntax error"
+                ),
+            ))
+    return findings
+
+
+def _phantom_client_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """The mirror image of `_client_call_missing_import_findings`: there, a
+    real call exists with no matching import; here, a real import exists
+    naming something the `*client*`-matching module never actually
+    exports.
+
+    golden-work-097 (session evidence, frozen): `TaskDelete.js` wrote
+    `import { deleteTask } from './apiClient'` and called `deleteTask(id)`
+    inside a real onClick handler -- `apiClient.js`'s own grouped export
+    statement (`export { getTasks, createTask, getTask, updateTask };`)
+    never named `deleteTask` at all. A real `npm run build` compiled
+    successfully (a named ES-module import of a name the target module
+    never exports resolves to `undefined` at runtime, not a build-time
+    error) -- only a real click would throw `TypeError: deleteTask is
+    not a function` in a real browser."""
+    client_text = "\n".join(
+        source for path, source in files.items()
+        if path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))
+        and "client" in path.lower()
+    )
+    if not client_text:
+        return []
+    exported = _client_exported_names(client_text)
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        if "client" in path.lower():
+            continue
+        findings.extend(_phantom_imports_in_file(path, source, exported))
     return findings
 
 
