@@ -224,7 +224,19 @@ qwen2.5-coder:14b's own real output for a module with a declared
 "delete" action added no delete control of any kind, on two consecutive
 real attempts — not a missing confirmation on an existing control, a
 missing control); add a visible success/feedback marker after a
-mutation completes. Return the
+mutation completes. When edit/delete is reached through a separate
+routed page rather than an inline button (a real, legal choice — a
+route per record, e.g. `/students/edit/:id`), the list rendering itself
+must also gain a real Link or button, per record, navigating to that
+exact route built from the record's own real id: a route a direct URL
+proves works is not real mutation UI if no control anywhere in the
+rendered app ever reaches it (golden-work-088/089, session evidence,
+frozen: a real qwen2.5-coder:14b added real, working
+`/students/edit/:id` and `/students/delete/:id` routes and real,
+correct components behind them — confirmed by navigating directly to
+`/students/edit/1` in a real browser — but never added a Link or button
+anywhere in the list itself, on two consecutive real full-budget runs).
+Return the
 complete, updated frontend source — frontend_ui's own navigation,
 dashboard and read-only rendering already work and are not this stage's
 concern; add the missing mutation UI onto them, do not rewrite them. A
