@@ -333,6 +333,36 @@ def _declared_navigation_labels(spec: _ProductUxSpec) -> set[str]:
     return labels
 
 
+def _repair_flat_ux_spec_envelope(stage_name: str, raw_json: str) -> str | None:
+    """golden-work-093/094 (session evidence, frozen, byte-identical
+    failure reproduced on two independent candidates): a real
+    qwen2.5-coder:14b reliably wrote this stage's own `_ProductUxSpec`
+    fields (`product_title`/`primary_roles`/`modules`/
+    `navigation_destinations`/`design_system`) directly at the JSON top
+    level -- a real, valid `_ProductUxSpec` by this module's own schema --
+    instead of nesting that same content as a string inside the generic
+    stage envelope (`{"files": {"product/ux_spec.json": "..."}}`) every
+    stage's own prompt (`stage_prompting._stage_prompt`'s
+    `output_contract`) explicitly documents. Proven by actually validating
+    the raw JSON against `_ProductUxSpec` itself, not by guessing at field
+    names, so this can never misfire on an unrelated stage's own different
+    contract violation. Returns `None` (no repair) for every other stage
+    and every shape that does not itself validate as a real spec."""
+    if stage_name != "product_ux_spec":
+        return None
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict) or "files" in parsed:
+        return None
+    try:
+        _ProductUxSpec.model_validate(parsed)
+    except ValidationError:
+        return None
+    return json.dumps({"files": {_UX_SPEC_PATH: json.dumps(parsed)}})
+
+
 def _ux_spec_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """`product_ux_spec`'s own narrow rule: the JSON parses against the real
     schema, every backend-declared data model has a corresponding module
@@ -352,4 +382,7 @@ def _ux_spec_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
-__all__ = ["_parse_ux_spec", "_ux_spec_stage_findings", "_backend_declared_models"]
+__all__ = [
+    "_parse_ux_spec", "_ux_spec_stage_findings", "_backend_declared_models",
+    "_repair_flat_ux_spec_envelope",
+]

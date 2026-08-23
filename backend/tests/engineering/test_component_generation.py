@@ -15,6 +15,7 @@ from arkali.engineering.factory.component_generation import (
     _backend_implementation_stage_findings,
     _cors_boundary_stage_findings,
     _frontend_ui_findings,
+    _parse_stage_envelope,
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError
@@ -251,6 +252,46 @@ def test_manifests_stage_prompt_is_reduced_not_the_whole_candidate(
     # The mechanically-extracted signal (backend/requirements.txt's real
     # declared dependency) is still there, since manifests genuinely needs it.
     assert "flask" in manifests_prompt
+
+
+def test_parse_stage_envelope_repairs_a_flat_ux_spec_response() -> None:
+    flat_spec = json.loads(HAPPY_PATH_FILES["product_ux_spec"]["product/ux_spec.json"])
+    envelope, failure = _parse_stage_envelope("product_ux_spec", json.dumps(flat_spec))
+    assert failure is None
+    assert envelope is not None
+    assert {item.path: item.content for item in envelope.files} == {
+        "product/ux_spec.json": json.dumps(flat_spec),
+    }
+
+
+def test_parse_stage_envelope_reports_the_original_error_when_no_repair_applies() -> None:
+    """A real, unrelated contract violation at a different stage must
+    surface its own real error, never a repair meant for a different
+    stage's own known defect shape."""
+    flat_spec = json.loads(HAPPY_PATH_FILES["product_ux_spec"]["product/ux_spec.json"])
+    envelope, failure = _parse_stage_envelope("frontend_ui", json.dumps(flat_spec))
+    assert envelope is None
+    assert failure is not None and "violates the contract" in failure
+
+
+def test_a_flat_ux_spec_response_is_deterministically_repaired(tmp_path: pathlib.Path) -> None:
+    """golden-work-093/094 (session evidence, frozen, byte-identical
+    failure reproduced on two independent real candidates): a real
+    qwen2.5-coder:14b wrote this stage's own real, valid ux_spec content
+    directly at the JSON top level instead of nesting it inside the
+    generic `{"files": {...}}` stage envelope every stage's own prompt
+    documents. Proves the real retry loop accepts it on the very first
+    attempt via the deterministic repair (only one outcome is queued
+    below -- a second attempt would raise IndexError), rather than
+    retrying or ever surfacing ARK-ERR-0116."""
+    queues = _happy_path_queues()
+    flat_spec = json.loads(HAPPY_PATH_FILES["product_ux_spec"]["product/ux_spec.json"])
+    queues["product_ux_spec"] = [(HonestState.PASS, json.dumps(flat_spec))]
+    result = generate_staged_model_product(
+        _blueprint(), _factory(queues), _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert "product/ux_spec.json" in result.files
 
 
 def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(

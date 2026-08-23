@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 
-from arkali.engineering.factory.product_ux_spec import _parse_ux_spec, _ux_spec_stage_findings
+from arkali.engineering.factory.product_ux_spec import (
+    _parse_ux_spec,
+    _repair_flat_ux_spec_envelope,
+    _ux_spec_stage_findings,
+)
 
 #: A deliberately non-Dershane, non-Golden-Product domain (e-commerce) --
 #: proving these checks generalize rather than encoding one product's
@@ -70,6 +74,56 @@ def test_a_complete_reconciling_spec_passes() -> None:
 def test_missing_spec_file_is_refused() -> None:
     findings = _ux_spec_stage_findings(dict(_BACKEND_FILES))
     assert [f.code for f in findings] == ["ux_spec_missing"]
+
+
+def _flat_valid_spec() -> dict:
+    """The exact real, valid `_ProductUxSpec` content -- with no `files`
+    envelope wrapper around it -- golden-work-093/094 (session evidence,
+    frozen, byte-identical failure reproduced on two independent
+    candidates) reliably produced at the `product_ux_spec` stage."""
+    return {
+        "product_title": "Shop", "primary_roles": ["staff"],
+        "modules": [_module("products", ["view"])],
+        "navigation_destinations": ["Products"],
+        "design_system": _DESIGN_SYSTEM,
+        "destructive_action_confirmation": True,
+    }
+
+
+def test_repairs_a_flat_spec_at_the_product_ux_spec_stage() -> None:
+    raw = json.dumps(_flat_valid_spec())
+    repaired = _repair_flat_ux_spec_envelope("product_ux_spec", raw)
+    assert repaired is not None
+    envelope = json.loads(repaired)
+    assert set(envelope) == {"files"}
+    rewrapped_spec = json.loads(envelope["files"]["product/ux_spec.json"])
+    assert rewrapped_spec == _flat_valid_spec()
+
+
+def test_repair_is_a_noop_for_a_different_stage() -> None:
+    """A flat JSON object matching `_ProductUxSpec`'s own shape is real
+    evidence only at `product_ux_spec` -- some other stage's own real,
+    unrelated contract violation must never be silently reinterpreted as
+    this one."""
+    raw = json.dumps(_flat_valid_spec())
+    assert _repair_flat_ux_spec_envelope("frontend_ui", raw) is None
+
+
+def test_repair_is_a_noop_when_files_key_already_present() -> None:
+    raw = json.dumps({"files": {"product/ux_spec.json": json.dumps(_flat_valid_spec())}})
+    assert _repair_flat_ux_spec_envelope("product_ux_spec", raw) is None
+
+
+def test_repair_is_a_noop_for_unparseable_json() -> None:
+    assert _repair_flat_ux_spec_envelope("product_ux_spec", "{not json") is None
+
+
+def test_repair_is_a_noop_when_the_flat_shape_does_not_validate_as_a_real_spec() -> None:
+    """Proof by real validation against `_ProductUxSpec`, not a guess from
+    field names -- an unrelated flat JSON object must never be wrapped and
+    accepted as a real ux_spec it never was."""
+    raw = json.dumps({"some_other_stage_shape": True})
+    assert _repair_flat_ux_spec_envelope("product_ux_spec", raw) is None
 
 
 def test_invalid_json_is_refused() -> None:

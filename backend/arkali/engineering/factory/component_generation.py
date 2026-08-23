@@ -15,15 +15,16 @@ architecture_budgets: max_public_surface_per_context: 40`) is measured
 per bounded context, across every module in it, counting every top-level
 class/function whose name does not start with `_` — not per module, and
 not filtered by `__all__`. This module's per-stage checks reuse
-`product_preflight.py`'s existing `_persistence_findings`,
-`_schema_context_findings`, `_manifest_findings` and
-`model_product_generation.py`'s `_json_payload` exactly as written, rather
-than promoting them to public names that no other bounded context will
-ever consume — promoting them was tried first and mechanically measured
-to push the context over budget (47/40) purely from added public names,
-with zero behavior difference either way. Only one new name is actually
-public here: `generate_staged_model_product`, the one entry point a real
-caller (`scripts/run_staged_generation.py`) needs.
+`product_preflight.py`'s existing `_manifest_findings`,
+`model_product_generation.py`'s `_json_payload` and
+`backend_stage_preflight.py`'s/`product_ux_spec.py`'s own per-stage
+validators exactly as written, rather than promoting them to public names
+that no other bounded context will ever consume — promoting them was
+tried first and mechanically measured to push the context over budget
+(47/40) purely from added public names, with zero behavior difference
+either way. Only one new name is actually public here:
+`generate_staged_model_product`, the one entry point a real caller
+(`scripts/run_staged_generation.py`) needs.
 
 STAGE OUTPUT IS NEVER MORE THAN ITS DECLARED INPUTS. Each stage's prompt
 embeds only the real, already-written bytes of the stage names
@@ -35,7 +36,6 @@ returned parseable JSON" is necessary, never sufficient.
 
 from __future__ import annotations
 
-import ast
 import json
 import platform
 import re
@@ -45,6 +45,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from arkali.control.specification.blueprint_contracts import RequirementBlueprint
 from arkali.engineering.factory.backend_contract_preflight import _backend_contract_findings
+from arkali.engineering.factory.backend_stage_preflight import (
+    _backend_implementation_stage_findings,
+    _backend_tests_stage_findings,
+    _cors_boundary_stage_findings,
+    _schema_only_findings,
+)
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_client_call_preflight import (
@@ -70,8 +76,10 @@ from arkali.engineering.factory.frontend_ux_preflight import (
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
 from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
 from arkali.engineering.factory.manifest_context import _manifest_context
-from arkali.engineering.factory.product_ux_spec import _ux_spec_stage_findings
-from arkali.engineering.factory.route_response_preflight import _missing_generated_id_findings, _raw_row_jsonify_findings
+from arkali.engineering.factory.product_ux_spec import (
+    _repair_flat_ux_spec_envelope,
+    _ux_spec_stage_findings,
+)
 from arkali.engineering.factory.model_product_generation import (
     GeneratedFile,
     ModelProductResult,
@@ -81,13 +89,8 @@ from arkali.engineering.factory.model_product_generation import (
 )
 from arkali.engineering.factory.product_preflight import (
     SemanticFinding, _manifest_findings, _manifests_stage_findings,
-    _persistence_findings, _schema_context_findings,
 )
 from arkali.engineering.factory.stage_prompting import _stage_prompt
-from arkali.engineering.factory.test_contract_preflight import (
-    fixture_findings,
-    lifecycle_findings,
-)
 
 MAX_STAGE_ATTEMPTS = 4
 
@@ -175,142 +178,6 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return _ux_spec_mutation_findings(files) + _client_call_missing_import_findings(files)
 
 
-def _backend_text(files: Mapping[str, str]) -> str:
-    return "\n".join(
-        source.lower() for path, source in files.items()
-        if path.startswith("backend/") and path.endswith(".py")
-    )
-
-
-def _python_syntax_findings(files: Mapping[str, str], *, path_prefix: str) -> list[SemanticFinding]:
-    """Real `ast.parse` on every `.py` file under `path_prefix`.
-
-    golden-work-045's real backend_implementation output (session evidence)
-    passed every substring/regex check here while containing an actual
-    `SyntaxError` (an unterminated multi-line string) — none of the checks
-    below ever parse the code they inspect. This is the gap that closes;
-    same finding code (`python_syntax`) `product_preflight.python_modules`
-    already uses for the same defect at the final whole-product gate, so a
-    caller sees one vocabulary either way.
-    """
-    findings: list[SemanticFinding] = []
-    for path, source in files.items():
-        if not (path.startswith(path_prefix) and path.endswith(".py")):
-            continue
-        try:
-            ast.parse(source)
-        except SyntaxError as error:
-            findings.append(SemanticFinding(
-                code="python_syntax", path=path,
-                detail=f"line {error.lineno}: {error.msg}",
-            ))
-    return findings
-
-
-def _schema_only_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Schema/persistence only — no route or entrypoint requirement.
-
-    backend_contract no longer declares any Python (see
-    STAGED_GENERATION_STAGES.md#1), so `product_preflight._persistence_findings`
-    (which bundles schema together with route markers and an entrypoint check)
-    cannot pass at this stage by construction — those belong to
-    backend_implementation, not backend_schema. This duplicates
-    `_persistence_findings`'s own sqlite/schema pair (not its route/entrypoint
-    half) rather than promoting a fourth product_preflight helper to public:
-    the real architecture-budget gate already measured this context at its
-    40/40 public-surface ceiling once this session (see this module's own
-    docstring) and every net-new promotion was reverted for exactly that
-    reason.
-    """
-    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
-    if syntax_findings:
-        return syntax_findings
-    backend_text = _backend_text(files)
-    findings: list[SemanticFinding] = []
-    uses_sqlite = "sqlite3" in backend_text or "sqlite://" in backend_text
-    creates_schema = "create table" in backend_text or "create_all(" in backend_text
-    if not uses_sqlite:
-        findings.append(SemanticFinding(
-            code="missing_persistence_code", path="backend/",
-            detail="backend Python source contains no executable SQLite persistence",
-        ))
-    elif not creates_schema:
-        findings.append(SemanticFinding(
-            code="missing_schema_bootstrap", path="backend/",
-            detail="SQLite is selected but no schema creation or migration is present",
-        ))
-    findings.extend(_schema_context_findings(backend_text))
-    return findings
-
-
-#: Same marker set `http_contract_preflight.frontend_contract_findings` checks
-#: for (FastAPI/Starlette's CORSMiddleware, Flask's flask_cors/CORS(app)).
-#: Duplicated here (3 short strings) rather than imported, since that
-#: function's own marker tuple is a local, unexported detail — promoting it
-#: to module level there would cost another public-surface symbol this
-#: context has no room for.
-_CORS_MARKERS = ("corsmiddleware", "flask_cors", "cors(app")
-
-
-def _backend_implementation_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """Full persistence+routes+entrypoint — CORS is not this stage's concern
-    (see backend_cors_boundary, immediately after). A real local model
-    reliably produced routes+schema+entrypoint together but did not
-    reliably add CORS in the same bounded attempt even when this stage's
-    own rule explicitly required it (golden-work-045, two consecutive real
-    runs) — narrowed to its own stage instead of raised attempts or
-    repeated whole-stage retries on the same combined requirement.
-    """
-    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
-    if syntax_findings:
-        return syntax_findings
-    return _persistence_findings(files) + _schema_context_findings(_backend_text(files)) + _missing_generated_id_findings(files) + _raw_row_jsonify_findings(files)
-
-
-def _cors_boundary_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """backend_cors_boundary's sole narrow rule: real CORS middleware exists.
-
-    Checked unconditionally (not "only if a frontend already exists"): this
-    stage runs before any frontend stage, by design, so no frontend bytes
-    are available yet to condition on.
-    """
-    syntax_findings = _python_syntax_findings(files, path_prefix="backend/")
-    if syntax_findings:
-        return syntax_findings
-    backend_text = _backend_text(files)
-    if any(marker in backend_text for marker in _CORS_MARKERS):
-        return []
-    return [SemanticFinding(
-        code="missing_browser_origin_boundary", path="backend/",
-        detail="backend declares no CORS middleware for its separate-origin frontend",
-    )]
-
-
-def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    syntax_findings = _python_syntax_findings(files, path_prefix="tests/")
-    if syntax_findings:
-        return syntax_findings
-    test_paths = [p for p in files if p.startswith("tests/") and p.endswith(".py")]
-    if not test_paths:
-        # ANTI-VACUITY. golden-work-048 (session evidence, frozen): a real
-        # qwen2.5-coder:14b placed its tests under backend/tests/test_app.py
-        # instead — a reasonable convention this stage's rule never ruled
-        # out — and this check, only ever iterating paths that already
-        # start with tests/, silently found nothing to reject. The
-        # whole-product gate's required_roots checks the top-level path
-        # segment; failing here, at the stage that owns it, is cheaper and
-        # more specific than only discovering it at the final gate.
-        return [SemanticFinding(
-            code="backend_tests_missing_top_level_path", path="tests/",
-            detail="no test file exists under the top-level tests/ path")]
-    findings: list[SemanticFinding] = []
-    for path in test_paths:
-        tree = ast.parse(files[path])
-        findings.extend(fixture_findings(path, tree))
-        findings.extend(lifecycle_findings(files))
-    return findings
-
-
 #: One handler per stage that has its own narrow rule. A stage absent here
 #: (currently none) has no per-stage check; the final whole-product
 #: `inspect_product_files` gate still applies to every stage's output.
@@ -367,6 +234,31 @@ def _apply_deterministic_repairs(
     return stage_files
 
 
+def _parse_stage_envelope(
+    stage_name: str, raw_output: str,
+) -> tuple[_StageEnvelope | None, str | None]:
+    """Real stage output validated against `_StageEnvelope`, falling back
+    to `product_ux_spec`'s own deterministic flat-envelope repair
+    (golden-work-093/094, session evidence, frozen, byte-identical
+    failure reproduced on two independent candidates) before treating a
+    contract violation as final -- once the exact, unambiguous fix for a
+    real, verified defect is known, applying it and re-validating is more
+    honest than another blind model retry (golden-work-050/051's own
+    lesson, the same one every other deterministic repair in this
+    pipeline already follows)."""
+    payload = _json_payload(raw_output)
+    try:
+        return _StageEnvelope.model_validate_json(payload), None
+    except (ValueError, json.JSONDecodeError) as error:
+        repaired = _repair_flat_ux_spec_envelope(stage_name, payload)
+        if repaired is None:
+            return None, f"stage response violates the contract: {error}"
+    try:
+        return _StageEnvelope.model_validate_json(repaired), None
+    except (ValueError, json.JSONDecodeError) as error:
+        return None, f"stage response violates the contract: {error}"
+
+
 def _generate_one_stage(
     declaration: StageDeclaration,
     blueprint: RequirementBlueprint,
@@ -390,10 +282,9 @@ def _generate_one_stage(
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
         else:
-            try:
-                envelope = _StageEnvelope.model_validate_json(_json_payload(outcome.output))
-            except (ValueError, json.JSONDecodeError) as error:
-                failure = f"stage response violates the contract: {error}"
+            envelope, parse_failure = _parse_stage_envelope(declaration.name, outcome.output)
+            if envelope is None:
+                failure = parse_failure
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
