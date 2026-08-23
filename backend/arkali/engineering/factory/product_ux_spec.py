@@ -256,8 +256,34 @@ def _backend_methods_by_resource(files: Mapping[str, str]) -> dict[str, set[str]
     return methods
 
 
+#: golden-work-098 (session evidence, frozen): backend_contract's own real
+#: `task_model.json` declared no `table_name` at all, so
+#: `_backend_declared_models`'s own fallback (`_path_stem`) named it
+#: "task_model" -- the exact real name `_module_parity_findings` then
+#: correctly required the ux_spec module to reuse verbatim (golden-work-
+#: 095's own fix). `_matching_methods` below normalizes that to
+#: "taskmodel" and compares it against the real route's own resource key
+#: ("tasks", from `/tasks`) -- neither string contains the other
+#: ("taskmodel" has no "tasks" substring; "tasks" is not a substring of
+#: "taskmodel" either), so this matched NOTHING, silently, for any real
+#: candidate using this exact "<resource>_model" naming convention this
+#: session's own real evidence has now produced twice (golden-work-095
+#: and golden-work-098 both named a module "task_model"). Stripping a
+#: trailing "model" suffix before the substring comparison -- only on
+#: this function's own resource-matching side, never touching
+#: `_module_parity_findings`'s own exact-name reconciliation, which
+#: genuinely needs the unstripped "task_model" to match the backend's own
+#: declared name -- turns "taskmodel" into "task", a real substring of
+#: "tasks".
+def _resource_matching_name(module_name: str) -> str:
+    normalized = _normalize(module_name)
+    if normalized.endswith("model") and len(normalized) > len("model"):
+        return normalized[: -len("model")]
+    return normalized
+
+
 def _matching_methods(resource_methods: dict[str, set[str]], module_name: str) -> set[str]:
-    normalized_module = _normalize(module_name)
+    normalized_module = _resource_matching_name(module_name)
     found: set[str] = set()
     for key, methods in resource_methods.items():
         if normalized_module in key or key in normalized_module:
@@ -317,7 +343,24 @@ def _module_action_findings(
     module: _UxModuleSpec, resource_methods: dict[str, set[str]]
 ) -> list[SemanticFinding]:
     """A module never under-claims a mutating action the real backend
-    exposes a method for, and never claims create/edit with no form."""
+    exposes a method for, never over-claims one the real backend has no
+    method for, and never claims create/edit with no form.
+
+    golden-work-098 (real end-to-end execution evidence, frozen): a real
+    module declared `"actions": ["create", "edit", "delete", "view"]`
+    against a real backend that only ever implemented GET/POST/PUT for
+    `/tasks` -- no DELETE route anywhere (backend_contract runs before
+    product_ux_spec even exists; it had no way to know a later stage
+    would declare a delete action). frontend_forms then faithfully built
+    a full, real TaskDelete.js -- a real confirm-then-delete UI, a real
+    `deleteTask` client call -- pointing at an endpoint that structurally
+    could never exist. A real production build compiled successfully; a
+    real user clicking "Yes" would get a real HTTP 405 from Flask, not a
+    build-time or syntax error. Over-claiming is only checked when
+    `real_methods` is non-empty -- an inconclusive resource match (this
+    module's own name never matched any real backend resource at all)
+    must never be treated as proof every one of its declared actions is
+    unsupported."""
     real_methods = _matching_methods(resource_methods, module.name)
     required_actions = {_METHOD_TO_ACTION[m] for m in real_methods if m in _METHOD_TO_ACTION}
     findings: list[SemanticFinding] = []
@@ -327,6 +370,19 @@ def _module_action_findings(
             code="ux_spec_action_under_declared", path=_UX_SPEC_PATH,
             detail=f"module {module.name!r}: backend exposes method(s) implying "
                    f"action(s) {under_declared!r}, not declared",
+        ))
+    over_declared = sorted(
+        action for action in module.actions
+        if real_methods and action != "view" and action not in required_actions
+    )
+    if over_declared:
+        findings.append(SemanticFinding(
+            code="ux_spec_action_over_declared", path=_UX_SPEC_PATH,
+            detail=f"module {module.name!r}: declares action(s) {over_declared!r} but "
+                   "the real backend exposes no matching method for them -- "
+                   "frontend_forms would build a real UI and client call pointing at "
+                   "an endpoint that does not exist. Remove the action, or add the "
+                   "matching route to backend_contract for the next candidate",
         ))
     if any(action in ("create", "edit") for action in module.actions) and not module.forms:
         findings.append(SemanticFinding(

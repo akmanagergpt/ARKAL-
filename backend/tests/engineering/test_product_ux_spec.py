@@ -204,6 +204,98 @@ def test_a_create_action_with_no_form_is_refused() -> None:
     assert any(f.code == "ux_spec_action_without_form" for f in findings)
 
 
+#: golden-work-098 (real end-to-end execution evidence, frozen): the real
+#: backend_contract/product_ux_spec shape that exposed the matching bug --
+#: a module named "task_model" (backend_contract's own task_model.json
+#: declared no table_name, so its real declared name defaulted to the
+#: file stem "task_model" -- golden-work-095's own fix requires the
+#: module to reuse that exact name) against a real backend that only ever
+#: implemented GET/POST/GET/PUT for /tasks, no DELETE.
+_TASK_BACKEND_FILES = {
+    "backend/task_model.json": json.dumps(
+        {"fields": {"id": {"type": "integer"}, "title": {"type": "string"}}}
+    ),
+    "backend/routes.json": json.dumps([
+        {"path": "/tasks", "method": "GET"},
+        {"path": "/tasks", "method": "POST"},
+        {"path": "/tasks/{id}", "method": "GET"},
+        {"path": "/tasks/{id}", "method": "PUT"},
+    ]),
+}
+
+
+def _task_spec_files(actions: list[str]) -> dict[str, str]:
+    spec = {
+        "product_title": "Task Management System", "primary_roles": ["Task Manager"],
+        "modules": [_module("task_model", actions, forms=[
+            {"name": "create_task", "fields": ["title"]},
+        ] if any(a in ("create", "edit") for a in actions) else [])],
+        "navigation_destinations": ["Tasks"],
+        "design_system": _DESIGN_SYSTEM,
+    }
+    return {**_TASK_BACKEND_FILES, "product/ux_spec.json": json.dumps(spec)}
+
+
+def test_module_action_matching_tolerates_a_model_suffixed_module_name() -> None:
+    """golden-work-098 (real end-to-end execution evidence, frozen): before
+    this fix, `_matching_methods` normalized "task_model" to "taskmodel"
+    and compared it against the real route's own resource key ("tasks")
+    -- neither string contains the other, so this matched NOTHING,
+    silently, for any real candidate using this exact naming convention.
+    Proven here via the real under-declared-action check that bug also
+    silently disabled: the backend genuinely exposes POST+PUT (create+
+    edit), which a view-only spec now correctly under-declares."""
+    files = _task_spec_files(["view"])
+    findings = _ux_spec_stage_findings(files)
+    under = next(f for f in findings if f.code == "ux_spec_action_under_declared")
+    assert "create" in under.detail and "edit" in under.detail
+
+
+def test_flags_a_declared_action_the_real_backend_has_no_route_for() -> None:
+    """golden-work-098 (real end-to-end execution evidence, frozen): the
+    real spec declared "delete" for task_model against a real backend
+    that never implemented a DELETE route for /tasks -- backend_contract
+    runs before product_ux_spec even exists, so it had no way to know a
+    later stage would declare a delete action. frontend_forms then
+    faithfully built a full, real TaskDelete.js pointing at an endpoint
+    that structurally could never exist -- a real production build
+    compiled successfully; only a real click would get a real HTTP 405
+    from Flask."""
+    files = _task_spec_files(["create", "edit", "delete", "view"])
+    findings = _ux_spec_stage_findings(files)
+    over = next(f for f in findings if f.code == "ux_spec_action_over_declared")
+    assert "delete" in over.detail
+    assert "create" not in over.detail and "edit" not in over.detail
+
+
+def test_is_silent_when_every_declared_action_has_a_real_backend_route() -> None:
+    files = _task_spec_files(["create", "edit", "view"])
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code == "ux_spec_action_over_declared" for f in findings)
+
+
+def test_over_declared_check_is_silent_when_the_module_matches_no_real_resource() -> None:
+    """An inconclusive resource match (real_methods empty) must never be
+    treated as proof every declared action is unsupported -- that would
+    be strictly worse than no check at all."""
+    files = {
+        "backend/widget_model.json": json.dumps(
+            {"fields": {"id": {"type": "integer"}}}
+        ),
+        "backend/routes.json": json.dumps([{"path": "/completely-unrelated", "method": "GET"}]),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Widgets", "primary_roles": ["user"],
+            "modules": [_module("widget_model", ["create", "edit", "delete", "view"], forms=[
+                {"name": "widget_form", "fields": ["name"]},
+            ])],
+            "navigation_destinations": ["Widgets"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code == "ux_spec_action_over_declared" for f in findings)
+
+
 def test_a_navigation_label_missing_from_destinations_is_refused() -> None:
     files = _valid_spec_files()
     spec = json.loads(files["product/ux_spec.json"])
