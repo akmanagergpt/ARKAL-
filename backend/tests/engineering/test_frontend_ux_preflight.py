@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from arkali.engineering.factory.frontend_manifest_preflight import (
+    _frontend_local_import_findings,
     _react_router_missing_import_findings,
     _repair_missing_react_router_imports,
     _route_component_missing_props_findings,
@@ -533,3 +534,47 @@ def test_is_silent_when_the_routed_component_only_destructures_route_injected_pr
         ),
     }
     assert _route_component_missing_props_findings(files) == []
+
+
+def test_flags_a_relative_import_with_no_matching_real_file() -> None:
+    """golden-work-086 (session evidence, frozen): frontend/src/App.js
+    imported Courses from './Courses' and mounted <Route path="/courses"
+    component={Courses} />, but no frontend/src/Courses.js (or
+    Courses/index.js) was ever generated -- a real `npm run build`
+    failed outright: "Module not found: Error: Can't resolve
+    './Courses'". Syntactically legal JS; `node --check` cannot see it."""
+    files = {
+        "frontend/src/App.js": "import Courses from './Courses';\nfunction App() { return <Courses />; }\n",
+    }
+    findings = _frontend_local_import_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_local_import_unresolved"
+    assert "./Courses" in findings[0].detail
+
+
+def test_is_silent_when_the_relative_import_resolves_to_a_bare_file() -> None:
+    files = {
+        "frontend/src/App.js": "import Courses from './Courses';\nfunction App() { return <Courses />; }\n",
+        "frontend/src/Courses.js": "const Courses = () => <div />;\nexport default Courses;\n",
+    }
+    assert _frontend_local_import_findings(files) == []
+
+
+def test_is_silent_when_the_relative_import_resolves_to_a_module_index() -> None:
+    files = {
+        "frontend/src/App.js": "import Students from './Students';\nfunction App() { return <Students />; }\n",
+        "frontend/src/Students/index.js": "const Students = () => <div />;\nexport default Students;\n",
+    }
+    assert _frontend_local_import_findings(files) == []
+
+
+def test_local_import_resolution_is_relative_to_the_importing_files_own_directory() -> None:
+    """A `../apiClient` import from a nested module file resolves against
+    that file's own directory, not the frontend/src root."""
+    files = {
+        "frontend/src/apiClient.js": "export function getStudents() {}\n",
+        "frontend/src/Students/EditStudent.js": (
+            "import { getStudents } from '../apiClient';\nfunction EditStudent() { getStudents(); }\n"
+        ),
+    }
+    assert _frontend_local_import_findings(files) == []

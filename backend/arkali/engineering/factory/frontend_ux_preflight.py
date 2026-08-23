@@ -116,6 +116,40 @@ def _exported_js_names(client_text: str) -> frozenset[str]:
 #: whether its forms validate anything, which would make this check pass
 #: vacuously every time.
 _VALIDATION_MARKERS = ("required", "invalid")
+#: golden-work-065 (session evidence, frozen): a real qwen2.5-coder:14b
+#: implemented a genuine empty-state branch three times over
+#: (`students.length === 0 ? <p>No students found</p> : ...`) and every
+#: one was a real false positive against a bare `"empty" in text`
+#: check — the literal word never appears, only real, more specific
+#: phrasing. Loading/error stay single-marker: real output overwhelmingly
+#: uses those exact words, and no real evidence yet shows otherwise.
+_EMPTY_STATE_MARKERS = ("empty", "no results", "nothing found", ".length === 0", ".length==0")
+
+
+def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
+    """Moved from `component_generation.py` (ADR-0008 decomposition, not
+    a GATE 8 exception: that module reached its own 400-logical-line
+    ceiling, measured live by the real architecture gate, not assumed),
+    to sit alongside `_state_coverage_findings`, the other real
+    UI-state-completeness check this file already owns. "empty" was
+    named in `frontend_ui`'s own rule text (STAGED_GENERATION_STAGES.md#8:
+    "renders loading, empty and error states") but never actually
+    checked here — a real gap in this check, not the rule, fixed
+    alongside this session's wider UX-reconciliation work rather than
+    left to drift further from its own rule."""
+    lowered = ui.lower()
+    missing = [state for state in ("loading", "error") if state not in lowered]
+    if not any(marker in lowered for marker in _EMPTY_STATE_MARKERS) and not re.search(
+        r"no\s+\w+\s+found", lowered
+    ):
+        missing.append("empty")
+    return [
+        SemanticFinding(
+            code="frontend_ui_missing_state", path="frontend/src/",
+            detail=f"frontend_ui renders no {state!r} state",
+        )
+        for state in missing
+    ]
 
 
 def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:

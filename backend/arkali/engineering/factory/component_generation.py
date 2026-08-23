@@ -49,11 +49,13 @@ from arkali.engineering.factory.dependency_resolution import _apply_missing_comp
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
+    _frontend_local_import_findings,
     _react_router_missing_import_findings,
     _repair_missing_react_router_imports,
     _repair_react_router_version_mismatch,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _missing_ui_state_findings,
     _split_client_and_ui,
     _unreachable_module_findings,
     _unused_client_export_findings,
@@ -139,29 +141,6 @@ class _StageEnvelope(BaseModel):
 #: check — the literal word never appears, only real, more specific
 #: phrasing. Loading/error stay single-marker: real output overwhelmingly
 #: uses those exact words, and no real evidence yet shows otherwise.
-_EMPTY_STATE_MARKERS = ("empty", "no results", "nothing found", ".length === 0", ".length==0")
-
-
-def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
-    # "empty" was named in this stage's own rule text (STAGED_GENERATION_STAGES.md#8:
-    # "renders loading, empty and error states") but never actually checked here —
-    # a real gap in this check, not the rule; fixed alongside this session's wider
-    # UX-reconciliation work rather than left to drift further from its own rule.
-    lowered = ui.lower()
-    missing = [state for state in ("loading", "error") if state not in lowered]
-    if not any(marker in lowered for marker in _EMPTY_STATE_MARKERS) and not re.search(
-        r"no\s+\w+\s+found", lowered
-    ):
-        missing.append("empty")
-    return [
-        SemanticFinding(
-            code="frontend_ui_missing_state", path="frontend/src/",
-            detail=f"frontend_ui renders no {state!r} state",
-        )
-        for state in missing
-    ]
-
-
 def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """`frontend_ui`'s own narrow rule: it calls the client, renders states,
     and (golden-work-061, session evidence, frozen) provides the real
@@ -176,6 +155,7 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _missing_frontend_entry_point_findings(files)
         + _unreachable_module_findings(files)
         + _react_router_missing_import_findings(files)
+        + _frontend_local_import_findings(files)
         + _ux_spec_shell_findings(files)
     )
 

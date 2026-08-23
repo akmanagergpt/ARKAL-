@@ -61,6 +61,7 @@ Flask/Werkzeug.
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 from collections.abc import Mapping
 
@@ -431,6 +432,56 @@ def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[Se
                         "(the same real pattern this candidate's own EditStudent/DeleteStudent "
                         "components already use) or replace component={...} with "
                         "render={props => <Component {...props} ... />} and pass the real data"
+                    ),
+                ))
+    return findings
+
+
+#: golden-work-086 (session evidence, frozen): `frontend/src/App.js`
+#: imported `Courses from './Courses'` and mounted
+#: `<Route path="/courses" component={Courses} />`, but no
+#: `frontend/src/Courses.js` (or `Courses/index.js`) was ever generated --
+#: real `npm run build` failed outright: "Module not found: Error: Can't
+#: resolve './Courses'". Syntactically legal JS (`node --check` cannot
+#: see it, same class of gap as every other webpack-only build failure
+#: this module already exists to catch); only a real module-resolution
+#: attempt proves it. Mechanical, not a real bundler: resolves exactly
+#: webpack's own default extension/index rules
+#: (`X`, `X.js`, `X.jsx`, `X/index.js`, `X/index.jsx`), matched against
+#: the real candidate's own declared file set.
+_RELATIVE_IMPORT = re.compile(r"""(?:from|require\()\s*['"](\.\.?/[^'"]+)['"]""")
+
+
+def _relative_import_resolves(importer_path: str, target: str, files: Mapping[str, str]) -> bool:
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(importer_path), target))
+    return any(
+        candidate in files
+        for candidate in (resolved, f"{resolved}.js", f"{resolved}.jsx",
+                          f"{resolved}/index.js", f"{resolved}/index.jsx")
+    )
+
+
+def _frontend_local_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Every real relative import (`from './X'`/`require('../X')`) in a
+    generated frontend file must resolve to a real file this candidate
+    actually wrote -- checked per file, since a resolution is always
+    relative to the importing file's own real directory, the same
+    per-file shape `_react_router_missing_import_findings` already uses.
+    Runs unconditionally (no `product_ux_spec` dependency) -- a general
+    module-resolution rule, not specific to the staged pipeline."""
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        for match in _RELATIVE_IMPORT.finditer(source):
+            target = match.group(1)
+            if not _relative_import_resolves(path, target, files):
+                findings.append(SemanticFinding(
+                    code="frontend_local_import_unresolved", path=path,
+                    detail=(
+                        f"{path} imports {target!r} but no such file exists anywhere in "
+                        "this real candidate -- a real webpack build fails outright with "
+                        f"\"Module not found: Error: Can't resolve {target!r}\""
                     ),
                 ))
     return findings
