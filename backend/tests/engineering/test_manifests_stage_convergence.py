@@ -271,19 +271,59 @@ def test_frontend_forms_is_rejected_for_a_parameterized_route_no_link_ever_targe
         )
 
 
-def test_frontend_forms_is_rejected_for_a_client_call_missing_its_own_import(
+def test_frontend_forms_self_heals_a_missing_client_call_import_without_a_retry(
     tmp_path: pathlib.Path,
 ) -> None:
-    """golden-work-090 (session evidence, frozen): App.js's real student
-    list gained a real, correct edit Link and a real inline delete
-    button calling `deleteStudent(student.id)` directly on click -- but
-    App.js's own import line was never updated to include
-    `deleteStudent`, a real export apiClient.js genuinely declares. A
-    real, hard ReferenceError the moment a real user clicks Delete. No
-    deterministic repair exists (the real fix is adding the missing
-    import, but only once the model itself decides which name it meant
-    to call), so this proves the real retry loop genuinely rejects and
-    exhausts rather than self-healing."""
+    """golden-work-090/091 (session evidence, frozen): a real
+    qwen2.5-coder:14b twice called a real frontend_client export
+    (deleteStudent, then getStudent in a different file) without
+    importing it, exhausting all 4 real frontend_forms attempts on the
+    second occurrence even with this check's own accurate per-attempt
+    feedback -- as mechanically unambiguous a fix as the Werkzeug<3 cap
+    (golden-work-050/051's own lesson), since a real anchor import from
+    the same client module already exists in the file to merge into."""
+    clean_app = _output({
+        **HAPPY_PATH_FILES["frontend_ui"],
+        "frontend/src/App.js": (
+            "import { fetchWorks, fetchArchived } from './client';\n"
+            "function App() { fetchWorks(); fetchArchived(); "
+            "return 'loading empty error works'; }\n"
+            "export default App;\n"
+        ),
+    })
+    broken_app = _output({
+        "frontend/src/App.js": (
+            "import { fetchWorks } from './client';\n"
+            "function App() { fetchWorks(); fetchArchived(); "
+            "return 'loading empty error works'; }\n"
+            "export default App;\n"
+        ),
+    })
+    queues = _happy_path_queues()
+    queues["frontend_client"] = [(HonestState.PASS, _output({
+        "frontend/src/client.js": (
+            "export function fetchWorks() { return fetch('/works'); }\n"
+            "export function fetchArchived() { return fetch('/archived'); }\n"
+        ),
+    }))]
+    queues["frontend_ui"] = [(HonestState.PASS, clean_app)]
+    queues["frontend_forms"] = [(HonestState.PASS, broken_app)]
+    result = generate_staged_model_product(
+        _blueprint(), _factory(queues), _workspace(tmp_path),
+        vocabulary=StageVocabulary.load(REPO),
+    )
+    assert result.attempts_used == 11
+    written = tmp_path / "candidates" / "staged-1" / "frontend" / "src" / "App.js"
+    assert "fetchWorks, fetchArchived" in written.read_text(encoding="utf-8")
+
+
+def test_frontend_forms_is_rejected_when_no_client_like_import_exists_to_repair(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Inventing a relative import path here could easily be wrong --
+    different files sit at different directory depths -- so a file with
+    no existing client-like import at all is genuinely rejected, not
+    guessed at."""
     broken_app = _output({
         "frontend/src/App.js": "function App() { fetchWorks(); return 'loading empty error works'; }\nexport default App;\n",
     })

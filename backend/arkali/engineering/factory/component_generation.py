@@ -49,6 +49,7 @@ from arkali.engineering.factory.dependency_resolution import _apply_missing_comp
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
+    _repair_missing_client_call_imports,
 )
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
@@ -355,6 +356,7 @@ def _apply_deterministic_repairs(
         lambda sf: _apply_missing_compatibility_cap_repair(sf),
         lambda sf: _repair_react_router_version_mismatch({**visible_files, **sf}, sf),
         lambda sf: _repair_missing_react_router_imports(sf),
+        lambda sf: _repair_missing_client_call_imports({**visible_files, **sf}, sf),
     )
     for repair_fn in repair_fns:
         repaired = repair_fn(stage_files)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
+    _repair_missing_client_call_imports,
 )
 
 
@@ -72,3 +73,53 @@ def test_does_not_flag_the_client_file_itself() -> None:
 def test_is_silent_when_no_client_file_exists_yet() -> None:
     files = {"frontend/src/App.js": "function App() { deleteStudent(1); return null; }\n"}
     assert _client_call_missing_import_findings(files) == []
+
+
+_API_CLIENT = (
+    "async function getStudent(id) { return fetch('/students/' + id); }\n"
+    "async function createStudent(name) { return fetch('/students', {method: 'POST'}); }\n"
+    "async function updateStudent(id, name) { return fetch('/students/' + id, {method: 'PUT'}); }\n"
+    "export { getStudent, createStudent, updateStudent };\n"
+)
+
+
+def test_repair_merges_a_missing_call_into_an_existing_client_import() -> None:
+    """golden-work-091 (session evidence, frozen): StudentForm.js called
+    getStudent(id) inside a real useEffect, but its own import line
+    (`import { createStudent, updateStudent } from './apiClient';`)
+    never named it, and a real qwen2.5-coder:14b exhausted all 4 real
+    frontend_forms attempts on this exact class even with accurate
+    per-attempt feedback."""
+    stage_files = {
+        "frontend/src/StudentForm.js": (
+            "import { createStudent, updateStudent } from './apiClient';\n"
+            "function StudentForm({ id }) { getStudent(id); }\n"
+        ),
+    }
+    merged = {"frontend/src/apiClient.js": _API_CLIENT, **stage_files}
+    repaired = _repair_missing_client_call_imports(merged, stage_files)
+    assert repaired is not None
+    assert "createStudent, updateStudent, getStudent" in repaired["frontend/src/StudentForm.js"]
+    assert _client_call_missing_import_findings({**merged, **repaired}) == []
+
+
+def test_repair_is_a_noop_when_no_client_like_import_exists_to_merge_into() -> None:
+    """Inventing a relative import path here could easily be wrong --
+    different files sit at different directory depths -- so a file that
+    calls a client export with no existing client-like import at all is
+    left for the model, not guessed."""
+    stage_files = {
+        "frontend/src/StudentForm.js": "function StudentForm({ id }) { getStudent(id); }\n",
+    }
+    merged = {"frontend/src/apiClient.js": _API_CLIENT, **stage_files}
+    assert _repair_missing_client_call_imports(merged, stage_files) is None
+
+
+def test_repair_is_a_noop_when_the_stage_did_not_write_the_calling_file() -> None:
+    merged = {
+        "frontend/src/apiClient.js": _API_CLIENT,
+        "frontend/src/StudentForm.js": (
+            "import { createStudent } from './apiClient';\nfunction StudentForm() { getStudent(1); }\n"
+        ),
+    }
+    assert _repair_missing_client_call_imports(merged, {}) is None
