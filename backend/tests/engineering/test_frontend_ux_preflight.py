@@ -5,6 +5,7 @@ import json
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _react_router_missing_import_findings,
     _repair_missing_react_router_imports,
+    _route_component_missing_props_findings,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
     _shadowed_route_findings,
@@ -478,3 +479,57 @@ def test_repair_is_a_noop_when_nothing_is_missing() -> None:
         ),
     }
     assert _repair_missing_react_router_imports(files) is None
+
+
+def test_flags_a_route_component_whose_definition_destructures_a_custom_prop() -> None:
+    """golden-work-085 (session evidence, frozen): Students/index.js
+    mounted `<Route path="/students" component={StudentList} exact />`;
+    StudentList destructures `{ students }` and calls `students.map(...)`.
+    react-router's component= prop only ever injects match/location/
+    history/staticContext, never a custom prop, so `students` was always
+    `undefined` and a real browser threw `TypeError: Cannot read
+    properties of undefined (reading 'map')`, blanking the page on real
+    navigation to /students."""
+    files = {
+        "frontend/src/Students/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "import StudentList from './StudentList';\n"
+            "const Students = () => (<Route path='/students' component={StudentList} exact />);\n"
+        ),
+        "frontend/src/Students/StudentList.js": (
+            "const StudentList = ({ students }) => (<ul>{students.map(s => <li>{s.name}</li>)}</ul>);\n"
+        ),
+    }
+    findings = _route_component_missing_props_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_route_component_missing_props"
+    assert "StudentList" in findings[0].detail
+    assert "students" in findings[0].detail
+
+
+def test_is_silent_when_the_routed_component_takes_no_custom_props() -> None:
+    files = {
+        "frontend/src/Students/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "import CreateStudent from './CreateStudent';\n"
+            "const Students = () => (<Route path='/students/create' component={CreateStudent} />);\n"
+        ),
+        "frontend/src/Students/CreateStudent.js": (
+            "const CreateStudent = () => (<form><button>Create</button></form>);\n"
+        ),
+    }
+    assert _route_component_missing_props_findings(files) == []
+
+
+def test_is_silent_when_the_routed_component_only_destructures_route_injected_props() -> None:
+    files = {
+        "frontend/src/Students/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "import EditStudent from './EditStudent';\n"
+            "const Students = () => (<Route path='/students/:id/edit' component={EditStudent} />);\n"
+        ),
+        "frontend/src/Students/EditStudent.js": (
+            "const EditStudent = ({ match }) => (<div>{match.params.id}</div>);\n"
+        ),
+    }
+    assert _route_component_missing_props_findings(files) == []

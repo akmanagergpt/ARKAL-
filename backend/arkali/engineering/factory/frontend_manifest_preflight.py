@@ -365,3 +365,72 @@ def _repair_missing_react_router_imports(stage_files: Mapping[str, str]) -> dict
             patched = dict(stage_files)
         patched[path] = repaired_source
     return patched
+
+
+#: golden-work-085 (session evidence, frozen): `Students/index.js` mounted
+#: `<Route path="/students" component={StudentList} exact />`; `StudentList`
+#: destructures `{ students }` and calls `students.map(...)` -- react-
+#: router's `component=` prop only ever injects `match`/`location`/
+#: `history`/`staticContext`, never a custom prop, so `students` is always
+#: `undefined` and a real browser threw `TypeError: Cannot read properties
+#: of undefined (reading 'map')`, blanking the page on real navigation to
+#: `/students`. The identical class recurred in the same file:
+#: `<Route path="/students/:id/edit" component={EditStudent} />` with
+#: `EditStudent` destructuring `{ studentId }`. No deterministic repair
+#: exists for this (unlike a version pin or a missing import, the actual
+#: fix is real application logic -- either the routed component fetches
+#: its own data, matching `EditStudent`/`DeleteStudent`'s own real pattern
+#: elsewhere in this same candidate, or the parent uses `render=` to
+#: thread real data through); finding-only, feeding the model concrete
+#: instructions.
+_ROUTE_COMPONENT_PROP = re.compile(r"<Route\s[^>]*?component=\{(\w+)\}")
+_COMPONENT_PROPS_PATTERN = r"(?:const|function)\s+{name}\s*=?\s*\(\s*\{{\s*([^}}]*)\}}"
+_STANDARD_ROUTE_INJECTED_PROPS = frozenset({"match", "location", "history", "staticContext"})
+
+
+def _destructured_param_names(props_block: str) -> set[str]:
+    return {
+        part.strip().split(":")[0].split("=")[0].strip()
+        for part in props_block.split(",") if part.strip()
+    }
+
+
+def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """A component reached only through `<Route ... component={X} />` can
+    never receive a custom prop -- if `X`'s own definition (anywhere in
+    the real frontend, not just the file declaring the route) destructures
+    one, that prop is always `undefined` at runtime. Runs unconditionally
+    (no `product_ux_spec` dependency), the same shape
+    `_react_router_missing_import_findings` already uses."""
+    all_source = "\n".join(
+        source for path, source in files.items()
+        if path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))
+    )
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        for route_match in _ROUTE_COMPONENT_PROP.finditer(source):
+            component_name = route_match.group(1)
+            def_match = re.search(
+                _COMPONENT_PROPS_PATTERN.format(name=component_name), all_source,
+            )
+            if def_match is None:
+                continue
+            unexpected = sorted(
+                _destructured_param_names(def_match.group(1)) - _STANDARD_ROUTE_INJECTED_PROPS
+            )
+            if unexpected:
+                findings.append(SemanticFinding(
+                    code="frontend_route_component_missing_props", path=path,
+                    detail=(
+                        f"<Route component={{{component_name}}}> in {path} never passes "
+                        f"custom props, but {component_name} destructures {unexpected!r} -- "
+                        "react-router's component= only ever injects match/location/history/"
+                        "staticContext. Either make the routed component fetch its own data "
+                        "(the same real pattern this candidate's own EditStudent/DeleteStudent "
+                        "components already use) or replace component={...} with "
+                        "render={props => <Component {...props} ... />} and pass the real data"
+                    ),
+                ))
+    return findings

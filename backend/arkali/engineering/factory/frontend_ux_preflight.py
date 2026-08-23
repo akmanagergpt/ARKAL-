@@ -43,7 +43,10 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.frontend_manifest_preflight import _react_router_missing_import_findings
+from arkali.engineering.factory.frontend_manifest_preflight import (
+    _react_router_missing_import_findings,
+    _route_component_missing_props_findings,
+)
 from arkali.engineering.factory.product_preflight import SemanticFinding
 from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
 
@@ -430,7 +433,11 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
     split itself — see `STAGED_GENERATION_STAGES.md#9`'s own rule text
     for the real evidence. The spec-dependent checks are silent when no
     spec exists, for the same reason the shell slice is."""
-    findings = _shadowed_route_findings(files) + _react_router_missing_import_findings(files)
+    findings = (
+        _shadowed_route_findings(files)
+        + _react_router_missing_import_findings(files)
+        + _route_component_missing_props_findings(files)
+    )
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:
         return findings
