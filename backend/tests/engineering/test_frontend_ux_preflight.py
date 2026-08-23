@@ -10,6 +10,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
     _shadowed_route_findings,
+    _unreachable_parameterized_route_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
     _unreachable_module_findings,
@@ -578,3 +579,49 @@ def test_local_import_resolution_is_relative_to_the_importing_files_own_director
         ),
     }
     assert _frontend_local_import_findings(files) == []
+
+
+def test_flags_a_parameterized_route_never_linked_to_from_anywhere() -> None:
+    """golden-work-088 (session evidence, frozen): frontend/src/index.js
+    declared `<Route path="/students/edit/:id" component={EditStudent} />`
+    -- a real, working form, confirmed correct by navigating directly to
+    /students/edit/1 in a real browser -- but App.js's own real student
+    list rendered a bare `<li>{student.name}</li>` with no Link, button
+    or any other control anywhere in the real frontend ever constructing
+    a matching URL. product_ux_spec declared students' actions as
+    ["create", "edit", "delete", "view"]; a real end user, using only the
+    rendered UI, could never reach a route a direct URL proves works."""
+    files = {
+        "frontend/src/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "const x = <Route path='/students/edit/:id' component={EditStudent} />;\n"
+        ),
+        "frontend/src/App.js": "function App() { return <ul><li>{student.name}</li></ul>; }\n",
+    }
+    findings = _unreachable_parameterized_route_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_route_unreachable"
+    assert "/students/edit/" in findings[0].detail
+
+
+def test_is_silent_when_a_real_link_targets_the_parameterized_route() -> None:
+    files = {
+        "frontend/src/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "const x = <Route path='/students/edit/:id' component={EditStudent} />;\n"
+        ),
+        "frontend/src/App.js": (
+            "function App() { return <Link to={`/students/edit/${student.id}`}>Edit</Link>; }\n"
+        ),
+    }
+    assert _unreachable_parameterized_route_findings(files) == []
+
+
+def test_is_silent_for_a_non_parameterized_route() -> None:
+    files = {
+        "frontend/src/index.js": (
+            "import { Route } from 'react-router-dom';\n"
+            "const x = <Route path='/students' component={StudentList} exact />;\n"
+        ),
+    }
+    assert _unreachable_parameterized_route_findings(files) == []

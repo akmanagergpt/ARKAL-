@@ -427,6 +427,63 @@ def _shadowed_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return findings
 
 
+#: golden-work-088 (session evidence, frozen): frontend/src/index.js
+#: declared `<Route path="/students/edit/:id" component={EditStudent} />`
+#: and `<Route path="/students/delete/:id" component={DeleteStudent} />`
+#: -- both real, working forms, confirmed correct by navigating directly
+#: to `/students/edit/1` in a real browser -- but App.js's own real
+#: student list rendered a bare `<li>{student.name}</li>` with no
+#: `<Link>`, button or any other control anywhere in the real frontend
+#: pointing at either route's own static path prefix
+#: (`/students/edit/`/`/students/delete/`, confirmed absent by a real
+#: grep of the whole candidate). product_ux_spec declared
+#: `"actions": ["create", "edit", "delete", "view"]` for students; a
+#: real end user, using only the rendered UI, could never reach a route
+#: that a direct URL proves works. Scoped to the common, real, observed
+#: shape where the URL param is the route's OWN LAST segment (`/x/:id`,
+#: not `/x/:id/y`) -- the only shape any real candidate this session has
+#: produced.
+_PARAMETERIZED_ROUTE = re.compile(r"""<Route\s[^>]*?path=["']([^"']*/:[^/"']+)["']""")
+
+
+def _route_static_prefix(route_path: str) -> str | None:
+    param_start = route_path.index(":")
+    slash = route_path.rfind("/", 0, param_start)
+    return route_path[:slash + 1] if slash >= 0 else None
+
+
+def _unreachable_parameterized_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """A parameterized route's own static prefix must appear somewhere in
+    the real frontend beyond its own declaration -- a real templated Link
+    target or history.push call built from that same prefix plus a real
+    id -- or no real code path anywhere ever constructs a matching URL.
+    Runs unconditionally (no `product_ux_spec` dependency), the same
+    shape `_shadowed_route_findings` already uses."""
+    all_source = "\n".join(
+        source for path, source in files.items()
+        if path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))
+    )
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        for match in _PARAMETERIZED_ROUTE.finditer(source):
+            route_path = match.group(1)
+            prefix = _route_static_prefix(route_path)
+            if not prefix or all_source.count(prefix) > 1:
+                continue
+            findings.append(SemanticFinding(
+                code="frontend_route_unreachable", path=path,
+                detail=(
+                    f"<Route path={route_path!r}> in {path} is never reached from "
+                    f"anywhere else in the real frontend -- {prefix!r} appears nowhere "
+                    "but this exact declaration, so no real Link, button or navigation "
+                    "call anywhere ever constructs a matching URL"
+                ),
+            ))
+    return findings
+
+
 def _raw_json_dump_findings(frontend: str) -> list[SemanticFinding]:
     if "{json.stringify(" not in frontend:
         return []
@@ -473,6 +530,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
         + _react_router_missing_import_findings(files)
         + _route_component_missing_props_findings(files)
         + _frontend_local_import_findings(files)
+        + _unreachable_parameterized_route_findings(files)
     )
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:

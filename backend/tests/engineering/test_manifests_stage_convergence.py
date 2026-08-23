@@ -241,6 +241,36 @@ def test_frontend_forms_is_rejected_for_reintroducing_a_local_import_gap(
         )
 
 
+def test_frontend_forms_is_rejected_for_a_parameterized_route_no_link_ever_targets(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-088 (session evidence, frozen): frontend/src/index.js
+    declared `<Route path="/students/edit/:id" component={EditStudent} />`
+    -- a real, working form, confirmed correct by navigating directly to
+    /students/edit/1 in a real browser -- but the real student list
+    rendered a bare `<li>{student.name}</li>` with no Link, button or
+    any other control anywhere in the real frontend ever constructing a
+    matching URL, so a real end user could never reach a route a direct
+    URL proves works. No deterministic repair exists (the real fix is
+    adding a real Link/button, an application decision only the model
+    can make), so this proves the real retry loop genuinely rejects and
+    exhausts rather than self-healing."""
+    broken_app = (
+        "import { fetchWorks } from './client';\n"
+        "import { Route } from 'react-router-dom';\n"
+        "function App() { fetchWorks(); "
+        "return (<Route path='/works/edit/:id' component={() => null} />); }\n"
+        "export default App;\n"
+    )
+    queues = _happy_path_queues()
+    queues["frontend_forms"] = [(HonestState.PASS, _output({"frontend/src/App.js": broken_app}))] * 4
+    with pytest.raises(ModelGenerationError, match="frontend_route_unreachable"):
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path),
+            vocabulary=StageVocabulary.load(REPO),
+        )
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:
