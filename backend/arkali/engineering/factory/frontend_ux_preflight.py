@@ -55,14 +55,41 @@ _CONFIRM_MARKERS = ("confirm(", "are you sure", "window.confirm")
 #: golden-work-080 (session evidence, frozen): a module declared
 #: `"actions": ["create", "edit", "delete", "view"]`, `frontend_client`
 #: exported a real `updateStudent`, and the assembled real frontend never
-#: called it anywhere -- only a create form existed, a real browser
+#: referenced it anywhere -- only a create form existed, a real browser
 #: session confirmed no edit route/control reached it -- yet
 #: `_action_ui_findings`'s own prior rule ("a create/edit action needs
 #: *a* `<form>` somewhere") was satisfied vacuously by the create form
-#: alone. A real update-shaped call is the mechanical signal that closes
-#: this: `updateStudent(...)`/`editStudent(...)`, not just its own
-#: definition in `frontend_client`.
-_UPDATE_LIKE_CALL = re.compile(r"\b(?:update|edit)\w*\s*\(")
+#: alone.
+_INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|function)\s+(\w+)")
+#: golden-work-081 (session evidence, frozen): every real candidate this
+#: session's own `frontend_client` output has actually used -- declare
+#: every function as a plain top-level `async function name(...)`, then
+#: export all of them together in one grouped statement at the bottom of
+#: the file (`export { getStudents, createStudent, updateStudent, ... };`)
+#: -- never the inline `export function name(...)` shape
+#: `_INLINE_EXPORT_PATTERN` alone recognizes. That shape matched zero
+#: names on every real candidate this session produced, silently, for
+#: both this module's own `_update_like_client_exports` and
+#: `component_generation._unused_client_export_findings` (same pattern,
+#: reproduced there too) -- neither ever exercised on real output before.
+_GROUPED_EXPORT_BLOCK = re.compile(r"export\s*\{([^}]*)\}")
+_UPDATE_OR_EDIT_NAME = re.compile(r"^(?:update|edit)", re.IGNORECASE)
+
+
+def _exported_js_names(client_text: str) -> frozenset[str]:
+    """Real names a JS/TS file exports, covering both real shapes this
+    pipeline's own generated `frontend_client` output has used: inline
+    (`export function name(...)`/`export const name = ...`) and grouped
+    (`export { name, other as alias };` -- the local declared name, the
+    one actually called or referenced elsewhere in the same file, not
+    any renamed alias)."""
+    names = set(_INLINE_EXPORT_PATTERN.findall(client_text))
+    for block in _GROUPED_EXPORT_BLOCK.findall(client_text):
+        for part in block.split(","):
+            local_name = part.strip().split(" as ")[0].strip()
+            if local_name:
+                names.add(local_name)
+    return frozenset(names)
 #: Deliberately excludes "error" -- an async-fetch error state (already
 #: required by `_state_coverage_findings`/`_missing_ui_state_findings`) is
 #: legitimately present in almost every real component regardless of
@@ -83,6 +110,29 @@ def _frontend_ui_only_text(files: Mapping[str, str]) -> str:
     return "\n".join(
         source.lower() for path, source in files.items()
         if path.startswith("frontend/src/") and "client" not in path.lower()
+    )
+
+
+def _update_like_client_exports(files: Mapping[str, str]) -> frozenset[str]:
+    """Real update/edit-named functions `frontend_client` actually exports
+    -- golden-work-081 (session evidence, frozen): a real model reused one
+    form component for both create and edit, passing the real exported
+    `updateStudent` BY REFERENCE (`<StudentForm onSubmit={updateStudent}
+    />`, invoked generically inside `StudentForm` as `onSubmit(...)`)
+    rather than calling it directly by name (`updateStudent(...)`) -- a
+    real, idiomatic React pattern this check's own first version (a regex
+    requiring a literal `(` right after the name) rejected as a false
+    positive on the very next real candidate. Matching the real declared
+    name itself, the same mechanism `_unused_client_export_findings`
+    already uses successfully, is robust to a call, a prop reference, or
+    any other real way of using it."""
+    client = "\n".join(
+        source for path, source in files.items()
+        if path.startswith("frontend/src/") and "client" in path.lower()
+    )
+    return frozenset(
+        name for name in _exported_js_names(client)
+        if _UPDATE_OR_EDIT_NAME.match(name)
     )
 
 
@@ -143,7 +193,9 @@ def _navigation_reconciliation_findings(spec: object, frontend: str) -> list[Sem
     )]
 
 
-def _action_ui_findings(spec: object, frontend: str, ui_only: str) -> list[SemanticFinding]:
+def _action_ui_findings(
+    spec: object, frontend: str, ui_only: str, update_like_exports: frozenset[str],
+) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
     needs_mutation_ui = any(
         action in ("create", "edit")
@@ -159,21 +211,23 @@ def _action_ui_findings(spec: object, frontend: str, ui_only: str) -> list[Seman
     # satisfied by ANY single `<form>` anywhere, so a module declaring
     # "edit" alongside "create" was silently treated as covered by the
     # create form alone -- a real generated frontend exported a real
-    # `updateStudent` from frontend_client and never called it from any
-    # component; no edit route, button or form existed anywhere, proven
-    # in a real browser session. Checked against `ui_only`, never
+    # `updateStudent` from frontend_client and never referenced it from
+    # any component; no edit route, button or form existed anywhere,
+    # proven in a real browser session. Checked against `ui_only`, never
     # `frontend`: `frontend_client`'s own file defines
-    # `function updateStudent(...)`, which would otherwise satisfy this
-    # regex on its own definition line, not a real UI-side call.
+    # `function updateStudent(...)`, which would otherwise satisfy a
+    # name search on its own definition line, not a real UI-side use.
     needs_edit_ui = any(
         "edit" in module.actions for module in spec.modules  # type: ignore[attr-defined]
     )
-    if needs_edit_ui and not _UPDATE_LIKE_CALL.search(ui_only):
+    if needs_edit_ui and not any(
+        re.search(rf"\b{re.escape(name.lower())}\b", ui_only) for name in update_like_exports
+    ):
         findings.append(SemanticFinding(
             code="frontend_ui_missing_edit_ui", path="frontend/src/",
-            detail="product_ux_spec declares an edit action but the frontend calls no "
-                   "update/edit-named function anywhere -- a create form alone does "
-                   "not satisfy a declared edit action",
+            detail="product_ux_spec declares an edit action but the frontend never "
+                   "references an update/edit-named client function anywhere -- a "
+                   "create form alone does not satisfy a declared edit action",
         ))
     return findings
 
@@ -321,7 +375,9 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
     if spec is None:
         return findings
     return findings + (
-        _action_ui_findings(spec, frontend, _frontend_ui_only_text(files))
+        _action_ui_findings(
+            spec, frontend, _frontend_ui_only_text(files), _update_like_client_exports(files),
+        )
         + _form_quality_findings(frontend)
         + _state_coverage_findings(spec, frontend)
         + _destructive_confirmation_findings(spec, frontend)

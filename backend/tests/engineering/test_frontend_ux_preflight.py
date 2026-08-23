@@ -228,9 +228,13 @@ def test_declares_edit_but_frontend_never_calls_an_update_function() -> None:
     assert any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
 
 
+_UPDATE_PRODUCT_CLIENT_JS = "export function updateProduct(id, name) { return fetch('/products/' + id); }\n"
+
+
 def test_is_silent_when_a_real_update_call_exists_for_the_edit_action() -> None:
     files = _with_products_edit_action({
         **_valid_spec_files(),
+        "frontend/src/client.js": _UPDATE_PRODUCT_CLIENT_JS,
         "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
             "function ProductForm() {",
             "function ProductForm() { updateProduct(id, name); ",
@@ -238,6 +242,37 @@ def test_is_silent_when_a_real_update_call_exists_for_the_edit_action() -> None:
     })
     findings = _ux_spec_mutation_findings(files)
     assert not any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
+
+
+def test_is_silent_when_the_update_export_is_reused_by_reference_not_called_directly() -> None:
+    """golden-work-081 (session evidence, frozen): a real model reused one
+    form component for both create and edit, passing the real exported
+    `updateStudent` BY REFERENCE (`<StudentForm onSubmit={updateStudent}
+    />`, invoked generically inside `StudentForm` as `onSubmit(...)`)
+    rather than calling it directly by name -- a real, idiomatic React
+    pattern this check's prior regex-only version (requiring a literal
+    `(` right after the name) rejected as a false positive, exhausting
+    frontend_forms's anti-loop budget on a real, working implementation."""
+    files = _with_products_edit_action({
+        **_valid_spec_files(),
+        "frontend/src/client.js": _UPDATE_PRODUCT_CLIENT_JS,
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            "function ProductForm() {",
+            "function ProductForm({ onSubmit = updateProduct }) {",
+        ),
+    })
+    findings = _ux_spec_mutation_findings(files)
+    assert not any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
+
+
+def test_flags_the_edit_action_when_no_update_named_export_exists_at_all() -> None:
+    files = _with_products_edit_action({
+        **_valid_spec_files(),
+        "frontend/src/client.js": "export function createProduct(name) { return fetch('/products'); }\n",
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS,
+    })
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
 
 
 def test_edit_call_check_ignores_the_client_files_own_function_definition() -> None:

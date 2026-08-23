@@ -52,6 +52,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _repair_react_router_version_mismatch,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _exported_js_names,
     _unreachable_module_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
@@ -141,7 +142,15 @@ def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:
 
 
 def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding]:
-    exported = set(re.findall(r"export\s+(?:const|function)\s+(\w+)", client))
+    # golden-work-081 (session evidence, frozen): every real candidate
+    # this session's own frontend_client output has actually declared
+    # every function as a plain top-level function and exported all of
+    # them together in one grouped `export { name, ... };` statement at
+    # the file's end -- the inline `export function name(...)` shape a
+    # bare regex here originally assumed matched zero real names on every
+    # one of them, so this check has been silently vacuous the entire
+    # time it has run against real generated output.
+    exported = _exported_js_names(client)
     uncalled = sorted(name for name in exported if name not in ui)
     if not uncalled:
         return []
