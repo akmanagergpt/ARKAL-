@@ -47,6 +47,9 @@ from arkali.control.specification.blueprint_contracts import RequirementBlueprin
 from arkali.engineering.factory.backend_contract_preflight import _backend_contract_findings
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.frontend_client_call_preflight import (
+    _client_call_missing_import_findings,
+)
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
     _frontend_local_import_findings,
@@ -166,7 +169,7 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     confirmation step before delete, and success feedback after a
     mutation. Split out from `frontend_ui` (golden-work-065, session
     evidence, frozen) — see `STAGED_GENERATION_STAGES.md#9`."""
-    return _ux_spec_mutation_findings(files)
+    return _ux_spec_mutation_findings(files) + _client_call_missing_import_findings(files)
 
 
 def _backend_text(files: Mapping[str, str]) -> str:

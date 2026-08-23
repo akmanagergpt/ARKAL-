@@ -485,3 +485,5 @@ def _frontend_local_import_findings(files: Mapping[str, str]) -> list[SemanticFi
                     ),
                 ))
     return findings
+
+

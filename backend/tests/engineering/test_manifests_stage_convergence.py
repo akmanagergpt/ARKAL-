@@ -271,6 +271,31 @@ def test_frontend_forms_is_rejected_for_a_parameterized_route_no_link_ever_targe
         )
 
 
+def test_frontend_forms_is_rejected_for_a_client_call_missing_its_own_import(
+    tmp_path: pathlib.Path,
+) -> None:
+    """golden-work-090 (session evidence, frozen): App.js's real student
+    list gained a real, correct edit Link and a real inline delete
+    button calling `deleteStudent(student.id)` directly on click -- but
+    App.js's own import line was never updated to include
+    `deleteStudent`, a real export apiClient.js genuinely declares. A
+    real, hard ReferenceError the moment a real user clicks Delete. No
+    deterministic repair exists (the real fix is adding the missing
+    import, but only once the model itself decides which name it meant
+    to call), so this proves the real retry loop genuinely rejects and
+    exhausts rather than self-healing."""
+    broken_app = _output({
+        "frontend/src/App.js": "function App() { fetchWorks(); return 'loading empty error works'; }\nexport default App;\n",
+    })
+    queues = _happy_path_queues()
+    queues["frontend_forms"] = [(HonestState.PASS, broken_app)] * 4
+    with pytest.raises(ModelGenerationError, match="frontend_client_call_missing_import"):
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path),
+            vocabulary=StageVocabulary.load(REPO),
+        )
+
+
 def test_anti_loop_stops_before_exhausting_the_budget_on_a_repeated_identical_finding(
     tmp_path: pathlib.Path,
 ) -> None:
