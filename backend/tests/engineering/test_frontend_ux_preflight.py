@@ -203,6 +203,56 @@ def test_f_a_professional_multi_module_shell_structurally_passes() -> None:
     assert _unreachable_module_findings(files) == []
 
 
+def _with_products_edit_action(files: dict[str, str]) -> dict[str, str]:
+    spec = json.loads(files["product/ux_spec.json"])
+    for module in spec["modules"]:
+        if module["name"] == "products":
+            module["actions"] = ["create", "edit", "view"]
+            module["forms"].append({"name": "EditProductForm", "fields": ["name"]})
+    return {**files, "product/ux_spec.json": json.dumps(spec)}
+
+
+def test_declares_edit_but_frontend_never_calls_an_update_function() -> None:
+    """golden-work-080 (session evidence, frozen): products declared
+    `["create", "edit", "view"]`, `frontend_client` exported a real
+    `updateProduct`, and the assembled real frontend only ever called
+    `createProduct` -- no edit route, button or form anywhere, confirmed
+    in a real browser session (zero console/network errors, the app just
+    never offered one). The prior rule ("a create/edit action needs *a*
+    <form> somewhere") was satisfied vacuously by the create form alone."""
+    files = _with_products_edit_action({
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS,
+    })
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
+
+
+def test_is_silent_when_a_real_update_call_exists_for_the_edit_action() -> None:
+    files = _with_products_edit_action({
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            "function ProductForm() {",
+            "function ProductForm() { updateProduct(id, name); ",
+        ),
+    })
+    findings = _ux_spec_mutation_findings(files)
+    assert not any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
+
+
+def test_edit_call_check_ignores_the_client_files_own_function_definition() -> None:
+    """A `*client*` file's own `function updateProduct(...)` definition
+    must never satisfy this check on its own -- only a real call from a
+    UI component does, exactly the gap golden-work-080 exposed."""
+    files = _with_products_edit_action({
+        **_valid_spec_files(),
+        "frontend/src/apiClient.js": "export async function updateProduct(id, name) { return fetch('/products/' + id); }\n",
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS,
+    })
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_missing_edit_ui" for f in findings)
+
+
 def test_g_a_genuinely_single_purpose_product_is_not_forced_into_a_shell() -> None:
     """One read-only module, no dashboard declared -- a minimal frontend
     with no navigation, no dashboard surface and no form must still pass:

@@ -52,12 +52,38 @@ _NAVIGATION_MARKERS = (
 )
 _INTERACTIVE_MARKERS = ("<form", "<input", "<button", "<select")
 _CONFIRM_MARKERS = ("confirm(", "are you sure", "window.confirm")
+#: golden-work-080 (session evidence, frozen): a module declared
+#: `"actions": ["create", "edit", "delete", "view"]`, `frontend_client`
+#: exported a real `updateStudent`, and the assembled real frontend never
+#: called it anywhere -- only a create form existed, a real browser
+#: session confirmed no edit route/control reached it -- yet
+#: `_action_ui_findings`'s own prior rule ("a create/edit action needs
+#: *a* `<form>` somewhere") was satisfied vacuously by the create form
+#: alone. A real update-shaped call is the mechanical signal that closes
+#: this: `updateStudent(...)`/`editStudent(...)`, not just its own
+#: definition in `frontend_client`.
+_UPDATE_LIKE_CALL = re.compile(r"\b(?:update|edit)\w*\s*\(")
 #: Deliberately excludes "error" -- an async-fetch error state (already
 #: required by `_state_coverage_findings`/`_missing_ui_state_findings`) is
 #: legitimately present in almost every real component regardless of
 #: whether its forms validate anything, which would make this check pass
 #: vacuously every time.
 _VALIDATION_MARKERS = ("required", "invalid")
+
+
+def _frontend_ui_only_text(files: Mapping[str, str]) -> str:
+    """The same client/UI split `component_generation._split_client_and_ui`
+    performs, duplicated rather than imported: that module already imports
+    from this one (`_ux_spec_shell_findings`/`_ux_spec_mutation_findings`),
+    so importing back would cycle -- the same shape as this file's own
+    `_CORS_MARKERS`-style duplication elsewhere in this pipeline. Needed
+    because a `*client*` file's own function DEFINITION (e.g. `async
+    function updateStudent(...)`) would otherwise satisfy a regex looking
+    for a real UI-side CALL to it."""
+    return "\n".join(
+        source.lower() for path, source in files.items()
+        if path.startswith("frontend/src/") and "client" not in path.lower()
+    )
 
 
 def _frontend_source_text(files: Mapping[str, str]) -> str:
@@ -117,18 +143,39 @@ def _navigation_reconciliation_findings(spec: object, frontend: str) -> list[Sem
     )]
 
 
-def _action_ui_findings(spec: object, frontend: str) -> list[SemanticFinding]:
+def _action_ui_findings(spec: object, frontend: str, ui_only: str) -> list[SemanticFinding]:
+    findings: list[SemanticFinding] = []
     needs_mutation_ui = any(
         action in ("create", "edit")
         for module in spec.modules for action in module.actions  # type: ignore[attr-defined]
     )
     if needs_mutation_ui and "<form" not in frontend:
-        return [SemanticFinding(
+        findings.append(SemanticFinding(
             code="frontend_ui_missing_mutation_ui", path="frontend/src/",
             detail="product_ux_spec declares a create/edit action but the frontend "
                    "contains no <form> anywhere",
-        )]
-    return []
+        ))
+    # golden-work-080 (session evidence, frozen): the check above is
+    # satisfied by ANY single `<form>` anywhere, so a module declaring
+    # "edit" alongside "create" was silently treated as covered by the
+    # create form alone -- a real generated frontend exported a real
+    # `updateStudent` from frontend_client and never called it from any
+    # component; no edit route, button or form existed anywhere, proven
+    # in a real browser session. Checked against `ui_only`, never
+    # `frontend`: `frontend_client`'s own file defines
+    # `function updateStudent(...)`, which would otherwise satisfy this
+    # regex on its own definition line, not a real UI-side call.
+    needs_edit_ui = any(
+        "edit" in module.actions for module in spec.modules  # type: ignore[attr-defined]
+    )
+    if needs_edit_ui and not _UPDATE_LIKE_CALL.search(ui_only):
+        findings.append(SemanticFinding(
+            code="frontend_ui_missing_edit_ui", path="frontend/src/",
+            detail="product_ux_spec declares an edit action but the frontend calls no "
+                   "update/edit-named function anywhere -- a create form alone does "
+                   "not satisfy a declared edit action",
+        ))
+    return findings
 
 
 def _form_quality_findings(frontend: str) -> list[SemanticFinding]:
@@ -274,7 +321,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
     if spec is None:
         return findings
     return findings + (
-        _action_ui_findings(spec, frontend)
+        _action_ui_findings(spec, frontend, _frontend_ui_only_text(files))
         + _form_quality_findings(frontend)
         + _state_coverage_findings(spec, frontend)
         + _destructive_confirmation_findings(spec, frontend)
