@@ -74,6 +74,20 @@ _INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|function)\s+(\w+)")
 #: reproduced there too) -- neither ever exercised on real output before.
 _GROUPED_EXPORT_BLOCK = re.compile(r"export\s*\{([^}]*)\}")
 _UPDATE_OR_EDIT_NAME = re.compile(r"^(?:update|edit)", re.IGNORECASE)
+#: golden-work-082 (session evidence, frozen): STAGED_GENERATION_STAGES.md#8
+#: ("the UI calls every function frontend_client exports") and #9
+#: ("mutating forms...are not this stage's concern -- that is
+#: frontend_forms's job") directly contradicted each other for any real
+#: product with mutations. Fixing `_exported_js_names` above made
+#: `component_generation._unused_client_export_findings` enforce #8's
+#: literal wording for the first time ever (previously silently inert)
+#: and immediately exhausted frontend_ui's full attempt budget on every
+#: declared create/update/delete export, since frontend_forms genuinely
+#: has not run yet at this point. #8's own text is corrected alongside
+#: this; a mutation-named export is real evidence's own naming
+#: convention (createX/updateX/editX/deleteX), the same evidence
+#: `_UPDATE_OR_EDIT_NAME` above already relies on.
+_MUTATION_EXPORT_NAME = re.compile(r"^(?:create|update|edit|delete)", re.IGNORECASE)
 
 
 def _exported_js_names(client_text: str) -> frozenset[str]:

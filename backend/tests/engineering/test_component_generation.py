@@ -344,6 +344,39 @@ def test_frontend_ui_findings_flags_unused_export_and_missing_states() -> None:
     assert "frontend_ui_missing_state" in codes
 
 
+def test_frontend_ui_findings_does_not_require_mutation_exports_to_be_called() -> None:
+    """golden-work-082 (session evidence, frozen): fixing this check's own
+    real export-extraction bug (ba46ff3) made it enforce STAGED_
+    GENERATION_STAGES.md#8's literal wording ("the UI calls every
+    function frontend_client exports") for the first time ever, and it
+    immediately exhausted frontend_ui's full attempt budget on every
+    declared create/update/delete export -- wiring those is
+    frontend_forms's job (STAGES.md#9; this module's own
+    `_frontend_ui_findings` docstring), and frontend_forms has not run
+    yet at this point. A genuinely unused READ export must still be
+    flagged in the same file."""
+    files = {
+        "frontend/src/client.js": (
+            "async function fetchWorks() { return fetch('/works'); }\n"
+            "async function fetchArchived() { return fetch('/archived'); }\n"
+            "async function createWork(title) { return fetch('/works', {method: 'POST'}); }\n"
+            "async function updateWork(id) { return fetch('/works/' + id, {method: 'PUT'}); }\n"
+            "async function deleteWork(id) { return fetch('/works/' + id, {method: 'DELETE'}); }\n"
+            "export { fetchWorks, fetchArchived, createWork, updateWork, deleteWork };\n"
+        ),
+        "frontend/src/App.js": (
+            "import { fetchWorks } from './client';\n"
+            "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+            "export default App;\n"
+        ),
+    }
+    findings = _frontend_ui_findings(files)
+    client_unused = next(f for f in findings if f.code == "frontend_ui_client_unused")
+    assert "fetchArchived" in client_unused.detail
+    for mutation_name in ("createWork", "updateWork", "deleteWork"):
+        assert mutation_name not in client_unused.detail
+
+
 def test_frontend_ui_findings_flags_a_missing_empty_state_specifically() -> None:
     """STAGED_GENERATION_STAGES.md#8 has always named "loading, empty and
     error states"; the check only ever compared against ("loading", "error")

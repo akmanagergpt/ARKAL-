@@ -53,6 +53,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
     _exported_js_names,
+    _MUTATION_EXPORT_NAME,
     _unreachable_module_findings,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
@@ -150,8 +151,20 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
     # bare regex here originally assumed matched zero real names on every
     # one of them, so this check has been silently vacuous the entire
     # time it has run against real generated output.
+    #
+    # golden-work-082 (session evidence, frozen): fixing that extraction
+    # bug made this check enforce STAGED_GENERATION_STAGES.md#8's literal
+    # wording ("the UI calls every function frontend_client exports") for
+    # the first time ever, and it immediately exhausted frontend_ui's
+    # full attempt budget on every declared create/update/delete export
+    # -- wiring those is frontend_forms's job, per #9 and this module's
+    # own `_frontend_ui_findings` docstring, and frontend_forms has not
+    # run yet at this point. Only a non-mutating (read) export can
+    # genuinely be "uncalled" here; #8's own text is corrected alongside
+    # this fix.
     exported = _exported_js_names(client)
-    uncalled = sorted(name for name in exported if name not in ui)
+    read_only_exports = {name for name in exported if not _MUTATION_EXPORT_NAME.match(name)}
+    uncalled = sorted(name for name in read_only_exports if name not in ui)
     if not uncalled:
         return []
     return [SemanticFinding(
