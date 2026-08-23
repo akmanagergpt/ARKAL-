@@ -47,7 +47,10 @@ from arkali.control.specification.blueprint_contracts import RequirementBlueprin
 from arkali.engineering.factory.backend_contract_preflight import _backend_contract_findings
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError
-from arkali.engineering.factory.frontend_manifest_preflight import _missing_frontend_entry_point_findings
+from arkali.engineering.factory.frontend_manifest_preflight import (
+    _missing_frontend_entry_point_findings,
+    _repair_react_router_version_mismatch,
+)
 from arkali.engineering.factory.frontend_ux_preflight import (
     _unreachable_module_findings,
     _ux_spec_mutation_findings,
@@ -414,6 +417,18 @@ def _generate_one_stage(
                 repaired = _apply_missing_compatibility_cap_repair(stage_files)
                 if repaired is not None:
                     stage_files = repaired
+                # Same deterministic-repair shape as the Werkzeug<3 cap
+                # above, for a different real ecosystem gap golden-work-078
+                # found: `manifests` picked a real, current react-router-dom
+                # 6.x while `frontend_ui`/`frontend_forms` had already
+                # written real v5-API source. The proving signal lives in
+                # an earlier stage's output, so this checks the merged view
+                # rather than `stage_files` alone.
+                router_repaired = _repair_react_router_version_mismatch(
+                    {**visible_files, **stage_files}, stage_files,
+                )
+                if router_repaired is not None:
+                    stage_files = router_repaired
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
                     return stage_files

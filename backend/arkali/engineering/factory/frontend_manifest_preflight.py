@@ -41,16 +41,38 @@ detected was genuinely installable.
 GENERAL, NOT GOLDEN-SPECIFIC. Checks the real, parsed JSON structure or
 the real declared file set — never any specific script command text,
 component name or app name.
+
+golden-work-078 (real end-to-end execution evidence, frozen): reached
+`STAGED_GENERATION_PASS`, real backend install/tests/runtime/CRUD/restart-
+persistence all genuinely passed, `npm install` succeeded — then the real
+production build failed outright: `Attempted import error: 'Switch' is
+not exported from 'react-router-dom'`. `frontend_ui`/`frontend_forms`'s
+own stage rule (`STAGED_GENERATION_STAGES.md`) has always assumed
+react-router v5's `<Switch>` API (the same route-shadowing rule
+golden-work-068 established), but nothing ever constrained `manifests`'
+own package.json version choice to match: it picked react-router-dom
+`^6.11.2`, a real, current, genuinely-installable version — whose own
+real breaking change (v6 removed `Switch` and `Route`'s children-based
+API entirely) no metadata-only check can see, the same class of gap
+`dependency_resolution.py`'s module docstring already documents for
+Flask/Werkzeug.
 """
 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.product_preflight import SemanticFinding
 
 _REQUIRED_SCRIPTS = ("start", "build")
+#: Mechanical, not a full JS parser: matches a real ES-module import of
+#: `Switch` from 'react-router-dom', the exact real signal
+#: `frontend_ui`/`frontend_forms` leave behind when they use the v5 API
+#: this pipeline's own stage rule documents.
+_V5_SWITCH_IMPORT = re.compile(r"import\s*\{[^}]*\bSwitch\b[^}]*\}\s*from\s*['\"]react-router-dom['\"]")
+_REACT_ROUTER_V5_PIN = "^5.3.4"
 
 
 def _declared_npm_packages(parsed: dict) -> set[str]:
@@ -130,3 +152,91 @@ def _missing_frontend_entry_point_findings(files: Mapping[str, str]) -> list[Sem
             "document.getElementById('root'))"
         ),
     )]
+
+
+def _uses_react_router_v5_switch(files: Mapping[str, str]) -> bool:
+    return any(
+        _V5_SWITCH_IMPORT.search(content)
+        for path, content in files.items()
+        if path.startswith("frontend/src/")
+    )
+
+
+def _declared_react_router_dom_specifier(parsed: dict) -> str | None:
+    for key in ("dependencies", "devDependencies"):
+        section = parsed.get(key)
+        if isinstance(section, dict) and "react-router-dom" in section:
+            return str(section["react-router-dom"])
+    return None
+
+
+def _specifier_major_version(specifier: str) -> int | None:
+    match = re.search(r"\d+", specifier)
+    return int(match.group()) if match else None
+
+
+def _react_router_version_mismatch_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """golden-work-078 (session evidence, frozen): `manifests` declared
+    `react-router-dom: ^6.11.2` — a real, current, genuinely-installable
+    version — while `frontend_ui`/`frontend_forms` had already written
+    real v5-API source (`import { Route, Switch } from 'react-router-dom'`).
+    `npm install` succeeded (both are real, resolvable packages); the real
+    production build then failed outright: react-router-dom 6 removed
+    `Switch` entirely. Checked only when the real source mechanically
+    proves v5-API usage — this never guesses at a "correct" react-router
+    major version in the abstract, only at a proven real mismatch."""
+    if not _uses_react_router_v5_switch(files):
+        return []
+    try:
+        parsed = json.loads(files.get("frontend/package.json", ""))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, dict):
+        return []
+    specifier = _declared_react_router_dom_specifier(parsed)
+    if specifier is None:
+        return []
+    major = _specifier_major_version(specifier)
+    if major is None or major < 6:
+        return []
+    return [SemanticFinding(
+        code="react_router_version_mismatch", path="frontend/package.json",
+        detail=(
+            "frontend source imports Switch from react-router-dom (the real "
+            f"react-router v5 API) but package.json declares "
+            f"'react-router-dom': {specifier!r} — react-router-dom 6 removed "
+            "Switch entirely, so a real production build fails outright with "
+            "\"Attempted import error: 'Switch' is not exported from "
+            "'react-router-dom'\"; declare a v5 version instead, e.g. "
+            f"'react-router-dom': {_REACT_ROUTER_V5_PIN!r}"
+        ),
+    )]
+
+
+def _repair_react_router_version_mismatch(
+    merged_files: Mapping[str, str], stage_files: Mapping[str, str],
+) -> dict[str, str] | None:
+    """Deterministic repair mirroring `dependency_resolution.py`'s
+    `Werkzeug<3` repair (golden-work-050/051's own lesson: once the exact,
+    unambiguous fix for a real, verified defect is known, applying it and
+    re-validating is more honest than another blind model retry). Checked
+    against `merged_files` (this stage's real inputs plus its own new
+    output, the same view `_stage_findings` validates) since the proving
+    signal — real v5-API source — lives in an earlier stage's output, not
+    this stage's own; only ever rewrites `stage_files`' own
+    `frontend/package.json`, since no other stage writes it."""
+    package_json = stage_files.get("frontend/package.json")
+    if package_json is None or not _react_router_version_mismatch_findings(merged_files):
+        return None
+    try:
+        parsed = json.loads(package_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    patched = dict(parsed)
+    for key in ("dependencies", "devDependencies"):
+        section = patched.get(key)
+        if isinstance(section, dict) and "react-router-dom" in section:
+            patched[key] = {**section, "react-router-dom": _REACT_ROUTER_V5_PIN}
+    return {**stage_files, "frontend/package.json": json.dumps(patched, indent=2) + "\n"}

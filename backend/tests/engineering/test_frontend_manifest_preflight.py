@@ -5,6 +5,8 @@ import json
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
     _missing_frontend_scripts_findings,
+    _react_router_version_mismatch_findings,
+    _repair_react_router_version_mismatch,
 )
 
 
@@ -102,3 +104,68 @@ def test_flags_missing_index_js() -> None:
 def test_entry_point_check_is_silent_when_index_js_exists() -> None:
     files = {"frontend/src/App.js": "x", "frontend/src/index.js": "ReactDOM.render(1,2);"}
     assert _missing_frontend_entry_point_findings(files) == []
+
+
+_V5_APP_SOURCE = "import { Route, Switch } from 'react-router-dom';\nexport default function App() { return null; }\n"
+
+
+def test_flags_react_router_v6_declared_against_real_v5_switch_source() -> None:
+    """golden-work-078 (session evidence, frozen): manifests declared
+    react-router-dom ^6.11.2 (a real, current, installable version) while
+    frontend_ui/frontend_forms had already written real v5-API source
+    (`import { Route, Switch } from 'react-router-dom'`). npm install
+    succeeded for both; the real production build then failed outright:
+    "Attempted import error: 'Switch' is not exported from
+    'react-router-dom'" -- react-router-dom 6 removed Switch entirely."""
+    files = {
+        "frontend/src/App.js": _V5_APP_SOURCE,
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^6.11.2"},
+        }),
+    }
+    findings = _react_router_version_mismatch_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "react_router_version_mismatch"
+    assert "^5" in findings[0].detail
+
+
+def test_is_silent_when_a_v5_react_router_is_already_declared() -> None:
+    files = {
+        "frontend/src/App.js": _V5_APP_SOURCE,
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^5.3.4"},
+        }),
+    }
+    assert _react_router_version_mismatch_findings(files) == []
+
+
+def test_is_silent_when_source_never_imports_switch() -> None:
+    """A v6-native app (Routes/element) declaring react-router-dom 6 is a
+    real, correct, unrelated combination -- never flagged."""
+    files = {
+        "frontend/src/App.js": "import { Routes, Route } from 'react-router-dom';\n",
+        "frontend/package.json": json.dumps({
+            "dependencies": {"react-router-dom": "^6.11.2"},
+        }),
+    }
+    assert _react_router_version_mismatch_findings(files) == []
+
+
+def test_router_version_repair_pins_a_real_v5_release() -> None:
+    stage_files = {"frontend/package.json": json.dumps({
+        "dependencies": {"react": "^18.2.0", "react-router-dom": "^6.11.2"},
+    })}
+    merged = {"frontend/src/App.js": _V5_APP_SOURCE, **stage_files}
+    repaired = _repair_react_router_version_mismatch(merged, stage_files)
+    assert repaired is not None
+    patched = json.loads(repaired["frontend/package.json"])
+    assert patched["dependencies"]["react-router-dom"] == "^5.3.4"
+    assert patched["dependencies"]["react"] == "^18.2.0"
+    assert _react_router_version_mismatch_findings({**merged, **repaired}) == []
+
+
+def test_router_version_repair_is_a_noop_when_stage_did_not_write_package_json() -> None:
+    merged = {"frontend/src/App.js": _V5_APP_SOURCE, "frontend/package.json": json.dumps({
+        "dependencies": {"react-router-dom": "^6.11.2"},
+    })}
+    assert _repair_react_router_version_mismatch(merged, {}) is None

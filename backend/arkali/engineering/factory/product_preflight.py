@@ -317,8 +317,10 @@ def _manifests_stage_findings(files: Mapping[str, str]) -> list[SemanticFinding]
         ))
     from arkali.engineering.factory.frontend_manifest_preflight import (
         _missing_frontend_scripts_findings,
+        _react_router_version_mismatch_findings,
     )
     findings.extend(_missing_frontend_scripts_findings(files))
+    findings.extend(_react_router_version_mismatch_findings(files))
     return findings
 
 
