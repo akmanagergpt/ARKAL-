@@ -34,6 +34,23 @@ declared, accurate lower bound) is left resolver-only, reappearing in
 `_offline_dependency_compatibility_findings` solely as the no-resolver
 fallback so that case is not silently lost when `pip` is unavailable.
 
+THE GAP IS NOT SPECIFIC TO OLD FLASK RELEASES. golden-work-077 (real
+end-to-end execution evidence, frozen) reached `STAGED_GENERATION_PASS`
+with `flask==2.3.2` and no Werkzeug line, cleanly `pip install`ed
+Werkzeug 3.1.8 (Flask 2.3.2's own real metadata declares only
+`Werkzeug>=2.3.3`, no upper bound — the identical under-declaration class
+as Flask 2.0.1, just a newer release), and then failed for real: Werkzeug
+3.x genuinely removed the `__version__` attribute
+(`var/factory/runtime/golden-work-077/.venv`, confirmed directly), and
+every Flask 2.x release's own `flask/testing.py` reads
+`werkzeug.__version__` unconditionally in `test_client()` — so the first
+real generated test that used the Flask test client failed outright with
+`AttributeError: module 'werkzeug' has no attribute '__version__'`. This
+is a property of Werkzeug 3.x versus the whole Flask-2.x line, not of any
+one Flask 2.x minor release, so the cap requirement below covers every
+Flask major-version-2 release, not only the pre-2.2 ones the original
+Flask-2.0.1 evidence happened to name.
+
 HONESTY. When the resolver cannot reach its index, or exits for any
 reason other than a real, named `ResolutionImpossible` conflict, this
 reports `_DependencyResolutionOutcome.NOT_CONFIGURED` — never a silent
@@ -203,11 +220,23 @@ def _needed_compatibility_cap_patches(lowered: str) -> list[tuple[str, str]]:
     patches: list[tuple[str, str]] = []
     flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)\.(\d+)", lowered)
     werkzeug_cap = re.search(r"(?m)^werkzeug\s*[^\n]*<\s*3(?:\.0+)?(?:\s|$)", lowered)
-    if flask_match and tuple(map(int, flask_match.groups())) < (2, 2) and not werkzeug_cap:
+    # An exact Werkzeug pin (any version) already fully determines what
+    # installs; `pip`'s real resolver already reports the correct conflict
+    # directly when that pin is incompatible (golden-work-047's own class)
+    # -- adding this advisory on top would be redundant at best and, since
+    # its own fixed wording only ever names "Werkzeug<3", actively
+    # misleading when the real problem is a pin that is already too low.
+    werkzeug_pinned = re.search(r"(?m)^werkzeug\s*==\s*\d", lowered)
+    if (
+        flask_match
+        and tuple(map(int, flask_match.groups())) < (3, 0)
+        and not werkzeug_cap
+        and not werkzeug_pinned
+    ):
         patches.append((
             "Werkzeug<3",
-            "add a line 'Werkzeug<3' to backend/requirements.txt, or change the "
-            "flask line to 'flask>=2.2'",
+            "add a line 'Werkzeug<3' to backend/requirements.txt, or upgrade the "
+            "flask line to 'flask>=3.0'",
         ))
     sqlalchemy_extension = re.search(r"(?m)^flask_sqlalchemy\s*==\s*(\d+)\.(\d+)", lowered)
     sqlalchemy_cap = re.search(r"(?m)^sqlalchemy\s*[^\n]*<\s*2(?:\.0+)?(?:\s|$)", lowered)

@@ -152,6 +152,20 @@ def test_missing_compatibility_cap_feedback_is_actionable() -> None:
     assert "Werkzeug<3" in detail
 
 
+def test_missing_compatibility_cap_fires_for_unpinned_werkzeug_on_flask_2_3() -> None:
+    """golden-work-077 (real end-to-end execution evidence, frozen):
+    `flask==2.3.2` with no Werkzeug line cleanly `pip install`ed Werkzeug
+    3.1.8 (Flask 2.3.2's own real metadata declares only
+    `Werkzeug>=2.3.3`, no upper bound) and then genuinely failed real
+    generated tests -- Werkzeug 3.x removed `__version__`, and
+    `flask/testing.py`'s `test_client()` reads it unconditionally on every
+    Flask 2.x release, not only the pre-2.2 ones the original
+    Flask-2.0.1 evidence named. The prior `< (2, 2)` boundary let this
+    exact real defect through the `manifests` stage undetected."""
+    findings = _missing_compatibility_cap_findings("flask==2.3.2\n")
+    assert any(code == "incompatible_dependency_range" for code, _, _ in findings)
+
+
 def test_missing_compatibility_cap_is_silent_when_a_cap_is_declared() -> None:
     findings = _missing_compatibility_cap_findings("flask==2.0.1\nwerkzeug<3\n")
     assert findings == []
