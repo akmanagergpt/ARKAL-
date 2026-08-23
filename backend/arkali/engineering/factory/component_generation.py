@@ -58,6 +58,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _repair_missing_react_router_imports,
     _repair_react_router_version_mismatch,
 )
+from arkali.engineering.factory.frontend_root_route_preflight import _missing_root_route_findings
 from arkali.engineering.factory.frontend_ux_preflight import (
     _missing_ui_state_findings,
     _split_client_and_ui,
@@ -160,6 +161,7 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _unreachable_module_findings(files)
         + _react_router_missing_import_findings(files)
         + _frontend_local_import_findings(files)
+        + _missing_root_route_findings(files)
         + _ux_spec_shell_findings(files)
     )
 

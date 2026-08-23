@@ -186,3 +186,5 @@ def test_router_version_repair_is_a_noop_when_stage_did_not_write_package_json()
         "dependencies": {"react-router-dom": "^6.11.2"},
     })}
     assert _repair_react_router_version_mismatch(merged, {}) is None
+
+

@@ -625,3 +625,24 @@ def test_is_silent_for_a_non_parameterized_route() -> None:
         ),
     }
     assert _unreachable_parameterized_route_findings(files) == []
+
+
+def test_root_route_check_runs_unconditionally_without_a_ux_spec() -> None:
+    """golden-work-092 (session evidence, frozen): frontend_forms can
+    rewrite index.js just as frontend_ui can (the same "wrong stage" shape
+    `_react_router_missing_import_findings`/`_frontend_local_import_findings`
+    are already wired here for), so this check must fire through
+    `_ux_spec_mutation_findings` too, not only `frontend_ui`'s own
+    validator -- proven here with no product/ux_spec.json artifact at
+    all, the same shape the react-router-import wiring test above uses."""
+    files = {
+        "frontend/src/index.js": (
+            "import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';\n"
+            "ReactDOM.render(<Router><Switch>"
+            "<Route path='/students' component={App} exact />"
+            "</Switch></Router>, document.getElementById('root'));\n"
+        ),
+    }
+    assert any(
+        f.code == "frontend_root_path_unreachable" for f in _ux_spec_mutation_findings(files)
+    )
