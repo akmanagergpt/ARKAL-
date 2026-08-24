@@ -60,6 +60,18 @@ from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _CLIENT_INLINE_EXPORT = re.compile(r"export\s+(?:const|function)\s+(\w+)")
 _CLIENT_GROUPED_EXPORT = re.compile(r"export\s*\{([^}]*)\}")
+#: golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
+#: wrote a real, complete, correctly-wired `apiClient.js` using CommonJS
+#: (`const getTasks = () => axios.get(...)`, then
+#: `module.exports = { getTasks, createTask, getTask, updateTask };`) --
+#: a real, legal pattern webpack/CRA's own module resolution interoperates
+#: with transparently (a real `npm run build` has already proven this
+#: exact ES-import/CommonJS-export mix compiles). Neither export regex
+#: above recognizes `module.exports = {...}` at all, so `exported` came
+#: back completely empty and every real file's every real import was
+#: flagged as phantom -- a false-positive hard block on an otherwise
+#: entirely valid candidate, not a real defect.
+_COMMONJS_EXPORTS_BLOCK = re.compile(r"module\.exports\s*=\s*\{([^}]*)\}")
 _IMPORT_STATEMENT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]""")
 _NAMED_IMPORT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]""")
 _LOCAL_DECLARATION = re.compile(r"(?:function|const|let|var)\s+(\w+)")
@@ -72,6 +84,15 @@ def _client_exported_names(client_text: str) -> frozenset[str]:
             local_name = part.strip().split(" as ")[0].strip()
             if local_name:
                 names.add(local_name)
+    for block in _COMMONJS_EXPORTS_BLOCK.findall(client_text):
+        for part in block.split(","):
+            # `{ name }` (shorthand) exports "name"; `{ key: value }`
+            # exports "key" (the property name), not the local "value" --
+            # only the shorthand form has real evidence, but taking the
+            # key is correct for both.
+            name = part.strip().split(":")[0].strip()
+            if name:
+                names.add(name)
     return frozenset(names)
 
 

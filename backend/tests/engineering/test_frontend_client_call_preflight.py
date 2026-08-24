@@ -175,6 +175,60 @@ def test_phantom_import_check_is_silent_when_no_client_file_exists_yet() -> None
     assert _phantom_client_import_findings(files) == []
 
 
+#: golden-work-101 (session evidence, frozen), verbatim real apiClient.js.
+_COMMONJS_API_CLIENT = """const axios = require('axios');
+
+const API_BASE_URL = 'http://localhost:5000';
+
+const getTasks = () => axios.get(`${API_BASE_URL}/tasks`);
+const createTask = (task) => axios.post(`${API_BASE_URL}/tasks`, task);
+const getTask = (id) => axios.get(`${API_BASE_URL}/tasks/${id}`);
+const updateTask = (id, task) => axios.put(`${API_BASE_URL}/tasks/${id}`, task);
+
+module.exports = {
+  getTasks,
+  createTask,
+  getTask,
+  updateTask
+};
+"""
+
+
+def test_is_silent_for_a_real_commonjs_client_module() -> None:
+    """golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
+    wrote a real, complete, correctly-wired apiClient.js using CommonJS
+    (`module.exports = { getTasks, createTask, ... };`) -- a real,
+    legitimate pattern a real `npm run build` has already proven
+    compiles cleanly with ES-module imports on the consuming side.
+    Before this fix, neither export regex recognized `module.exports`,
+    so `exported` came back completely empty and EVERY real file's
+    every real import was flagged as phantom -- a false-positive hard
+    block on an otherwise entirely valid candidate that exhausted all 4
+    real frontend_forms attempts."""
+    files = {
+        "frontend/src/apiClient.js": _COMMONJS_API_CLIENT,
+        "frontend/src/TaskList.js": "import { getTasks } from './apiClient';\ngetTasks();\n",
+        "frontend/src/TaskCreate.js": "import { createTask } from './apiClient';\ncreateTask({});\n",
+        "frontend/src/TaskEdit.js": (
+            "import { getTask, updateTask } from './apiClient';\ngetTask(1); updateTask(1, {});\n"
+        ),
+    }
+    assert _phantom_client_import_findings(files) == []
+
+
+def test_flags_a_genuinely_phantom_import_against_a_commonjs_client() -> None:
+    """The CommonJS fix must not become blind in the other direction --
+    a real phantom import against a real CommonJS client is still
+    caught."""
+    files = {
+        "frontend/src/apiClient.js": _COMMONJS_API_CLIENT,
+        "frontend/src/TaskDelete.js": "import { deleteTask } from './apiClient';\ndeleteTask(1);\n",
+    }
+    findings = _phantom_client_import_findings(files)
+    assert len(findings) == 1
+    assert "deleteTask" in findings[0].detail
+
+
 def test_phantom_import_check_does_not_flag_the_client_file_itself() -> None:
     """A client file importing from another client-like file is not this
     defect's concern -- only real UI-side phantom imports are checked."""

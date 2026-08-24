@@ -83,6 +83,14 @@ _INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|function)\s+(\w+)")
 #: `component_generation._unused_client_export_findings` (same pattern,
 #: reproduced there too) -- neither ever exercised on real output before.
 _GROUPED_EXPORT_BLOCK = re.compile(r"export\s*\{([^}]*)\}")
+#: golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
+#: wrote a real, complete, correctly-wired `apiClient.js` using CommonJS
+#: (`module.exports = { getTasks, createTask, ... };`), a real pattern a
+#: real `npm run build` has already proven compiles cleanly. Neither
+#: export regex above recognizes it, so this extractor -- and every
+#: check built on it -- silently saw zero exports for any real candidate
+#: using this shape.
+_COMMONJS_EXPORTS_BLOCK = re.compile(r"module\.exports\s*=\s*\{([^}]*)\}")
 _UPDATE_OR_EDIT_NAME = re.compile(r"^(?:update|edit)", re.IGNORECASE)
 #: golden-work-082 (session evidence, frozen): STAGED_GENERATION_STAGES.md#8
 #: ("the UI calls every function frontend_client exports") and #9
@@ -101,18 +109,24 @@ _MUTATION_EXPORT_NAME = re.compile(r"^(?:create|update|edit|delete)", re.IGNOREC
 
 
 def _exported_js_names(client_text: str) -> frozenset[str]:
-    """Real names a JS/TS file exports, covering both real shapes this
+    """Real names a JS/TS file exports, covering every real shape this
     pipeline's own generated `frontend_client` output has used: inline
-    (`export function name(...)`/`export const name = ...`) and grouped
+    (`export function name(...)`/`export const name = ...`), grouped
     (`export { name, other as alias };` -- the local declared name, the
     one actually called or referenced elsewhere in the same file, not
-    any renamed alias)."""
+    any renamed alias) and CommonJS (`module.exports = { name, ... };`
+    -- golden-work-101, session evidence, frozen)."""
     names = set(_INLINE_EXPORT_PATTERN.findall(client_text))
     for block in _GROUPED_EXPORT_BLOCK.findall(client_text):
         for part in block.split(","):
             local_name = part.strip().split(" as ")[0].strip()
             if local_name:
                 names.add(local_name)
+    for block in _COMMONJS_EXPORTS_BLOCK.findall(client_text):
+        for part in block.split(","):
+            name = part.strip().split(":")[0].strip()
+            if name:
+                names.add(name)
     return frozenset(names)
 
 

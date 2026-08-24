@@ -9,6 +9,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
     _route_component_missing_props_findings,
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
+    _exported_js_names,
     _shadowed_route_findings,
     _unreachable_parameterized_route_findings,
     _ux_spec_mutation_findings,
@@ -646,3 +647,24 @@ def test_root_route_check_runs_unconditionally_without_a_ux_spec() -> None:
     assert any(
         f.code == "frontend_root_path_unreachable" for f in _ux_spec_mutation_findings(files)
     )
+
+
+def test_exported_js_names_recognizes_a_real_commonjs_module() -> None:
+    """golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
+    wrote a real, complete, correctly-wired apiClient.js using CommonJS
+    (`module.exports = { getTasks, createTask, ... };`) -- a real,
+    legitimate pattern a real `npm run build` has already proven
+    compiles cleanly. Before this fix, neither export regex here
+    recognized `module.exports`, so this extractor -- and every check
+    built on it (`_unused_client_export_findings`,
+    `_update_like_client_exports`) -- silently saw zero exports for any
+    real candidate using this shape."""
+    client_text = (
+        "const getTasks = () => axios.get('/tasks');\n"
+        "const createTask = (task) => axios.post('/tasks', task);\n"
+        "module.exports = {\n"
+        "  getTasks,\n"
+        "  createTask\n"
+        "};\n"
+    )
+    assert _exported_js_names(client_text) == frozenset({"getTasks", "createTask"})
