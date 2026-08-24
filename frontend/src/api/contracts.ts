@@ -159,6 +159,54 @@ export interface WorkflowNodeExecutionResponse {
   recorded_at: string;
 }
 
+/**
+ * C-34 Operations telemetry shapes (`ARK-REQ-0396`, D-028).
+ *
+ * `DimensionReading.value` is populated only when `state` is `PASS` — a
+ * `NOT_CONFIGURED`/`NOT_APPLICABLE` reading never carries a number, so a
+ * component must never mistake "no data" for a real zero. `state` is
+ * `string`, not a union of `HonestState`'s members, for the identical
+ * reason `lifecycle_state` above is `string`: `kernel.contracts.honest_state`
+ * is the sole authority for that vocabulary, and narrowing it here would be
+ * a second, driftable copy of it.
+ */
+export interface DimensionReading {
+  dimension: string;
+  state: string;
+  detail: string;
+  value: number | null;
+}
+
+export interface RuntimeSnapshot {
+  jobs_active: DimensionReading;
+  jobs_queued: DimensionReading;
+  jobs_stuck: DimensionReading;
+  workflows_active: DimensionReading;
+  providers: DimensionReading;
+  agents: DimensionReading;
+  workers: DimensionReading;
+}
+
+export interface HardwareSnapshot {
+  cpu_logical_cores: DimensionReading;
+  ram_total_bytes: DimensionReading;
+  disk_free_bytes: DimensionReading;
+  network_reachable: DimensionReading;
+  gpu_present: DimensionReading;
+  vram_total_bytes: DimensionReading;
+}
+
+export interface StorageSnapshot {
+  database_reachable: DimensionReading;
+  database_size_bytes: DimensionReading;
+}
+
+export interface OperationsSnapshot {
+  runtime: RuntimeSnapshot;
+  hardware: HardwareSnapshot;
+  storage: StorageSnapshot;
+}
+
 export interface WorkflowExecutionDetailResponse {
   execution_id: string;
   workflow_id: string;

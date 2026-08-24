@@ -19,6 +19,7 @@ import type {
   CreateRevisionRequest,
   HealthResponse,
   LifecycleMachineResponse,
+  OperationsSnapshot,
   ProjectDetailResponse,
   ProjectListResponse,
   PublishWorkflowRevisionRequest,
@@ -64,6 +65,7 @@ export const ENDPOINTS = {
     method: 'POST',
     path: '/api/workflows/{workflow_id}/executions/{execution_id}/approve',
   },
+  operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
 } as const;
 
 /**
@@ -306,6 +308,15 @@ export class ArkaliApiClient {
       params: { workflow_id: workflowId, execution_id: executionId },
       body,
     });
+  }
+
+  /**
+   * The real-time Operations telemetry snapshot (`ARK-REQ-0396`, D-028).
+   * Re-derived by the backend on every call from live authorities — never
+   * cached here, never held across renders as if it were still current.
+   */
+  operationsSnapshot(): Promise<OperationsSnapshot> {
+    return this.request<OperationsSnapshot>(ENDPOINTS.operationsSnapshot);
   }
 }
 

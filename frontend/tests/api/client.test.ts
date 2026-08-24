@@ -133,6 +133,41 @@ describe('ArkaliApiClient', () => {
     expect(machine.states).toEqual(LIFECYCLE.states);
   });
 
+  it('reads the operations snapshot from the declared route', async () => {
+    const snapshot = {
+      runtime: {
+        jobs_active: { dimension: 'jobs_active', state: 'PASS', detail: '', value: 0 },
+        jobs_queued: { dimension: 'jobs_queued', state: 'PASS', detail: '', value: 0 },
+        jobs_stuck: { dimension: 'jobs_stuck', state: 'PASS', detail: '', value: 0 },
+        workflows_active: { dimension: 'workflows_active', state: 'PASS', detail: '', value: 0 },
+        providers: { dimension: 'providers', state: 'NOT_CONFIGURED', detail: 'no provider', value: null },
+        agents: { dimension: 'agents', state: 'NOT_CONFIGURED', detail: 'no agent', value: null },
+        workers: { dimension: 'workers', state: 'NOT_CONFIGURED', detail: 'no worker', value: null },
+      },
+      hardware: {
+        cpu_logical_cores: { dimension: 'cpu_logical_cores', state: 'PASS', detail: '', value: 8 },
+        ram_total_bytes: { dimension: 'ram_total_bytes', state: 'PASS', detail: '', value: 1 },
+        disk_free_bytes: { dimension: 'disk_free_bytes', state: 'PASS', detail: '', value: 1 },
+        network_reachable: { dimension: 'network_reachable', state: 'PASS', detail: '', value: 1 },
+        gpu_present: { dimension: 'gpu_present', state: 'NOT_APPLICABLE', detail: 'no gpu', value: null },
+        vram_total_bytes: { dimension: 'vram_total_bytes', state: 'NOT_APPLICABLE', detail: 'no gpu', value: null },
+      },
+      storage: {
+        database_reachable: { dimension: 'database_reachable', state: 'PASS', detail: '', value: 1 },
+        database_size_bytes: { dimension: 'database_size_bytes', state: 'PASS', detail: '', value: 1 },
+      },
+    };
+    const { client, calls } = clientWith({
+      [`GET ${BASE}/api/operations/snapshot`]: { status: 200, body: snapshot },
+    });
+
+    const result = await client.operationsSnapshot();
+
+    expect(result).toEqual(snapshot);
+    expect(calls[0]?.url).toBe(`${BASE}/api/operations/snapshot`);
+    expect(calls[0]?.method).toBe('GET');
+  });
+
   it('declares every route as data so the drift control can compare it', () => {
     expect(Object.values(ENDPOINTS).map((route) => `${route.method} ${route.path}`)).toEqual([
       'GET /api/health',
@@ -150,6 +185,7 @@ describe('ArkaliApiClient', () => {
       'GET /api/workflows/{workflow_id}/executions/{execution_id}',
       'POST /api/workflows/{workflow_id}/executions/{execution_id}/signal',
       'POST /api/workflows/{workflow_id}/executions/{execution_id}/approve',
+      'GET /api/operations/snapshot',
     ]);
   });
 });
