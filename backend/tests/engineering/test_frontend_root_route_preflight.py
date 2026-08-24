@@ -3,6 +3,7 @@ from __future__ import annotations
 from arkali.engineering.factory.frontend_root_route_preflight import (
     _missing_root_route_findings,
     _orphaned_router_root_findings,
+    _repair_orphaned_router_root,
 )
 
 #: golden-work-092 (session evidence, frozen), verbatim real frontend/src/index.js.
@@ -194,3 +195,63 @@ def test_is_silent_when_the_router_is_declared_inline_in_index_js() -> None:
         ),
     }
     assert _orphaned_router_root_findings(files) == []
+
+
+_GOOD_INDEX_JS = (
+    "import React from 'react';\nimport ReactDOM from 'react-dom';\n"
+    "import App from './App';\n\nReactDOM.render(<App />, document.getElementById('root'));\n"
+)
+_BROKEN_INDEX_JS = (
+    "import React from 'react';\nimport ReactDOM from 'react-dom';\n"
+    "import TaskList from './TaskList';\n\n"
+    "ReactDOM.render(<TaskList />, document.getElementById('root'));\n"
+)
+
+
+def test_repair_restores_the_known_good_prior_index_js() -> None:
+    """golden-work-100/102/103 (session evidence, frozen -- the identical
+    compound failure reproduced across three independent candidates, the
+    last two byte-for-byte identical): frontend_ui's own attempt already
+    proved index.js correctly mounts App -- frontend_forms's own stage
+    rule explicitly says not to rewrite frontend_ui's own navigation, but
+    a real model exhausted all 4 real attempts regenerating index.js
+    incorrectly anyway."""
+    visible_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": _BROKEN_INDEX_JS,
+        "frontend/src/TaskDelete.js": "x",
+    }
+    repaired = _repair_orphaned_router_root(visible_files, stage_files)
+    assert repaired is not None
+    assert repaired["frontend/src/index.js"] == _GOOD_INDEX_JS
+    assert repaired["frontend/src/TaskDelete.js"] == "x"
+    merged = {**visible_files, **repaired}
+    assert _orphaned_router_root_findings(merged) == []
+
+
+def test_repair_is_a_noop_when_index_js_is_already_unchanged() -> None:
+    visible_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
+    stage_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
+    assert _repair_orphaned_router_root(visible_files, stage_files) is None
+
+
+def test_repair_is_a_noop_when_the_current_version_is_not_actually_broken() -> None:
+    """A real, different, legitimate rewrite of index.js that still
+    correctly mounts App must never be reverted."""
+    visible_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": _GOOD_INDEX_JS.replace("import React from 'react';\n", ""),
+    }
+    assert _repair_orphaned_router_root(visible_files, stage_files) is None
+
+
+def test_repair_is_a_noop_when_frontend_ui_never_declared_index_js() -> None:
+    stage_files = {"frontend/src/index.js": _BROKEN_INDEX_JS}
+    assert _repair_orphaned_router_root({}, stage_files) is None
+
+
+def test_repair_is_a_noop_when_the_stage_did_not_write_index_js() -> None:
+    visible_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
+    assert _repair_orphaned_router_root(visible_files, {}) is None

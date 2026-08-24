@@ -130,11 +130,11 @@ def _orphaned_router_root_findings(files: Mapping[str, str]) -> list[SemanticFin
     concern, not this one) declares a real
     `<Router>`/`<BrowserRouter>`/`<HashRouter>` and index.js's own
     `ReactDOM.render(...)` call never mounts that exact component. No
-    deterministic repair exists (unlike a version pin or a missing
-    import, the correct fix requires knowing which component is
-    genuinely the app's real root -- a mechanical guess could as easily
-    paper over a real, different mistake) -- finding-only, the same shape
-    `_missing_root_route_findings` already uses."""
+    blind mechanical guess exists for a genuinely NEW candidate (picking
+    the app's real root requires knowing which component that is) --
+    `_repair_orphaned_router_root`, below, instead restores a real,
+    already-proven-correct prior version when one exists, the one case
+    this can be resolved mechanically without guessing."""
     index_source = files.get("frontend/src/index.js")
     if index_source is None:
         return []
@@ -157,3 +157,37 @@ def _orphaned_router_root_findings(files: Mapping[str, str]) -> list[SemanticFin
             "routing tree"
         ),
     )]
+
+
+def _repair_orphaned_router_root(
+    visible_files: Mapping[str, str], stage_files: Mapping[str, str],
+) -> dict[str, str] | None:
+    """golden-work-100/102/103 (session evidence, frozen -- the identical
+    compound failure reproduced across three independent candidates,
+    the last two byte-for-byte identical): `frontend_ui`'s own attempt
+    already proved index.js correctly mounts the real router root --
+    `frontend_ui`'s own validator runs this exact check before
+    `frontend_forms` ever starts, so `visible_files`' own real index.js
+    (`frontend_ui`'s declared output, one of `frontend_forms`'s own
+    declared inputs per `STAGED_GENERATION_STAGES.md#9`) is always
+    already known-good. That same stage rule explicitly says not to
+    rewrite `frontend_ui`'s own navigation -- "add the missing mutation
+    UI onto them, do not rewrite them" -- but a real qwen2.5-coder:14b
+    exhausted all 4 real attempts on three separate real candidates
+    regenerating index.js incorrectly anyway. Restoring the known-good
+    prior version enforces the stage's own explicit instruction
+    mechanically rather than guessing at new behavior -- checked, not
+    assumed, that doing so actually resolves the real defect (and does
+    not silently mask some other, genuinely different mistake) before
+    ever applying it."""
+    index_path = "frontend/src/index.js"
+    prior = visible_files.get(index_path)
+    current = stage_files.get(index_path)
+    if prior is None or current is None or prior == current:
+        return None
+    if not _orphaned_router_root_findings({**visible_files, **stage_files}):
+        return None
+    restored = {**stage_files, index_path: prior}
+    if _orphaned_router_root_findings({**visible_files, **restored}):
+        return None
+    return restored
