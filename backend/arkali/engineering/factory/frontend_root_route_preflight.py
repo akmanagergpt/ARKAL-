@@ -159,35 +159,100 @@ def _orphaned_router_root_findings(files: Mapping[str, str]) -> list[SemanticFin
     )]
 
 
-def _repair_orphaned_router_root(
-    visible_files: Mapping[str, str], stage_files: Mapping[str, str],
+def _restore_prior_index_js(
+    visible_files: Mapping[str, str], stage_files: Mapping[str, str], merged: Mapping[str, str],
 ) -> dict[str, str] | None:
     """golden-work-100/102/103 (session evidence, frozen -- the identical
-    compound failure reproduced across three independent candidates,
-    the last two byte-for-byte identical): `frontend_ui`'s own attempt
-    already proved index.js correctly mounts the real router root --
-    `frontend_ui`'s own validator runs this exact check before
-    `frontend_forms` ever starts, so `visible_files`' own real index.js
-    (`frontend_ui`'s declared output, one of `frontend_forms`'s own
-    declared inputs per `STAGED_GENERATION_STAGES.md#9`) is always
-    already known-good. That same stage rule explicitly says not to
-    rewrite `frontend_ui`'s own navigation -- "add the missing mutation
-    UI onto them, do not rewrite them" -- but a real qwen2.5-coder:14b
-    exhausted all 4 real attempts on three separate real candidates
-    regenerating index.js incorrectly anyway. Restoring the known-good
-    prior version enforces the stage's own explicit instruction
-    mechanically rather than guessing at new behavior -- checked, not
-    assumed, that doing so actually resolves the real defect (and does
-    not silently mask some other, genuinely different mistake) before
-    ever applying it."""
+    compound failure reproduced across three independent candidates, the
+    last two byte-for-byte identical): when `frontend_ui` itself already
+    wrote a real router root, its own validator (this exact same check,
+    wired into both stages) already proved `visible_files`' own real
+    index.js correctly mounts it -- `frontend_forms`'s own stage rule
+    explicitly says not to rewrite that navigation ("add the missing
+    mutation UI onto them, do not rewrite them"), but a real
+    qwen2.5-coder:14b exhausted all 4 real attempts on three separate
+    real candidates regenerating index.js incorrectly anyway. Restoring
+    the known-good prior version enforces the stage's own explicit
+    instruction mechanically -- checked, not assumed, that doing so
+    actually resolves the real defect, so a genuinely different mistake
+    is never silently masked."""
     index_path = "frontend/src/index.js"
     prior = visible_files.get(index_path)
     current = stage_files.get(index_path)
     if prior is None or current is None or prior == current:
         return None
-    if not _orphaned_router_root_findings({**visible_files, **stage_files}):
-        return None
     restored = {**stage_files, index_path: prior}
     if _orphaned_router_root_findings({**visible_files, **restored}):
         return None
     return restored
+
+
+_SELF_CLOSING_TAG = r"<{name}\s*/>"
+
+
+def _retarget_render_call(
+    current_index_js: str, router_root_name: str,
+) -> str | None:
+    """golden-work-104 (session evidence, frozen): `frontend_ui` itself
+    had no router at all (a real, legitimate single-page baseline --
+    `ReactDOM.render(<TaskList />, ...)`, correct at the time it was
+    written); `frontend_forms` introduced the real router root for the
+    first time in the same attempt that failed to update index.js, so no
+    known-good PRIOR version of index.js mounting it can exist to
+    restore. Mechanically retargets the render call's own single,
+    self-closing mounted component instead -- the only real shape this
+    pipeline's own generated `index.js` has ever used -- adding the
+    matching import line when it is not already present. Returns `None`
+    when the current text does not match that exact, unambiguous shape,
+    rather than guessing at a different one."""
+    match = _RENDER_ROOT_TAG.search(current_index_js)
+    if match is None or match.group(1) == router_root_name:
+        return None
+    wrong_name = match.group(1)
+    self_closing = re.search(_SELF_CLOSING_TAG.format(name=re.escape(wrong_name)), current_index_js)
+    if self_closing is None:
+        return None
+    retargeted = (
+        current_index_js[:self_closing.start()]
+        + f"<{router_root_name} />"
+        + current_index_js[self_closing.end():]
+    )
+    already_imported = (
+        f"'./{router_root_name}'" in retargeted or f'"./{router_root_name}"' in retargeted
+    )
+    if not already_imported:
+        retargeted = f"import {router_root_name} from './{router_root_name}';\n" + retargeted
+    return retargeted
+
+
+def _repair_orphaned_router_root(
+    visible_files: Mapping[str, str], stage_files: Mapping[str, str],
+) -> dict[str, str] | None:
+    """Tries the cheapest, safest fix first (`_restore_prior_index_js`);
+    falls back to mechanically retargeting the render call
+    (`_retarget_render_call`) only when a real router root exists in the
+    same directory as index.js (every real candidate this session has
+    produced) and no known-good prior version applies. Every path is
+    checked, not assumed, against the real finding before being applied."""
+    index_path = "frontend/src/index.js"
+    current = stage_files.get(index_path)
+    if current is None:
+        return None
+    merged = {**visible_files, **stage_files}
+    if not _orphaned_router_root_findings(merged):
+        return None
+    restored = _restore_prior_index_js(visible_files, stage_files, merged)
+    if restored is not None:
+        return restored
+    router_root_path = _router_root_path(merged)
+    if router_root_path is None:
+        return None
+    if router_root_path.rsplit("/", 1)[0] != index_path.rsplit("/", 1)[0]:
+        return None
+    retargeted = _retarget_render_call(current, _module_stem(router_root_path))
+    if retargeted is None:
+        return None
+    patched = {**stage_files, index_path: retargeted}
+    if _orphaned_router_root_findings({**visible_files, **patched}):
+        return None
+    return patched

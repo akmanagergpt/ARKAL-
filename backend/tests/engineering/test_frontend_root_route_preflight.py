@@ -255,3 +255,71 @@ def test_repair_is_a_noop_when_frontend_ui_never_declared_index_js() -> None:
 def test_repair_is_a_noop_when_the_stage_did_not_write_index_js() -> None:
     visible_files = {"frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER, "frontend/src/index.js": _GOOD_INDEX_JS}
     assert _repair_orphaned_router_root(visible_files, {}) is None
+
+
+#: golden-work-104 (session evidence, frozen): frontend_ui itself had no
+#: router at all -- a real, legitimate single-page baseline, correct at
+#: the time it was written -- so no known-good PRIOR index.js mounting
+#: App can exist; frontend_forms introduced the real router root for the
+#: first time in the same attempt that failed to update index.js.
+_NO_ROUTER_INDEX_JS = (
+    "import React from 'react';\nimport ReactDOM from 'react-dom';\n"
+    "import TaskList from './TaskList';\n\n"
+    "ReactDOM.render(<TaskList />, document.getElementById('root'));"
+)
+
+
+def test_repair_retargets_the_render_call_when_no_prior_version_helps() -> None:
+    visible_files = {"frontend/src/index.js": _NO_ROUTER_INDEX_JS, "frontend/src/TaskList.js": "x"}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": _NO_ROUTER_INDEX_JS,
+        "frontend/src/TaskDelete.js": "y",
+    }
+    repaired = _repair_orphaned_router_root(visible_files, stage_files)
+    assert repaired is not None
+    assert "<App />" in repaired["frontend/src/index.js"]
+    assert "<TaskList />" not in repaired["frontend/src/index.js"]
+    assert "import App from './App';" in repaired["frontend/src/index.js"]
+    merged = {**visible_files, **repaired}
+    assert _orphaned_router_root_findings(merged) == []
+
+
+def test_retarget_repair_does_not_duplicate_an_existing_import() -> None:
+    visible_files = {"frontend/src/index.js": _NO_ROUTER_INDEX_JS, "frontend/src/TaskList.js": "x"}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": (
+            "import App from './App';\n" + _NO_ROUTER_INDEX_JS
+        ),
+    }
+    repaired = _repair_orphaned_router_root(visible_files, stage_files)
+    assert repaired is not None
+    assert repaired["frontend/src/index.js"].count("import App from './App';") == 1
+
+
+def test_retarget_repair_is_a_noop_when_the_router_root_is_in_a_different_directory() -> None:
+    """Inventing a relative import path across directories here could
+    easily be wrong -- every real candidate this session has produced
+    keeps index.js and its router root in the same directory, so this
+    is left for the model, not guessed."""
+    visible_files = {"frontend/src/index.js": _NO_ROUTER_INDEX_JS}
+    stage_files = {
+        "frontend/src/pages/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": _NO_ROUTER_INDEX_JS,
+    }
+    assert _repair_orphaned_router_root(visible_files, stage_files) is None
+
+
+def test_retarget_repair_is_a_noop_when_the_render_call_has_no_self_closing_tag() -> None:
+    """A real shape this pipeline has not produced (a mounted component
+    with children/props, not a bare self-closing tag) is left for the
+    model, not guessed at."""
+    visible_files = {"frontend/src/index.js": "x"}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/index.js": (
+            "ReactDOM.render(<TaskList>{children}</TaskList>, document.getElementById('root'));"
+        ),
+    }
+    assert _repair_orphaned_router_root(visible_files, stage_files) is None
