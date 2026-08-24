@@ -232,8 +232,9 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
 
         frontend_log = (evidence / "frontend.log").open("w", encoding="utf-8")
         frontend = subprocess.Popen(
-            [str(python), "-m", "http.server", str(FRONTEND_PORT), "--bind", "127.0.0.1"],
-            cwd=frontend_dir / "build", stdout=frontend_log, stderr=subprocess.STDOUT, text=True,
+            [str(python), str(ROOT / "scripts" / "serve_spa.py"),
+             "--directory", str(frontend_dir / "build"), "--port", str(FRONTEND_PORT)],
+            cwd=ROOT, stdout=frontend_log, stderr=subprocess.STDOUT, text=True,
         )
         _wait_http(f"http://127.0.0.1:{FRONTEND_PORT}", frontend)
         if not skip_browser:

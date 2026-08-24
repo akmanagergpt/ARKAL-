@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import pathlib
 import sys
+import threading
+import urllib.request
 
 import pytest
 
@@ -149,3 +151,31 @@ def test_browser_journey_accepts_a_visible_accessible_form_without_a_heading() -
     browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
     assert "getByLabel(/name/i)" in browser
     assert "createHeading" not in browser
+
+
+def test_production_server_returns_the_spa_for_a_browser_history_route(
+    tmp_path: pathlib.Path,
+) -> None:
+    index = tmp_path / "index.html"
+    index.write_text("spa-shell", encoding="utf-8")
+    script = REPO / "scripts" / "serve_spa.py"
+    spec = importlib.util.spec_from_file_location("serve_spa", script)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    handler = lambda *values, **kwargs: module.SpaHandler(  # noqa: E731
+        *values, directory=str(tmp_path), **kwargs,
+    )
+    server = module.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{server.server_port}/students", timeout=2,
+        ) as response:
+            assert response.status == 200
+            assert response.read() == b"spa-shell"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
