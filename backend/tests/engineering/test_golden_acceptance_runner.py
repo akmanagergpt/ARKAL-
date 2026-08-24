@@ -143,3 +143,9 @@ def test_run_kills_its_owned_process_tree_on_timeout(monkeypatch, tmp_path) -> N
 def test_frontend_install_has_a_finite_timeout() -> None:
     source = (REPO / "scripts" / "run_golden_acceptance.py").read_text(encoding="utf-8")
     assert '_run([npm, "install"], cwd=frontend_dir, timeout_seconds=600)' in source
+
+
+def test_browser_journey_accepts_a_visible_accessible_form_without_a_heading() -> None:
+    browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
+    assert "getByLabel(/name/i)" in browser
+    assert "createHeading" not in browser

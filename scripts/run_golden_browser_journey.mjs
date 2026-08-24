@@ -63,8 +63,8 @@ try {
   await expect(page.getByRole('heading', { name: /students/i })).toBeVisible();
 
   await clickNamed(page, /create.*student|add.*student|new.*student/i);
-  const createHeading = page.getByRole('heading', { name: /create.*student|add.*student/i });
-  await expect(createHeading).toBeVisible();
+  await expect(page.getByLabel(/name/i)).toBeVisible();
+  await expect(page.getByLabel(/email/i)).toBeVisible();
   const mutationCountBeforeValidation = mutations.length;
   await clickNamed(page, /create.*student|save|submit/i);
   if (mutations.length !== mutationCountBeforeValidation) {

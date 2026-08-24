@@ -199,6 +199,30 @@ def test_d_form_exists_with_no_label_and_no_validation_marker() -> None:
     assert "frontend_ui_form_missing_validation" in codes
 
 
+def test_adjacent_label_text_without_association_is_not_an_accessible_name() -> None:
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            '<label htmlFor="name">Name</label>\n      <input id="name" required />',
+            '<label>Name</label>\n      <input required />',
+        ),
+    }
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_form_control_unlabelled" for f in findings)
+
+
+def test_wrapping_label_gives_its_control_an_accessible_name() -> None:
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            '<label htmlFor="name">Name</label>\n      <input id="name" required />',
+            '<label>Name <input required /></label>',
+        ),
+    }
+    findings = _ux_spec_mutation_findings(files)
+    assert not any(f.code == "frontend_ui_form_control_unlabelled" for f in findings)
+
+
 def test_f_a_professional_multi_module_shell_structurally_passes() -> None:
     """Every declared navigation destination reachable, real forms with
     labels and validation, loading/empty/error/success states, and a

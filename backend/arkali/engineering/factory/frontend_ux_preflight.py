@@ -358,6 +358,33 @@ def _form_quality_findings(frontend: str) -> list[SemanticFinding]:
             code="frontend_ui_form_missing_labels", path="frontend/src/",
             detail="a <form> exists but the frontend contains no <label> or aria-label",
         ))
+    controls = re.findall(r"<(?:input|select|textarea)\b[^>]*>", frontend, re.IGNORECASE)
+    label_blocks = re.findall(
+        r"<label\b[^>]*>.*?</label>", frontend, re.DOTALL | re.IGNORECASE,
+    )
+    labelled_ids = set(re.findall(
+        r"<label\b[^>]*\b(?:htmlFor|for)=[\"']([^\"']+)[\"']", frontend,
+        re.IGNORECASE,
+    ))
+
+    def has_accessible_name(control: str) -> bool:
+        if re.search(r"\baria-(?:label|labelledby)=[\"'][^\"']+[\"']", control):
+            return True
+        control_id = re.search(r"\bid=[\"']([^\"']+)[\"']", control)
+        if control_id and control_id.group(1) in labelled_ids:
+            return True
+        return any(control in block for block in label_blocks)
+
+    if controls and any(not has_accessible_name(control) for control in controls):
+        findings.append(SemanticFinding(
+            code="frontend_ui_form_control_unlabelled", path="frontend/src/",
+            detail=(
+                "every input/select/textarea must have an accessible name: associate "
+                "a label with htmlFor+id, wrap the control in its label, or use a "
+                "non-empty aria-label/aria-labelledby; adjacent label text alone is "
+                "not exposed as the control's accessible name"
+            ),
+        ))
     if not any(marker in frontend for marker in _VALIDATION_MARKERS):
         findings.append(SemanticFinding(
             code="frontend_ui_form_missing_validation", path="frontend/src/",
