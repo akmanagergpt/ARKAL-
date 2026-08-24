@@ -82,3 +82,83 @@ def _invented_mutation_ui_findings(files: Mapping[str, str]) -> list[SemanticFin
                 ),
             ))
     return findings
+
+
+def _module_stem(path: str) -> str:
+    name = path.rsplit("/", 1)[-1]
+    for suffix in (".jsx", ".js"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _strip_component_references(source: str, name: str) -> str:
+    """Removes a real `import {name} from './{name}';` line and any real
+    `<Route ... component={{{name}}} ... />` (self-closing -- the only
+    real shape `component=` routing has ever used this session, since
+    `component=` cannot take children) referencing an invented,
+    now-removed component. Scoped to exactly the two real reference
+    shapes this pipeline's own generated App.js has produced; a
+    different reference shape is left untouched rather than guessed at."""
+    import_pattern = re.compile(
+        rf"""^import\s+{re.escape(name)}\s+from\s+['"]\./{re.escape(name)}['"];?\n?""",
+        re.MULTILINE,
+    )
+    route_pattern = re.compile(
+        rf"""[ \t]*<Route\b[^>]*?component=\{{{re.escape(name)}\}}[^>]*/>\n?""",
+    )
+    return route_pattern.sub("", import_pattern.sub("", source))
+
+
+def _drop_offending_files_and_references(
+    stage_files: Mapping[str, str], offending_paths: set[str],
+) -> dict[str, str]:
+    """The two mechanical steps once `offending_paths` is known: drop
+    those files entirely, then strip every other real frontend file's
+    own import/`<Route>` reference to each removed component. Extracted
+    from `_repair_invented_mutation_ui` (ADR-0008 decomposition, not a
+    GATE 8 exception: that function's own measured complexity exceeded
+    its ceiling)."""
+    patched = {path: source for path, source in stage_files.items() if path not in offending_paths}
+    for offending_path in offending_paths:
+        name = _module_stem(offending_path)
+        for path, source in list(patched.items()):
+            if path.startswith("frontend/src/") and path.endswith((".js", ".jsx")):
+                patched[path] = _strip_component_references(source, name)
+    return patched
+
+
+def _repair_invented_mutation_ui(
+    merged_files: Mapping[str, str], stage_files: Mapping[str, str],
+) -> dict[str, str] | None:
+    """Deterministic repair mirroring this pipeline's own Werkzeug<3-style
+    repairs (golden-work-050/051's own lesson: once the exact,
+    unambiguous fix for a real, verified defect is known, applying it
+    and re-validating is more honest than another blind model retry).
+
+    golden-work-099 through golden-work-106 (session evidence, frozen):
+    a real qwen2.5-coder:14b reproduced this exact invented-delete-
+    control mistake across eight separate real candidates, exhausting
+    frontend_forms's full attempt budget every time -- clear, accurate,
+    finding-only feedback alone was never enough for it to self-correct.
+    Once `_invented_mutation_ui_findings` proves a specific file's own
+    mutation call has no ux_spec-declared authorization, that file's
+    entire real purpose is invented: dropping it from `stage_files`
+    (`frontend_ui` never writes it -- this is exclusively
+    `frontend_forms`'s own new output) and stripping the matching
+    import/`<Route>` reference any OTHER file in `stage_files` declares
+    is the same class of mechanical, unambiguous transform as every
+    other repair in this pipeline, not a guess. Checked, not assumed:
+    only applied when it actually resolves every real finding, so a
+    reference shape this repair does not recognize is left for the
+    model rather than silently leaving a dangling import behind."""
+    findings = _invented_mutation_ui_findings(merged_files)
+    offending_paths = {f.path for f in findings if f.path in stage_files}
+    if not offending_paths:
+        return None
+    patched = _drop_offending_files_and_references(stage_files, offending_paths)
+    verification = {k: v for k, v in merged_files.items() if k not in offending_paths}
+    verification.update(patched)
+    if _invented_mutation_ui_findings(verification):
+        return None
+    return patched

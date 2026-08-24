@@ -4,6 +4,7 @@ import json
 
 from arkali.engineering.factory.frontend_invented_mutation_preflight import (
     _invented_mutation_ui_findings,
+    _repair_invented_mutation_ui,
 )
 
 _DESIGN_SYSTEM = {
@@ -121,3 +122,77 @@ def test_flags_an_update_call_as_the_edit_action() -> None:
     findings = _invented_mutation_ui_findings(files)
     assert len(findings) == 1
     assert "'edit'" in findings[0].detail
+
+
+#: golden-work-099 through golden-work-106 (session evidence, frozen): a
+#: real qwen2.5-coder:14b reproduced this exact invented-delete-control
+#: mistake across eight separate real candidates, exhausting
+#: frontend_forms's full attempt budget every time.
+_REAL_APP_JS = """import React from "react";
+import { BrowserRouter as Router, Route, Switch } from "react-router-dom";
+import TaskList from "./TaskList";
+import TaskCreate from "./TaskCreate";
+import TaskEdit from "./TaskEdit";
+import TaskDelete from "./TaskDelete";
+
+const App = () => (
+  <Router>
+    <Switch>
+      <Route exact path="/tasks" component={TaskList} />
+      <Route path="/tasks/create" component={TaskCreate} />
+      <Route path="/tasks/edit/:id" component={TaskEdit} />
+      <Route path="/tasks/delete/:id" component={TaskDelete} />
+    </Switch>
+  </Router>
+);
+export default App;
+"""
+_REAL_TASK_DELETE_JS = """import { deleteTask } from './apiClient';
+function TaskDelete({ id }) { return <button onClick={() => deleteTask(id)}>Delete</button>; }
+export default TaskDelete;
+"""
+
+
+def test_repair_removes_the_invented_file_and_its_app_js_reference() -> None:
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS,
+        "frontend/src/TaskCreate.js": "x",
+        "frontend/src/TaskEdit.js": "y",
+        "frontend/src/TaskDelete.js": _REAL_TASK_DELETE_JS,
+    }
+    merged = {"product/ux_spec.json": _task_ux_spec(["create", "edit", "view"]), **stage_files}
+    repaired = _repair_invented_mutation_ui(merged, stage_files)
+    assert repaired is not None
+    assert "frontend/src/TaskDelete.js" not in repaired
+    assert "TaskDelete" not in repaired["frontend/src/App.js"]
+    assert "TaskCreate" in repaired["frontend/src/App.js"]
+    assert "TaskEdit" in repaired["frontend/src/App.js"]
+    final = {"product/ux_spec.json": _task_ux_spec(["create", "edit", "view"]), **repaired}
+    assert _invented_mutation_ui_findings(final) == []
+
+
+def test_repair_is_a_noop_when_the_action_is_genuinely_declared() -> None:
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS,
+        "frontend/src/TaskDelete.js": _REAL_TASK_DELETE_JS,
+    }
+    merged = {
+        "product/ux_spec.json": _task_ux_spec(["create", "edit", "delete", "view"]), **stage_files,
+    }
+    assert _repair_invented_mutation_ui(merged, stage_files) is None
+
+
+def test_repair_is_a_noop_when_no_ux_spec_exists() -> None:
+    stage_files = {"frontend/src/TaskDelete.js": _REAL_TASK_DELETE_JS}
+    assert _repair_invented_mutation_ui(stage_files, stage_files) is None
+
+
+def test_repair_is_a_noop_when_the_offending_file_is_not_this_stages_own_output() -> None:
+    """`frontend_ui` never writes a mutation component -- if the offending
+    path is only visible through an earlier stage's own output, this
+    stage cannot remove a file it did not write."""
+    merged = {
+        "product/ux_spec.json": _task_ux_spec(["view"]),
+        "frontend/src/TaskDelete.js": _REAL_TASK_DELETE_JS,
+    }
+    assert _repair_invented_mutation_ui(merged, {}) is None
