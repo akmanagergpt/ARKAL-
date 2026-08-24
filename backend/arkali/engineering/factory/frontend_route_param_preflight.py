@@ -93,16 +93,20 @@ def _unread_route_param_findings(files: Mapping[str, str]) -> list[SemanticFindi
     missing = sorted(set(declared) - read)
     if not missing:
         return []
+    name = missing[0]
     return [SemanticFinding(
-        code="frontend_ui_route_param_never_read", path=declared[missing[0]],
+        code="frontend_ui_route_param_never_read", path=declared[name],
         detail=(
-            f"<Route path> declares URL parameter(s) {missing!r} that no component "
-            "anywhere reads — no useParams() destructures it and no match.params./"
-            "props.match.params. access names it. A mutation triggered from that "
-            "route cannot know which record it targets; wire the param through "
-            "useParams() (works with the children Route form too, unlike "
-            "match/location/history, which only component=/render= inject) or "
-            "match.params in whichever component actually calls the client's "
-            "update/delete function"
+            f"<Route path> declares URL parameter {name!r} ({missing!r} total) that no "
+            "component anywhere reads, so a mutation triggered from that route cannot "
+            "know which record it targets. Fix: as the first line inside the function "
+            "of whichever component that route renders, add exactly "
+            f"`const {{ {name} }} = useParams();` (import useParams from "
+            "'react-router-dom' if not already imported), then pass that "
+            f"{name} value as the actual argument to the update/delete client call — "
+            "never rely on a form's own onSubmit(name, email)-style arguments to carry "
+            f"it. Do not add a `:{name}` prop to the routed component itself: the "
+            "children <Route path=\"...\"><Comp /></Route> form used here never "
+            "injects match/location/history as props the way component=/render= do."
         ),
     )]

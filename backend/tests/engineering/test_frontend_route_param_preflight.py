@@ -30,6 +30,19 @@ def test_catches_golden_work_113s_own_real_defect() -> None:
     assert "'id'" in findings[0].detail
 
 
+def test_the_finding_gives_a_literal_copy_pasteable_fix() -> None:
+    """golden-work-115 (session evidence, frozen): the first, prose-only
+    wording of this finding was fed back verbatim on every retry and the
+    model still exhausted the frontend_forms stage's full 4-attempt
+    budget without ever satisfying it. Reworded to name the exact line to
+    add, the same lesson the golden-work-050/051 Werkzeug<3 finding
+    already established for this pipeline."""
+    findings = _unread_route_param_findings(
+        {"frontend/src/App.js": _GOLDEN_WORK_113_APP_JS}
+    )
+    assert "const { id } = useParams();" in findings[0].detail
+
+
 def test_use_params_destructure_satisfies_the_route() -> None:
     files = {
         "frontend/src/App.js": (
