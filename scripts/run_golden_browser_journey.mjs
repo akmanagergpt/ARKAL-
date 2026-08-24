@@ -1,9 +1,37 @@
-/** Real Chromium journey for a generated Student/Fee Golden candidate. */
+/**
+ * Real Chromium journey for a generated Student/Fee Golden candidate.
+ *
+ * TWO REAL TIMING GAPS, FOUND LIVE AGAINST golden-work-113's OWN BUILD, ARE
+ * CLOSED HERE - neither by relaxing what this journey actually proves.
+ *
+ * (1) NO ASSERTION ON A TRANSIENT "SUCCESS" TEXT. A generated candidate that
+ * navigates via `window.location.href` right after a mutation (real, common,
+ * unremarkable CRUD code) can unmount its own success message before the
+ * browser ever paints it - it painted on one run and not on the next, an
+ * inherent race against that valid pattern rather than a defect. Every
+ * mutation step (create/edit/delete/payment) already proves success the
+ * same, non-racy way every other step here does: a real network mutation is
+ * observed (`mutations`), and the record's new state is later found in the
+ * app's own stable, reloaded view. A transient toast is a UX nicety, not
+ * something this journey needs to observe to prove the mutation real.
+ *
+ * (2) `firstVisible` (`lib/browser_journey_wait.mjs`) now retries instead of
+ * checking visibility once - the same full-reload window can hide the next
+ * control this journey needs to click, not only the toast in (1). Every
+ * `mutations` check now polls (`waitForMutation`) instead of a fixed
+ * `waitForTimeout(200)`: that fixed wait was already the only thing standing
+ * between a real mutation and the check confirming it, for all four
+ * mutations this journey drives, and 200ms is not a bound on anything real -
+ * a slower first fetch under real host load can exceed it, which is exactly
+ * what a live run reproduced.
+ */
 
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+
+import { firstVisible, waitForMutation } from './lib/browser_journey_wait.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -17,13 +45,6 @@ const studentIdIndex = process.argv.indexOf('--student-id');
 const studentId = studentIdIndex >= 0 ? process.argv[studentIdIndex + 1] : null;
 if (!studentId || !/^\d+$/.test(studentId)) {
   throw new Error('--student-id must identify the persisted backend acceptance student');
-}
-
-async function firstVisible(locators) {
-  for (const locator of locators) {
-    if (await locator.count() && await locator.first().isVisible()) return locator.first();
-  }
-  throw new Error('no expected visible control found');
 }
 
 async function clickNamed(page, pattern) {
@@ -73,11 +94,11 @@ try {
   await fillByLabel(page, /name/i, 'Browser Acceptance Student');
   await fillByLabel(page, /email/i, 'browser.acceptance@example.com');
   await clickNamed(page, /create.*student|save|submit/i);
-  await expect(page.getByText(/success|created/i)).toBeVisible();
-  await page.waitForTimeout(200);
-  if (!mutations.some((item) => item.startsWith('POST ') && item.includes('/students'))) {
-    throw new Error('student form did not emit a real POST /students request');
-  }
+  await waitForMutation(
+    mutations,
+    (item) => item.startsWith('POST ') && item.includes('/students'),
+    'student form did not emit a real POST /students request',
+  );
 
   await clickNamed(page, /students/i);
   await expect(page.getByText('Browser Acceptance Student', { exact: false })).toBeVisible();
@@ -85,10 +106,11 @@ try {
   await expect(page.getByRole('heading', { name: /edit/i })).toBeVisible();
   await fillByLabel(page, /name/i, 'Browser Acceptance Edited');
   await clickNamed(page, /update|save/i);
-  await page.waitForTimeout(200);
-  if (!mutations.some((item) => item.startsWith('PUT ') && item.includes('/students/'))) {
-    throw new Error('edit form did not emit a real PUT /students/:id request');
-  }
+  await waitForMutation(
+    mutations,
+    (item) => item.startsWith('PUT ') && item.includes('/students/'),
+    'edit form did not emit a real PUT /students/:id request',
+  );
 
   await clickNamed(page, /students/i);
   await expect(page.getByText('Browser Acceptance Edited', { exact: false })).toBeVisible();
@@ -98,10 +120,11 @@ try {
     page.getByRole('link', { name: /confirm|yes|delete/i }),
   ]);
   await confirm.click();
-  await page.waitForTimeout(200);
-  if (!mutations.some((item) => item.startsWith('DELETE ') && item.includes('/students/'))) {
-    throw new Error('delete flow did not emit a real DELETE /students/:id request');
-  }
+  await waitForMutation(
+    mutations,
+    (item) => item.startsWith('DELETE ') && item.includes('/students/'),
+    'delete flow did not emit a real DELETE /students/:id request',
+  );
 
   await clickNamed(page, /payments/i);
   await expect(page.getByRole('heading', { name: /payments/i })).toBeVisible();
@@ -112,10 +135,11 @@ try {
     await fillByLabel(page, /amount/i, '50.25');
     await fillByLabel(page, /due.*date/i, '2030-02-01');
     await clickNamed(page, /create.*payment|save|submit/i);
-    await page.waitForTimeout(200);
-    if (!mutations.some((item) => item.startsWith('POST ') && item.includes('/payments'))) {
-      throw new Error('payment form did not emit a real POST /payments request');
-    }
+    await waitForMutation(
+      mutations,
+      (item) => item.startsWith('POST ') && item.includes('/payments'),
+      'payment form did not emit a real POST /payments request',
+    );
   }
 
   await clickNamed(page, /dashboard/i);
