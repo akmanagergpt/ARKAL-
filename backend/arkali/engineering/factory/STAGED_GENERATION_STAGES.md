@@ -252,30 +252,12 @@ both real, present routes rendering a real form component, and both were
 completely unreachable in a real browser — `<Switch>` always rendered the
 parent list route instead, on every navigation, silently). A route built
 this way (`/students/edit/:id`) obligates something real to read that
-`:id` — react-router v5's children Route form (`<Route path="..."><Comp
-/></Route>`) never injects `match`/`location`/`history` as props the way
-`component=`/`render=` do, so `useParams()` (or `match.params.id` where
-`match` genuinely is in scope) is the only real way a component reached
-this way learns which record it targets (golden-work-113, session
-evidence, frozen: real `qwen2.5-coder:14b` output declared both
-`/students/edit/:id` and `/students/delete/:id`, never called
-`useParams()` or read `match.params` anywhere, and wired the edit route's
-own outer handler — declared `async (id, name, email) => {...}` — to a
-shared form component that actually calls its `onSubmit` with only 2
-arguments (`name, email`); `id` silently received the *name* value at
-runtime, reached only by a real browser acceptance journey). Concretely:
-as the first line inside the function of whichever component that route
-renders, add exactly `const { id } = useParams();` (import `useParams`
-from `'react-router-dom'` if not already imported), then pass that `id`
-value as the real argument to the update/delete client call — never rely
-on a form's own `onSubmit(name, email)`-style arguments to carry it, and
-never add an `id` prop to the routed component itself (golden-work-115,
-session evidence, frozen: the first, prose-only wording of this rule was
-fed back verbatim on every retry and a real `qwen2.5-coder:14b` still
-exhausted this stage's full 4-attempt budget without ever satisfying it
-— reworded here to name the exact line to add, the same lesson the
-golden-work-050/051 `Werkzeug<3` finding already established for this
-pipeline). Split out as
+`:id`: add `const { id } = useParams();` as the first line inside the
+routed component's function (import `useParams` from
+`'react-router-dom'`), then pass `id` to the update/delete client call —
+never an `id` prop on the routed component itself, which the children
+Route form used here never receives (golden-work-113/115, session
+evidence, frozen). Split out as
 its own stage (real evidence, golden-work-065): a real
 qwen2.5-coder:14b reliably produced a genuine multi-module shell —
 react-router navigation, a dashboard with real KPIs, loading/empty/error
