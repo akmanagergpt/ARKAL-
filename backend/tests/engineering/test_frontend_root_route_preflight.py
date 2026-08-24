@@ -311,6 +311,30 @@ def test_retarget_repair_is_a_noop_when_the_router_root_is_in_a_different_direct
     assert _repair_orphaned_router_root(visible_files, stage_files) is None
 
 
+def test_retarget_repair_finds_something_to_fix_when_the_stage_omits_index_js() -> None:
+    """golden-work-105 (session evidence, frozen): a real qwen2.5-coder:14b
+    followed frontend_forms's own "do not rewrite them" instruction so
+    literally it never included frontend/src/index.js in its own
+    returned files at all. Before this fix, `stage_files.get(index_path)`
+    alone returned None and the whole repair silently no-op'd, even
+    though the merged view (this stage's own new App.js plus
+    visible_files' unmodified, pre-router index.js) still had the real
+    defect. The repaired index.js must be explicitly added to the
+    returned dict, since only keys a stage's own output declares are
+    ever written to the workspace."""
+    visible_files = {"frontend/src/index.js": _NO_ROUTER_INDEX_JS, "frontend/src/TaskList.js": "x"}
+    stage_files = {
+        "frontend/src/App.js": _REAL_APP_JS_WITH_ROUTER,
+        "frontend/src/TaskDelete.js": "y",
+    }
+    repaired = _repair_orphaned_router_root(visible_files, stage_files)
+    assert repaired is not None
+    assert "frontend/src/index.js" in repaired
+    assert "<App />" in repaired["frontend/src/index.js"]
+    merged = {**visible_files, **repaired}
+    assert _orphaned_router_root_findings(merged) == []
+
+
 def test_retarget_repair_is_a_noop_when_the_render_call_has_no_self_closing_tag() -> None:
     """A real shape this pipeline has not produced (a mounted component
     with children/props, not a bare self-closing tag) is left for the

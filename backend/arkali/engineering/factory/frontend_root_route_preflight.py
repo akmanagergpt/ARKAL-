@@ -233,9 +233,22 @@ def _repair_orphaned_router_root(
     (`_retarget_render_call`) only when a real router root exists in the
     same directory as index.js (every real candidate this session has
     produced) and no known-good prior version applies. Every path is
-    checked, not assumed, against the real finding before being applied."""
+    checked, not assumed, against the real finding before being applied.
+
+    golden-work-105 (session evidence, frozen): a real qwen2.5-coder:14b
+    followed `frontend_forms`'s own "do not rewrite them" instruction so
+    literally it never included `frontend/src/index.js` in its own
+    returned files at all -- `stage_files.get(index_path)` alone
+    returned `None` and this whole repair silently no-op'd, even though
+    the merged view (this stage's own new `App.js` plus `visible_files`'
+    unmodified, pre-router index.js) still had the real defect. `current`
+    now falls back to `visible_files`' own version, the one genuinely
+    active in the merged view the real validator checks, so the retarget
+    fallback can still find something to fix -- and the repaired index.js
+    is explicitly added to the returned dict either way, since only keys
+    a stage's own output declares are ever written to the workspace."""
     index_path = "frontend/src/index.js"
-    current = stage_files.get(index_path)
+    current = stage_files.get(index_path, visible_files.get(index_path))
     if current is None:
         return None
     merged = {**visible_files, **stage_files}
