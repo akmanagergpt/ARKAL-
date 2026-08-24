@@ -127,8 +127,13 @@ export function Panel({ title, actions, children }: {
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  // `min-w-0`: a CSS grid/flex item's default min-width is `auto`, which
+  // floors it at its content's min-content width. An unbreakable token inside
+  // (a Windows path, a dotted identifier) can exceed the viewport before this
+  // overrides that floor, so without it a narrow-viewport panel forces the
+  // whole page to scroll horizontally instead of wrapping its own text.
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="min-w-0 rounded-lg border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
           {title}
