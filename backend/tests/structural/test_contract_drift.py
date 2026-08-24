@@ -30,6 +30,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from arkali.control.policy.pdp import PolicyDecisionPoint
+from arkali.control.policy.pep import PolicyEnforcementPoint
+from arkali.engineering.localai import host_probe
+from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.surfaces.command import contracts, workflow_contracts
 from arkali.surfaces.command.contracts import (
@@ -38,7 +41,8 @@ from arkali.surfaces.command.contracts import (
     ROUTE_AUDIENCES,
     ErrorResponse,
 )
-from arkali.surfaces.command.app import create_app
+from arkali.surfaces.command.app import _CommandExtensions, create_app
+from arkali.surfaces.operations import contracts as operations_contracts
 from tests.structural.typescript_reader import (
     FRONTEND_SRC,
     REPO,
@@ -92,33 +96,76 @@ def _workflow_wiring(pdp: PolicyDecisionPoint):
     return document_builder, graph_store_factory, executor_factory
 
 
+def _operations_wiring(pdp: PolicyDecisionPoint):
+    """The real C-34 wiring, mirroring `scripts/run_command_center.py`'s own
+    `_operations_wiring` and `tests/surfaces/test_command_operations_api.py`'s
+    identical fixture - so the drift control exercises the same `/snapshot`
+    route (`ARK-REQ-0396`, D-028) a real caller reaches, not a narrower stand-in.
+    """
+    from arkali.control.policy.workflow_approval import WorkflowApprovalGate
+    from arkali.execution.workflow.executor import WorkflowExecutor
+    from arkali.execution.workflow.graph_vocabulary import GraphVocabulary
+
+    vocabulary = GraphVocabulary.load(REPO)
+    approval_gate = WorkflowApprovalGate.load(REPO)
+
+    def job_recovery_factory(session):
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.execution")
+        return JobRecovery(session, pep)
+
+    def executor_factory(session):
+        return WorkflowExecutor(session, pdp, vocabulary, approval_gate)
+
+    return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
+
+
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
     """A real application, so the contract is generated and never transcribed."""
     database = tmp_path_factory.mktemp("contract") / "drift.db"
     engine = create_persistence_engine(sqlite_url(database))
     pdp = PolicyDecisionPoint.load(REPO)
-    return create_app(engine, pdp, workflow_wiring=_workflow_wiring(pdp))
+    return create_app(
+        engine, pdp, workflow_wiring=_workflow_wiring(pdp),
+        extensions=_CommandExtensions(
+            operations_wiring=_operations_wiring(pdp), operations_repo_root=REPO,
+        ),
+    )
 
 
-def canonical(schema: dict[str, Any]) -> str:
+def canonical(schema: dict[str, Any], components: dict[str, Any]) -> str:
     """Reduce a JSON-Schema fragment to the TypeScript type it implies.
 
     Deliberately narrow. Anything this cannot reduce raises, because a contract
     the control cannot compare is a contract it cannot protect, and reporting
     success in that case would be the failure mode the module exists to prevent.
+
+    `components` resolves a `$ref`. Most refs (a nested model such as
+    `WorkflowNodeShape`) still reduce to their own name, so a rename or a
+    restructuring is still caught field by field. The one exception is a
+    `$ref` to a plain string enum (e.g. `HonestState`): TypeScript `string`
+    is a real supertype of every one of its members, and `DimensionReading.
+    state` deliberately declares `string` rather than restating the enum's
+    members as a second, driftable copy of that vocabulary - the identical
+    choice already made for `lifecycle_state`, which stays a plain `str` on
+    the backend for the same reason. Any other `$ref` (an object schema)
+    still returns its own name unchanged.
     """
     if "$ref" in schema:
-        return str(schema["$ref"]).rsplit("/", 1)[-1]
+        name = str(schema["$ref"]).rsplit("/", 1)[-1]
+        target = components.get(name, {})
+        if target.get("type") == "string" and "enum" in target:
+            return "string"
+        return name
     if "anyOf" in schema:
         options = [option for option in schema["anyOf"] if option.get("type") != "null"]
         nullable = len(options) != len(schema["anyOf"])
         if len(options) != 1:
             raise AssertionError(f"unsupported union in contract schema: {schema}")
-        return canonical(options[0]) + ("|null" if nullable else "")
+        return canonical(options[0], components) + ("|null" if nullable else "")
     kind = schema.get("type")
     if kind == "array":
-        return canonical(schema["items"]) + "[]"
+        return canonical(schema["items"], components) + "[]"
     if kind == "string":
         return "string"
     if kind in {"integer", "number"}:
@@ -163,11 +210,16 @@ def surface_contract_names() -> frozenset[str]:
     They are the framework's contract, not this surface's, and the frontend does
     not declare them.
 
-    Spans both `contracts.py` and `workflow_contracts.py` - the latter split
-    out in Package 6 purely for `max_public_symbols_per_module`, not because
-    its shapes belong to a different surface.
+    Spans `contracts.py` and `workflow_contracts.py` - the latter split out
+    in Package 6 purely for `max_public_symbols_per_module`, not because its
+    shapes belong to a different surface - plus `surfaces.operations.contracts`
+    (`ARK-REQ-0396`, D-028): `/snapshot`'s `response_model` is
+    `OperationsSnapshot`, owned by `surfaces.operations` and composed
+    unmodified rather than restated here, so its shapes are real transport
+    this surface publishes even though `surfaces.command` does not declare
+    the class.
     """
-    modules = (contracts, workflow_contracts)
+    modules = (contracts, workflow_contracts, operations_contracts)
     return frozenset(
         name
         for module in modules
@@ -191,7 +243,7 @@ def backend_shapes(app: FastAPI) -> dict[str, dict[str, str]]:
     schemas["ErrorResponse"] = ErrorResponse.model_json_schema()
     return {
         name: {
-            field: canonical(fragment)
+            field: canonical(fragment, published)
             for field, fragment in schema.get("properties", {}).items()
         }
         for name, schema in schemas.items()
@@ -240,6 +292,11 @@ class TestTransportTypesMatchTheBackend:
             "ApproveExecutionRequest",
             "WorkflowNodeExecutionResponse",
             "WorkflowExecutionDetailResponse",
+            "DimensionReading",
+            "RuntimeSnapshot",
+            "HardwareSnapshot",
+            "StorageSnapshot",
+            "OperationsSnapshot",
         }
         assert exchanged <= declared
 
@@ -260,6 +317,32 @@ class TestTransportTypesMatchTheBackend:
         expected = dict(backend_shapes(app)["RevisionResponse"])
         expected["provenance_ref"] = "string"
         assert expected != interfaces_of(CONTRACTS_TS)["RevisionResponse"]
+
+    def test_a_ref_to_a_string_enum_reduces_to_string(self, app: FastAPI) -> None:
+        """REGRESSION (root cause of the `DimensionReading.state` false-drift
+        failure this control raised before `canonical()` learned to resolve a
+        `$ref`). `HonestState` is a real `str` enum on the backend, so a naive
+        `$ref` reduction returned the literal ref name `'HonestState'` and
+        could never equal the frontend's deliberate `string` declaration -
+        the exact choice already made for `lifecycle_state` above."""
+        components = dict(app.openapi()["components"]["schemas"])
+        assert "HonestState" in components, "fixture drifted: HonestState no longer published"
+        assert canonical({"$ref": "#/components/schemas/HonestState"}, components) == "string"
+
+    def test_a_ref_to_a_real_object_is_not_reduced_to_string(self, app: FastAPI) -> None:
+        """NEGATIVE CONTROL: the string-enum exception above must stay narrow.
+
+        A `$ref` to a real nested model (not a string enum) must still reduce
+        to its own name, or a renamed/restructured nested type would silently
+        compare equal to any other object and this control would stop
+        catching the exact drift it exists for.
+        """
+        components = dict(app.openapi()["components"]["schemas"])
+        assert "WorkflowNodeShape" in components, "fixture drifted: WorkflowNodeShape not published"
+        assert (
+            canonical({"$ref": "#/components/schemas/WorkflowNodeShape"}, components)
+            == "WorkflowNodeShape"
+        )
 
 
 class TestRoutesMatchTheBackend:
