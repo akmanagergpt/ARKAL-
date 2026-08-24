@@ -373,9 +373,9 @@ Evidence keys: `arch`=architecture test · `unit` · `contract` · `integ`=integ
 
 ---
 
-## Block 8 — Human governance rulings (ARK-REQ-0381 … 0395)
+## Block 8 — Human governance rulings (ARK-REQ-0381 … 0396)
 
-Unlike Blocks 1–7, these entries are not sourced from MS/BP/VDC text. They repair a genuine canonical gap: Phase 15 (Requirement + Architecture Intelligence) and four D-026 routing responsibilities owned nothing in this register, `CONTRACT_INVENTORY.md` or `AUTHORITY_MAP.yaml` before D-025/D-026 (`docs/build/DECISION_LOG.md`), confirmed by read-only research before any entry here was written. IDs continue sequentially from the highest previously allocated (`ARK-REQ-0380`) rather than using either MS-block reserved gap (`0187–0199`, `0244–0299`), because those gaps are reserved for MS/BP-sourced content and using one here would misattribute source.
+Unlike Blocks 1–7, these entries are not sourced from MS/BP/VDC text. They repair a genuine canonical gap: Phase 15 (Requirement + Architecture Intelligence) and four D-026 routing responsibilities owned nothing in this register, `CONTRACT_INVENTORY.md` or `AUTHORITY_MAP.yaml` before D-025/D-026 (`docs/build/DECISION_LOG.md`), confirmed by read-only research before any entry here was written. IDs continue sequentially from the highest previously allocated (`ARK-REQ-0380`) rather than using either MS-block reserved gap (`0187–0199`, `0244–0299`), because those gaps are reserved for MS/BP-sourced content and using one here would misattribute source. `ARK-REQ-0396` (D-028) repairs a further gap the same way: `CONTRACT_INVENTORY.md`'s C-34 row already names Command Center as an `ADDITIVE` consumer of Operations telemetry, but Phase 25 delivered that telemetry with `integ` evidence only — its own acceptance record states "no frontend increment" as a deliberate scope boundary — and Phase 27 (Command Center Consolidation) left the Operations view unbuilt for the same reason. No requirement anywhere claimed the `e2e` evidence a real browser consumer would produce; `ARK-REQ-0396` is that requirement, continuing this block's own sequential-ID convention.
 
 | ID | Requirement | Source | Class | Phase | Owner | Evidence |
 |---|---|---|---|---|---|---|
@@ -394,8 +394,9 @@ Unlike Blocks 1–7, these entries are not sourced from MS/BP/VDC text. They rep
 | ARK-REQ-0393 | Failover to another eligible worker on provider quota/capacity/auth/session unavailability preserves durable task state and never produces a false PASS; repeated use of one failing strategy is bounded by the existing repair-budget mechanism | D-026 | MANDATORY | 16 | engineering.factory | integ, prop, chaos |
 | ARK-REQ-0394 | Per-model, per-task-class empirical outcome statistics are recorded only from verified results; a model's self-reported performance claim is never treated as evidence | D-026 | MANDATORY | 18 | engineering.knowledge | integ, prov |
 | ARK-REQ-0395 | Operations telemetry additionally surfaces per-task latency and verified quality-outcome signals alongside the existing hardware/cost dimensions, sourced from real execution and verification results | D-026 | CONDITIONAL | 25 | surfaces.operations | integ, sec |
+| ARK-REQ-0396 | The Command Center Operations view renders C-34's real-time telemetry (runtime/hardware/storage dimensions) from a real, live `GET /api/operations/snapshot` response only; every dimension is presented exactly as `DimensionReading.state` reports it (no value shown for `NOT_CONFIGURED`/`NOT_APPLICABLE`), with honest loading/empty/error/retry presentation and no fabricated, cached or hard-coded value | D-028 | MANDATORY | 30 | surfaces.command | e2e |
 
-`ARK-REQ-0392`/`0393`/`0394` are implementation obligations of phases not yet started (16, 18); recording them now does not begin that implementation. Two D-026 areas were audited and found already sufficient, so no new entry was added for them: Phase 22 (`engineering.localai`) already carries `ARK-REQ-0016`/`0129`/`0130` for hardware-aware, reference-not-copy local execution, and Phase 30/31 already require a real provider or local model (`ARK-REQ-0234`/`0235`) and a Direct-AI value comparison (`ARK-REQ-0362`) — both cover D-026's remaining claims without a further requirement.
+`ARK-REQ-0392`/`0393`/`0394` are implementation obligations of phases not yet started (16, 18); recording them now does not begin that implementation. Two D-026 areas were audited and found already sufficient, so no new entry was added for them: Phase 22 (`engineering.localai`) already carries `ARK-REQ-0016`/`0129`/`0130` for hardware-aware, reference-not-copy local execution, and Phase 30/31 already require a real provider or local model (`ARK-REQ-0234`/`0235`) and a Direct-AI value comparison (`ARK-REQ-0362`) — both cover D-026's remaining claims without a further requirement. `ARK-REQ-0396`'s `owning_phase` is recorded as 30 — the phase open at the time D-028 ruled, mirroring D-025/D-026's own placement practice — not because Phase 30's canonical theme (Golden Product + Golden Repair Verification) covers Command Center UI work, but because no existing phase's declared scope does, and this block's own precedent is that a genuine canonical gap is filled where the human authority actually rules on it. This does not reopen, amend or rescore Phase 25's or Phase 27's accepted evidence, both of which remain byte-identical and continue to describe truthfully what was proven at their own acceptance time.
 
 ---
 
@@ -423,13 +424,13 @@ Every rule is objective and machine-evaluable from recorded system state. No rul
 
 | Metric | Value |
 |---|---|
-| Total registered requirements | **328 entries** (highest ID allocated: ARK-REQ-0395) |
-| MANDATORY | 317 |
+| Total registered requirements | **329 entries** (highest ID allocated: ARK-REQ-0396) |
+| MANDATORY | 318 |
 | CONDITIONAL | 9 |
 | OPTIONAL | 2 |
 | Duplicate IDs | 0 |
-| Entries with owner assigned | 328 (100%) |
-| Entries with evidence definition | 328 (100%) |
+| Entries with owner assigned | 329 (100%) |
+| Entries with evidence definition | 329 (100%) |
 | CONDITIONAL entries with objective rule in Appendix A | 9 (100%) |
 | Orphan applicability rules (rule with no CONDITIONAL entry) | 0 |
 | Requirements verified | 0 — Phase 0 produces no implementation and claims no coverage |
