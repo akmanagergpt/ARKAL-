@@ -1,4 +1,5 @@
-"""The C-34 Operations HTTP surface (ARK-REQ-0168, 0169, 0170, 0355-0357).
+"""The C-34 Operations HTTP surface (ARK-REQ-0168, 0169, 0170, 0355-0357,
+0396).
 
 Owner: `surfaces.command`. Composes `surfaces.operations` unmodified via the
 declared `surfaces.command -> surfaces.operations` sibling edge
@@ -33,11 +34,20 @@ two real, measured constraints found by running the gate:
 aggregate view's own authorization, exactly as `telemetry.
 ReadAuthorization` requires, with no new PDP/PEP import here either.
 
-BACKEND_ONLY. No Phase 25 requirement is owned by any `surfaces.*` context
-(all eight are owned by `surfaces.operations`, `control.policy` or
-`acceptance.engine`, none with `e2e` evidence), so no frontend obligation
-exists and none is invented here - the identical reasoning `jobs.py`
-already recorded for `ARK-REQ-0027`.
+MIXED AUDIENCE (D-028, `docs/build/DECISION_LOG.md`). Phase 25's own eight
+requirements (`ARK-REQ-0168`/`0169`/`0170`/`0218`/`0355`/`0356`/`0357`/
+`0395`) are owned by `surfaces.operations`, `control.policy` or
+`acceptance.engine`, none with `e2e` evidence, so no frontend obligation
+existed for any route here at that phase's own acceptance -- the identical
+reasoning `jobs.py` already recorded for `ARK-REQ-0027`. That reasoning
+still holds for every route below except one: `/snapshot` alone is now
+`BROWSER_SLICE`, the Command Center Operations view's own real consumer
+(`ARK-REQ-0396`, D-028) -- a real, additive `e2e` consumer of `CONTRACT_
+INVENTORY.md`'s C-34 row, which already named Command Center as a
+legitimate consumer under `ADDITIVE` compatibility. `/conditional/*`,
+`/architecture` and `/computer-use/authorize` remain `BACKEND_ONLY`: D-028
+scoped its ruling to `/snapshot` alone, and no later requirement has
+claimed `e2e` evidence for the rest.
 """
 
 from __future__ import annotations
@@ -52,7 +62,7 @@ from sqlalchemy.orm import Session
 
 from arkali.control.policy.pdp import PolicyDecisionPoint
 from arkali.execution.durable.recovery import JobRecovery
-from arkali.surfaces.command.contracts import BACKEND_ONLY
+from arkali.surfaces.command.contracts import BACKEND_ONLY, BROWSER_SLICE
 from arkali.surfaces.operations.ai_review_bundle import ArchitectureSummary, observe_architecture
 from arkali.surfaces.operations.computer_use import authorize_computer_use_action
 from arkali.surfaces.operations.computer_use_contracts import ComputerUseDecision
@@ -113,12 +123,23 @@ def _build_operations_router(
     repo_root: pathlib.Path,
     wiring: Wiring,
 ) -> APIRouter:
-    """The Operations telemetry + Computer-Use authorization routes."""
+    """The Operations telemetry + Computer-Use authorization routes.
+
+    MIXED AUDIENCE, DECLARED PER ROUTE (D-028). `/snapshot` alone is
+    `BROWSER_SLICE` -- the Command Center Operations view's own real
+    consumer, `ARK-REQ-0396`. Every other route here
+    (`/conditional/*`, `/architecture`, `/computer-use/authorize`) stays
+    `BACKEND_ONLY`: D-028 scoped its ruling to `/snapshot`'s existing
+    real-time dimensions alone, and no requirement claims `e2e` evidence
+    for the rest. No router-level default tag exists on purpose -- a
+    mixed-audience router cannot use one without silently mis-tagging
+    whichever routes do not override it.
+    """
     job_recovery_factory, executor_factory, pdp, probe_host = wiring
-    router = APIRouter(prefix="/api/operations", tags=[BACKEND_ONLY])
+    router = APIRouter(prefix="/api/operations")
     read_authorization = _GuardReadAuthorization(guard)
 
-    @router.get("/snapshot", response_model=OperationsSnapshot)
+    @router.get("/snapshot", response_model=OperationsSnapshot, tags=[BROWSER_SLICE])
     def snapshot(session: Session = Depends(session_scope)) -> OperationsSnapshot:
         guard("READ_FILE")
         recovery: JobRecovery = job_recovery_factory(session)
@@ -132,24 +153,33 @@ def _build_operations_router(
         except Exception as error:
             raise refuse(error) from error
 
-    @router.get("/conditional/hardware-cost", response_model=HardwareCostDimensions)
+    @router.get(
+        "/conditional/hardware-cost", response_model=HardwareCostDimensions,
+        tags=[BACKEND_ONLY],
+    )
     def conditional_hardware_cost() -> HardwareCostDimensions:
         guard("READ_FILE")
         return observe_hardware_cost_dimensions(
             observe_hardware(str(repo_root), probe_host)
         )
 
-    @router.get("/conditional/quality-latency", response_model=QualityLatencyDimensions)
+    @router.get(
+        "/conditional/quality-latency", response_model=QualityLatencyDimensions,
+        tags=[BACKEND_ONLY],
+    )
     def conditional_quality_latency() -> QualityLatencyDimensions:
         guard("READ_FILE")
         return observe_quality_latency_dimensions()
 
-    @router.get("/architecture", response_model=ArchitectureSummary)
+    @router.get("/architecture", response_model=ArchitectureSummary, tags=[BACKEND_ONLY])
     def architecture() -> ArchitectureSummary:
         guard("READ_FILE")
         return observe_architecture(repo_root)
 
-    @router.post("/computer-use/authorize", response_model=ComputerUseDecision)
+    @router.post(
+        "/computer-use/authorize", response_model=ComputerUseDecision,
+        tags=[BACKEND_ONLY],
+    )
     def authorize(body: _ComputerUseAuthorizeRequest) -> ComputerUseDecision:
         """The real PDP's decision only - never executes anything."""
         guard("READ_FILE")
