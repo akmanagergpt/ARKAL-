@@ -58,6 +58,9 @@ from arkali.engineering.factory.frontend_client_call_preflight import (
     _phantom_client_import_findings,
     _repair_missing_client_call_imports,
 )
+from arkali.engineering.factory.frontend_invented_mutation_preflight import (
+    _invented_mutation_ui_findings,
+)
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _missing_frontend_entry_point_findings,
     _frontend_local_import_findings,
@@ -185,6 +188,7 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         _ux_spec_mutation_findings(files)
         + _client_call_missing_import_findings(files)
         + _phantom_client_import_findings(files)
+        + _invented_mutation_ui_findings(files)
     )
 
 
