@@ -136,7 +136,7 @@ export class ArkaliApiClient {
 
   private async request<T>(
     endpoint: { readonly method: string; readonly path: string },
-    options: { params?: Record<string, string>; body?: unknown } = {},
+    options: { params?: Record<string, string>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<T> {
     const url = this.baseUrl + expand(endpoint.path, options.params ?? {});
     let response: Response;
@@ -148,8 +148,12 @@ export class ArkaliApiClient {
             ? { Accept: 'application/json' }
             : { Accept: 'application/json', 'Content-Type': 'application/json' },
         ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
+        ...(options.signal === undefined ? {} : { signal: options.signal }),
       });
     } catch (cause) {
+      if (cause instanceof Error && cause.name === 'AbortError') {
+        throw cause;
+      }
       throw new ApiUnavailable(
         cause instanceof Error
           ? `The Command Center API is unreachable: ${cause.message}`
@@ -314,9 +318,14 @@ export class ArkaliApiClient {
    * The real-time Operations telemetry snapshot (`ARK-REQ-0396`, D-028).
    * Re-derived by the backend on every call from live authorities — never
    * cached here, never held across renders as if it were still current.
+   * `signal` lets a caller (a polling hook, an unmounting component) abort
+   * the underlying request rather than merely ignore its result.
    */
-  operationsSnapshot(): Promise<OperationsSnapshot> {
-    return this.request<OperationsSnapshot>(ENDPOINTS.operationsSnapshot);
+  operationsSnapshot(signal?: AbortSignal): Promise<OperationsSnapshot> {
+    return this.request<OperationsSnapshot>(
+      ENDPOINTS.operationsSnapshot,
+      signal === undefined ? {} : { signal },
+    );
   }
 }
 

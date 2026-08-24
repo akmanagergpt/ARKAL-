@@ -10,6 +10,7 @@
 
 import type {
   LifecycleMachineResponse,
+  OperationsSnapshot,
   ProjectDetailResponse,
   ProjectListResponse,
   WorkflowExecutionDetailResponse,
@@ -170,4 +171,86 @@ export const SUCCEEDED_EXECUTION: WorkflowExecutionDetailResponse = {
   ...WAITING_APPROVAL_EXECUTION,
   lifecycle_state: 'SUCCEEDED',
   pending_approval_node_id: null,
+};
+
+export const OPERATIONS_SNAPSHOT: OperationsSnapshot = {
+  runtime: {
+    jobs_active: { dimension: 'jobs_active', state: 'PASS', detail: 'live job count', value: 2 },
+    jobs_queued: { dimension: 'jobs_queued', state: 'PASS', detail: 'live queue depth', value: 0 },
+    jobs_stuck: { dimension: 'jobs_stuck', state: 'PASS', detail: 'no stuck jobs', value: 0 },
+    workflows_active: {
+      dimension: 'workflows_active', state: 'PASS', detail: 'live executions', value: 1,
+    },
+    providers: {
+      dimension: 'providers', state: 'NOT_CONFIGURED', detail: 'no provider registered', value: null,
+    },
+    agents: { dimension: 'agents', state: 'NOT_CONFIGURED', detail: 'no agent registered', value: null },
+    workers: { dimension: 'workers', state: 'NOT_CONFIGURED', detail: 'no worker registered', value: null },
+  },
+  hardware: {
+    cpu_logical_cores: {
+      dimension: 'cpu_logical_cores', state: 'PASS', detail: 'host probe', value: 8,
+    },
+    ram_total_bytes: {
+      dimension: 'ram_total_bytes', state: 'PASS', detail: 'host probe', value: 17179869184,
+    },
+    disk_free_bytes: {
+      dimension: 'disk_free_bytes', state: 'PASS', detail: 'host probe', value: 500000000000,
+    },
+    network_reachable: {
+      dimension: 'network_reachable', state: 'PASS', detail: 'host probe', value: 1,
+    },
+    gpu_present: {
+      dimension: 'gpu_present', state: 'NOT_APPLICABLE', detail: 'no gpu detected', value: null,
+    },
+    vram_total_bytes: {
+      dimension: 'vram_total_bytes', state: 'NOT_APPLICABLE', detail: 'no gpu detected', value: null,
+    },
+  },
+  storage: {
+    database_reachable: {
+      dimension: 'database_reachable', state: 'PASS', detail: 'sqlite ping', value: 1,
+    },
+    database_size_bytes: {
+      dimension: 'database_size_bytes', state: 'PASS', detail: 'sqlite file size', value: 245760,
+    },
+  },
+};
+
+const NOT_CONFIGURED_READING = { state: 'NOT_CONFIGURED' as const, value: null };
+
+export const OPERATIONS_SNAPSHOT_NOT_CONFIGURED: OperationsSnapshot = {
+  runtime: {
+    jobs_active: { dimension: 'jobs_active', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+    jobs_queued: { dimension: 'jobs_queued', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+    jobs_stuck: { dimension: 'jobs_stuck', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+    workflows_active: {
+      dimension: 'workflows_active', detail: 'no runtime configured', ...NOT_CONFIGURED_READING,
+    },
+    providers: { dimension: 'providers', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+    agents: { dimension: 'agents', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+    workers: { dimension: 'workers', detail: 'no runtime configured', ...NOT_CONFIGURED_READING },
+  },
+  hardware: {
+    cpu_logical_cores: {
+      dimension: 'cpu_logical_cores', detail: 'no host probe', ...NOT_CONFIGURED_READING,
+    },
+    ram_total_bytes: { dimension: 'ram_total_bytes', detail: 'no host probe', ...NOT_CONFIGURED_READING },
+    disk_free_bytes: { dimension: 'disk_free_bytes', detail: 'no host probe', ...NOT_CONFIGURED_READING },
+    network_reachable: {
+      dimension: 'network_reachable', detail: 'no host probe', ...NOT_CONFIGURED_READING,
+    },
+    gpu_present: { dimension: 'gpu_present', detail: 'no gpu detected', ...NOT_CONFIGURED_READING },
+    vram_total_bytes: {
+      dimension: 'vram_total_bytes', detail: 'no gpu detected', ...NOT_CONFIGURED_READING,
+    },
+  },
+  storage: {
+    database_reachable: {
+      dimension: 'database_reachable', detail: 'no storage configured', ...NOT_CONFIGURED_READING,
+    },
+    database_size_bytes: {
+      dimension: 'database_size_bytes', detail: 'no storage configured', ...NOT_CONFIGURED_READING,
+    },
+  },
 };

@@ -10,7 +10,7 @@ export const COMMAND_AREAS: readonly CommandArea[] = [
   { id: 'workflow', label: 'Workflow Studio', description: 'Gelişmiş iş akışı tasarımı', available: true },
   { id: 'team', label: 'AI Ekibi', description: 'Ajanlar ve görevler', available: false },
   { id: 'providers', label: 'Sağlayıcılar ve Modeller', description: 'Model kullanılabilirliği', available: false },
-  { id: 'operations', label: 'Operasyonlar', description: 'Sistem ve çalışma durumu', available: false },
+  { id: 'operations', label: 'Operasyonlar', description: 'Sistem ve çalışma durumu', available: true },
   { id: 'knowledge', label: 'Bilgi', description: 'Doğrulanmış bilgi ve bileşenler', available: false },
   { id: 'code-intelligence', label: 'Kod Zekâsı', description: 'Kod görünümü ve analizler', available: false },
   { id: 'evolution', label: 'Evrim', description: 'Ürün ve çekirdek evrimi', available: false },

@@ -16,6 +16,7 @@ export function CommandCenterHome({ navigate, mode }: { navigate: (area: AreaId)
       <h2 id="available-heading" className="text-lg font-semibold text-slate-950">Kullanılabilir çalışma alanları</h2>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <button onClick={() => navigate('products')} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md"><span className="text-sm font-semibold text-slate-950">Yönetilen Ürünler</span><span className="mt-1 block text-sm text-slate-600">Gerçek proje kayıtlarını görüntüleyin ve yönetin.</span></button>
+        <button onClick={() => navigate('operations')} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md"><span className="text-sm font-semibold text-slate-950">Operasyonlar</span><span className="mt-1 block text-sm text-slate-600">Sistem ve çalışma durumunu canlı olarak izleyin.</span></button>
         {mode === 'expert' ? <button onClick={() => navigate('workflow')} className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-sky-300 hover:shadow-md"><span className="text-sm font-semibold text-slate-950">Workflow Studio</span><span className="mt-1 block text-sm text-slate-600">İş akışlarını tasarlayın, yayınlayın ve çalıştırın.</span></button> : null}
       </div>
     </section>
