@@ -73,13 +73,26 @@ def _copy_candidate(source: pathlib.Path, destination: pathlib.Path) -> None:
     )
 
 
-def _run(command: list[str], *, cwd: pathlib.Path, env: dict[str, str] | None = None) -> str:
-    completed = subprocess.run(
-        command, cwd=cwd, env=env, text=True, capture_output=True, check=False,
+def _run(
+    command: list[str], *, cwd: pathlib.Path, env: dict[str, str] | None = None,
+    timeout_seconds: float = 300.0,
+) -> str:
+    process = subprocess.Popen(
+        command, cwd=cwd, env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
     )
-    output = completed.stdout + completed.stderr
-    if completed.returncode:
-        raise RuntimeError(f"command failed ({completed.returncode}): {' '.join(command)}\n{output}")
+    try:
+        output, _ = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as error:
+        _stop(process)
+        partial = error.output or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        raise RuntimeError(
+            f"command timed out after {timeout_seconds:g}s: {' '.join(command)}\n{partial}"
+        ) from error
+    if process.returncode:
+        raise RuntimeError(f"command failed ({process.returncode}): {' '.join(command)}\n{output}")
     return output
 
 
@@ -207,10 +220,13 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
 
         frontend_dir = candidate / "frontend"
         npm = "npm.cmd" if os.name == "nt" else "npm"
-        install_output = _run([npm, "install"], cwd=frontend_dir)
+        install_output = _run([npm, "install"], cwd=frontend_dir, timeout_seconds=600)
         journey.record("frontend_clean_install", True, install_output.strip().splitlines()[-1])
         build_env = {**os.environ, "NODE_OPTIONS": "--openssl-legacy-provider"}
-        build_output = _run([npm, "run", "build"], cwd=frontend_dir, env=build_env)
+        build_output = _run(
+            [npm, "run", "build"], cwd=frontend_dir, env=build_env,
+            timeout_seconds=300,
+        )
         journey.record("frontend_production_build", (frontend_dir / "build" / "index.html").is_file(),
                        build_output.strip().splitlines()[-1])
 
@@ -224,6 +240,7 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
             browser_output = _run(
                 ["node", str(ROOT / "scripts" / "run_golden_browser_journey.mjs"),
                  "--candidate", candidate_id, "--student-id", str(student_id)], cwd=ROOT,
+                timeout_seconds=120,
             )
             (evidence / "browser.json").write_text(browser_output, encoding="utf-8")
             journey.record("real_browser_journey", True, browser_output.strip().splitlines()[-1])

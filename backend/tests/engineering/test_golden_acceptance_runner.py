@@ -119,3 +119,27 @@ def test_browser_journey_receives_the_real_persisted_student_id() -> None:
     assert '"--student-id", str(student_id)' in source
     browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
     assert "fillByLabel(page, /student.*id/i, studentId)" in browser
+
+
+def test_run_kills_its_owned_process_tree_on_timeout(monkeypatch, tmp_path) -> None:  # noqa: ANN001
+    runner = _module()
+    stopped: list[object] = []
+
+    class Process:
+        returncode = None
+
+        def communicate(self, timeout: float):  # noqa: ANN202
+            assert timeout == 7
+            raise runner.subprocess.TimeoutExpired(["stuck"], timeout, output="partial")
+
+    process = Process()
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *args, **kwargs: process)
+    monkeypatch.setattr(runner, "_stop", lambda owned: stopped.append(owned))
+    with pytest.raises(RuntimeError, match="timed out after 7s.*stuck"):
+        runner._run(["stuck"], cwd=tmp_path, timeout_seconds=7)
+    assert stopped == [process]
+
+
+def test_frontend_install_has_a_finite_timeout() -> None:
+    source = (REPO / "scripts" / "run_golden_acceptance.py").read_text(encoding="utf-8")
+    assert '_run([npm, "install"], cwd=frontend_dir, timeout_seconds=600)' in source
