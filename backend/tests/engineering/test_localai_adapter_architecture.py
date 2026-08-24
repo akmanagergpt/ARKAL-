@@ -9,7 +9,9 @@ structurally (AST + `isinstance`), not by exercising a live runtime.
 from __future__ import annotations
 
 import ast
+import json
 import pathlib
+import urllib.request
 from typing import Final
 
 import pytest
@@ -98,3 +100,41 @@ class TestBoundedAndReadOnlyByConstruction:
         for adapter in (OllamaAdapter(), OpenAICompatibleAdapter()):
             params = inspect.signature(adapter.infer).parameters
             assert "timeout_seconds" in params
+
+    def test_openai_compatible_generation_forwards_json_and_token_bounds(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        captured: dict[str, object] = {}
+
+        class Response:
+            status = 200
+
+            def __enter__(self):  # noqa: ANN204
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({
+                    "choices": [{"message": {"content": '{"files": []}'}}],
+                }).encode()
+
+        def fake_urlopen(request, timeout):  # noqa: ANN001, ANN202
+            captured["payload"] = json.loads(request.data.decode())
+            captured["timeout"] = timeout
+            return Response()
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        adapter = OpenAICompatibleAdapter(max_output_tokens=4096, json_mode=True)
+        outcome = adapter.infer("local-model", "generate", timeout_seconds=91)
+        assert outcome.state.value == "PASS"
+        assert captured == {
+            "payload": {
+                "model": "local-model",
+                "messages": [{"role": "user", "content": "generate"}],
+                "max_tokens": 4096,
+                "response_format": {"type": "json_object"},
+            },
+            "timeout": 91,
+        }

@@ -43,6 +43,10 @@ from arkali.engineering.factory.product_preflight import (  # noqa: E402
     inspect_product_files,
 )
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
+from arkali.engineering.localai.openai_compatible_adapter import (  # noqa: E402
+    DEFAULT_ENDPOINT as OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
+    OpenAICompatibleAdapter,
+)
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput  # noqa: E402
 from arkali.kernel.persistence.engine import (  # noqa: E402
@@ -65,7 +69,10 @@ GOAL = """1. The system must persist task records using SQLite with at least 1 t
 4. The backend must respond within 500 ms for a single task request under normal load."""
 
 
-def _freeze(payload: bytes, task_id: str, context_hash: str, evidence: tuple[str, ...], model: str) -> str:
+def _freeze(
+    payload: bytes, task_id: str, context_hash: str,
+    evidence: tuple[str, ...], provider_model: str,
+) -> str:
     state = ROOT / "var" / "factory" / "evidence"
     state.mkdir(parents=True, exist_ok=True)
     database = state / "repair-evidence.db"
@@ -85,7 +92,7 @@ def _freeze(payload: bytes, task_id: str, context_hash: str, evidence: tuple[str
                 payload,
                 ProvenanceInput(
                     producer_agent="engineering.factory",
-                    provider_model=f"ollama/{model}",
+                    provider_model=provider_model,
                     task_id=task_id,
                     specification_version="phase-30-staged-generation/1.0.0",
                     context_hash=context_hash,
@@ -100,6 +107,20 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--model", default="qwen2.5-coder:14b")
+    parser.add_argument(
+        "--runtime", choices=("ollama", "openai-compatible"), default="ollama",
+        help=(
+            "local inference transport; openai-compatible supports loopback "
+            "servers such as llama.cpp, LM Studio, LocalAI and vLLM"
+        ),
+    )
+    parser.add_argument(
+        "--endpoint", default=None,
+        help=(
+            "loopback OpenAI-compatible server base URL (default: "
+            f"{OPENAI_COMPATIBLE_DEFAULT_ENDPOINT}); ignored for Ollama"
+        ),
+    )
     parser.add_argument("--max-output-tokens", type=int, default=DEFAULT_MAX_OUTPUT_TOKENS)
     parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--per-stage-max-attempts", type=int, default=4)
@@ -109,6 +130,7 @@ def main(argv: list[str]) -> int:
              "defaults to this script's own built-in Task/Work Management GOAL",
     )
     args = parser.parse_args(argv[1:])
+    provider_model = f"{args.runtime}/{args.model}"
 
     goal_text = args.goal_file.read_text(encoding="utf-8") if args.goal_file else GOAL
     blueprint = derive_blueprint(goal_text, AuthorityMap.load(ROOT))
@@ -121,7 +143,13 @@ def main(argv: list[str]) -> int:
         agent_id="staged-generation", stable_snapshot=empty_snapshot,
     )
 
-    def model_factory(_stage_name: str) -> tuple[OllamaAdapter, str]:
+    def model_factory(_stage_name: str):  # noqa: ANN202
+        if args.runtime == "openai-compatible":
+            adapter = OpenAICompatibleAdapter(
+                endpoint=args.endpoint or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
+                max_output_tokens=args.max_output_tokens, json_mode=True,
+            )
+            return adapter, args.model
         adapter = OllamaAdapter(json_mode=True, max_output_tokens=args.max_output_tokens)
         return adapter, args.model
 
@@ -140,7 +168,7 @@ def main(argv: list[str]) -> int:
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
-            ("real staged-generation stage failure",), args.model,
+            ("real staged-generation stage failure",), provider_model,
         )
         print(json.dumps({
             "outcome": "STAGE_FAILED", "error": str(error), "evidence_ref": ref,
@@ -161,7 +189,8 @@ def main(argv: list[str]) -> int:
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
-            ("real assembled candidate failed the final whole-product gate",), args.model,
+            ("real assembled candidate failed the final whole-product gate",),
+            provider_model,
         )
         print(json.dumps({
             "outcome": "FINAL_GATE_FAILED", "error": str(error), "evidence_ref": ref,
@@ -177,7 +206,8 @@ def main(argv: list[str]) -> int:
     }, sort_keys=True).encode()
     ref = _freeze(
         payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
-        ("real staged generation + final whole-product gate, both PASS",), args.model,
+        ("real staged generation + final whole-product gate, both PASS",),
+        provider_model,
     )
     print(json.dumps({
         "outcome": "STAGED_GENERATION_PASS", "evidence_ref": ref, "files": sorted(assembled),

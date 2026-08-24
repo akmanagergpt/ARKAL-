@@ -50,13 +50,18 @@ class OpenAICompatibleAdapter:
     """`LocalRuntimeAdapter` over a real, locally-running OpenAI-compatible
     server (e.g. llama.cpp's `server`, LM Studio)."""
 
-    def __init__(self, endpoint: str = DEFAULT_ENDPOINT) -> None:
+    def __init__(
+        self, endpoint: str = DEFAULT_ENDPOINT, *,
+        max_output_tokens: int | None = None, json_mode: bool = False,
+    ) -> None:
         if not _is_loopback(endpoint):
             raise LocalRuntimeTargetNotLoopbackError(
                 f"openai-compatible adapter endpoint {endpoint!r} is not loopback",
                 source="MS §Local-Only mode",
             )
         self._endpoint = endpoint
+        self._max_output_tokens = max_output_tokens
+        self._json_mode = json_mode
 
     @property
     def runtime(self) -> str:
@@ -115,10 +120,15 @@ class OpenAICompatibleAdapter:
     def infer(
         self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0
     ) -> InferenceResult:
-        body = json.dumps({
+        payload: dict[str, object] = {
             "model": model_id,
             "messages": [{"role": "user", "content": prompt}],
-        }).encode("utf-8")
+        }
+        if self._max_output_tokens is not None:
+            payload["max_tokens"] = self._max_output_tokens
+        if self._json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             f"{self._endpoint}/v1/chat/completions", data=body,
             headers={"Content-Type": "application/json"}, method="POST",
