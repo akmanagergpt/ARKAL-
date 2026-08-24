@@ -250,7 +250,20 @@ new, more specific route before it in the `<Switch>` (real evidence this
 session, golden-work-068: `/students/create` and `/payments/create` were
 both real, present routes rendering a real form component, and both were
 completely unreachable in a real browser — `<Switch>` always rendered the
-parent list route instead, on every navigation, silently). Split out as
+parent list route instead, on every navigation, silently). A route built
+this way (`/students/edit/:id`) obligates something real to read that
+`:id` — react-router v5's children Route form (`<Route path="..."><Comp
+/></Route>`) never injects `match`/`location`/`history` as props the way
+`component=`/`render=` do, so `useParams()` (or `match.params.id` where
+`match` genuinely is in scope) is the only real way a component reached
+this way learns which record it targets (golden-work-113, session
+evidence, frozen: real `qwen2.5-coder:14b` output declared both
+`/students/edit/:id` and `/students/delete/:id`, never called
+`useParams()` or read `match.params` anywhere, and wired the edit route's
+own outer handler — declared `async (id, name, email) => {...}` — to a
+shared form component that actually calls its `onSubmit` with only 2
+arguments (`name, email`); `id` silently received the *name* value at
+runtime, reached only by a real browser acceptance journey). Split out as
 its own stage (real evidence, golden-work-065): a real
 qwen2.5-coder:14b reliably produced a genuine multi-module shell —
 react-router navigation, a dashboard with real KPIs, loading/empty/error
