@@ -132,3 +132,45 @@ def test_silent_when_the_component_definition_cannot_be_found() -> None:
 
 def test_silent_when_no_frontend_files_exist() -> None:
     assert _callback_prop_arity_mismatch_findings({"backend/app.py": "onSubmit(a, b, c)"}) == []
+
+
+#: golden-work-122 (real repository evidence, real qwen2.5-coder:14b,
+#: frozen): the identical defect one syntactic layer removed - a BARE
+#: reference to the real, imported updateStudent(id, name, email), not an
+#: inline arrow function at all.
+def test_catches_golden_work_122s_bare_function_reference() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "<Route path='/students/create'>"
+            "<StudentForm onSubmit={createStudent} /></Route>"
+            "<Route path='/students/edit/:id'>"
+            "<StudentForm onSubmit={updateStudent} /></Route>"
+        ),
+        "frontend/src/StudentForm.js": _STUDENT_FORM_JS,
+        "frontend/src/apiClient.js": (
+            "async function createStudent(name, email) { ... }\n"
+            "async function updateStudent(id, name, email) { ... }\n"
+        ),
+    }
+    findings = _callback_prop_arity_mismatch_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_ui_callback_prop_arity_mismatch"
+    assert "updateStudent" in findings[0].detail
+    assert "'id'" in findings[0].detail
+
+
+def test_a_bare_reference_with_matching_arity_is_not_flagged() -> None:
+    files = {
+        "frontend/src/App.js": "<StudentForm onSubmit={createStudent} />",
+        "frontend/src/StudentForm.js": _STUDENT_FORM_JS,
+        "frontend/src/apiClient.js": "async function createStudent(name, email) { ... }\n",
+    }
+    assert _callback_prop_arity_mismatch_findings(files) == []
+
+
+def test_a_bare_reference_to_an_undefined_name_is_silent() -> None:
+    files = {
+        "frontend/src/App.js": "<StudentForm onSubmit={someUndefinedHelper} />",
+        "frontend/src/StudentForm.js": _STUDENT_FORM_JS,
+    }
+    assert _callback_prop_arity_mismatch_findings(files) == []
