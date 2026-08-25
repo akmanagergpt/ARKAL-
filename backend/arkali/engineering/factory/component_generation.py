@@ -74,6 +74,9 @@ from arkali.engineering.factory.frontend_root_route_preflight import (
     _orphaned_router_root_findings,
     _repair_orphaned_router_root,
 )
+from arkali.engineering.factory.frontend_callback_arity_preflight import (
+    _callback_prop_arity_mismatch_findings,
+)
 from arkali.engineering.factory.frontend_route_param_preflight import _unread_route_param_findings
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
@@ -193,6 +196,7 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _phantom_client_import_findings(files)
         + _invented_mutation_ui_findings(files)
         + _unread_route_param_findings(files)
+        + _callback_prop_arity_mismatch_findings(files)
     )
 
 

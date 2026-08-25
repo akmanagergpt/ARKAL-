@@ -257,7 +257,14 @@ routed component's function (import `useParams` from
 `'react-router-dom'`), then pass `id` to the update/delete client call —
 never an `id` prop on the routed component itself, which the children
 Route form used here never receives (golden-work-113/115, session
-evidence, frozen). Split out as
+evidence, frozen). When one form component is reused for both create and
+edit, its own call to the submit prop must pass every argument the edit
+route's own handler declares, in order — reusing the create route's
+shorter call unchanged at edit silently shifts every argument
+(golden-work-119, session evidence, frozen: `StudentForm`'s own
+`onSubmit(name, email)` call, correct for the 2-parameter create
+handler, was reused unchanged for the edit route's 3-parameter handler,
+so `id` silently received the real `name` value). Split out as
 its own stage (real evidence, golden-work-065): a real
 qwen2.5-coder:14b reliably produced a genuine multi-module shell —
 react-router navigation, a dashboard with real KPIs, loading/empty/error
