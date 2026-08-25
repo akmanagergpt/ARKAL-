@@ -69,6 +69,25 @@ def test_a_renamed_use_params_destructure_still_satisfies_the_route() -> None:
     assert _unread_route_param_findings(files) == []
 
 
+def test_direct_use_params_member_access_satisfies_the_route() -> None:
+    """golden-work-121 (real repository evidence, real qwen2.5-coder:14b,
+    frozen): `useParams().id`, called and immediately member-accessed
+    with no intermediate variable - equally valid, idiomatic JS, and a
+    real false positive against the destructure-only pattern before this
+    was recognized (verified directly against golden-work-121's own
+    frozen last-attempt output, which used exactly this pattern in both
+    the edit route's onSuccess callback and the delete route's onClick
+    handler and was still, wrongly, flagged)."""
+    files = {
+        "frontend/src/App.js": (
+            "<Route path='/students/edit/:id'><StudentForm "
+            "onSuccess={() => setStudents(students.map(s => "
+            "s.id === parseInt(useParams().id) ? s : s))} /></Route>"
+        ),
+    }
+    assert _unread_route_param_findings(files) == []
+
+
 def test_match_params_access_satisfies_the_route() -> None:
     files = {
         "frontend/src/App.js": (

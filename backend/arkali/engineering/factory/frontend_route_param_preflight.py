@@ -24,10 +24,16 @@ injection failure mode, which this candidate's routes never use).
 
 DELIBERATELY GENERAL, NOT GOLDEN-SPECIFIC. Any route path carrying a
 `:name` segment obligates SOME real component reached from it to read
-that exact name — via `useParams()` destructuring it (renamed or not) or
-via a `match.params.name` / `props.match.params.name` access anywhere in
-the frontend. Checked across the whole frontend, not per file: a real,
-legal split (the router config in one file, the params consumed in a
+that exact name — via `useParams()` destructuring it (renamed or not),
+via `useParams().name` accessed directly with no intermediate variable
+(golden-work-121, session evidence, frozen: a real, valid, idiomatic
+pattern this check's first version did not recognize, a real false
+positive on an otherwise-correct candidate, caught by reading that
+candidate's own frozen last-attempt output directly rather than assuming
+the finding was right), or via a `match.params.name` /
+`props.match.params.name` access anywhere in the frontend. Checked
+across the whole frontend, not per file: a real, legal split (the router
+config in one file, the params consumed in a
 component it renders) must not be flagged just because the two live
 apart.
 """
@@ -49,6 +55,15 @@ _PARAM_MEMBER_ACCESS = re.compile(r"\bparams\s*\.\s*(\w+)\b")
 #: makes the non-greedy group swallow everything up to the destructuring's
 #: OWN closing brace instead of stopping at its opening one.
 _USE_PARAMS_DESTRUCTURE = re.compile(r"\{([^{}]*)\}\s*=\s*useParams\s*\(")
+#: golden-work-121 (real repository evidence, real qwen2.5-coder:14b,
+#: frozen): `useParams().id`, called and immediately member-accessed with
+#: no intermediate variable at all - equally valid, idiomatic JS, and a
+#: real false positive against the destructure-only pattern above before
+#: this was added (verified: golden-work-121's own frozen last-attempt
+#: output used this pattern consistently and correctly, in both the edit
+#: route's `onSuccess` callback and the delete route's `onClick` handler,
+#: and this check still reported `id` as never read).
+_USE_PARAMS_MEMBER_ACCESS = re.compile(r"useParams\s*\(\s*\)\s*\.\s*(\w+)")
 
 
 def _frontend_files(files: Mapping[str, str]) -> dict[str, str]:
@@ -66,7 +81,7 @@ def _declared_route_param_names(source: str) -> set[str]:
 
 
 def _read_route_param_names(source: str) -> set[str]:
-    read = set(_PARAM_MEMBER_ACCESS.findall(source))
+    read = set(_PARAM_MEMBER_ACCESS.findall(source)) | set(_USE_PARAMS_MEMBER_ACCESS.findall(source))
     for block in _USE_PARAMS_DESTRUCTURE.findall(source):
         for piece in block.split(","):
             # `{ id: studentId }` renames the *local* binding; the real
