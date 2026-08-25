@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
+    _client_exported_names,
     _phantom_client_import_findings,
     _repair_missing_client_call_imports,
 )
@@ -236,6 +237,53 @@ def test_phantom_import_check_does_not_flag_the_client_file_itself() -> None:
         "frontend/src/apiClient.js": _API_CLIENT,
         "frontend/src/otherClient.js": (
             "import { deleteTask } from './apiClient';\nexport { deleteTask };\n"
+        ),
+    }
+    assert _phantom_client_import_findings(files) == []
+
+
+#: golden-work-124 (session evidence, frozen): a real qwen2.5-coder:14b
+#: exhausted all 4 real frontend_forms attempts on `frontend_ui_missing_
+#: edit_ui`, even though `StudentEdit.js` correctly called `apiClient.
+#: updateStudent(id, { name, email })`. Root cause: `apiClient.js` exports
+#: a single, pre-declared object variable (`module.exports = apiClient;`),
+#: not an inline literal (`module.exports = { updateStudent, ... };`,
+#: golden-work-101's own already-fixed shape) - neither export regex
+#: recognized this at all, so `_action_ui_findings` saw zero "update-like"
+#: exports anywhere and flagged a real, correctly-wired edit action as
+#: missing.
+_COMMONJS_OBJECT_VARIABLE_CLIENT = """const axios = require('axios');
+
+const apiClient = {
+  getStudents: async () => {
+    const response = await axios.get('/students');
+    return response.data;
+  },
+  updateStudent: async (id, student) => {
+    const response = await axios.put(`/students/${id}`, student);
+    return response.data;
+  },
+  deleteStudent: async (id) => {
+    const response = await axios.delete(`/students/${id}`);
+    return response.data;
+  }
+};
+
+module.exports = apiClient;
+"""
+
+
+def test_recognizes_exports_of_a_predeclared_object_variable() -> None:
+    names = _client_exported_names(_COMMONJS_OBJECT_VARIABLE_CLIENT)
+    assert names == frozenset({"getStudents", "updateStudent", "deleteStudent"})
+
+
+def test_a_predeclared_object_variable_export_is_not_flagged_as_phantom() -> None:
+    files = {
+        "frontend/src/apiClient.js": _COMMONJS_OBJECT_VARIABLE_CLIENT,
+        "frontend/src/StudentEdit.js": (
+            "import apiClient from './apiClient';\n"
+            "apiClient.updateStudent(1, { name: 'x', email: 'y' });\n"
         ),
     }
     assert _phantom_client_import_findings(files) == []

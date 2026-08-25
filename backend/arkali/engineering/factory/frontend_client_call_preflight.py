@@ -72,9 +72,39 @@ _CLIENT_GROUPED_EXPORT = re.compile(r"export\s*\{([^}]*)\}")
 #: flagged as phantom -- a false-positive hard block on an otherwise
 #: entirely valid candidate, not a real defect.
 _COMMONJS_EXPORTS_BLOCK = re.compile(r"module\.exports\s*=\s*\{([^}]*)\}")
+#: golden-work-124 (session evidence, frozen): a real qwen2.5-coder:14b wrote
+#: `const apiClient = { getStudents: async () => {...}, updateStudent:
+#: async (id, student) => {...}, ... }; module.exports = apiClient;` -- a
+#: real, legal, common pattern (export a single pre-declared object variable,
+#: not an inline literal) neither export regex above recognizes: `module.
+#: exports = apiClient` is a bare identifier, not `{...}`, so
+#: `_COMMONJS_EXPORTS_BLOCK` never matches it at all. `_action_ui_findings`
+#: (frontend_ux_preflight.py) then saw zero "update-like" exports and flagged
+#: `frontend_ui_missing_edit_ui` even though `StudentEdit.js` correctly
+#: called `apiClient.updateStudent(id, {...})` - a false-positive hard block
+#: on an otherwise entirely valid candidate, the identical failure mode
+#: golden-work-101 already fixed for the inline-literal case.
+_COMMONJS_EXPORTS_IDENTIFIER = re.compile(r"module\.exports\s*=\s*(\w+)\s*;")
+_OBJECT_LITERAL_KEY = re.compile(r"^\s*(\w+)\s*:", re.MULTILINE)
 _IMPORT_STATEMENT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]""")
 _NAMED_IMPORT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]""")
 _LOCAL_DECLARATION = re.compile(r"(?:function|const|let|var)\s+(\w+)")
+
+
+def _balanced_brace_body(text: str, open_brace_index: int) -> str:
+    """The text strictly between the `{` at `open_brace_index` and its own
+    matching `}`, tracking nesting depth - a real object literal's own
+    method bodies (arrow functions, nested objects) contain further `{`/`}`
+    pairs a non-nesting regex would stop at prematurely."""
+    depth = 0
+    for index in range(open_brace_index, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_brace_index + 1:index]
+    return text[open_brace_index + 1:]
 
 
 def _client_exported_names(client_text: str) -> frozenset[str]:
@@ -93,6 +123,14 @@ def _client_exported_names(client_text: str) -> frozenset[str]:
             name = part.strip().split(":")[0].strip()
             if name:
                 names.add(name)
+    for identifier in _COMMONJS_EXPORTS_IDENTIFIER.findall(client_text):
+        declaration = re.search(
+            rf"(?:const|let|var)\s+{re.escape(identifier)}\s*=\s*\{{", client_text,
+        )
+        if declaration is None:
+            continue
+        body = _balanced_brace_body(client_text, declaration.end() - 1)
+        names.update(_OBJECT_LITERAL_KEY.findall(body))
     return frozenset(names)
 
 
