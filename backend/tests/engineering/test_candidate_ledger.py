@@ -63,6 +63,7 @@ class TestIdentityReuse:
         work.mkdir(parents=True)
         _write(work, "a.txt", "hello")
         ledger.allocate("golden-work-999", provenance=_provenance())
+        ledger.record_state("golden-work-999", GENERATING, work)
         ledger.record_state("golden-work-999", STAGED_GENERATION_PASS, work)
 
         import shutil
@@ -80,6 +81,7 @@ class TestIntegrityVerification:
         work.mkdir(parents=True)
         _write(work, "a.txt", "hello")
         ledger.allocate("golden-work-1", provenance=_provenance())
+        ledger.record_state("golden-work-1", GENERATING, work)
         ledger.record_state("golden-work-1", STAGED_GENERATION_PASS, work)
         ledger.verify_integrity("golden-work-1", work)  # must not raise
 
@@ -91,6 +93,7 @@ class TestIntegrityVerification:
         work.mkdir(parents=True)
         _write(work, "a.txt", "hello")
         ledger.allocate("golden-work-2", provenance=_provenance())
+        ledger.record_state("golden-work-2", GENERATING, work)
         ledger.record_state("golden-work-2", STAGED_GENERATION_PASS, work)
 
         _write(work, "a.txt", "tampered")
@@ -105,6 +108,7 @@ class TestIntegrityVerification:
         work.mkdir(parents=True)
         _write(work, "a.txt", "hello")
         ledger.allocate("golden-work-3", provenance=_provenance())
+        ledger.record_state("golden-work-3", GENERATING, work)
         ledger.record_state("golden-work-3", STAGED_GENERATION_PASS, work)
 
         _write(work, "planted.txt", "not part of the original candidate")
@@ -120,6 +124,7 @@ class TestIntegrityVerification:
         _write(work, "a.txt", "hello")
         _write(work, "b.txt", "world")
         ledger.allocate("golden-work-4", provenance=_provenance())
+        ledger.record_state("golden-work-4", GENERATING, work)
         ledger.record_state("golden-work-4", STAGED_GENERATION_PASS, work)
 
         (work / "b.txt").unlink()
@@ -136,6 +141,7 @@ class TestIntegrityVerification:
         work.mkdir(parents=True)
         _write(work, "a.txt", "hello")
         ledger.allocate("golden-work-5", provenance=_provenance())
+        ledger.record_state("golden-work-5", GENERATING, work)
         ledger.record_state("golden-work-5", STAGED_GENERATION_PASS, work)
 
         before = file_manifest(work)
@@ -311,8 +317,10 @@ class TestCandidateReportIsolation:
         _write(work_b, "App.js", "// candidate B, unrelated content")
 
         ledger.allocate("golden-work-a1", provenance=_provenance())
+        ledger.record_state("golden-work-a1", GENERATING, work_a)
         ledger.record_state("golden-work-a1", STAGED_GENERATION_PASS, work_a)
         ledger.allocate("golden-work-b1", provenance=_provenance())
+        ledger.record_state("golden-work-b1", GENERATING, work_b)
         ledger.record_state("golden-work-b1", STAGED_GENERATION_PASS, work_b)
 
         latest_a = ledger.latest("golden-work-a1")
@@ -343,5 +351,6 @@ class TestLegacyClassification:
         assert ledger.classify("golden-work-10") == LEGACY_UNVERIFIED
         ledger.allocate("golden-work-10", provenance=_provenance())
         assert ledger.classify("golden-work-10") == ALLOCATED
+        ledger.record_state("golden-work-10", GENERATING, work)
         ledger.record_state("golden-work-10", STAGED_GENERATION_PASS, work)
         assert ledger.classify("golden-work-10") == STAGED_GENERATION_PASS

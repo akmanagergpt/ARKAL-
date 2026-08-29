@@ -9,9 +9,15 @@ import urllib.request
 import pytest
 
 from arkali.engineering.candidate.ledger import (
+    ACCEPTED,
+    ACCEPTANCE_FAILED,
     CandidateLedger,
+    file_manifest,
+    GENERATING,
     GenerationProvenance,
     hash_text,
+    INTERRUPTED,
+    STAGE_FAILED,
     STAGED_GENERATION_PASS,
 )
 
@@ -111,12 +117,159 @@ def test_acceptance_uses_a_clean_copy_and_never_mutates_the_frozen_candidate(
     assert (source / "backend.db").read_bytes() == b"frozen"
 
 
-def test_acceptance_refuses_a_candidate_with_no_recorded_manifest_before_copying(
+def _provenance() -> GenerationProvenance:
+    return GenerationProvenance(
+        goal_hash=hash_text("goal"), source_commit="abc", runtime="ollama",
+        endpoint="local", model="qwen",
+    )
+
+
+def _seed_verified_candidate(
+    runner, monkeypatch, tmp_path: pathlib.Path, candidate_id: str,  # noqa: ANN001
+) -> tuple[pathlib.Path, CandidateLedger]:
+    """A real, isolated CANDIDATES/RUNTIMES root with one candidate whose
+    ledger history is ALLOCATED -> GENERATING -> STAGED_GENERATION_PASS
+    (the only state acceptance may begin from) and whose live content
+    exactly matches the manifest recorded at that state."""
+    candidates = tmp_path / "candidates"
+    work = candidates / candidate_id
+    work.mkdir(parents=True)
+    (work / "App.js").write_text("// unmodified", encoding="utf-8")
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+
+    ledger = CandidateLedger(candidates / "_ledger")
+    ledger.allocate(candidate_id, provenance=_provenance())
+    ledger.record_state(candidate_id, GENERATING, work)
+    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+    return work, ledger
+
+
+class _FakeProcess:
+    """Stands in for both the backend and frontend `subprocess.Popen`
+    handles -- `_stop` only ever needs `.poll()`/`.pid`/`.terminate()`/
+    `.wait()`, never the real process."""
+
+    def __init__(self) -> None:
+        self.pid = 999999
+        self._stopped = False
+
+    def poll(self):  # noqa: ANN201
+        return 0 if self._stopped else None
+
+    def terminate(self) -> None:
+        self._stopped = True
+
+    def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002
+        self._stopped = True
+        return 0
+
+
+def _stub_a_full_successful_journey(runner, monkeypatch) -> None:  # noqa: ANN001
+    """Replaces every real subprocess/network/browser step `_accept`
+    takes with a fast, deterministic double -- proves the ledger/outcome
+    wiring end-to-end without a real npm, flask, or Chromium install."""
+    def fake_run(command, *, cwd, env=None, timeout_seconds=300.0):  # noqa: ANN001, ARG001
+        if "run" in command and "build" in command:
+            (cwd / "build").mkdir(parents=True, exist_ok=True)
+            (cwd / "build" / "index.html").write_text("<html></html>", encoding="utf-8")
+        return "ok\nok"
+
+    def fake_json_request(method, url, payload=None):  # noqa: ANN001, ARG001
+        if method == "POST" and url.endswith("/students"):
+            return 201, {"id": 1}
+        if method == "PUT" and "/students/" in url:
+            return 200, {}
+        if method == "POST" and url.endswith("/payments"):
+            return 201, {"id": 1}
+        if method == "GET" and url.endswith("/students"):
+            return 200, [{"id": 1}]
+        if method == "GET" and url.endswith("/payments"):
+            return 200, [{"id": 1}]
+        raise AssertionError(f"unexpected request {method} {url}")
+
+    monkeypatch.setattr(runner, "_run", fake_run)
+    monkeypatch.setattr(runner, "_json_request", fake_json_request)
+    monkeypatch.setattr(runner, "_wait_http", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_port_is_free", lambda port: True)
+    monkeypatch.setattr(runner, "_port_accepts_connections", lambda port: False)
+    monkeypatch.setattr(runner, "_backend_process", lambda *a, **k: _FakeProcess())
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **k: _FakeProcess())
+    # `_stop`'s real Windows path shells out to `taskkill` via the (now
+    # patched) `subprocess.Popen`; these tests aren't exercising `_stop`
+    # itself (that's `test_stop_owns_only_the_passed_process`'s job), so
+    # make it a no-op rather than fighting the patched Popen through it.
+    monkeypatch.setattr(runner, "_stop", lambda process: None)
+
+
+def test_1_staged_generation_pass_through_acceptance_running_to_accepted(
     monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
 ) -> None:
-    """A candidate this ledger has no terminal manifest for (never
-    allocated through it, i.e. LEGACY_UNVERIFIED, or a real tamper) must
-    refuse before acceptance ever copies or touches it."""
+    runner = _module()
+    candidate_id = "golden-work-pass"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    _stub_a_full_successful_journey(runner, monkeypatch)
+
+    result = runner._accept(candidate_id, skip_browser=True)
+
+    assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+    states = [entry["state"] for entry in ledger.history(candidate_id)]
+    assert states == [
+        "ALLOCATED", "GENERATING", "STAGED_GENERATION_PASS", "ACCEPTANCE_RUNNING", "ACCEPTED",
+    ]
+    assert ledger.classify(candidate_id) == ACCEPTED
+
+
+def test_2_staged_generation_pass_through_acceptance_running_to_acceptance_failed(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidate_id = "golden-work-checkfail"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    monkeypatch.setattr(runner, "_port_is_free", lambda port: False)  # the very first check fails
+
+    result = runner._accept(candidate_id, skip_browser=True)
+
+    assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED"
+    states = [entry["state"] for entry in ledger.history(candidate_id)]
+    assert states == [
+        "ALLOCATED", "GENERATING", "STAGED_GENERATION_PASS", "ACCEPTANCE_RUNNING",
+        "ACCEPTANCE_FAILED",
+    ]
+    assert ledger.classify(candidate_id) == ACCEPTANCE_FAILED
+
+
+def test_3_a_stage_failed_candidate_cannot_be_accepted(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidates = tmp_path / "candidates"
+    candidate_id = "golden-work-stagefailed"
+    work = candidates / candidate_id
+    work.mkdir(parents=True)
+    (work / "App.js").write_text("// incomplete", encoding="utf-8")
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+    ledger = CandidateLedger(candidates / "_ledger")
+    ledger.allocate(candidate_id, provenance=_provenance())
+    ledger.record_state(candidate_id, GENERATING, work)
+    ledger.record_state(candidate_id, STAGE_FAILED, work)
+
+    copied: list[object] = []
+    monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
+    assert STAGE_FAILED in result["error"]
+    assert copied == []
+    assert ledger.classify(candidate_id) == STAGE_FAILED  # unchanged -- no transition recorded
+
+
+def test_4_a_legacy_unverified_candidate_cannot_be_accepted(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """A candidate this ledger has no history for at all (never allocated
+    through it) must refuse before acceptance ever copies or touches it."""
     runner = _module()
     candidates = tmp_path / "candidates"
     candidate_id = "golden-work-nohistory"
@@ -133,25 +286,12 @@ def test_acceptance_refuses_a_candidate_with_no_recorded_manifest_before_copying
     assert copied == []
 
 
-def test_acceptance_refuses_a_candidate_whose_content_changed_since_its_manifest(
+def test_5_a_candidate_whose_manifest_was_modified_cannot_be_accepted(
     monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
 ) -> None:
     runner = _module()
-    candidates = tmp_path / "candidates"
     candidate_id = "golden-work-tampered"
-    work = candidates / candidate_id
-    work.mkdir(parents=True)
-    (work / "App.js").write_text("// original", encoding="utf-8")
-    monkeypatch.setattr(runner, "CANDIDATES", candidates)
-    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
-
-    ledger = CandidateLedger(candidates / "_ledger")
-    provenance = GenerationProvenance(
-        goal_hash=hash_text("goal"), source_commit="abc", runtime="ollama",
-        endpoint="local", model="qwen",
-    )
-    ledger.allocate(candidate_id, provenance=provenance)
-    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+    work, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
 
     (work / "App.js").write_text("// tampered after the terminal state", encoding="utf-8")
     copied: list[object] = []
@@ -163,39 +303,124 @@ def test_acceptance_refuses_a_candidate_whose_content_changed_since_its_manifest
     assert copied == []
 
 
-def test_acceptance_proceeds_past_the_integrity_gate_for_a_verified_candidate(
+def test_6_a_second_concurrent_acceptance_attempt_is_refused(
     monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
 ) -> None:
-    """A candidate whose live content still matches its recorded terminal
-    manifest must clear the integrity gate and reach real acceptance
-    work (verified here by the copy step actually running)."""
     runner = _module()
-    candidates = tmp_path / "candidates"
-    candidate_id = "golden-work-verified"
-    work = candidates / candidate_id
-    work.mkdir(parents=True)
-    (work / "App.js").write_text("// unmodified", encoding="utf-8")
-    monkeypatch.setattr(runner, "CANDIDATES", candidates)
-    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+    candidate_id = "golden-work-concurrent"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
 
-    ledger = CandidateLedger(candidates / "_ledger")
-    provenance = GenerationProvenance(
-        goal_hash=hash_text("goal"), source_commit="abc", runtime="ollama",
-        endpoint="local", model="qwen",
-    )
-    ledger.allocate(candidate_id, provenance=provenance)
-    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+    # Simulate a first attempt already holding the lock.
+    lock_path = (runner.CANDIDATES / "_ledger") / f"{candidate_id}.acceptance.lock"
+    fd = runner.os.open(str(lock_path), runner.os.O_CREAT | runner.os.O_EXCL | runner.os.O_WRONLY)
+    runner.os.close(fd)
 
     copied: list[object] = []
     monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
-    monkeypatch.setattr(
-        runner, "_run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop after copy")),
-    )
 
     result = runner._accept(candidate_id, skip_browser=True)
-    assert len(copied) == 1
-    assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED"
-    assert result["outcome"] != "CANDIDATE_INTEGRITY_FAILED"
+    assert result["outcome"] == "ACCEPTANCE_ALREADY_IN_PROGRESS"
+    assert copied == []
+    assert ledger.classify(candidate_id) == STAGED_GENERATION_PASS  # untouched
+
+
+def test_7_a_crash_during_acceptance_is_recorded_as_interrupted(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """A crash that is NOT a classified named-check failure -- here, the
+    venv-creation step itself blowing up -- is genuinely ambiguous, not a
+    verdict any check reached."""
+    runner = _module()
+    candidate_id = "golden-work-crash"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    monkeypatch.setattr(runner, "_port_is_free", lambda port: True)
+
+    def boom(*a, **k):  # noqa: ANN001, ANN202
+        raise RuntimeError("venv creation exploded")
+
+    monkeypatch.setattr(runner, "_run", boom)
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    assert result["outcome"] == "ACCEPTANCE_INTERRUPTED"
+    assert ledger.classify(candidate_id) == INTERRUPTED
+
+
+def test_7_a_keyboard_interrupt_during_acceptance_is_recorded_as_interrupted(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidate_id = "golden-work-ctrlc"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    monkeypatch.setattr(runner, "_port_is_free", lambda port: True)
+
+    def interrupted(*a, **k):  # noqa: ANN001, ANN202
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(runner, "_run", interrupted)
+
+    with pytest.raises(KeyboardInterrupt):
+        runner._accept(candidate_id, skip_browser=True)
+    # Ctrl+C still propagates (the process really stops), but the ledger
+    # and evidence were written first -- never a silently unrecorded gap.
+    assert ledger.classify(candidate_id) == INTERRUPTED
+
+
+def test_8_an_accepted_candidate_cannot_be_re_run(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidate_id = "golden-work-noreplay"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    _stub_a_full_successful_journey(runner, monkeypatch)
+
+    first = runner._accept(candidate_id, skip_browser=True)
+    assert first["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+
+    copied: list[object] = []
+    monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
+    # `runtime` is named from `int(time.time())`; force a distinct second
+    # so the two real, back-to-back calls don't collide on one directory.
+    real_time = runner.time.time
+    monkeypatch.setattr(runner.time, "time", lambda: real_time() + 1)
+    second = runner._accept(candidate_id, skip_browser=True)
+    assert second["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
+    assert "ACCEPTED" in second["error"]
+    assert copied == []
+
+
+def test_9_acceptance_evidence_dir_and_result_hash_are_recorded_in_the_ledger(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidate_id = "golden-work-evidence"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    _stub_a_full_successful_journey(runner, monkeypatch)
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    latest = ledger.latest(candidate_id)
+    assert latest is not None
+    detail = latest["detail"]
+    assert detail["runtime_dir"]
+    assert detail["evidence_dir"] == result["evidence_dir"]
+    result_path = pathlib.Path(detail["evidence_dir"]) / "result.json"
+    assert result_path.is_file()
+    import hashlib
+    assert detail["result_sha256"] == hashlib.sha256(result_path.read_bytes()).hexdigest()
+
+
+def test_10_the_source_candidate_stays_byte_identical_across_acceptance(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidate_id = "golden-work-untouched"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    before = file_manifest(source)
+    _stub_a_full_successful_journey(runner, monkeypatch)
+
+    runner._accept(candidate_id, skip_browser=True)
+
+    after = file_manifest(source)
+    assert before == after
 
 
 def test_skip_browser_can_never_report_acceptance(monkeypatch, capsys) -> None:  # noqa: ANN001

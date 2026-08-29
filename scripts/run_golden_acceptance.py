@@ -9,6 +9,7 @@ edits the candidate and never turns a failed obligation into a PASS.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -26,8 +27,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
 from arkali.engineering.candidate.ledger import (  # noqa: E402
     ACCEPTANCE_FAILED,
     ACCEPTED,
+    CandidateAcceptanceInProgressError,
     CandidateIntegrityError,
     CandidateLedger,
+    INTERRUPTED,
 )
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -35,6 +38,14 @@ CANDIDATES = ROOT / "var" / "factory" / "candidates"
 RUNTIMES = ROOT / "var" / "factory" / "runtime"
 BACKEND_PORT = 5000
 FRONTEND_PORT = 3000
+
+
+class AcceptanceCheckFailed(RuntimeError):
+    """One specific, named acceptance check (`Journey.record`) failed --
+    a classified, evidenced GOLDEN_ACCEPTANCE_FAILED outcome, distinct
+    from an unclassified crash or a Ctrl+C (ACCEPTANCE_INTERRUPTED):
+    every check that ran before this one, and the one that failed, are
+    all in `Journey.checks` either way."""
 
 
 @dataclass
@@ -45,7 +56,7 @@ class Journey:
     def record(self, name: str, passed: bool, detail: str) -> None:
         self.checks.append({"name": name, "passed": passed, "detail": detail})
         if not passed:
-            raise RuntimeError(f"{name}: {detail}")
+            raise AcceptanceCheckFailed(f"{name}: {detail}")
 
 
 def _candidate(candidate_id: str) -> pathlib.Path:
@@ -177,17 +188,30 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
     evidence.mkdir()
     started = time.monotonic()
 
-    # Verify BEFORE touching the source candidate at all: acceptance must
-    # run against a verified isolated copy, never a candidate whose content
-    # no longer matches the manifest recorded at its last terminal state
-    # (or one with no such manifest -- LEGACY_UNVERIFIED candidates refuse
-    # here too, since "unchanged since when" cannot be answered without a
-    # recorded baseline to compare against).
+    # begin_acceptance is the strict, atomic, single gate: eligibility
+    # (latest recorded state must be exactly STAGED_GENERATION_PASS -- a
+    # STAGE_FAILED, ACCEPTANCE_FAILED, already-ACCEPTED, or LEGACY_
+    # UNVERIFIED candidate is refused here just as surely as a tampered
+    # one), integrity (live content must match the manifest recorded at
+    # that state), and the ACCEPTANCE_RUNNING transition itself, all
+    # behind one cross-platform file lock so a second concurrent
+    # acceptance attempt for the same candidate_id is refused outright.
+    # Nothing about the source candidate is touched before this passes.
     try:
-        ledger.verify_integrity(candidate_id, source_candidate)
+        ledger.begin_acceptance(candidate_id, source_candidate)
     except CandidateIntegrityError as error:
         result = {
             "outcome": "CANDIDATE_INTEGRITY_FAILED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": [], "evidence_dir": str(evidence),
+        }
+        (evidence / "result.json").write_text(
+            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        return result
+    except CandidateAcceptanceInProgressError as error:
+        result = {
+            "outcome": "ACCEPTANCE_ALREADY_IN_PROGRESS", "candidate_id": candidate_id,
             "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
             "checks": [], "evidence_dir": str(evidence),
         }
@@ -200,7 +224,16 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
     _copy_candidate(source_candidate, candidate)
     backend: subprocess.Popen[str] | None = None
     frontend: subprocess.Popen[str] | None = None
-    result: dict[str, object]
+    # A real placeholder, not left unbound: a KeyboardInterrupt or crash
+    # before any check even runs must still leave `finally` something
+    # real to persist -- the candidate must never end up in a recorded-
+    # nowhere, truly ambiguous state.
+    result: dict[str, object] = {
+        "outcome": "ACCEPTANCE_INTERRUPTED", "candidate_id": candidate_id,
+        "error": "acceptance ended before any check completed",
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "checks": journey.checks, "evidence_dir": str(evidence),
+    }
 
     try:
         journey.record("ports_free", all(_port_is_free(p) for p in (BACKEND_PORT, FRONTEND_PORT)),
@@ -281,24 +314,51 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
             "elapsed_seconds": round(time.monotonic() - started, 1), "checks": journey.checks,
             "evidence_dir": str(evidence),
         }
-    except Exception as error:  # evidence must survive every real first failure
+    except AcceptanceCheckFailed as error:  # a classified, evidenced failure
         result = {
             "outcome": "GOLDEN_ACCEPTANCE_FAILED", "candidate_id": candidate_id,
             "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
             "checks": journey.checks, "evidence_dir": str(evidence),
         }
+    except (KeyboardInterrupt, Exception) as error:
+        # Anything NOT a classified named-check failure -- Ctrl+C, a
+        # crashed subprocess, a bug -- is genuinely ambiguous, not a
+        # verdict any check reached; record it as such rather than
+        # silently reusing GOLDEN_ACCEPTANCE_FAILED for it. A real
+        # KeyboardInterrupt is re-raised once the ledger/evidence below
+        # are written (`finally` always runs first) -- Ctrl+C must still
+        # actually stop the process.
+        result = {
+            "outcome": "ACCEPTANCE_INTERRUPTED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": journey.checks, "evidence_dir": str(evidence),
+        }
+        if isinstance(error, KeyboardInterrupt):
+            raise
     finally:
         _stop(frontend)
         _stop(backend)
         result_path = evidence / "result.json"
         result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    # Recorded against the original candidate directory, not the isolated
-    # runtime copy -- acceptance observes the source, it never mutates it.
-    if ledger.history(candidate_id):
-        state = ACCEPTED if result["outcome"] == "GOLDEN_ACCEPTANCE_PASS" else ACCEPTANCE_FAILED
+        result_sha256 = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        # Recorded against the original candidate directory, not the
+        # isolated runtime copy -- acceptance observes the source, it
+        # never mutates it. The ACCEPTANCE_RUNNING -> {..} transition
+        # itself is what `record_state` enforces; an outcome this
+        # function did not expect would be refused here, not silently
+        # accepted.
+        state = {
+            "GOLDEN_ACCEPTANCE_PASS": ACCEPTED,
+            "GOLDEN_ACCEPTANCE_FAILED": ACCEPTANCE_FAILED,
+            "ACCEPTANCE_INTERRUPTED": INTERRUPTED,
+        }[result["outcome"]]
         ledger.record_state(
             candidate_id, state, source_candidate,
-            detail={"outcome": result["outcome"], "elapsed_seconds": result["elapsed_seconds"]},
+            detail={
+                "outcome": result["outcome"], "elapsed_seconds": result["elapsed_seconds"],
+                "runtime_dir": str(runtime), "evidence_dir": str(evidence),
+                "result_sha256": result_sha256,
+            },
         )
     return result
 

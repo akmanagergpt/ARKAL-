@@ -75,3 +75,20 @@ class CampaignEscalatedError(CandidateContractError):
     and refuses every further candidate, override or not."""
 
     code = "ARK-ERR-0113"
+
+
+class InvalidLifecycleTransitionError(CandidateContractError):
+    """A candidate lifecycle state (`ledger.py`) was recorded that its
+    current latest state does not permit -- e.g. entering
+    ACCEPTANCE_RUNNING from anything but STAGED_GENERATION_PASS, or
+    recording anything at all after a true dead-end state."""
+
+    code = "ARK-ERR-0114"
+
+
+class CandidateAcceptanceInProgressError(CandidateContractError):
+    """A second acceptance attempt was refused because one for this
+    `candidate_id` is already starting or in progress (`ledger.py`
+    `begin_acceptance`'s file lock)."""
+
+    code = "ARK-ERR-0115"
