@@ -39,3 +39,23 @@ class InvalidAssemblyReportError(CandidateContractError):
     """A C-25 report is incomplete, ambiguous, or not manifest-bound."""
 
     code = "ARK-ERR-0108"
+
+
+class CandidateIdentityReuseError(CandidateContractError):
+    """A `candidate_id` already has ledger history (`ledger.py`), even if
+    its workspace directory was deleted; identities are never reused."""
+
+    code = "ARK-ERR-0109"
+
+
+class CandidateIntegrityError(CandidateContractError):
+    """A candidate's live on-disk content no longer matches the manifest
+    recorded at its last terminal state (`ledger.py`)."""
+
+    code = "ARK-ERR-0110"
+
+
+class UnknownLifecycleStateError(CandidateContractError):
+    """A state outside `ledger.ALL_STATES` was recorded or requested."""
+
+    code = "ARK-ERR-0111"

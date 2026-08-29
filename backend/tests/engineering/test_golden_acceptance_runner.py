@@ -8,6 +8,13 @@ import urllib.request
 
 import pytest
 
+from arkali.engineering.candidate.ledger import (
+    CandidateLedger,
+    GenerationProvenance,
+    hash_text,
+    STAGED_GENERATION_PASS,
+)
+
 REPO = pathlib.Path(__file__).resolve().parents[3]
 SCRIPT = REPO / "scripts" / "run_golden_acceptance.py"
 
@@ -102,6 +109,93 @@ def test_acceptance_uses_a_clean_copy_and_never_mutates_the_frozen_candidate(
     assert not (destination / "frontend" / "build").exists()
     assert not (destination / "backend.db").exists()
     assert (source / "backend.db").read_bytes() == b"frozen"
+
+
+def test_acceptance_refuses_a_candidate_with_no_recorded_manifest_before_copying(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """A candidate this ledger has no terminal manifest for (never
+    allocated through it, i.e. LEGACY_UNVERIFIED, or a real tamper) must
+    refuse before acceptance ever copies or touches it."""
+    runner = _module()
+    candidates = tmp_path / "candidates"
+    candidate_id = "golden-work-nohistory"
+    (candidates / candidate_id).mkdir(parents=True)
+    (candidates / candidate_id / "App.js").write_text("// no ledger history", encoding="utf-8")
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+
+    copied: list[object] = []
+    monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
+    assert copied == []
+
+
+def test_acceptance_refuses_a_candidate_whose_content_changed_since_its_manifest(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    runner = _module()
+    candidates = tmp_path / "candidates"
+    candidate_id = "golden-work-tampered"
+    work = candidates / candidate_id
+    work.mkdir(parents=True)
+    (work / "App.js").write_text("// original", encoding="utf-8")
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+
+    ledger = CandidateLedger(candidates / "_ledger")
+    provenance = GenerationProvenance(
+        goal_hash=hash_text("goal"), source_commit="abc", runtime="ollama",
+        endpoint="local", model="qwen",
+    )
+    ledger.allocate(candidate_id, provenance=provenance)
+    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+
+    (work / "App.js").write_text("// tampered after the terminal state", encoding="utf-8")
+    copied: list[object] = []
+    monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
+    assert "changed=" in result["error"]
+    assert copied == []
+
+
+def test_acceptance_proceeds_past_the_integrity_gate_for_a_verified_candidate(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """A candidate whose live content still matches its recorded terminal
+    manifest must clear the integrity gate and reach real acceptance
+    work (verified here by the copy step actually running)."""
+    runner = _module()
+    candidates = tmp_path / "candidates"
+    candidate_id = "golden-work-verified"
+    work = candidates / candidate_id
+    work.mkdir(parents=True)
+    (work / "App.js").write_text("// unmodified", encoding="utf-8")
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+    monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+
+    ledger = CandidateLedger(candidates / "_ledger")
+    provenance = GenerationProvenance(
+        goal_hash=hash_text("goal"), source_commit="abc", runtime="ollama",
+        endpoint="local", model="qwen",
+    )
+    ledger.allocate(candidate_id, provenance=provenance)
+    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+
+    copied: list[object] = []
+    monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
+    monkeypatch.setattr(
+        runner, "_run", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop after copy")),
+    )
+
+    result = runner._accept(candidate_id, skip_browser=True)
+    assert len(copied) == 1
+    assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED"
+    assert result["outcome"] != "CANDIDATE_INTEGRITY_FAILED"
 
 
 def test_skip_browser_can_never_report_acceptance(monkeypatch, capsys) -> None:  # noqa: ANN001

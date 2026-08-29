@@ -21,6 +21,15 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
+
+from arkali.engineering.candidate.ledger import (  # noqa: E402
+    ACCEPTANCE_FAILED,
+    ACCEPTED,
+    CandidateIntegrityError,
+    CandidateLedger,
+)
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CANDIDATES = ROOT / "var" / "factory" / "candidates"
 RUNTIMES = ROOT / "var" / "factory" / "runtime"
@@ -160,16 +169,37 @@ def _backend_process(python: pathlib.Path, candidate: pathlib.Path, log) -> subp
 
 def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, object]:
     source_candidate = _candidate(candidate_id)
+    ledger = CandidateLedger(CANDIDATES / "_ledger")
     journey = Journey(candidate_id)
     runtime = RUNTIMES / candidate_id / f"acceptance-{int(time.time())}"
     runtime.mkdir(parents=True, exist_ok=False)
     evidence = runtime / "evidence"
     evidence.mkdir()
+    started = time.monotonic()
+
+    # Verify BEFORE touching the source candidate at all: acceptance must
+    # run against a verified isolated copy, never a candidate whose content
+    # no longer matches the manifest recorded at its last terminal state
+    # (or one with no such manifest -- LEGACY_UNVERIFIED candidates refuse
+    # here too, since "unchanged since when" cannot be answered without a
+    # recorded baseline to compare against).
+    try:
+        ledger.verify_integrity(candidate_id, source_candidate)
+    except CandidateIntegrityError as error:
+        result = {
+            "outcome": "CANDIDATE_INTEGRITY_FAILED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": [], "evidence_dir": str(evidence),
+        }
+        (evidence / "result.json").write_text(
+            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        return result
+
     candidate = runtime / "candidate"
     _copy_candidate(source_candidate, candidate)
     backend: subprocess.Popen[str] | None = None
     frontend: subprocess.Popen[str] | None = None
-    started = time.monotonic()
     result: dict[str, object]
 
     try:
@@ -262,6 +292,14 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
         _stop(backend)
         result_path = evidence / "result.json"
         result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Recorded against the original candidate directory, not the isolated
+    # runtime copy -- acceptance observes the source, it never mutates it.
+    if ledger.history(candidate_id):
+        state = ACCEPTED if result["outcome"] == "GOLDEN_ACCEPTANCE_PASS" else ACCEPTANCE_FAILED
+        ledger.record_state(
+            candidate_id, state, source_candidate,
+            detail={"outcome": result["outcome"], "elapsed_seconds": result["elapsed_seconds"]},
+        )
     return result
 
 

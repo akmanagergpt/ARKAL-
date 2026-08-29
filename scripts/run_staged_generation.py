@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import subprocess
 import sys
 import time
 
@@ -26,6 +27,16 @@ from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.specification.blueprint_engine import derive_blueprint  # noqa: E402
+from arkali.engineering.candidate.ledger import (  # noqa: E402
+    CandidateLedger,
+    FINAL_GATE_FAILED,
+    GenerationProvenance,
+    GENERATING,
+    hash_text,
+    INTERRUPTED,
+    STAGED_GENERATION_PASS,
+    STAGE_FAILED,
+)
 from arkali.engineering.candidate.workspace import WorkspaceAuthority  # noqa: E402
 from arkali.engineering.factory.component_generation import (  # noqa: E402
     DEFAULT_MAX_OUTPUT_TOKENS,
@@ -103,6 +114,15 @@ def _freeze(
         engine.dispose()
 
 
+def _source_commit() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
@@ -137,11 +157,28 @@ def main(argv: list[str]) -> int:
     vocabulary = StageVocabulary.load(ROOT)
 
     candidates_root = ROOT / "var" / "factory" / "candidates"
+    ledger = CandidateLedger(candidates_root / "_ledger")
+    provenance = GenerationProvenance(
+        goal_hash=hash_text(goal_text), source_commit=_source_commit(),
+        runtime=args.runtime, endpoint=args.endpoint or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
+        model=args.model,
+        model_parameters={
+            "max_output_tokens": args.max_output_tokens,
+            "timeout_seconds": args.timeout_seconds,
+            "per_stage_max_attempts": args.per_stage_max_attempts,
+        },
+        pipeline_version="phase-30-staged-generation/1.0.0",
+    )
+    # Identity is claimed here, before any directory exists -- a reused
+    # candidate_id is refused even if its old workspace was later deleted.
+    ledger.allocate(args.candidate_id, provenance=provenance)
+
     empty_snapshot = ROOT / "var" / "factory" / "empty-stable-snapshot"
     workspace = WorkspaceAuthority(candidates_root).allocate(
         workspace_id=args.candidate_id, task_id=args.candidate_id,
         agent_id="staged-generation", stable_snapshot=empty_snapshot,
     )
+    ledger.record_state(args.candidate_id, GENERATING, workspace.root)
 
     def model_factory(_stage_name: str):  # noqa: ANN202
         if args.runtime == "openai-compatible":
@@ -161,58 +198,74 @@ def main(argv: list[str]) -> int:
             per_stage_max_attempts=args.per_stage_max_attempts,
         )
     except ModelGenerationError as error:
+        elapsed = round(time.monotonic() - started, 1)
         payload = json.dumps({
             "candidate_id": args.candidate_id, "outcome": "STAGE_FAILED",
-            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "error": str(error), "elapsed_seconds": elapsed,
             "last_raw_output": getattr(error, "last_raw_output", ""),
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
             ("real staged-generation stage failure",), provider_model,
         )
+        ledger.record_state(
+            args.candidate_id, STAGE_FAILED, workspace.root, detail={"error": str(error)},
+        )
         print(json.dumps({
             "outcome": "STAGE_FAILED", "error": str(error), "evidence_ref": ref,
-            "elapsed_seconds": round(time.monotonic() - started, 1),
+            "elapsed_seconds": elapsed,
             "candidate_dir": str(workspace.root),
         }, ensure_ascii=False))
         return 2
+    except (KeyboardInterrupt, Exception):
+        ledger.record_state(
+            args.candidate_id, INTERRUPTED, workspace.root,
+            detail={"note": "generation ended without reaching a classified outcome"},
+        )
+        raise
 
     assembled = {path: (workspace.root / path).read_text(encoding="utf-8") for path in result.files}
     try:
         ModelProductEnvelope(files=tuple(GeneratedFile(path=p, content=c) for p, c in assembled.items()))
         inspect_product_files(assembled).require_pass()
     except (ValueError, ProductSemanticPreflightError) as error:
+        elapsed = round(time.monotonic() - started, 1)
         payload = json.dumps({
             "candidate_id": args.candidate_id, "outcome": "FINAL_GATE_FAILED",
             "error": str(error), "files": sorted(assembled),
-            "elapsed_seconds": round(time.monotonic() - started, 1),
+            "elapsed_seconds": elapsed,
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
             ("real assembled candidate failed the final whole-product gate",),
             provider_model,
         )
+        ledger.record_state(
+            args.candidate_id, FINAL_GATE_FAILED, workspace.root, detail={"error": str(error)},
+        )
         print(json.dumps({
             "outcome": "FINAL_GATE_FAILED", "error": str(error), "evidence_ref": ref,
-            "elapsed_seconds": round(time.monotonic() - started, 1),
+            "elapsed_seconds": elapsed,
             "candidate_dir": str(workspace.root),
         }, ensure_ascii=False))
         return 3
 
+    elapsed = round(time.monotonic() - started, 1)
     payload = json.dumps({
         "candidate_id": args.candidate_id, "outcome": "STAGED_GENERATION_PASS",
         "files": sorted(assembled), "attempts_used": result.attempts_used,
-        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "elapsed_seconds": elapsed,
     }, sort_keys=True).encode()
     ref = _freeze(
         payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
         ("real staged generation + final whole-product gate, both PASS",),
         provider_model,
     )
+    ledger.record_state(args.candidate_id, STAGED_GENERATION_PASS, workspace.root)
     print(json.dumps({
         "outcome": "STAGED_GENERATION_PASS", "evidence_ref": ref, "files": sorted(assembled),
         "attempts_used": result.attempts_used,
-        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "elapsed_seconds": elapsed,
         "candidate_dir": str(workspace.root),
     }, ensure_ascii=False))
     return 0
