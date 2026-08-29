@@ -89,6 +89,41 @@ _OBJECT_LITERAL_KEY = re.compile(r"^\s*(\w+)\s*:", re.MULTILINE)
 _IMPORT_STATEMENT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]""")
 _NAMED_IMPORT = re.compile(r"""import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]""")
 _LOCAL_DECLARATION = re.compile(r"(?:function|const|let|var)\s+(\w+)")
+#: golden-work-124 (real repository evidence, real qwen2.5-coder:14b,
+#: frozen): a real `apiClient.js` exporting a single pre-declared object
+#: variable (`module.exports = apiClient;`, the same shape
+#: `_COMMONJS_EXPORTS_IDENTIFIER` above already recognizes on the export
+#: side) is consumed the way that shape actually gets consumed --
+#: `import apiClient from './apiClient';` then `apiClient.getStudents()`,
+#: property access through the whole-module default import, never a
+#: named `{ getStudents }` import at all. `StudentList.js`, `CourseList.
+#: js`, `Dashboard.js`, and `PaymentList.js` each did exactly this, real,
+#: correct, idiomatic JS -- but the bare-call regex below matched
+#: `getStudents(` inside `apiClient.getStudents(` too (a word boundary
+#: sits right after the `.`), and neither `imported` (only tracks named
+#: `{...}` imports) nor `declared` (only tracks local declarations) ever
+#: contains `getStudents`, so every one of these real, correctly-wired
+#: calls was flagged as a missing import -- a false-positive hard block
+#: on an otherwise entirely valid candidate, the mirror image on the call
+#: side of the export-side defect golden-work-124 already fixed above.
+_DEFAULT_IMPORT = re.compile(r"""import\s+(\w+)\s*(?:,\s*\{[^}]*\})?\s*from\s*['"]([^'"]+)['"]""")
+_NAMESPACE_IMPORT = re.compile(r"""import\s*\*\s*as\s*(\w+)\s*from\s*['"]([^'"]+)['"]""")
+_REQUIRE_BINDING = re.compile(r"""(?:const|let|var)\s+(\w+)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)""")
+
+
+def _client_object_locals(source: str) -> set[str]:
+    """Local names bound to a whole `*client*`-matching module object --
+    `import apiClient from './apiClient'`, `import * as apiClient from
+    './apiClient'`, or `const apiClient = require('./apiClient')`. A call
+    reached through one of these (`apiClient.getStudents(...)`) is a real
+    property access on a properly imported module, not a bare global
+    reference, so it needs no separate named import of that property."""
+    locals_: set[str] = set()
+    for pattern in (_DEFAULT_IMPORT, _NAMESPACE_IMPORT, _REQUIRE_BINDING):
+        for local_name, path in pattern.findall(source):
+            if "client" in path.lower():
+                locals_.add(local_name)
+    return locals_
 
 
 def _balanced_brace_body(text: str, open_brace_index: int) -> str:
@@ -147,11 +182,19 @@ def _file_imported_locals(source: str) -> set[str]:
 def _missing_client_calls_in_file(source: str, exported: frozenset[str]) -> list[str]:
     imported = _file_imported_locals(source)
     declared = set(_LOCAL_DECLARATION.findall(source))
-    return sorted(
-        name for name in exported
-        if name not in imported and name not in declared
-        and re.search(rf"\b{name}\s*\(", source)
-    )
+    client_objects = _client_object_locals(source)
+    missing: list[str] = []
+    for name in exported:
+        if name in imported or name in declared:
+            continue
+        match = re.search(rf"(?:(\w+)\.)?\b{name}\s*\(", source)
+        if match is None:
+            continue
+        receiver = match.group(1)
+        if receiver is not None and receiver in client_objects:
+            continue
+        missing.append(name)
+    return sorted(missing)
 
 
 def _client_call_missing_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:

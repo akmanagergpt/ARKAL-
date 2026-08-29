@@ -287,3 +287,46 @@ def test_a_predeclared_object_variable_export_is_not_flagged_as_phantom() -> Non
         ),
     }
     assert _phantom_client_import_findings(files) == []
+
+
+def test_a_property_access_call_through_a_default_imported_client_is_not_flagged_as_missing() -> None:
+    """golden-work-124 (real repository evidence, real qwen2.5-coder:14b,
+    frozen): the same predeclared-object `apiClient.js` above, consumed
+    the way that shape actually gets consumed on the call side --
+    `StudentList.js` wrote `import apiClient from './apiClient';` then
+    called `apiClient.getStudents()`, real, correct, idiomatic JS. Before
+    this fix, the bare-call regex matched `getStudents(` inside
+    `apiClient.getStudents(` too (a word boundary sits right after the
+    `.`), and since `getStudents` was never a *named* `{ getStudents }`
+    import, this real, correctly-wired call was flagged as a missing
+    import -- a false positive on an otherwise entirely valid candidate."""
+    files = {
+        "frontend/src/apiClient.js": _COMMONJS_OBJECT_VARIABLE_CLIENT,
+        "frontend/src/StudentList.js": (
+            "import React, { useState, useEffect } from 'react';\n"
+            "import apiClient from './apiClient';\n"
+            "function StudentList() { "
+            "useEffect(() => { apiClient.getStudents(); }, []); "
+            "return null; }\n"
+        ),
+    }
+    assert _client_call_missing_import_findings(files) == []
+
+
+def test_a_bare_call_is_still_flagged_even_when_the_file_also_imports_the_client_object() -> None:
+    """The property-access fix must not become blind to a real bare-call
+    bug just because the same file happens to also default-import the
+    client object for unrelated calls -- a real, separate
+    `ReferenceError` at the bare call site is still caught."""
+    files = {
+        "frontend/src/apiClient.js": _COMMONJS_OBJECT_VARIABLE_CLIENT,
+        "frontend/src/StudentRow.js": (
+            "import apiClient from './apiClient';\n"
+            "function StudentRow({ id }) { "
+            "apiClient.getStudents(); "
+            "return <button onClick={() => deleteStudent(id)}>Delete</button>; }\n"
+        ),
+    }
+    findings = _client_call_missing_import_findings(files)
+    assert len(findings) == 1
+    assert "deleteStudent" in findings[0].detail
