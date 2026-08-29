@@ -59,3 +59,19 @@ class UnknownLifecycleStateError(CandidateContractError):
     """A state outside `ledger.ALL_STATES` was recorded or requested."""
 
     code = "ARK-ERR-0111"
+
+
+class CampaignBudgetExhaustedError(CandidateContractError):
+    """A generation campaign (`campaign_budget.py`) has no headroom left on
+    at least one declared budget dimension; a new candidate may not start
+    without an explicit, human-confirmed override."""
+
+    code = "ARK-ERR-0112"
+
+
+class CampaignEscalatedError(CandidateContractError):
+    """The same failure fingerprint recurred a third time within a
+    generation campaign (`campaign_budget.py`); the campaign is escalated
+    and refuses every further candidate, override or not."""
+
+    code = "ARK-ERR-0113"

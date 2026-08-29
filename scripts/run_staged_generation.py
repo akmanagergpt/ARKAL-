@@ -27,6 +27,12 @@ from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.specification.blueprint_engine import derive_blueprint  # noqa: E402
+from arkali.engineering.candidate.campaign_budget import (  # noqa: E402
+    CampaignBudget,
+    CANDIDATE_DEFECT,
+    FAILURE_CLASSES,
+    GenerationCampaignLedger,
+)
 from arkali.engineering.candidate.ledger import (  # noqa: E402
     CandidateLedger,
     FINAL_GATE_FAILED,
@@ -149,12 +155,47 @@ def main(argv: list[str]) -> int:
         help="path to a real goal-text file (one requirement per numbered line); "
              "defaults to this script's own built-in Task/Work Management GOAL",
     )
+    parser.add_argument(
+        "--campaign-id", default="default",
+        help="generation campaign this candidate belongs to; its budget ledger "
+             "persists on disk under var/factory/campaigns/<campaign-id>/ and is "
+             "never reset by a new session -- only by starting a new campaign id",
+    )
+    parser.add_argument("--max-new-candidates", type=int, default=CampaignBudget().max_new_candidates)
+    parser.add_argument("--max-total-seconds", type=float, default=CampaignBudget().max_total_seconds)
+    parser.add_argument(
+        "--max-same-fingerprint-repeats", type=int,
+        default=CampaignBudget().max_same_fingerprint_repeats,
+    )
+    parser.add_argument(
+        "--confirm-budget-override", action="store_true",
+        help="required to start a new candidate once the campaign's own candidate-count "
+             "or elapsed-time budget is already exhausted; never overrides an escalated "
+             "campaign (a recurring fingerprint), which always refuses",
+    )
+    parser.add_argument(
+        "--failure-class", choices=sorted(FAILURE_CLASSES), default=CANDIDATE_DEFECT,
+        help="how a STAGE_FAILED/FINAL_GATE_FAILED outcome should be classified in the "
+             "campaign ledger; defaults to the conservative assumption that a failure "
+             "is a real candidate defect unless a human overrides it",
+    )
     args = parser.parse_args(argv[1:])
     provider_model = f"{args.runtime}/{args.model}"
 
     goal_text = args.goal_file.read_text(encoding="utf-8") if args.goal_file else GOAL
     blueprint = derive_blueprint(goal_text, AuthorityMap.load(ROOT))
     vocabulary = StageVocabulary.load(ROOT)
+
+    campaigns_root = ROOT / "var" / "factory" / "campaigns"
+    campaign = GenerationCampaignLedger.load_or_create(
+        campaigns_root, args.campaign_id,
+        CampaignBudget(
+            max_new_candidates=args.max_new_candidates,
+            max_total_seconds=args.max_total_seconds,
+            max_same_fingerprint_repeats=args.max_same_fingerprint_repeats,
+        ),
+    )
+    campaign.refuse_new_candidate_unless_permitted(override_confirmed=args.confirm_budget_override)
 
     candidates_root = ROOT / "var" / "factory" / "candidates"
     ledger = CandidateLedger(candidates_root / "_ledger")
@@ -211,6 +252,10 @@ def main(argv: list[str]) -> int:
         ledger.record_state(
             args.candidate_id, STAGE_FAILED, workspace.root, detail={"error": str(error)},
         )
+        campaign.record(
+            args.candidate_id, "STAGE_FAILED", elapsed_seconds=elapsed,
+            failure_class=args.failure_class, error_message=str(error),
+        )
         print(json.dumps({
             "outcome": "STAGE_FAILED", "error": str(error), "evidence_ref": ref,
             "elapsed_seconds": elapsed,
@@ -218,9 +263,14 @@ def main(argv: list[str]) -> int:
         }, ensure_ascii=False))
         return 2
     except (KeyboardInterrupt, Exception):
+        elapsed = round(time.monotonic() - started, 1)
         ledger.record_state(
             args.candidate_id, INTERRUPTED, workspace.root,
             detail={"note": "generation ended without reaching a classified outcome"},
+        )
+        campaign.record(
+            args.candidate_id, "INTERRUPTED", elapsed_seconds=elapsed,
+            error_message="staged generation interrupted before a terminal outcome",
         )
         raise
 
@@ -243,6 +293,10 @@ def main(argv: list[str]) -> int:
         ledger.record_state(
             args.candidate_id, FINAL_GATE_FAILED, workspace.root, detail={"error": str(error)},
         )
+        campaign.record(
+            args.candidate_id, "FINAL_GATE_FAILED", elapsed_seconds=elapsed,
+            failure_class=args.failure_class, error_message=str(error),
+        )
         print(json.dumps({
             "outcome": "FINAL_GATE_FAILED", "error": str(error), "evidence_ref": ref,
             "elapsed_seconds": elapsed,
@@ -262,6 +316,7 @@ def main(argv: list[str]) -> int:
         provider_model,
     )
     ledger.record_state(args.candidate_id, STAGED_GENERATION_PASS, workspace.root)
+    campaign.record(args.candidate_id, "STAGED_GENERATION_PASS", elapsed_seconds=elapsed)
     print(json.dumps({
         "outcome": "STAGED_GENERATION_PASS", "evidence_ref": ref, "files": sorted(assembled),
         "attempts_used": result.attempts_used,
