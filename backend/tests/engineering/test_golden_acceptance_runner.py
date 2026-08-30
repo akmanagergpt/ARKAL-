@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import sys
 import threading
@@ -606,3 +607,129 @@ def test_browser_journey_is_driven_entirely_by_the_scenario_file() -> None:
         lowered = stripped.lower()
         for token in domain_tokens:
             assert token not in lowered, f"domain literal {token!r} found in executable line: {line!r}"
+
+
+_DESIGN_SYSTEM = {
+    "typography_scale": ["14px", "16px", "24px"],
+    "spacing_scale": ["4px", "8px", "16px"],
+    "component_conventions": ["primary buttons are filled"],
+}
+
+
+def _widget_contract_files(work: pathlib.Path) -> None:
+    """Writes a real, minimal `product/ux_spec.json` + `backend/*.json`
+    pair for a single-resource "widgets" product -- enough for
+    `_compile_acceptance_plan` to derive a real scenario from, and
+    unrelated to every real Student/Fee literal this file's own domain-
+    independence tests already cover."""
+    (work / "product").mkdir(parents=True, exist_ok=True)
+    (work / "backend").mkdir(parents=True, exist_ok=True)
+    (work / "product" / "ux_spec.json").write_text(json.dumps({
+        "product_title": "Widget Tracker", "primary_roles": ["Operator"],
+        "modules": [{
+            "name": "widgets", "navigation_label": "Widgets", "presentation": "table",
+            "actions": ["create", "edit", "delete"],
+            "forms": [{"name": "WidgetForm", "fields": ["id", "name", "price"]}],
+        }],
+        "navigation_destinations": ["Widgets"], "design_system": _DESIGN_SYSTEM,
+    }), encoding="utf-8")
+    (work / "backend" / "routes.json").write_text(json.dumps([
+        {"path": "/widgets", "method": "GET"}, {"path": "/widgets", "method": "POST"},
+        {"path": "/widgets/{id}", "method": "PUT"}, {"path": "/widgets/{id}", "method": "DELETE"},
+    ]), encoding="utf-8")
+    (work / "backend" / "data_model.json").write_text(json.dumps(
+        {"fields": {"widgets": {"id": "integer", "name": "string", "price": "float"}}},
+    ), encoding="utf-8")
+
+
+class TestScenarioResolution:
+    """`main()` compiles a real scenario by default (ARK-REQ-0074 Part A:
+    ARKALI cannot ask an operator to hand-author one per generated
+    product), and only ever trusts an explicit `--scenario` override after
+    it reconciles against the SAME candidate's own real contracts."""
+
+    def test_resolve_scenario_compiles_by_default(self, tmp_path: pathlib.Path) -> None:
+        runner = _module()
+        monkeypatch_dir = tmp_path / "candidate"
+        _widget_contract_files(monkeypatch_dir)
+        contract_files = runner._candidate_contract_files(monkeypatch_dir)
+
+        resolved = runner._resolve_scenario("golden-work-widgets", contract_files, None)
+        assert not isinstance(resolved, dict)
+        scenario, scenario_path = resolved
+        assert scenario.primary_resource == "widgets"
+        assert scenario_path.is_file()
+        assert json.loads(scenario_path.read_text(encoding="utf-8"))["primary_resource"] == "widgets"
+
+    def test_resolve_scenario_refuses_when_compilation_is_incomplete(self, tmp_path: pathlib.Path) -> None:
+        runner = _module()
+        empty_dir = tmp_path / "empty-candidate"
+        empty_dir.mkdir()
+        resolved = runner._resolve_scenario("golden-work-empty", {}, None)
+        assert isinstance(resolved, dict)
+        assert resolved["outcome"] == "ACCEPTANCE_PLAN_INCOMPLETE"
+        assert resolved["reasons"]
+
+    def test_resolve_scenario_accepts_a_compatible_override(self, tmp_path: pathlib.Path) -> None:
+        runner = _module()
+        work = tmp_path / "candidate"
+        _widget_contract_files(work)
+        contract_files = runner._candidate_contract_files(work)
+        compiled, _path = runner._resolve_scenario("golden-work-widgets", contract_files, None)
+
+        override_path = tmp_path / "override.json"
+        override_path.write_text(compiled.model_dump_json(), encoding="utf-8")
+        resolved = runner._resolve_scenario("golden-work-widgets", contract_files, override_path)
+        assert not isinstance(resolved, dict)
+        scenario, scenario_path = resolved
+        assert scenario.primary_resource == "widgets"
+        assert scenario_path == override_path
+
+    def test_resolve_scenario_rejects_an_incompatible_override(self, tmp_path: pathlib.Path) -> None:
+        runner = _module()
+        work = tmp_path / "candidate"
+        _widget_contract_files(work)
+        contract_files = runner._candidate_contract_files(work)
+
+        override_path = tmp_path / "override.json"
+        override_path.write_text(json.dumps({
+            "scenario_id": "wrong", "resources": [{
+                "name": "widgets", "collection_route": "/widgets", "navigation_label": "Widgets",
+                "singular_label": "Widget", "editable_form_fields": ["name", "sku"],
+            }],
+            "primary_resource": "widgets", "create_payload": {"name": "A", "sku": "X"},
+            "update_payload": {"name": "B"}, "navigation_destinations": ["Widgets"],
+        }), encoding="utf-8")
+
+        resolved = runner._resolve_scenario("golden-work-widgets", contract_files, override_path)
+        assert isinstance(resolved, dict)
+        assert resolved["outcome"] == "ACCEPTANCE_SCENARIO_INCOMPATIBLE"
+        assert any("sku" in reason for reason in resolved["reasons"])
+
+    def test_main_compiles_and_reaches_a_real_pass_with_no_scenario_flag(
+        self, monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+    ) -> None:
+        """End-to-end through `main()` itself (not `_accept()` directly):
+        no `--scenario` flag at all, a real candidate directory carrying
+        only its own real contracts -- the compiled path, not a fixture.
+        The contract files must exist BEFORE the STAGED_GENERATION_PASS
+        manifest is recorded (`_seed_verified_candidate` records it too
+        early for this test's own purpose), so this seeds the ledger
+        itself rather than reusing that helper."""
+        runner = _module()
+        candidate_id = "golden-work-widgetsmain"
+        candidates = tmp_path / "candidates"
+        work = candidates / candidate_id
+        _widget_contract_files(work)
+        monkeypatch.setattr(runner, "CANDIDATES", candidates)
+        monkeypatch.setattr(runner, "RUNTIMES", tmp_path / "runtime")
+        ledger = CandidateLedger(candidates / "_ledger")
+        ledger.allocate(candidate_id, provenance=_provenance())
+        ledger.record_state(candidate_id, GENERATING, work)
+        ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+
+        scenario = runner._compile_acceptance_plan(runner._candidate_contract_files(work))
+        _stub_a_full_successful_journey(runner, monkeypatch, scenario=scenario)
+
+        exit_code = runner.main(["run_golden_acceptance.py", "--candidate-id", candidate_id])
+        assert exit_code == 0

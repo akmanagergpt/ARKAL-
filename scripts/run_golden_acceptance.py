@@ -32,6 +32,11 @@ from arkali.engineering.candidate.ledger import (  # noqa: E402
     CandidateLedger,
     INTERRUPTED,
 )
+from arkali.engineering.factory.acceptance_plan_compiler import (  # noqa: E402
+    _AcceptancePlanIncomplete,
+    _compile_acceptance_plan,
+)
+from arkali.engineering.factory.acceptance_plan_reconciliation import _reconcile_scenario  # noqa: E402
 from arkali.engineering.factory.acceptance_scenario import _AcceptanceScenario  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -42,13 +47,45 @@ FRONTEND_PORT = 3000
 #: ARK-REQ-0074 ("Golden domain logic must not enter ARKALI core"): the
 #: runner itself names no resource, field, or route -- every real domain
 #: fact (route, payload, relationship, navigation, editable field) comes
-#: from a real `_AcceptanceScenario` loaded from here. A different Golden
-#: family gets its own sibling JSON, never a change to this script.
+#: from a real `_AcceptanceScenario`, by default COMPILED from the
+#: candidate's own real generated contracts (`_compile_acceptance_plan`),
+#: never hand-authored per candidate. `golden/scenarios/student_fee_
+#: management.json` remains real data too -- now only a regression
+#: fixture/oracle a real `--scenario` override can point at, reconciled
+#: against the candidate's own contracts before it is trusted.
 DEFAULT_SCENARIO = ROOT / "golden" / "scenarios" / "student_fee_management.json"
 
 
 def _load_scenario(path: pathlib.Path) -> _AcceptanceScenario:
     return _AcceptanceScenario.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _candidate_contract_files(candidate_dir: pathlib.Path) -> dict[str, str]:
+    """Every real `product/*.json` and `backend/*.json` file the candidate
+    itself wrote, keyed `"<root>/<name>.json"` -- the same `files:
+    Mapping[str, str]` shape every other stage-input reader in
+    `engineering.factory` already consumes (`_parse_ux_spec`,
+    `_backend_json_documents`), read fresh from the frozen candidate
+    directory rather than re-derived from anything in memory."""
+    files: dict[str, str] = {}
+    for sub in ("product", "backend"):
+        directory = candidate_dir / sub
+        if not directory.is_dir():
+            continue
+        for path in directory.glob("*.json"):
+            files[f"{sub}/{path.name}"] = path.read_text(encoding="utf-8")
+    return files
+
+
+def _write_compiled_scenario(candidate_id: str, scenario: _AcceptanceScenario) -> pathlib.Path:
+    """Persists a compiled scenario to a real file -- `run_golden_browser_
+    journey.mjs` only ever reads a scenario from a real path argument, the
+    same as it does for an explicit `--scenario` override."""
+    directory = RUNTIMES / candidate_id
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"compiled-scenario-{int(time.time())}.json"
+    path.write_text(scenario.model_dump_json(indent=2), encoding="utf-8")
+    return path
 
 
 def _relationship_payload(
@@ -420,19 +457,62 @@ def _accept(
     return result
 
 
+def _resolve_scenario(
+    candidate_id: str, contract_files: dict[str, str], override_path: pathlib.Path | None,
+) -> tuple[_AcceptanceScenario, pathlib.Path] | dict[str, object]:
+    """The real scenario to run, plus the real file path the browser
+    journey subprocess reads it from -- or a terminal, unaccepted result
+    dict when neither a compiled nor an override scenario is trustworthy.
+    No override (the default): COMPILE one from `contract_files` and
+    persist it so the browser journey has a real path to read. An
+    override: load it, then RECONCILE it against `contract_files` and
+    refuse rather than run a scenario that no longer matches this real
+    candidate."""
+    if override_path is None:
+        try:
+            scenario = _compile_acceptance_plan(contract_files)
+        except _AcceptancePlanIncomplete as error:
+            return {
+                "outcome": "ACCEPTANCE_PLAN_INCOMPLETE", "candidate_id": candidate_id,
+                "error": str(error), "reasons": error.reasons, "checks": [],
+            }
+        return scenario, _write_compiled_scenario(candidate_id, scenario)
+
+    scenario = _load_scenario(override_path)
+    reasons = _reconcile_scenario(scenario, contract_files)
+    if reasons:
+        return {
+            "outcome": "ACCEPTANCE_SCENARIO_INCOMPATIBLE", "candidate_id": candidate_id,
+            "error": f"--scenario {override_path} does not match candidate {candidate_id!r}'s "
+                     "own real contracts", "reasons": reasons, "checks": [],
+        }
+    return scenario, override_path
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--skip-browser", action="store_true", help="diagnostic only; can never accept")
     parser.add_argument(
-        "--scenario", type=pathlib.Path, default=DEFAULT_SCENARIO,
-        help="path to a real AcceptanceScenario JSON file (ARK-REQ-0074: this runner names no "
-             "resource, field, or route of its own); defaults to the Student/Fee Golden's own "
-             f"scenario ({DEFAULT_SCENARIO.relative_to(ROOT)})",
+        "--scenario", type=pathlib.Path, default=None,
+        help="explicit AcceptanceScenario JSON override (ARK-REQ-0074: this runner names no "
+             "resource, field, or route of its own); by default the runner instead COMPILES a "
+             "real scenario from the candidate's own generated contracts (product/ux_spec.json, "
+             "backend/*.json). An override is only ever used after it RECONCILES against those "
+             f"same real contracts (e.g. the Student/Fee Golden's own regression fixture, "
+             f"{DEFAULT_SCENARIO.relative_to(ROOT)})",
     )
     args = parser.parse_args(argv[1:])
-    scenario = _load_scenario(args.scenario)
-    result = _accept(args.candidate_id, scenario, args.scenario, skip_browser=args.skip_browser)
+
+    candidate_dir = _candidate(args.candidate_id)
+    contract_files = _candidate_contract_files(candidate_dir)
+    resolved = _resolve_scenario(args.candidate_id, contract_files, args.scenario)
+    if isinstance(resolved, dict):
+        print(json.dumps(resolved, ensure_ascii=False))
+        return 2
+    scenario, scenario_path = resolved
+
+    result = _accept(args.candidate_id, scenario, scenario_path, skip_browser=args.skip_browser)
     if args.skip_browser and result["outcome"] == "GOLDEN_ACCEPTANCE_PASS":
         result["outcome"] = "GOLDEN_ACCEPTANCE_INCOMPLETE"
     print(json.dumps(result, ensure_ascii=False))
