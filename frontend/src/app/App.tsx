@@ -13,6 +13,7 @@
 import { useState } from 'react';
 
 import type { ArkaliApiClient } from '@/api/client';
+import { FactoryHistoryPage } from '@/features/factory/FactoryHistoryPage';
 import { OperationsPage } from '@/features/operations/OperationsPage';
 import { ProjectRegistryPage } from '@/features/projects/ProjectRegistryPage';
 import { WorkflowStudioPage } from '@/features/workflow/WorkflowStudioPage';
@@ -35,7 +36,9 @@ export function App({ client }: { client: ArkaliApiClient }) {
       ? <WorkflowStudioPage client={client} />
       : area === 'operations'
         ? <OperationsPage client={client} />
-        : <CommandCenterHome navigate={setArea} mode={mode} />;
+        : area === 'factory'
+          ? <FactoryHistoryPage client={client} />
+          : <CommandCenterHome navigate={setArea} mode={mode} />;
 
   return (
     <div className="min-h-full bg-slate-50 lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">

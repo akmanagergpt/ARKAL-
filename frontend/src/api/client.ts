@@ -17,6 +17,7 @@ import type {
   ApproveExecutionRequest,
   CreateProjectRequest,
   CreateRevisionRequest,
+  FactoryHistorySnapshot,
   HealthResponse,
   LifecycleMachineResponse,
   OperationsSnapshot,
@@ -66,6 +67,7 @@ export const ENDPOINTS = {
     path: '/api/workflows/{workflow_id}/executions/{execution_id}/approve',
   },
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
+  factoryHistory: { method: 'GET', path: '/api/factory/history' },
 } as const;
 
 /**
@@ -324,6 +326,19 @@ export class ArkaliApiClient {
   operationsSnapshot(signal?: AbortSignal): Promise<OperationsSnapshot> {
     return this.request<OperationsSnapshot>(
       ENDPOINTS.operationsSnapshot,
+      signal === undefined ? {} : { signal },
+    );
+  }
+
+  /**
+   * The real, read-only Phase 30 production history: every `golden-work-*`
+   * candidate and campaign the pipeline's own ledgers have recorded.
+   * NOT a live orchestrator view and never a trigger — see
+   * `FactoryHistorySnapshot`'s own doc comment.
+   */
+  factoryHistory(signal?: AbortSignal): Promise<FactoryHistorySnapshot> {
+    return this.request<FactoryHistorySnapshot>(
+      ENDPOINTS.factoryHistory,
       signal === undefined ? {} : { signal },
     );
   }

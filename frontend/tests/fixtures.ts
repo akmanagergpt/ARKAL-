@@ -9,6 +9,7 @@
  */
 
 import type {
+  FactoryHistorySnapshot,
   LifecycleMachineResponse,
   OperationsSnapshot,
   ProjectDetailResponse,
@@ -254,3 +255,33 @@ export const OPERATIONS_SNAPSHOT_NOT_CONFIGURED: OperationsSnapshot = {
     },
   },
 };
+
+export const FACTORY_HISTORY_SNAPSHOT: FactoryHistorySnapshot = {
+  candidates: [
+    { candidate_id: 'golden-work-127', state: 'ACCEPTANCE_INTERRUPTED', recorded_at: '2026-08-30T22:00:00Z' },
+    { candidate_id: 'golden-work-126', state: 'STAGE_FAILED', recorded_at: '2026-08-30T18:30:00Z' },
+  ],
+  campaigns: [
+    {
+      campaign_id: 'student-fee-golden-work-127-20260831',
+      max_new_candidates: 1,
+      max_total_seconds: 14400,
+      max_same_fingerprint_repeats: 2,
+      consumed_candidates: 1,
+      consumed_seconds: 2418.1,
+      status: 'CAMPAIGN_BUDGET_EXHAUSTED',
+      attempts: [
+        {
+          candidate_id: 'golden-work-127',
+          outcome: 'STAGED_GENERATION_PASS',
+          failure_class: null,
+          fingerprint: null,
+          elapsed_seconds: 2418.1,
+          recorded_at: '2026-08-30T21:50:00Z',
+        },
+      ],
+    },
+  ],
+};
+
+export const FACTORY_HISTORY_EMPTY: FactoryHistorySnapshot = { candidates: [], campaigns: [] };

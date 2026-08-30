@@ -207,6 +207,46 @@ export interface OperationsSnapshot {
   storage: StorageSnapshot;
 }
 
+/**
+ * Read-only Phase 30 production-history shapes.
+ *
+ * NOT A LIVE ORCHESTRATOR VIEW. This is what the staged-generation
+ * pipeline's own CLI-driven runs (`run_staged_generation.py`/
+ * `run_golden_acceptance.py`) have already recorded to disk — never a
+ * trigger, never a live job. See `factory_history.py`'s own module
+ * docstring (DEF-009 remains open; this does not close it).
+ */
+export interface FactoryCandidateSummary {
+  candidate_id: string;
+  state: string;
+  recorded_at: string;
+}
+
+export interface FactoryCampaignAttempt {
+  candidate_id: string;
+  outcome: string;
+  failure_class: string | null;
+  fingerprint: string | null;
+  elapsed_seconds: number;
+  recorded_at: string;
+}
+
+export interface FactoryCampaignSummary {
+  campaign_id: string;
+  max_new_candidates: number;
+  max_total_seconds: number;
+  max_same_fingerprint_repeats: number;
+  consumed_candidates: number;
+  consumed_seconds: number;
+  status: string;
+  attempts: FactoryCampaignAttempt[];
+}
+
+export interface FactoryHistorySnapshot {
+  candidates: FactoryCandidateSummary[];
+  campaigns: FactoryCampaignSummary[];
+}
+
 export interface WorkflowExecutionDetailResponse {
   execution_id: string;
   workflow_id: string;

@@ -5,7 +5,11 @@ export interface CommandArea { readonly id: AreaId; readonly label: string; read
 /** Canonical Command Center names plus this frontend's real surface inventory. */
 export const COMMAND_AREAS: readonly CommandArea[] = [
   { id: 'command', label: 'Ana Sayfa', description: 'Genel bakış ve sonraki adımlar', available: true },
-  { id: 'factory', label: 'AI Software Factory', description: 'Üretim akışları', available: false },
+  {
+    id: 'factory', label: 'AI Software Factory',
+    description: 'Üretim geçmişi (salt okunur — Yapay Zekâ Yazılım Fabrikası)',
+    available: true,
+  },
   { id: 'products', label: 'Yönetilen Ürünler', description: 'Projeler ve ürün kayıtları', available: true },
   { id: 'workflow', label: 'Workflow Studio', description: 'Gelişmiş iş akışı tasarımı', available: true },
   { id: 'team', label: 'AI Ekibi', description: 'Ajanlar ve görevler', available: false },
