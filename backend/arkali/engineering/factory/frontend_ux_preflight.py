@@ -362,16 +362,20 @@ def _form_quality_findings(frontend: str) -> list[SemanticFinding]:
     label_blocks = re.findall(
         r"<label\b[^>]*>.*?</label>", frontend, re.DOTALL | re.IGNORECASE,
     )
-    labelled_ids = set(re.findall(
-        r"<label\b[^>]*\b(?:htmlFor|for)=[\"']([^\"']+)[\"']", frontend,
-        re.IGNORECASE,
-    ))
+    attribute_value = r"(?:[\"']([^\"']+)[\"']|\{\s*([A-Za-z_$][\w$]*)\s*\})"
+    labelled_ids = {
+        quoted or identifier
+        for quoted, identifier in re.findall(
+            rf"<label\b[^>]*\b(?:htmlFor|for)={attribute_value}", frontend,
+            re.IGNORECASE,
+        )
+    }
 
     def has_accessible_name(control: str) -> bool:
         if re.search(r"\baria-(?:label|labelledby)=[\"'][^\"']+[\"']", control):
             return True
-        control_id = re.search(r"\bid=[\"']([^\"']+)[\"']", control)
-        if control_id and control_id.group(1) in labelled_ids:
+        control_id = re.search(rf"\bid={attribute_value}", control)
+        if control_id and (control_id.group(1) or control_id.group(2)) in labelled_ids:
             return True
         return any(control in block for block in label_blocks)
 

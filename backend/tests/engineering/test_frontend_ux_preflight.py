@@ -223,6 +223,32 @@ def test_wrapping_label_gives_its_control_an_accessible_name() -> None:
     assert not any(f.code == "frontend_ui_form_control_unlabelled" for f in findings)
 
 
+def test_matching_jsx_identifier_expressions_associate_label_and_control() -> None:
+    """golden-work-126: mapped fields commonly bind both attributes to the
+    same runtime identifier instead of a quoted constant."""
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            '<label htmlFor="name">Name</label>\n      <input id="name" required />',
+            "<label htmlFor={field}>Name</label>\n      <input id={field} required />",
+        ),
+    }
+    findings = _ux_spec_mutation_findings(files)
+    assert not any(f.code == "frontend_ui_form_control_unlabelled" for f in findings)
+
+
+def test_different_jsx_identifier_expressions_do_not_associate_a_label() -> None:
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            '<label htmlFor="name">Name</label>\n      <input id="name" required />',
+            "<label htmlFor={labelId}>Name</label>\n      <input id={controlId} required />",
+        ),
+    }
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_form_control_unlabelled" for f in findings)
+
+
 def test_f_a_professional_multi_module_shell_structurally_passes() -> None:
     """Every declared navigation destination reachable, real forms with
     labels and validation, loading/empty/error/success states, and a
