@@ -55,6 +55,23 @@
  * the list row containing this journey's own created record's own real
  * value, and both mutation checks require the exact real id this journey
  * itself created, not just any id.
+ *
+ * (5) A NATIVE `window.confirm()` DESTRUCTIVE-CONFIRMATION IS A REAL, VALID
+ * IMPLEMENTATION CHOICE, NOT A DEFECT. golden-work-127 (real evidence,
+ * frozen): its own real Students.js wires the row's own "Delete" button
+ * directly to `if (window.confirm(...)) { await deleteStudent(id); ... }`
+ * - no separate confirm route or in-page Yes/No control exists at all, the
+ * one real, idiomatic pattern this journey had not yet seen. Playwright
+ * auto-DISMISSES any dialog with no registered handler (`confirm()`
+ * resolves `false`), so the click fired, the dialog appeared and was
+ * silently dismissed, and the `if` branch - and therefore the real DELETE
+ * request - never ran: "delete flow did not emit a real DELETE .../9
+ * request", reproduced live. A human clicking the same button in a real
+ * browser sees the dialog and can accept it; this journey must do the
+ * same rather than penalizing a candidate for a real, common React
+ * pattern. The handler below accepts every dialog unconditionally - this
+ * journey drives no destructive action it does not itself intend, so
+ * there is nothing to decline.
  */
 
 import { createRequire } from 'node:module';
@@ -148,6 +165,10 @@ const failedRequests = [];
 const mutations = [];
 page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 page.on('pageerror', (error) => pageErrors.push(String(error)));
+// (5, module docstring): a real destructive-confirmation can be a native
+// `window.confirm()`, which Playwright otherwise auto-dismisses. Accepting
+// every dialog is what a real user proceeding through this journey does.
+page.on('dialog', (dialog) => { void dialog.accept(); });
 page.on('requestfailed', (request) => failedRequests.push(`${request.method()} ${request.url()}`));
 page.on('response', (response) => {
   const method = response.request().method();

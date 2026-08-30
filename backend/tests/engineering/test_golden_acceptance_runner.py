@@ -599,6 +599,22 @@ class TestCoreRunnerIsDomainIndependent:
         assert shapes[0] == shapes[1] == shapes[2]
 
 
+def test_browser_journey_accepts_native_confirmation_dialogs() -> None:
+    """golden-work-127 (real evidence, frozen): a real, valid, idiomatic
+    candidate frontend gated its destructive confirmation behind a native
+    `window.confirm()` rather than a custom in-page control. Playwright
+    auto-dismisses any dialog with no registered handler, so the real
+    DELETE request this candidate's own code would otherwise have sent
+    never fired -- reproduced live, and confirmed fixed live (a real
+    Playwright page with the identical `if (window.confirm(...)) {...}`
+    shape: the delete branch never runs with no handler registered, and
+    always runs once `page.on('dialog', ...)` accepts it). Not a candidate
+    defect: the journey must accept a dialog exactly as a real user would."""
+    browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
+    assert "page.on('dialog'" in browser
+    assert "dialog.accept()" in browser
+
+
 def test_browser_journey_is_driven_entirely_by_the_scenario_file() -> None:
     """ARK-REQ-0074: the browser journey script itself names no resource,
     field, or route -- every literal comes from --scenario at runtime."""
