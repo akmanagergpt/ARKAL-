@@ -1,0 +1,33 @@
+{
+  "scenario_id": "student_fee_management",
+  "resources": [
+    {
+      "name": "students",
+      "collection_route": "/students",
+      "navigation_label": "Students",
+      "singular_label": "Student",
+      "editable_form_fields": ["name", "email"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": true
+    },
+    {
+      "name": "payments",
+      "collection_route": "/payments",
+      "navigation_label": "Payments",
+      "singular_label": "Payment",
+      "editable_form_fields": ["amount", "due_date"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": false,
+      "relationship_fields": {"student_id": "students"}
+    }
+  ],
+  "primary_resource": "students",
+  "create_payload": {"name": "Acceptance Student", "email": "acceptance@example.com"},
+  "update_payload": {"name": "Acceptance Student Edited", "email": "edited@example.com"},
+  "related_resource": "payments",
+  "related_create_payload": {"amount": 125.5, "due_date": "2030-01-15"},
+  "navigation_destinations": ["Students", "Payments", "Dashboard"],
+  "browser_create_values": {"name": "Browser Acceptance Student", "email": "browser.acceptance@example.com"},
+  "browser_update_values": {"name": "Browser Acceptance Edited"},
+  "browser_related_values": {"amount": "50.25", "due_date": "2030-02-01"}
+}

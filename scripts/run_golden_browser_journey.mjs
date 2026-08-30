@@ -1,5 +1,12 @@
 /**
- * Real Chromium journey for a generated Student/Fee Golden candidate.
+ * Real Chromium journey for a generated Golden candidate, driven entirely
+ * by a real `AcceptanceScenario` JSON file (`--scenario`) -- ARK-REQ-0074
+ * ("Golden domain logic must not enter ARKALI core"): this script itself
+ * names no resource, field, or route. What follows was hardened against
+ * the Student/Fee Golden specifically; every fact that made it Student/Fee-
+ * specific (routes, nav labels, field names, payload values) now comes
+ * from the scenario file. The four real gaps below, and the fixes for
+ * them, are domain-independent and apply to any scenario this drives.
  *
  * FOUR REAL GAPS, EACH FOUND LIVE AGAINST A REAL CANDIDATE BUILD, ARE CLOSED
  * HERE - never by relaxing what this journey actually proves.
@@ -9,11 +16,12 @@
  * unremarkable CRUD code) can unmount its own success message before the
  * browser ever paints it - it painted on one run and not on the next, an
  * inherent race against that valid pattern rather than a defect. Every
- * mutation step (create/edit/delete/payment) already proves success the
- * same, non-racy way every other step here does: a real network mutation is
- * observed (`mutations`), and the record's new state is later found in the
- * app's own stable, reloaded view. A transient toast is a UX nicety, not
- * something this journey needs to observe to prove the mutation real.
+ * mutation step (create/edit/delete/related-create) already proves success
+ * the same, non-racy way every other step here does: a real network
+ * mutation is observed (`mutations`), and the record's new state is later
+ * found in the app's own stable, reloaded view. A transient toast is a UX
+ * nicety, not something this journey needs to observe to prove the
+ * mutation real.
  *
  * (2) `firstVisible` (`lib/browser_journey_wait.mjs`) now retries instead of
  * checking visibility once - the same full-reload window can hide the next
@@ -26,30 +34,31 @@
  * what a live run reproduced.
  *
  * (3) NO ASSUMPTION THAT EDIT LOOKS TEXTUALLY DIFFERENT FROM CREATE.
- * golden-work-113/119 (real evidence, both frozen): a shared form component
- * reused for both create and edit renders no "Edit" heading of any kind, and
- * its one submit button reads "Submit" on both routes, not "Update"/"Save" -
- * a real, valid, minimal implementation, not a defect, and this journey's
- * own `/update|save/i` pattern and heading assertion both failed 100% of the
- * time they were ever actually reached. The heading assertion is replaced
- * with a URL assertion (`/students/edit/<the real created id>`), which
- * proves the same real fact (we reached the real edit route for the real
- * record) without presuming any particular heading text exists; the submit
- * pattern now also accepts "submit".
+ * golden-work-113/119 (real evidence, both frozen, Student/Fee Golden): a
+ * shared form component reused for both create and edit renders no "Edit"
+ * heading of any kind, and its one submit button reads "Submit" on both
+ * routes, not "Update"/"Save" - a real, valid, minimal implementation, not
+ * a defect, and this journey's own `/update|save/i` pattern and heading
+ * assertion both failed 100% of the time they were ever actually reached.
+ * The heading assertion is replaced with a URL assertion (the real created
+ * id's own edit route), which proves the same real fact (we reached the
+ * real edit route for the real record) without presuming any particular
+ * heading text exists; the submit pattern now also accepts "submit".
  *
  * (4) EDIT/DELETE NOW CLICK THE CONTROL IN THIS JOURNEY'S OWN ROW, NOT THE
- * FIRST MATCH ON THE PAGE. A fresh acceptance database seeds at least one
- * pre-existing student (`John Doe`); `clickNamed(page, /edit/i)` matched
- * that row's Edit link first, in DOM order, silently editing the wrong
- * record every time this journey ran against a real seeded database - the
- * PUT still landed on some real id, so the old, unscoped mutation check
- * (`.includes('/students/')`) never caught it. Edit/delete are now scoped
- * to the list row containing this journey's own created student's name,
- * and both mutation checks require the exact real id this journey itself
- * created, not just any id.
+ * FIRST MATCH ON THE PAGE. A fresh acceptance database can seed at least
+ * one pre-existing record; `clickNamed(page, /edit/i)` would match that
+ * row's Edit link first, in DOM order, silently editing the wrong record
+ * every time this journey ran against a real seeded database - the PUT
+ * still landed on some real id, so an unscoped mutation check (matching
+ * only the collection route) never caught it. Edit/delete are scoped to
+ * the list row containing this journey's own created record's own real
+ * value, and both mutation checks require the exact real id this journey
+ * itself created, not just any id.
  */
 
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -62,12 +71,40 @@ const requireFromFrontend = createRequire(path.join(ROOT, 'frontend', 'package.j
 const { chromium, expect } = requireFromFrontend('@playwright/test');
 const BASE = 'http://127.0.0.1:3000';
 const API = 'http://localhost:5000';
+
 const candidateIndex = process.argv.indexOf('--candidate');
 const candidate = candidateIndex >= 0 ? process.argv[candidateIndex + 1] : 'unknown';
-const studentIdIndex = process.argv.indexOf('--student-id');
-const studentId = studentIdIndex >= 0 ? process.argv[studentIdIndex + 1] : null;
-if (!studentId || !/^\d+$/.test(studentId)) {
-  throw new Error('--student-id must identify the persisted backend acceptance student');
+const primaryIdIndex = process.argv.indexOf('--primary-id');
+const primaryBackendId = primaryIdIndex >= 0 ? process.argv[primaryIdIndex + 1] : null;
+if (!primaryBackendId || !/^\d+$/.test(primaryBackendId)) {
+  throw new Error('--primary-id must identify the real backend-persisted primary record');
+}
+const scenarioIndex = process.argv.indexOf('--scenario');
+const scenarioPath = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : null;
+if (!scenarioPath) {
+  throw new Error('--scenario must name a real AcceptanceScenario JSON file');
+}
+const scenario = JSON.parse(readFileSync(scenarioPath, 'utf-8'));
+const resourceByName = Object.fromEntries(scenario.resources.map((r) => [r.name, r]));
+const primary = resourceByName[scenario.primary_resource];
+const related = scenario.related_resource ? resourceByName[scenario.related_resource] : null;
+const dashboardLabel = scenario.navigation_destinations[scenario.navigation_destinations.length - 1];
+
+/** A loose, case-insensitive label pattern for a real declared field name
+ * -- "due_date" -> /due.*date/i, "amount" -> /amount/i -- the same shape
+ * this journey's own hardened patterns already used before every field
+ * name was a scenario value rather than a literal. */
+function fieldPattern(fieldName) {
+  return new RegExp(fieldName.replace(/_/g, '.*'), 'i');
+}
+
+function navPattern(label) {
+  return new RegExp(label, 'i');
+}
+
+function createButtonPattern(singularLabel) {
+  const word = singularLabel.toLowerCase();
+  return new RegExp(`create.*${word}|add.*${word}|new.*${word}`, 'i');
 }
 
 async function clickNamed(page, pattern) {
@@ -83,6 +120,14 @@ async function fillByLabel(page, pattern, value) {
     page.getByLabel(pattern), page.getByPlaceholder(pattern),
   ]);
   await input.fill(value);
+}
+
+async function fillFields(page, fields, values) {
+  for (const fieldName of fields) {
+    if (Object.prototype.hasOwnProperty.call(values, fieldName)) {
+      await fillByLabel(page, fieldPattern(fieldName), String(values[fieldName]));
+    }
+  }
 }
 
 /** The `pattern`-named control inside the list row whose text is `rowText`. */
@@ -113,53 +158,59 @@ page.on('response', (response) => {
 try {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await expect(page.getByRole('navigation')).toBeVisible();
-  await clickNamed(page, /students/i);
-  await expect(page.getByRole('heading', { name: /students/i })).toBeVisible();
+  await clickNamed(page, navPattern(primary.navigation_label));
+  await expect(page.getByRole('heading', { name: navPattern(primary.navigation_label) })).toBeVisible();
 
-  await clickNamed(page, /create.*student|add.*student|new.*student/i);
-  await expect(page.getByLabel(/name/i)).toBeVisible();
-  await expect(page.getByLabel(/email/i)).toBeVisible();
+  const createValues = scenario.browser_create_values || {};
+  await clickNamed(page, createButtonPattern(primary.singular_label));
+  for (const fieldName of primary.editable_form_fields) {
+    await expect(page.getByLabel(fieldPattern(fieldName))).toBeVisible();
+  }
   const mutationCountBeforeValidation = mutations.length;
-  await clickNamed(page, /create.*student|save|submit/i);
+  await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
   if (mutations.length !== mutationCountBeforeValidation) {
     throw new Error('invalid empty form emitted a network mutation');
   }
-  await fillByLabel(page, /name/i, 'Browser Acceptance Student');
-  await fillByLabel(page, /email/i, 'browser.acceptance@example.com');
-  await clickNamed(page, /create.*student|save|submit/i);
+  await fillFields(page, primary.editable_form_fields, createValues);
+  await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
   await waitForMutation(
     mutations,
-    (m) => m.method === 'POST' && m.url.includes('/students'),
-    'student form did not emit a real POST /students request',
+    (m) => m.method === 'POST' && m.url.includes(primary.collection_route),
+    `${primary.name} form did not emit a real POST ${primary.collection_route} request`,
   );
 
-  await clickNamed(page, /students/i);
-  await expect(page.getByText('Browser Acceptance Student', { exact: false })).toBeVisible();
+  const createdText = Object.values(createValues)[0];
+  await clickNamed(page, navPattern(primary.navigation_label));
+  await expect(page.getByText(createdText, { exact: false })).toBeVisible();
   // Read the real created id back from the list's own rendered edit link
   // (its href always embeds the record's real id) rather than the create
-  // POST's response body: that read raced against this candidate's own
+  // POST's response body: that read raced against a real candidate's own
   // window.location.href navigation and intermittently came back empty,
-  // reproduced live - the DOM here is post-navigation and stable.
-  const createdRow = page.getByRole('listitem').filter({ hasText: 'Browser Acceptance Student' });
+  // reproduced live against the Student/Fee Golden - the DOM here is
+  // post-navigation and stable.
+  const createdRow = page.getByRole('listitem').filter({ hasText: createdText });
   const editHref = await createdRow.getByRole('link', { name: /edit/i }).first().getAttribute('href');
   const createdIdMatch = editHref?.match(/(\d+)\/?$/);
   if (!createdIdMatch) {
-    throw new Error(`the new student's own row has no numeric id in its edit link href: ${editHref}`);
+    throw new Error(`the new ${primary.name} row has no numeric id in its edit link href: ${editHref}`);
   }
   const createdId = createdIdMatch[1];
-  await clickInRow(page, 'Browser Acceptance Student', /edit/i);
-  await expect(page).toHaveURL(new RegExp(`/students/edit/${createdId}(?:[/?]|$)`));
-  await fillByLabel(page, /name/i, 'Browser Acceptance Edited');
+  await clickInRow(page, createdText, /edit/i);
+  const collectionSegment = primary.collection_route.replace(/^\//, '');
+  await expect(page).toHaveURL(new RegExp(`/${collectionSegment}/edit/${createdId}(?:[/?]|$)`));
+  const updateValues = scenario.browser_update_values || {};
+  await fillFields(page, primary.editable_form_fields, updateValues);
   await clickNamed(page, /update|save|submit/i);
   await waitForMutation(
     mutations,
-    (m) => m.method === 'PUT' && m.url.includes(`/students/${createdId}`),
-    `edit form did not emit a real PUT /students/${createdId} request`,
+    (m) => m.method === 'PUT' && m.url.includes(`${primary.collection_route}/${createdId}`),
+    `edit form did not emit a real PUT ${primary.collection_route}/${createdId} request`,
   );
 
-  await clickNamed(page, /students/i);
-  await expect(page.getByText('Browser Acceptance Edited', { exact: false })).toBeVisible();
-  await clickInRow(page, 'Browser Acceptance Edited', /delete/i);
+  const updatedText = Object.values(updateValues)[0] || createdText;
+  await clickNamed(page, navPattern(primary.navigation_label));
+  await expect(page.getByText(updatedText, { exact: false })).toBeVisible();
+  await clickInRow(page, updatedText, /delete/i);
   const confirm = await firstVisible([
     page.getByRole('button', { name: /confirm|yes|delete/i }),
     page.getByRole('link', { name: /confirm|yes|delete/i }),
@@ -167,28 +218,32 @@ try {
   await confirm.click();
   await waitForMutation(
     mutations,
-    (m) => m.method === 'DELETE' && m.url.includes(`/students/${createdId}`),
-    `delete flow did not emit a real DELETE /students/${createdId} request`,
+    (m) => m.method === 'DELETE' && m.url.includes(`${primary.collection_route}/${createdId}`),
+    `delete flow did not emit a real DELETE ${primary.collection_route}/${createdId} request`,
   );
 
-  await clickNamed(page, /payments/i);
-  await expect(page.getByRole('heading', { name: /payments/i })).toBeVisible();
-  const paymentCreate = page.getByRole('link', { name: /create.*payment|add.*payment|new.*payment/i });
-  if (await paymentCreate.count()) {
-    await paymentCreate.first().click();
-    await fillByLabel(page, /student.*id/i, studentId);
-    await fillByLabel(page, /amount/i, '50.25');
-    await fillByLabel(page, /due.*date/i, '2030-02-01');
-    await clickNamed(page, /create.*payment|save|submit/i);
-    await waitForMutation(
-      mutations,
-      (m) => m.method === 'POST' && m.url.includes('/payments'),
-      'payment form did not emit a real POST /payments request',
-    );
+  if (related) {
+    await clickNamed(page, navPattern(related.navigation_label));
+    await expect(page.getByRole('heading', { name: navPattern(related.navigation_label) })).toBeVisible();
+    const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
+    if (await relatedCreate.count()) {
+      await relatedCreate.first().click();
+      const relationshipField = Object.keys(related.relationship_fields || {})[0];
+      if (relationshipField) {
+        await fillByLabel(page, fieldPattern(relationshipField), primaryBackendId);
+      }
+      await fillFields(page, related.editable_form_fields, scenario.browser_related_values || {});
+      await clickNamed(page, new RegExp(`create.*${related.singular_label.toLowerCase()}|save|submit`, 'i'));
+      await waitForMutation(
+        mutations,
+        (m) => m.method === 'POST' && m.url.includes(related.collection_route),
+        `${related.name} form did not emit a real POST ${related.collection_route} request`,
+      );
+    }
   }
 
-  await clickNamed(page, /dashboard/i);
-  await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible();
+  await clickNamed(page, navPattern(dashboardLabel));
+  await expect(page.getByRole('heading', { name: navPattern(dashboardLabel) })).toBeVisible();
   if (consoleErrors.length || pageErrors.length || failedRequests.length) {
     throw new Error(JSON.stringify({ consoleErrors, pageErrors, failedRequests }));
   }

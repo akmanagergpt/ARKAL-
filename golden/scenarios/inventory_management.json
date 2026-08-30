@@ -1,0 +1,42 @@
+{
+  "scenario_id": "inventory_management",
+  "resources": [
+    {
+      "name": "products",
+      "collection_route": "/products",
+      "navigation_label": "Products",
+      "singular_label": "Product",
+      "editable_form_fields": ["name", "price"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": true
+    },
+    {
+      "name": "categories",
+      "collection_route": "/categories",
+      "navigation_label": "Categories",
+      "singular_label": "Category",
+      "editable_form_fields": ["name"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": false
+    },
+    {
+      "name": "stock_movements",
+      "collection_route": "/stock-movements",
+      "navigation_label": "Stock Movements",
+      "singular_label": "Stock Movement",
+      "editable_form_fields": ["quantity", "movement_type"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": false,
+      "relationship_fields": {"product_id": "products"}
+    }
+  ],
+  "primary_resource": "products",
+  "create_payload": {"name": "Acceptance Product", "price": 19.99},
+  "update_payload": {"name": "Acceptance Product Edited", "price": 24.99},
+  "related_resource": "stock_movements",
+  "related_create_payload": {"quantity": 10, "movement_type": "restock"},
+  "navigation_destinations": ["Products", "Categories", "Stock Movements", "Dashboard"],
+  "browser_create_values": {"name": "Browser Acceptance Product", "price": "29.99"},
+  "browser_update_values": {"name": "Browser Acceptance Product Edited"},
+  "browser_related_values": {"quantity": "5", "movement_type": "restock"}
+}

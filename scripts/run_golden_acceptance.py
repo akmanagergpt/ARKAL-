@@ -32,12 +32,37 @@ from arkali.engineering.candidate.ledger import (  # noqa: E402
     CandidateLedger,
     INTERRUPTED,
 )
+from arkali.engineering.factory.acceptance_scenario import _AcceptanceScenario  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CANDIDATES = ROOT / "var" / "factory" / "candidates"
 RUNTIMES = ROOT / "var" / "factory" / "runtime"
 BACKEND_PORT = 5000
 FRONTEND_PORT = 3000
+#: ARK-REQ-0074 ("Golden domain logic must not enter ARKALI core"): the
+#: runner itself names no resource, field, or route -- every real domain
+#: fact (route, payload, relationship, navigation, editable field) comes
+#: from a real `_AcceptanceScenario` loaded from here. A different Golden
+#: family gets its own sibling JSON, never a change to this script.
+DEFAULT_SCENARIO = ROOT / "golden" / "scenarios" / "student_fee_management.json"
+
+
+def _load_scenario(path: pathlib.Path) -> _AcceptanceScenario:
+    return _AcceptanceScenario.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _relationship_payload(
+    related: object, related_create_payload: dict[str, object], created_ids: dict[str, int],
+) -> dict[str, object]:
+    """`related_create_payload` plus every relationship field this
+    resource declares, resolved against ids real earlier resources in
+    this same journey actually got back from the backend -- never a
+    literal id this runner invented itself."""
+    payload = dict(related_create_payload)
+    for field_name, resource_name in related.relationship_fields.items():  # type: ignore[attr-defined]
+        if resource_name in created_ids:
+            payload[field_name] = created_ids[resource_name]
+    return payload
 
 
 class AcceptanceCheckFailed(RuntimeError):
@@ -178,7 +203,10 @@ def _backend_process(python: pathlib.Path, candidate: pathlib.Path, log) -> subp
     )
 
 
-def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, object]:
+def _accept(
+    candidate_id: str, scenario: _AcceptanceScenario, scenario_path: pathlib.Path,
+    *, skip_browser: bool = False,
+) -> dict[str, object]:
     source_candidate = _candidate(candidate_id)
     ledger = CandidateLedger(CANDIDATES / "_ledger")
     journey = Journey(candidate_id)
@@ -249,22 +277,40 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
         test_output = _run([str(python), "-m", "pytest", "tests", "-q"], cwd=candidate)
         journey.record("generated_backend_tests", True, test_output.strip().splitlines()[-1])
 
+        primary = scenario.resource(scenario.primary_resource)
         backend_log = (evidence / "backend-first.log").open("w", encoding="utf-8")
         backend = _backend_process(python, candidate, backend_log)
-        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}/students", backend)
-        status, student = _json_request("POST", f"http://127.0.0.1:{BACKEND_PORT}/students", {
-            "name": "Acceptance Student", "email": "acceptance@example.com",
-        })
-        student_id = int(student["id"])  # type: ignore[index]
-        journey.record("student_create", status == 201, f"POST /students -> {status}, id={student_id}")
-        status, _ = _json_request("PUT", f"http://127.0.0.1:{BACKEND_PORT}/students/{student_id}", {
-            "name": "Acceptance Student Edited", "email": "edited@example.com",
-        })
-        journey.record("student_edit", status == 200, f"PUT /students/{student_id} -> {status}")
-        status, payment = _json_request("POST", f"http://127.0.0.1:{BACKEND_PORT}/payments", {
-            "student_id": student_id, "amount": 125.5, "due_date": "2030-01-15",
-        })
-        journey.record("payment_create", status == 201, f"POST /payments -> {status}, body={payment}")
+        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
+        status, primary_obj = _json_request(
+            "POST", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+            scenario.create_payload,
+        )
+        primary_id = int(primary_obj["id"])  # type: ignore[index]
+        created_ids = {scenario.primary_resource: primary_id}
+        journey.record(
+            f"{scenario.primary_resource}_create", status == 201,
+            f"POST {primary.collection_route} -> {status}, id={primary_id}",
+        )
+        status, _ = _json_request(
+            "PUT", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}/{primary_id}",
+            scenario.update_payload,
+        )
+        journey.record(
+            f"{scenario.primary_resource}_edit", status == 200,
+            f"PUT {primary.collection_route}/{primary_id} -> {status}",
+        )
+        related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
+        if related is not None and scenario.related_create_payload is not None:
+            related_payload = _relationship_payload(
+                related, scenario.related_create_payload, created_ids,
+            )
+            status, related_obj = _json_request(
+                "POST", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}", related_payload,
+            )
+            journey.record(
+                f"{scenario.related_resource}_create", status == 201,
+                f"POST {related.collection_route} -> {status}, body={related_obj}",
+            )
         _stop(backend)
         backend = None
         journey.record(
@@ -275,11 +321,21 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
         backend_log.close()
         restart_log = (evidence / "backend-restart.log").open("w", encoding="utf-8")
         backend = _backend_process(python, candidate, restart_log)
-        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}/students", backend)
-        _, students = _json_request("GET", f"http://127.0.0.1:{BACKEND_PORT}/students")
-        _, payments = _json_request("GET", f"http://127.0.0.1:{BACKEND_PORT}/payments")
-        persisted = any(row.get("id") == student_id for row in students) and bool(payments)  # type: ignore[union-attr]
-        journey.record("sqlite_restart_persistence", persisted, "student and payment survived a real restart")
+        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
+        _, primary_rows = _json_request(
+            "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+        )
+        primary_persisted = any(row.get("id") == primary_id for row in primary_rows)  # type: ignore[union-attr]
+        related_persisted = True
+        if related is not None:
+            _, related_rows = _json_request(
+                "GET", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}",
+            )
+            related_persisted = bool(related_rows)
+        journey.record(
+            "sqlite_restart_persistence", primary_persisted and related_persisted,
+            f"{scenario.primary_resource} and {scenario.related_resource} survived a real restart",
+        )
 
         frontend_dir = candidate / "frontend"
         npm = "npm.cmd" if os.name == "nt" else "npm"
@@ -303,7 +359,8 @@ def _accept(candidate_id: str, *, skip_browser: bool = False) -> dict[str, objec
         if not skip_browser:
             browser_output = _run(
                 ["node", str(ROOT / "scripts" / "run_golden_browser_journey.mjs"),
-                 "--candidate", candidate_id, "--student-id", str(student_id)], cwd=ROOT,
+                 "--candidate", candidate_id, "--scenario", str(scenario_path),
+                 "--primary-id", str(primary_id)], cwd=ROOT,
                 timeout_seconds=120,
             )
             (evidence / "browser.json").write_text(browser_output, encoding="utf-8")
@@ -367,8 +424,15 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--skip-browser", action="store_true", help="diagnostic only; can never accept")
+    parser.add_argument(
+        "--scenario", type=pathlib.Path, default=DEFAULT_SCENARIO,
+        help="path to a real AcceptanceScenario JSON file (ARK-REQ-0074: this runner names no "
+             "resource, field, or route of its own); defaults to the Student/Fee Golden's own "
+             f"scenario ({DEFAULT_SCENARIO.relative_to(ROOT)})",
+    )
     args = parser.parse_args(argv[1:])
-    result = _accept(args.candidate_id, skip_browser=args.skip_browser)
+    scenario = _load_scenario(args.scenario)
+    result = _accept(args.candidate_id, scenario, args.scenario, skip_browser=args.skip_browser)
     if args.skip_browser and result["outcome"] == "GOLDEN_ACCEPTANCE_PASS":
         result["outcome"] = "GOLDEN_ACCEPTANCE_INCOMPLETE"
     print(json.dumps(result, ensure_ascii=False))

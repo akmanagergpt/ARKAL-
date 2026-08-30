@@ -429,8 +429,9 @@ def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[Se
                         f"custom props, but {component_name} destructures {unexpected!r} -- "
                         "react-router's component= only ever injects match/location/history/"
                         "staticContext. Either make the routed component fetch its own data "
-                        "(the same real pattern this candidate's own EditStudent/DeleteStudent "
-                        "components already use) or replace component={...} with "
+                        "(reading any route parameter it needs via useParams(), the same "
+                        "pattern any other real, correctly-wired routed component in this "
+                        "candidate already uses) or replace component={...} with "
                         "render={props => <Component {...props} ... />} and pass the real data"
                     ),
                 ))

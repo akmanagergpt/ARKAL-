@@ -117,6 +117,60 @@ class TestMutationContractBuilder:
             "form_fields": ["name", "email"],
         }]
 
+    def test_the_same_algorithm_produces_the_same_shape_across_three_unrelated_domains(
+        self,
+    ) -> None:
+        """The core mutation-contract algorithm names no domain -- the
+        exact same code, unchanged, must derive a structurally identical
+        contract shape for a student/fee product, an inventory product,
+        and a task/reservation product. Proves _build_mutation_contracts
+        is domain-independent, not merely undocumented-as-domain-specific."""
+        domains = {
+            "student_fee": (
+                json.dumps({"modules": [{
+                    "name": "students", "actions": ["create", "edit", "delete"],
+                    "forms": [{"name": "student_form", "fields": ["id", "name", "email"]}],
+                }]}),
+                "export function createStudent(name, email) {}\n"
+                "export function updateStudent(id, name, email) {}\n"
+                "export function deleteStudent(id) {}\n",
+                "createStudent", "updateStudent", "deleteStudent",
+            ),
+            "inventory": (
+                json.dumps({"modules": [{
+                    "name": "products", "actions": ["create", "edit", "delete"],
+                    "forms": [{"name": "product_form", "fields": ["id", "name", "price"]}],
+                }]}),
+                "export function createProduct(name, price) {}\n"
+                "export function updateProduct(id, name, price) {}\n"
+                "export function deleteProduct(id) {}\n",
+                "createProduct", "updateProduct", "deleteProduct",
+            ),
+            "task_reservation": (
+                json.dumps({"modules": [{
+                    "name": "tasks", "actions": ["create", "edit", "delete"],
+                    "forms": [{"name": "task_form", "fields": ["id", "title", "due_date"]}],
+                }]}),
+                "export function createTask(title, due_date) {}\n"
+                "export function updateTask(id, title, due_date) {}\n"
+                "export function deleteTask(id) {}\n",
+                "createTask", "updateTask", "deleteTask",
+            ),
+        }
+        for domain_name, (ux_spec, client, create_fn, edit_fn, delete_fn) in domains.items():
+            contracts = _build_mutation_contracts(ux_spec, client)
+            assert len(contracts) == 1, domain_name
+            contract = contracts[0]
+            # Structural shape identical across all three -- only the real
+            # names differ, never the algorithm.
+            assert set(contract.keys()) == {"module", "actions", "form_fields"}, domain_name
+            assert set(contract["actions"].keys()) == {"create", "edit", "delete"}, domain_name
+            assert contract["actions"]["create"]["client_function"] == create_fn
+            assert contract["actions"]["edit"]["client_function"] == edit_fn
+            assert contract["actions"]["edit"]["route_param"] == "id"
+            assert contract["actions"]["delete"]["client_function"] == delete_fn
+            assert "id" not in contract["form_fields"]
+
     def test_8_the_route_identifier_is_never_a_form_field(self) -> None:
         """"Route ID form alanı değildir" -- golden-work-125's own real
         product_ux_spec.json listed "id" inside forms[].fields as though
@@ -192,6 +246,11 @@ class TestRepairStrategyEscalation:
         assert "repair_hint" not in payload
 
     def test_structured_hint_strategy_names_the_forbidden_pattern_and_a_worked_example(self) -> None:
+        """The worked example inside the hint must be derived from THIS
+        candidate's own real mutation_contracts (here, the "works"
+        domain fixture's own real updateWork(id, title)) -- never a
+        fixed example naming a field or function from an unrelated
+        domain a differently-domained candidate would never generate."""
         decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
         visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
         payload = json.loads(_stage_prompt(
@@ -200,8 +259,10 @@ class TestRepairStrategyEscalation:
         ))
         assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
         hint = payload["repair_hint"]
-        assert "onSubmit={updateStudent}" in hint
+        assert "updateWork" in hint  # this fixture's own real edit client function
         assert "useParams()" in hint
+        assert "updateStudent" not in hint
+        assert "StudentForm" not in hint
 
 
 class TestBareReferenceEditCallbackBan:

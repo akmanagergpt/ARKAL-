@@ -53,24 +53,54 @@ def _repair_strategy_for_attempt(attempt_number: int) -> str:
     return _DEFAULT_REPAIR_STRATEGY if attempt_number <= 1 else _STRUCTURED_HINT_REPAIR_STRATEGY
 
 
-_STRUCTURED_HINT_TEXT = (
-    "This is a retry. Do not simply reword the previous attempt -- apply this "
-    "exact pattern. For any module's edit or delete action, the route (not the "
-    "form) supplies the record's real identifier: read it as the FIRST line of "
-    "the routed component's own function body via `const { id } = useParams();` "
-    "(imported from 'react-router-dom'), then pass it explicitly, in order, to "
-    "the real client function named in mutation_contracts. If a form component "
-    "is shared between create and edit, wrap the mutation call in a closure "
-    "that supplies every real argument explicitly -- for example: "
-    "`onSubmit={async (name, email) => { const { id } = useParams(); "
-    "await updateStudent(id, name, email); }}`. NEVER bind a mutation prop "
-    "directly to a bare multi-parameter client function reference (for "
-    "example `onSubmit={updateStudent}` is always wrong for a shared form "
-    "component) -- a bare reference cannot supply the route's own identifier "
-    "and silently shifts every other positional argument. A route's own "
-    "identifier is never a user-entered form field -- do not render an input "
-    "for it; mutation_contracts.form_fields already excludes it."
-)
+def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) -> str:
+    """A real worked example derived from THIS candidate's own real
+    `mutation_contracts` -- never a fixed example naming a field or
+    function from some other, unrelated domain. A pipeline that must
+    generate an inventory or task-management product just as reliably
+    as a student/fee one must never see a worked example whose names
+    only make sense for a different domain than the one it is actually
+    generating."""
+    for contract in mutation_contracts:
+        actions = contract.get("actions") if isinstance(contract, dict) else None
+        edit = actions.get("edit") if isinstance(actions, dict) else None
+        if not isinstance(edit, dict):
+            continue
+        function = edit.get("client_function")
+        signature = edit.get("signature")
+        route_param = edit.get("route_param")
+        if not (function and isinstance(signature, list) and route_param):
+            continue
+        form_args = [p for p in signature if p != route_param]
+        return (
+            f"`onSubmit={{async ({', '.join(form_args)}) => {{ const {{ {route_param} }} "
+            f"= useParams(); await {function}({', '.join(signature)}); }}}}`"
+        )
+    return (
+        "`onSubmit={async (...formFields) => { const { id } = useParams(); "
+        "await updateResource(id, ...formFields); }}`"
+    )
+
+
+def _structured_hint_text(mutation_contracts: list[dict[str, object]]) -> str:
+    example = _worked_example_from_contracts(mutation_contracts)
+    return (
+        "This is a retry. Do not simply reword the previous attempt -- apply this "
+        "exact pattern. For any resource's edit or delete action, the route (not "
+        "the form) supplies the record's real identifier: read it as the FIRST "
+        "line of the routed component's own function body via "
+        "`const { id } = useParams();` (imported from 'react-router-dom'), then "
+        "pass it explicitly, in order, to the real client function named in "
+        "mutation_contracts. If a form component is shared between create and "
+        "edit, wrap the mutation call in a closure that supplies every real "
+        "argument explicitly -- for example, derived from this candidate's own "
+        f"real edit contract: {example}. NEVER bind a mutation prop directly to "
+        "a bare multi-parameter client function reference -- a bare reference "
+        "cannot supply the route's own identifier and silently shifts every "
+        "other positional argument. A route's own identifier is never a "
+        "user-entered form field -- do not render an input for it; "
+        "mutation_contracts.form_fields already excludes it."
+    )
 
 
 def _stage_prompt(
@@ -112,5 +142,5 @@ def _stage_prompt(
         payload["mutation_contracts"] = mutation_contracts
         payload["repair_strategy"] = repair_strategy
         if repair_strategy == _STRUCTURED_HINT_REPAIR_STRATEGY:
-            payload["repair_hint"] = _STRUCTURED_HINT_TEXT
+            payload["repair_hint"] = _structured_hint_text(mutation_contracts)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

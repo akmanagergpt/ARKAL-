@@ -1,0 +1,33 @@
+{
+  "scenario_id": "task_management",
+  "resources": [
+    {
+      "name": "projects",
+      "collection_route": "/projects",
+      "navigation_label": "Projects",
+      "singular_label": "Project",
+      "editable_form_fields": ["title"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": true
+    },
+    {
+      "name": "tasks",
+      "collection_route": "/tasks",
+      "navigation_label": "Tasks",
+      "singular_label": "Task",
+      "editable_form_fields": ["title", "due_date"],
+      "success_indicator_text": "success",
+      "destructive_confirmation_required": true,
+      "relationship_fields": {"project_id": "projects"}
+    }
+  ],
+  "primary_resource": "projects",
+  "create_payload": {"title": "Acceptance Project"},
+  "update_payload": {"title": "Acceptance Project Edited"},
+  "related_resource": "tasks",
+  "related_create_payload": {"title": "Acceptance Task", "due_date": "2030-03-01"},
+  "navigation_destinations": ["Projects", "Tasks", "Dashboard"],
+  "browser_create_values": {"title": "Browser Acceptance Project"},
+  "browser_update_values": {"title": "Browser Acceptance Project Edited"},
+  "browser_related_values": {"title": "Browser Acceptance Task", "due_date": "2030-04-01"}
+}

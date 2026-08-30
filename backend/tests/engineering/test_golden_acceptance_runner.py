@@ -23,6 +23,7 @@ from arkali.engineering.candidate.ledger import (
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 SCRIPT = REPO / "scripts" / "run_golden_acceptance.py"
+DEFAULT_SCENARIO_PATH = REPO / "golden" / "scenarios" / "student_fee_management.json"
 
 
 def _module():  # noqa: ANN202
@@ -32,6 +33,17 @@ def _module():  # noqa: ANN202
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _accept(runner, candidate_id: str, *, skip_browser: bool = True, scenario_path=None):  # noqa: ANN001, ANN202
+    """Defaults to the Student/Fee Golden's own real scenario -- most of
+    these tests exercise the runner's real lifecycle/ledger wiring, not
+    scenario generality. `TestCoreRunnerIsDomainIndependent` below passes
+    a different real scenario_path to prove the exact same runner code
+    drives an unrelated domain identically."""
+    path = scenario_path or DEFAULT_SCENARIO_PATH
+    scenario = runner._load_scenario(path)
+    return runner._accept(candidate_id, scenario, path, skip_browser=skip_browser)
 
 
 def test_candidate_path_rejects_traversal() -> None:
@@ -165,10 +177,18 @@ class _FakeProcess:
         return 0
 
 
-def _stub_a_full_successful_journey(runner, monkeypatch) -> None:  # noqa: ANN001
+def _stub_a_full_successful_journey(runner, monkeypatch, scenario=None) -> None:  # noqa: ANN001
     """Replaces every real subprocess/network/browser step `_accept`
     takes with a fast, deterministic double -- proves the ledger/outcome
-    wiring end-to-end without a real npm, flask, or Chromium install."""
+    wiring end-to-end without a real npm, flask, or Chromium install.
+    Route matching is derived from `scenario` itself (default: the
+    Student/Fee Golden's own real scenario) -- never hardcoded to one
+    domain's routes, so the same stub serves every domain's own tests."""
+    if scenario is None:
+        scenario = runner._load_scenario(DEFAULT_SCENARIO_PATH)
+    primary = scenario.resource(scenario.primary_resource)
+    related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
+
     def fake_run(command, *, cwd, env=None, timeout_seconds=300.0):  # noqa: ANN001, ARG001
         if "run" in command and "build" in command:
             (cwd / "build").mkdir(parents=True, exist_ok=True)
@@ -176,16 +196,17 @@ def _stub_a_full_successful_journey(runner, monkeypatch) -> None:  # noqa: ANN00
         return "ok\nok"
 
     def fake_json_request(method, url, payload=None):  # noqa: ANN001, ARG001
-        if method == "POST" and url.endswith("/students"):
+        if method == "POST" and url.endswith(primary.collection_route):
             return 201, {"id": 1}
-        if method == "PUT" and "/students/" in url:
+        if method == "PUT" and f"{primary.collection_route}/" in url:
             return 200, {}
-        if method == "POST" and url.endswith("/payments"):
-            return 201, {"id": 1}
-        if method == "GET" and url.endswith("/students"):
+        if method == "GET" and url.endswith(primary.collection_route):
             return 200, [{"id": 1}]
-        if method == "GET" and url.endswith("/payments"):
-            return 200, [{"id": 1}]
+        if related is not None:
+            if method == "POST" and url.endswith(related.collection_route):
+                return 201, {"id": 1}
+            if method == "GET" and url.endswith(related.collection_route):
+                return 200, [{"id": 1}]
         raise AssertionError(f"unexpected request {method} {url}")
 
     monkeypatch.setattr(runner, "_run", fake_run)
@@ -210,7 +231,7 @@ def test_1_staged_generation_pass_through_acceptance_running_to_accepted(
     source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
     _stub_a_full_successful_journey(runner, monkeypatch)
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
 
     assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
     states = [entry["state"] for entry in ledger.history(candidate_id)]
@@ -228,7 +249,7 @@ def test_2_staged_generation_pass_through_acceptance_running_to_acceptance_faile
     source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
     monkeypatch.setattr(runner, "_port_is_free", lambda port: False)  # the very first check fails
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
 
     assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED"
     states = [entry["state"] for entry in ledger.history(candidate_id)]
@@ -258,7 +279,7 @@ def test_3_a_stage_failed_candidate_cannot_be_accepted(
     copied: list[object] = []
     monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
     assert STAGE_FAILED in result["error"]
     assert copied == []
@@ -281,7 +302,7 @@ def test_4_a_legacy_unverified_candidate_cannot_be_accepted(
     copied: list[object] = []
     monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
     assert copied == []
 
@@ -297,7 +318,7 @@ def test_5_a_candidate_whose_manifest_was_modified_cannot_be_accepted(
     copied: list[object] = []
     monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     assert result["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
     assert "changed=" in result["error"]
     assert copied == []
@@ -318,7 +339,7 @@ def test_6_a_second_concurrent_acceptance_attempt_is_refused(
     copied: list[object] = []
     monkeypatch.setattr(runner, "_copy_candidate", lambda *a, **k: copied.append(a))
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     assert result["outcome"] == "ACCEPTANCE_ALREADY_IN_PROGRESS"
     assert copied == []
     assert ledger.classify(candidate_id) == STAGED_GENERATION_PASS  # untouched
@@ -340,7 +361,7 @@ def test_7_a_crash_during_acceptance_is_recorded_as_interrupted(
 
     monkeypatch.setattr(runner, "_run", boom)
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     assert result["outcome"] == "ACCEPTANCE_INTERRUPTED"
     assert ledger.classify(candidate_id) == INTERRUPTED
 
@@ -359,7 +380,7 @@ def test_7_a_keyboard_interrupt_during_acceptance_is_recorded_as_interrupted(
     monkeypatch.setattr(runner, "_run", interrupted)
 
     with pytest.raises(KeyboardInterrupt):
-        runner._accept(candidate_id, skip_browser=True)
+        _accept(runner, candidate_id)
     # Ctrl+C still propagates (the process really stops), but the ledger
     # and evidence were written first -- never a silently unrecorded gap.
     assert ledger.classify(candidate_id) == INTERRUPTED
@@ -373,7 +394,7 @@ def test_8_an_accepted_candidate_cannot_be_re_run(
     source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
     _stub_a_full_successful_journey(runner, monkeypatch)
 
-    first = runner._accept(candidate_id, skip_browser=True)
+    first = _accept(runner, candidate_id)
     assert first["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
 
     copied: list[object] = []
@@ -382,7 +403,7 @@ def test_8_an_accepted_candidate_cannot_be_re_run(
     # so the two real, back-to-back calls don't collide on one directory.
     real_time = runner.time.time
     monkeypatch.setattr(runner.time, "time", lambda: real_time() + 1)
-    second = runner._accept(candidate_id, skip_browser=True)
+    second = _accept(runner, candidate_id)
     assert second["outcome"] == "CANDIDATE_INTEGRITY_FAILED"
     assert "ACCEPTED" in second["error"]
     assert copied == []
@@ -396,7 +417,7 @@ def test_9_acceptance_evidence_dir_and_result_hash_are_recorded_in_the_ledger(
     source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
     _stub_a_full_successful_journey(runner, monkeypatch)
 
-    result = runner._accept(candidate_id, skip_browser=True)
+    result = _accept(runner, candidate_id)
     latest = ledger.latest(candidate_id)
     assert latest is not None
     detail = latest["detail"]
@@ -417,7 +438,7 @@ def test_10_the_source_candidate_stays_byte_identical_across_acceptance(
     before = file_manifest(source)
     _stub_a_full_successful_journey(runner, monkeypatch)
 
-    runner._accept(candidate_id, skip_browser=True)
+    _accept(runner, candidate_id)
 
     after = file_manifest(source)
     assert before == after
@@ -427,7 +448,7 @@ def test_skip_browser_can_never_report_acceptance(monkeypatch, capsys) -> None: 
     runner = _module()
     monkeypatch.setattr(
         runner, "_accept",
-        lambda candidate_id, skip_browser: {
+        lambda candidate_id, scenario, scenario_path, skip_browser: {
             "outcome": "GOLDEN_ACCEPTANCE_PASS", "candidate_id": candidate_id,
         },
     )
@@ -435,11 +456,12 @@ def test_skip_browser_can_never_report_acceptance(monkeypatch, capsys) -> None: 
     assert "GOLDEN_ACCEPTANCE_INCOMPLETE" in capsys.readouterr().out
 
 
-def test_browser_journey_receives_the_real_persisted_student_id() -> None:
+def test_browser_journey_receives_the_real_persisted_primary_id_and_scenario() -> None:
+    """ARK-REQ-0074: the runner passes the real scenario file through to
+    the browser journey rather than naming a resource of its own."""
     source = (REPO / "scripts" / "run_golden_acceptance.py").read_text(encoding="utf-8")
-    assert '"--student-id", str(student_id)' in source
-    browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
-    assert "fillByLabel(page, /student.*id/i, studentId)" in browser
+    assert '"--scenario", str(scenario_path)' in source
+    assert '"--primary-id", str(primary_id)' in source
 
 
 def test_run_kills_its_owned_process_tree_on_timeout(monkeypatch, tmp_path) -> None:  # noqa: ANN001
@@ -467,8 +489,14 @@ def test_frontend_install_has_a_finite_timeout() -> None:
 
 
 def test_browser_journey_accepts_a_visible_accessible_form_without_a_heading() -> None:
+    """Every editable field's own label is checked visible, derived from
+    the real scenario's own field names -- never a hardcoded field name
+    or an assumed "create" heading (golden-work-113/119's own real gap
+    (3): a shared form component reused for create and edit renders no
+    "Edit" heading of any kind on either route)."""
     browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
-    assert "getByLabel(/name/i)" in browser
+    assert "primary.editable_form_fields" in browser
+    assert "getByLabel(fieldPattern(fieldName))" in browser
     assert "createHeading" not in browser
 
 
@@ -498,3 +526,83 @@ def test_production_server_returns_the_spa_for_a_browser_history_route(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+class TestCoreRunnerIsDomainIndependent:
+    """ARK-REQ-0074 ("Golden domain logic must not enter ARKALI core"):
+    the exact same `_accept()` code, unchanged, drives an inventory
+    product and a task/reservation product exactly as it drives the
+    Student/Fee Golden -- every resource, route, and payload comes from
+    the real scenario file, never from the runner itself."""
+
+    def _run_scenario(self, monkeypatch, tmp_path: pathlib.Path, scenario_name: str):  # noqa: ANN001, ANN202
+        runner = _module()
+        scenario_path = REPO / "golden" / "scenarios" / f"{scenario_name}.json"
+        candidate_id = f"golden-work-{scenario_name.replace('_', '')}"
+        _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+        scenario = runner._load_scenario(scenario_path)
+        _stub_a_full_successful_journey(runner, monkeypatch, scenario=scenario)
+        result = _accept(runner, candidate_id, scenario_path=scenario_path)
+        return runner, scenario, result
+
+    def test_inventory_management_scenario_reaches_a_real_pass(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        _runner, scenario, result = self._run_scenario(monkeypatch, tmp_path, "inventory_management")
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+        check_names = {c["name"] for c in result["checks"]}
+        assert f"{scenario.primary_resource}_create" in check_names
+        assert f"{scenario.primary_resource}_edit" in check_names
+        assert f"{scenario.related_resource}_create" in check_names
+        assert "students_create" not in check_names
+        assert "payments_create" not in check_names
+
+    def test_task_management_scenario_reaches_a_real_pass(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        _runner, scenario, result = self._run_scenario(monkeypatch, tmp_path, "task_management")
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+        check_names = {c["name"] for c in result["checks"]}
+        assert f"{scenario.primary_resource}_create" in check_names
+        assert f"{scenario.related_resource}_create" in check_names
+        assert "students_create" not in check_names
+        assert "products_create" not in check_names
+
+    def test_all_three_domain_scenarios_produce_the_same_check_shape(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """The set of check KINDS (create/edit/related-create/backend-
+        stopped/persistence/etc.) is identical across all three domains
+        -- only the resource-name prefixes differ."""
+        shapes = []
+        for scenario_name in ("student_fee_management", "inventory_management", "task_management"):
+            _runner, scenario, result = self._run_scenario(monkeypatch, tmp_path, scenario_name)
+            assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+            generic_kinds = {
+                name.replace(scenario.primary_resource, "PRIMARY").replace(
+                    scenario.related_resource or "\0", "RELATED",
+                )
+                for name in (c["name"] for c in result["checks"])
+            }
+            shapes.append(generic_kinds)
+        assert shapes[0] == shapes[1] == shapes[2]
+
+
+def test_browser_journey_is_driven_entirely_by_the_scenario_file() -> None:
+    """ARK-REQ-0074: the browser journey script itself names no resource,
+    field, or route -- every literal comes from --scenario at runtime."""
+    browser = (REPO / "scripts" / "run_golden_browser_journey.mjs").read_text(encoding="utf-8")
+    assert "--scenario" in browser
+    assert "--primary-id" in browser
+    assert "JSON.parse(readFileSync(scenarioPath" in browser
+    # Only inside historical-evidence prose comments (frozen session
+    # evidence explaining a real, already-fixed race condition), never in
+    # executable logic -- checked line-by-line, skipping comment lines.
+    domain_tokens = ("student", "payment")
+    for line in browser.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("*") or stripped.startswith("//") or stripped.startswith("/**"):
+            continue
+        lowered = stripped.lower()
+        for token in domain_tokens:
+            assert token not in lowered, f"domain literal {token!r} found in executable line: {line!r}"
