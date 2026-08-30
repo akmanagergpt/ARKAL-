@@ -40,7 +40,7 @@ def test_json_mode_uses_ollama_native_structured_output(
         "prompt": "prompt",
         "stream": False,
         "format": "json",
-        "options": {"num_predict": 4096, "temperature": 0},
+        "options": {"num_ctx": 8192, "num_predict": 4096, "temperature": 0},
     }
     assert captured["timeout"] == 9
     assert result.output == "{}"
@@ -57,4 +57,36 @@ def test_default_adapter_does_not_force_runtime_specific_format(monkeypatch) -> 
     OllamaAdapter().infer("coder", "prompt")
 
     assert "format" not in captured
-    assert "options" not in captured
+    # golden-work-125 (real repository evidence): num_ctx is now ALWAYS
+    # sent explicitly, regardless of max_output_tokens -- leaving it unset
+    # let the real Ollama server on this host silently fall back to its
+    # own OLLAMA_CONTEXT_LENGTH=4096 default instead of the model's real,
+    # much larger capability, starving a dense real prompt of headroom.
+    assert captured["options"] == {"num_ctx": 8192, "temperature": 0}
+
+
+def test_num_ctx_leaves_real_headroom_for_a_dense_real_frontend_forms_prompt(
+    monkeypatch,
+) -> None:  # noqa: ANN001
+    """golden-work-125 (real repository evidence): reconstructing its own
+    real, final `frontend_forms` prompt (goal + requirements + the
+    stage's own dense rule text + every visible prior file + the prior
+    attempt's failure text) measured ~3274 tokens of input alone (a
+    chars/4 estimate) -- against the real host's own
+    OLLAMA_CONTEXT_LENGTH=4096 default and a `num_predict` request of
+    4096, input and requested output were competing for the same,
+    already-exhausted window. The default `num_ctx` here (8192) must
+    leave real headroom for input this size plus a full-budget
+    `num_predict=4096` output request, not just barely fit one alone."""
+    captured: dict[str, object] = {}
+
+    def urlopen(request: urllib.request.Request, timeout: float) -> _Response:
+        captured.update(json.loads(bytes(request.data or b"{}")))
+        return _Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    measured_real_input_tokens = 3274
+    OllamaAdapter(max_output_tokens=4096).infer("coder", "x" * 100)
+
+    options = captured["options"]
+    assert options["num_ctx"] >= measured_real_input_tokens + options["num_predict"]

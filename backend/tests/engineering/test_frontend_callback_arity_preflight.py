@@ -153,10 +153,17 @@ def test_catches_golden_work_122s_bare_function_reference() -> None:
         ),
     }
     findings = _callback_prop_arity_mismatch_findings(files)
-    assert len(findings) == 1
-    assert findings[0].code == "frontend_ui_callback_prop_arity_mismatch"
-    assert "updateStudent" in findings[0].detail
-    assert "'id'" in findings[0].detail
+    # golden-work-125: the same bare reference now also trips the newer,
+    # unconditional structural ban below -- both real, both correct.
+    assert len(findings) == 2
+    codes = {f.code for f in findings}
+    assert codes == {
+        "frontend_ui_callback_prop_arity_mismatch",
+        "frontend_ui_edit_callback_bound_by_bare_reference",
+    }
+    arity_finding = next(f for f in findings if f.code == "frontend_ui_callback_prop_arity_mismatch")
+    assert "updateStudent" in arity_finding.detail
+    assert "'id'" in arity_finding.detail
 
 
 def test_a_bare_reference_with_matching_arity_is_not_flagged() -> None:

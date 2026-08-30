@@ -40,6 +40,21 @@ from arkali.engineering.localai.errors import LocalRuntimeTargetNotLoopbackError
 RUNTIME = "ollama"
 DEFAULT_ENDPOINT = "http://127.0.0.1:11434"
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+#: golden-work-125 (real repository evidence): this adapter's own `infer()`
+#: never set `num_ctx`, so every real call ran under whatever context
+#: window the Ollama SERVER defaulted to -- on the real host this session
+#: ran on, `OLLAMA_CONTEXT_LENGTH=4096`, NOT the model's own real declared
+#: `context_length` (32768, confirmed via `/api/show`). Reconstructing
+#: golden-work-125's actual real `frontend_forms` prompt (goal +
+#: requirements + the stage's own dense rule text + every visible prior
+#: file + the prior attempt's failure text) measured ~3274 tokens of input
+#: alone (chars/4 estimate) against a `num_predict` request of 4096 --
+#: input and requested output compete for the SAME window in Ollama, so
+#: the real remaining headroom for output was under 900 tokens while two
+#: real files (App.js + StudentForm.js) were being requested. A generous,
+#: explicit default closes this regardless of what a given host's own
+#: Ollama environment happens to default to.
+DEFAULT_NUM_CTX = 8192
 
 
 def _is_loopback(endpoint: str) -> bool:
@@ -55,6 +70,7 @@ class OllamaAdapter:
         *,
         json_mode: bool = False,
         max_output_tokens: int | None = None,
+        num_ctx: int = DEFAULT_NUM_CTX,
     ) -> None:
         if not _is_loopback(endpoint):
             raise LocalRuntimeTargetNotLoopbackError(
@@ -66,6 +82,9 @@ class OllamaAdapter:
         if max_output_tokens is not None and not 1 <= max_output_tokens <= 32768:
             raise ValueError("max_output_tokens must be between 1 and 32768")
         self._max_output_tokens = max_output_tokens
+        if not 1 <= num_ctx <= 131072:
+            raise ValueError("num_ctx must be between 1 and 131072")
+        self._num_ctx = num_ctx
 
     @property
     def runtime(self) -> str:
@@ -138,11 +157,10 @@ class OllamaAdapter:
         }
         if self._json_mode:
             payload["format"] = "json"
+        options: dict[str, object] = {"num_ctx": self._num_ctx, "temperature": 0}
         if self._max_output_tokens is not None:
-            payload["options"] = {
-                "num_predict": self._max_output_tokens,
-                "temperature": 0,
-            }
+            options["num_predict"] = self._max_output_tokens
+        payload["options"] = options
         body = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             f"{self._endpoint}/api/generate",

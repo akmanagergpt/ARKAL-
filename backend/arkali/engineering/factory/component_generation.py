@@ -104,7 +104,7 @@ from arkali.engineering.factory.model_product_generation import (
 from arkali.engineering.factory.product_preflight import (
     SemanticFinding, _manifest_findings, _manifests_stage_findings,
 )
-from arkali.engineering.factory.stage_prompting import _stage_prompt
+from arkali.engineering.factory.stage_prompting import _stage_prompt, _repair_strategy_for_attempt
 
 MAX_STAGE_ATTEMPTS = 4
 
@@ -301,7 +301,11 @@ def _generate_one_stage(
     previous_failure: str | None = None
     last_raw_output: str = ""
     for attempt_number in range(1, max_attempts + 1):
-        prompt = _stage_prompt(declaration, blueprint, visible_files, failure, target_runtime)
+        strategy = _repair_strategy_for_attempt(attempt_number)
+        prompt = _stage_prompt(
+            declaration, blueprint, visible_files, failure, target_runtime,
+            repair_strategy=strategy,
+        )
         outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
         last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
