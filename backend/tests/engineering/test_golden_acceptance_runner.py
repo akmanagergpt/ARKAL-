@@ -445,8 +445,18 @@ def test_10_the_source_candidate_stays_byte_identical_across_acceptance(
     assert before == after
 
 
-def test_skip_browser_can_never_report_acceptance(monkeypatch, capsys) -> None:  # noqa: ANN001
+def test_skip_browser_can_never_report_acceptance(
+    monkeypatch, capsys, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
     runner = _module()
+    candidate = tmp_path / "golden-work-090"
+    candidate.mkdir()
+    monkeypatch.setattr(runner, "_candidate", lambda candidate_id: candidate)
+    monkeypatch.setattr(runner, "_candidate_contract_files", lambda candidate_dir: {})
+    monkeypatch.setattr(
+        runner, "_resolve_scenario",
+        lambda candidate_id, files, override: (object(), tmp_path / "scenario.json"),
+    )
     monkeypatch.setattr(
         runner, "_accept",
         lambda candidate_id, scenario, scenario_path, skip_browser: {
