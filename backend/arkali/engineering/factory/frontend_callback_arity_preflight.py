@@ -77,6 +77,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from arkali.engineering.factory.frontend_js_semantics import _function_parameters_across_files
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _MUTATION_PROP = r"on(?:Submit|Create|Update|Edit|Save|Delete|Confirm)"
@@ -96,23 +97,6 @@ _JSX_BARE_CALLBACK_PROP = re.compile(
 def _component_definition_pattern(name: str) -> str:
     escaped = re.escape(name)
     return rf"(?:function\s+{escaped}\s*\(|const\s+{escaped}\s*=)"
-
-
-def _function_definition_params(name: str, source: str) -> str | None:
-    """The raw parameter text of `name`'s own real definition, wherever in
-    the frontend it lives - `async function name(...)` or
-    `const name = (...) =>`. `None` if this file does not define it (most
-    files: a bare-reference prop almost always names an IMPORTED client
-    function, defined in a different file than the one rendering the JSX)."""
-    escaped = re.escape(name)
-    match = re.search(
-        rf"(?:async\s+)?function\s+{escaped}\s*\(([^)]*)\)"
-        rf"|(?:const|let|var)\s+{escaped}\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>",
-        source,
-    )
-    if match is None:
-        return None
-    return match.group(1) if match.group(1) is not None else match.group(2)
 
 
 def _split_top_level(text: str) -> list[str]:
@@ -189,29 +173,16 @@ def _inline_arrow_findings(
     return findings
 
 
-def _bare_reference_declared_params(name: str, frontend: Mapping[str, str]) -> str | None:
-    """`name`'s own real parameter text, searched across every frontend file
-    - a bare-reference prop almost always names an imported client function,
-    defined in a different file than the one rendering the JSX."""
-    return next(
-        (found for found in (_function_definition_params(name, source) for source in frontend.values())
-         if found is not None),
-        None,
-    )
-
-
 def _bare_reference_findings(
     frontend: Mapping[str, str], path: str, source: str,
 ) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
     for match in _JSX_BARE_CALLBACK_PROP.finditer(source):
         comp, prop, name = match.group("comp", "prop", "name")
-        params_text = _bare_reference_declared_params(name, frontend)
-        if params_text is None or "{" in params_text or "[" in params_text:
+        declared_params = _function_parameters_across_files(name, frontend)
+        if not declared_params:
             continue
-        declared = _split_top_level(params_text)
-        if not declared:
-            continue
+        declared = list(declared_params)
         finding = _arity_mismatch_finding(frontend, path, comp, prop, declared, name)
         if finding is not None:
             findings.append(finding)
@@ -282,12 +253,10 @@ def _bare_reference_edit_callback_findings(
     findings: list[SemanticFinding] = []
     for match in _JSX_BARE_CALLBACK_PROP.finditer(source):
         comp, prop, name = match.group("comp", "prop", "name")
-        params_text = _bare_reference_declared_params(name, frontend)
-        if params_text is None or "{" in params_text or "[" in params_text:
+        declared_params = _function_parameters_across_files(name, frontend)
+        if not declared_params or declared_params[0] != _ROUTE_IDENTIFIER_PARAM_NAME:
             continue
-        declared = _split_top_level(params_text)
-        if not declared or declared[0] != _ROUTE_IDENTIFIER_PARAM_NAME:
-            continue
+        declared = list(declared_params)
         findings.append(SemanticFinding(
             code="frontend_ui_edit_callback_bound_by_bare_reference", path=path,
             detail=(

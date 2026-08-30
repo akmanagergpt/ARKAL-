@@ -31,8 +31,9 @@ instead of) the stage's own prose rule.
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
+
+from arkali.engineering.factory.frontend_js_semantics import _function_parameters
 
 #: Field names in `product_ux_spec.json`'s own `forms[].fields` that name the
 #: route's own identifier, not something a real user types into the form --
@@ -47,11 +48,6 @@ _ACTION_VERBS: tuple[tuple[str, str], ...] = (
     ("create", "create"), ("edit", "update"), ("delete", "delete"),
 )
 
-_FUNCTION_PARAMS = re.compile(
-    r"(?:async\s+)?function\s+(?P<fname1>\w+)\s*\(\s*(?P<params1>[^)]*)\)"
-    r"|(?:export\s+)?(?:const|let|var)\s+(?P<fname2>\w+)\s*=\s*(?:async\s*)?\(\s*(?P<params2>[^)]*)\)\s*=>"
-)
-
 
 def _singularize(module_name: str) -> str:
     """The exact naive rule every real evidenced candidate's own client
@@ -63,23 +59,11 @@ def _singularize(module_name: str) -> str:
     return stripped[:1].upper() + stripped[1:] if stripped else stripped
 
 
-def _function_params(name: str, source: str) -> tuple[str, ...] | None:
-    for match in _FUNCTION_PARAMS.finditer(source):
-        fname = match.group("fname1") or match.group("fname2")
-        if fname != name:
-            continue
-        params_text = match.group("params1") if match.group("fname1") else match.group("params2")
-        if "{" in params_text or "[" in params_text:
-            return None  # a destructured parameter -- one real param, not several
-        return tuple(p.strip() for p in params_text.split(",") if p.strip())
-    return None
-
-
 def _action_contract(
     action: str, verb: str, module_name: str, client_source: str,
 ) -> dict[str, object] | None:
     function_name = f"{verb}{_singularize(module_name)}"
-    params = _function_params(function_name, client_source)
+    params = _function_parameters(function_name, client_source)
     if params is None:
         return None
     entry: dict[str, object] = {"client_function": function_name, "signature": list(params)}
