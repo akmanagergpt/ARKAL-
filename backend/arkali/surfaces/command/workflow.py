@@ -66,7 +66,7 @@ Guard = Callable[[str], None]
 Refuse = Callable[[Exception], Exception]
 
 
-class RevisionLike(Protocol):
+class _RevisionLike(Protocol):
     workflow_id: str
     revision_number: int
     semver: str
@@ -74,12 +74,12 @@ class RevisionLike(Protocol):
     created_at: dt.datetime
 
 
-class DocumentLike(Protocol):
+class _DocumentLike(Protocol):
     def nodes(self) -> Any: ...
     def edges(self) -> Any: ...
 
 
-class ExecutionLike(Protocol):
+class _ExecutionLike(Protocol):
     execution_id: str
     workflow_id: str
     revision_number: int
@@ -90,7 +90,7 @@ class ExecutionLike(Protocol):
     updated_at: dt.datetime
 
 
-class NodeExecutionLike(Protocol):
+class _NodeExecutionLike(Protocol):
     sequence: int
     node_id: str
     kind: str
@@ -102,25 +102,25 @@ class NodeExecutionLike(Protocol):
 
 
 class GraphStoreLike(Protocol):
-    def publish(self, document: Any, *, semver_bump: str) -> RevisionLike: ...
-    def latest(self, workflow_id: str) -> RevisionLike | None: ...
+    def publish(self, document: Any, *, semver_bump: str) -> _RevisionLike: ...
+    def latest(self, workflow_id: str) -> _RevisionLike | None: ...
     def require_workflow(self, workflow_id: str) -> Any: ...
-    def require_revision(self, workflow_id: str, revision_number: int) -> RevisionLike: ...
-    def history(self, workflow_id: str) -> tuple[RevisionLike, ...]: ...
-    def document_of(self, record: RevisionLike) -> DocumentLike: ...
+    def require_revision(self, workflow_id: str, revision_number: int) -> _RevisionLike: ...
+    def history(self, workflow_id: str) -> tuple[_RevisionLike, ...]: ...
+    def document_of(self, record: _RevisionLike) -> _DocumentLike: ...
 
 
 class ExecutorLike(Protocol):
     def start(
         self, execution_id: str, workflow_id: str, *, revision_number: int | None = None
-    ) -> ExecutionLike: ...
-    def require(self, execution_id: str) -> ExecutionLike: ...
-    def evidence(self, execution_id: str) -> tuple[NodeExecutionLike, ...]: ...
-    def resume_after_signal(self, execution_id: str) -> ExecutionLike: ...
+    ) -> _ExecutionLike: ...
+    def require(self, execution_id: str) -> _ExecutionLike: ...
+    def evidence(self, execution_id: str) -> tuple[_NodeExecutionLike, ...]: ...
+    def resume_after_signal(self, execution_id: str) -> _ExecutionLike: ...
     def approve(
         self, execution_id: str, *, node_id: str, actor: str, decision: str,
         approved_revision_hash: str,
-    ) -> ExecutionLike: ...
+    ) -> _ExecutionLike: ...
 
 
 #: Builds a real, validated canonical document from plain data - never from a
@@ -131,7 +131,7 @@ GraphStoreFactory = Callable[[Session], GraphStoreLike]
 ExecutorFactory = Callable[[Session], ExecutorLike]
 
 
-def _revision_response(record: RevisionLike) -> WorkflowRevisionResponse:
+def _revision_response(record: _RevisionLike) -> WorkflowRevisionResponse:
     return WorkflowRevisionResponse(
         workflow_id=record.workflow_id,
         revision_number=record.revision_number,
@@ -142,7 +142,7 @@ def _revision_response(record: RevisionLike) -> WorkflowRevisionResponse:
 
 
 def _revision_detail(
-    record: RevisionLike, document: DocumentLike
+    record: _RevisionLike, document: _DocumentLike
 ) -> WorkflowRevisionDetailResponse:
     return WorkflowRevisionDetailResponse(
         **_revision_response(record).model_dump(),
@@ -164,7 +164,7 @@ def _revision_detail(
     )
 
 
-def _execution_response(record: ExecutionLike) -> WorkflowExecutionResponse:
+def _execution_response(record: _ExecutionLike) -> WorkflowExecutionResponse:
     return WorkflowExecutionResponse(
         execution_id=record.execution_id,
         workflow_id=record.workflow_id,
@@ -178,7 +178,7 @@ def _execution_response(record: ExecutionLike) -> WorkflowExecutionResponse:
 
 
 def _execution_detail(
-    record: ExecutionLike, evidence: tuple[NodeExecutionLike, ...]
+    record: _ExecutionLike, evidence: tuple[_NodeExecutionLike, ...]
 ) -> WorkflowExecutionDetailResponse:
     return WorkflowExecutionDetailResponse(
         **_execution_response(record).model_dump(),

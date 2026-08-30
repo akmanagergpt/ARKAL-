@@ -81,6 +81,18 @@ def fingerprint_of(outcome: str, error_message: str) -> str:
     return f"{outcome}:{error_message}"
 
 
+def list_campaign_ids(campaigns_root: pathlib.Path) -> tuple[str, ...]:
+    """Every real campaign_id this root has ever recorded, sorted -- a
+    directory counts only if it actually has a `ledger.jsonl`, never an
+    empty or partially-created one."""
+    if not campaigns_root.is_dir():
+        return ()
+    return tuple(sorted(
+        p.name for p in campaigns_root.iterdir()
+        if p.is_dir() and (p / "ledger.jsonl").is_file()
+    ))
+
+
 @dataclass(frozen=True)
 class CampaignBudget:
     max_new_candidates: int = DEFAULT_MAX_NEW_CANDIDATES
@@ -142,6 +154,11 @@ class GenerationCampaignLedger:
     def _append(self, entry: dict[str, object]) -> None:
         with self._log.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+    def attempts(self) -> tuple[dict[str, object], ...]:
+        """Every real candidate attempt this campaign has recorded, in
+        the order it happened."""
+        return tuple(self._attempts)
 
     @property
     def consumed_candidates(self) -> int:
@@ -249,4 +266,5 @@ __all__ = [
     "INFRASTRUCTURE_FAILURE",
     "MODEL_VARIANCE",
     "fingerprint_of",
+    "list_campaign_ids",
 ]

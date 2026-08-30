@@ -236,6 +236,21 @@ class CandidateLedger:
                 entries.append(entry)
         return tuple(entries)
 
+    def all_candidate_ids(self) -> tuple[str, ...]:
+        """Every real candidate_id this ledger has ever recorded, in first-
+        appearance order -- the ledger, not the filesystem, is authoritative
+        (the same posture `history`/`classify` already take), so a deleted
+        workspace directory still appears here."""
+        if not self._log.exists():
+            return ()
+        seen: dict[str, None] = {}
+        for line in self._log.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            entry = json.loads(line)
+            seen.setdefault(str(entry["candidate_id"]), None)
+        return tuple(seen)
+
     def latest(self, candidate_id: str) -> dict[str, object] | None:
         entries = self.history(candidate_id)
         return entries[-1] if entries else None

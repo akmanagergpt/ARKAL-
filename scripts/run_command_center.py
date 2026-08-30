@@ -41,6 +41,12 @@ from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
 from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
+from arkali.engineering.candidate.campaign_budget import (  # noqa: E402
+    CampaignBudget,
+    GenerationCampaignLedger,
+    list_campaign_ids,
+)
+from arkali.engineering.candidate.ledger import CandidateLedger  # noqa: E402
 from arkali.engineering.factory.production_orchestration import (  # noqa: E402
     ProductionFactory,
     ProductionGoalRequest,
@@ -62,6 +68,11 @@ from arkali.kernel.persistence.engine import (  # noqa: E402
 )
 from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
 from arkali.surfaces.command.app import _CommandExtensions, create_app  # noqa: E402
+from arkali.surfaces.command.factory_history import (  # noqa: E402
+    FactoryCampaignAttempt,
+    FactoryCampaignSummary,
+    FactoryCandidateSummary,
+)
 
 
 class _DurableFactorySink:
@@ -147,6 +158,62 @@ def _operations_wiring(
     return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
 
 
+def _factory_candidate_history(repo_root: pathlib.Path) -> Callable[[], tuple[FactoryCandidateSummary, ...]]:
+    """Real, unmodified `engineering.candidate.ledger.CandidateLedger`,
+    composed here (outside the measured architecture graph) exactly as
+    `factory_history.py`'s own module docstring requires."""
+    ledger = CandidateLedger(repo_root / "var" / "factory" / "candidates" / "_ledger")
+
+    def read() -> tuple[FactoryCandidateSummary, ...]:
+        return tuple(
+            FactoryCandidateSummary(
+                candidate_id=candidate_id,
+                state=ledger.classify(candidate_id),
+                recorded_at=str((ledger.latest(candidate_id) or {}).get("recorded_at", "")),
+            )
+            for candidate_id in ledger.all_candidate_ids()
+        )
+
+    return read
+
+
+def _factory_campaign_history(repo_root: pathlib.Path) -> Callable[[], tuple[FactoryCampaignSummary, ...]]:
+    """Real, unmodified `engineering.candidate.campaign_budget` ledgers,
+    composed here for the identical reason `_factory_candidate_history`
+    above is."""
+    campaigns_root = repo_root / "var" / "factory" / "campaigns"
+
+    def read() -> tuple[FactoryCampaignSummary, ...]:
+        summaries = []
+        for campaign_id in list_campaign_ids(campaigns_root):
+            campaign = GenerationCampaignLedger.load_or_create(
+                campaigns_root, campaign_id, CampaignBudget(),
+            )
+            summaries.append(FactoryCampaignSummary(
+                campaign_id=campaign_id,
+                max_new_candidates=campaign.budget.max_new_candidates,
+                max_total_seconds=campaign.budget.max_total_seconds,
+                max_same_fingerprint_repeats=campaign.budget.max_same_fingerprint_repeats,
+                consumed_candidates=campaign.consumed_candidates,
+                consumed_seconds=campaign.consumed_seconds,
+                status=campaign.status(),
+                attempts=tuple(
+                    FactoryCampaignAttempt(
+                        candidate_id=str(a["candidate_id"]),
+                        outcome=str(a["outcome"]),
+                        failure_class=a.get("failure_class"),  # type: ignore[arg-type]
+                        fingerprint=a.get("fingerprint"),  # type: ignore[arg-type]
+                        elapsed_seconds=float(a["elapsed_seconds"]),  # type: ignore[arg-type]
+                        recorded_at=str(a["recorded_at"]),
+                    )
+                    for a in campaign.attempts()
+                ),
+            ))
+        return tuple(summaries)
+
+    return read
+
+
 def migrate(database: pathlib.Path) -> None:
     """Bring the database to head with the real migration chain."""
     config = Config(str(ROOT / "backend" / ALEMBIC_INI))
@@ -200,6 +267,8 @@ def main(argv: list[str]) -> int:
             operations_wiring=_operations_wiring(pdp, ROOT),
             operations_repo_root=ROOT,
             factory_submitter=_factory_submitter(pdp, ROOT),
+            factory_candidate_history=_factory_candidate_history(ROOT),
+            factory_campaign_history=_factory_campaign_history(ROOT),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")

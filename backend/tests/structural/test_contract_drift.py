@@ -34,7 +34,7 @@ from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.engineering.localai import host_probe
 from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.surfaces.command import contracts, workflow_contracts
+from arkali.surfaces.command import contracts, factory_history, workflow_contracts
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
     BROWSER_SLICE,
@@ -119,16 +119,74 @@ def _operations_wiring(pdp: PolicyDecisionPoint):
     return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
 
 
+def _factory_history_wiring(var_root: pathlib.Path):
+    """Mirrors `scripts/run_command_center.py`'s own `_factory_candidate_
+    history`/`_factory_campaign_history` exactly, over an isolated root -
+    the identical shape `_operations_wiring` above already establishes for
+    its own route."""
+    from arkali.engineering.candidate.campaign_budget import (
+        CampaignBudget, GenerationCampaignLedger, list_campaign_ids,
+    )
+    from arkali.engineering.candidate.ledger import CandidateLedger
+    from arkali.surfaces.command.factory_history import (
+        FactoryCampaignAttempt, FactoryCampaignSummary, FactoryCandidateSummary,
+    )
+
+    ledger = CandidateLedger(var_root / "factory" / "candidates" / "_ledger")
+    campaigns_root = var_root / "factory" / "campaigns"
+
+    def candidate_history():
+        return tuple(
+            FactoryCandidateSummary(
+                candidate_id=cid, state=ledger.classify(cid),
+                recorded_at=str((ledger.latest(cid) or {}).get("recorded_at", "")),
+            )
+            for cid in ledger.all_candidate_ids()
+        )
+
+    def campaign_history():
+        summaries = []
+        for campaign_id in list_campaign_ids(campaigns_root):
+            campaign = GenerationCampaignLedger.load_or_create(
+                campaigns_root, campaign_id, CampaignBudget(),
+            )
+            summaries.append(FactoryCampaignSummary(
+                campaign_id=campaign_id,
+                max_new_candidates=campaign.budget.max_new_candidates,
+                max_total_seconds=campaign.budget.max_total_seconds,
+                max_same_fingerprint_repeats=campaign.budget.max_same_fingerprint_repeats,
+                consumed_candidates=campaign.consumed_candidates,
+                consumed_seconds=campaign.consumed_seconds,
+                status=campaign.status(),
+                attempts=tuple(
+                    FactoryCampaignAttempt(
+                        candidate_id=str(a["candidate_id"]), outcome=str(a["outcome"]),
+                        failure_class=a.get("failure_class"), fingerprint=a.get("fingerprint"),
+                        elapsed_seconds=float(a["elapsed_seconds"]), recorded_at=str(a["recorded_at"]),
+                    )
+                    for a in campaign.attempts()
+                ),
+            ))
+        return tuple(summaries)
+
+    return candidate_history, campaign_history
+
+
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
     """A real application, so the contract is generated and never transcribed."""
     database = tmp_path_factory.mktemp("contract") / "drift.db"
     engine = create_persistence_engine(sqlite_url(database))
     pdp = PolicyDecisionPoint.load(REPO)
+    candidate_history, campaign_history = _factory_history_wiring(
+        tmp_path_factory.mktemp("factory-history-var"),
+    )
     return create_app(
         engine, pdp, workflow_wiring=_workflow_wiring(pdp),
         extensions=_CommandExtensions(
             operations_wiring=_operations_wiring(pdp), operations_repo_root=REPO,
+            factory_candidate_history=candidate_history,
+            factory_campaign_history=campaign_history,
         ),
     )
 
@@ -219,7 +277,7 @@ def surface_contract_names() -> frozenset[str]:
     this surface publishes even though `surfaces.command` does not declare
     the class.
     """
-    modules = (contracts, workflow_contracts, operations_contracts)
+    modules = (contracts, workflow_contracts, operations_contracts, factory_history)
     return frozenset(
         name
         for module in modules

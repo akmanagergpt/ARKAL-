@@ -65,6 +65,11 @@ from arkali.surfaces.command.error_mapping import (
     status_for,
 )
 from arkali.surfaces.command.factory import _build_factory_router, _FactorySubmitter
+from arkali.surfaces.command.factory_history import (
+    _CampaignHistorySource,
+    _CandidateHistorySource,
+    _build_factory_history_router,
+)
 from arkali.surfaces.command.jobs import build_jobs_router
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
@@ -89,6 +94,8 @@ class _CommandExtensions:
     operations_wiring: OperationsWiring | None = None
     operations_repo_root: pathlib.Path | None = None
     factory_submitter: _FactorySubmitter | None = None
+    factory_candidate_history: _CandidateHistorySource | None = None
+    factory_campaign_history: _CampaignHistorySource | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -150,6 +157,11 @@ def create_app(
     `operations_repo_root` is required alongside it - both `None` together
     omit the operations routes entirely, so every existing caller of
     `create_app` is unaffected.
+
+    `factory_candidate_history`/`factory_campaign_history` are the two data
+    sources for the read-only `GET /api/factory/history` route - see
+    `factory_history.py`'s own module docstring for why this is not a
+    DEF-009 closure. Both `None` (the default) omit the route entirely.
     """
     factory = create_session_factory(engine)
     pep = PolicyEnforcementPoint(pdp, SURFACE)
@@ -347,6 +359,16 @@ def create_app(
         app.include_router(
             _build_factory_router(
                 session_scope, guard, WRITE, extensions.factory_submitter
+            )
+        )
+    # Read-only production history (see `factory_history.py`'s own module
+    # docstring for why this is NOT a DEF-009 closure): additive and
+    # optional, the identical shape every extension above already uses.
+    if (extensions is not None and extensions.factory_candidate_history is not None
+            and extensions.factory_campaign_history is not None):
+        app.include_router(
+            _build_factory_history_router(
+                guard, extensions.factory_candidate_history, extensions.factory_campaign_history,
             )
         )
     return app

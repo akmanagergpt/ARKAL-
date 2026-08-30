@@ -66,10 +66,10 @@ from arkali.surfaces.command.contracts import (
 #: Supplied by the composition root so this module neither builds a session nor
 #: decides policy: it receives the same guard and the same refusal mapping every
 #: other route on this surface uses.
-SessionScope = Callable[[], Iterator[Session]]
-Guard = Callable[[str], None]
-Refuse = Callable[[Exception], Exception]
-Clock = Callable[[], dt.datetime]
+_SessionScope = Callable[[], Iterator[Session]]
+_Guard = Callable[[str], None]
+_Refuse = Callable[[Exception], Exception]
+_Clock = Callable[[], dt.datetime]
 
 #: The two operation classes are IMPORTED from the context whose operations they
 #: govern, not restated. `READ` and `WRITE` are the classes C-19 already requests
@@ -94,11 +94,11 @@ def _reference(record: DurableJobRecord) -> JobReferenceResponse:
 
 
 def build_jobs_router(
-    session_scope: SessionScope,
-    guard: Guard,
-    refuse: Refuse,
+    session_scope: _SessionScope,
+    guard: _Guard,
+    refuse: _Refuse,
     pep: PolicyEnforcementPoint,
-    clock: Clock | None = None,
+    clock: _Clock | None = None,
 ) -> APIRouter:
     """The durable-job routes, over collaborators the application supplies.
 
@@ -112,7 +112,7 @@ def build_jobs_router(
     # contract-drift control reads this tag off the live OpenAPI document and
     # fails on a route that declares no audience at all.
     router = APIRouter(prefix="/api", tags=[BACKEND_ONLY])
-    ticking: Clock = clock or utc_now
+    ticking: _Clock = clock or utc_now
 
     def store(session: Session) -> JobStore:
         return JobStore(session, pep, ticking)
