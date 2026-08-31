@@ -202,22 +202,30 @@ class TestRecordSideMutationsAreDetected:
     def test_a_reopened_finding_contradicts_a_closed_summary(
         self, validator: types.ModuleType, handoff_text: str, truth: dict
     ) -> None:
-        """If the record says OPEN, a summary saying CLOSED must be refused.
+        """A change on the RECORD side must be refused just as surely as one on
+        the handoff's own text -- the summary is judged against the record as
+        it stands now, never a memorized copy.
 
-        The mutation is anchored to the LATEST finding's own row. Replacing the
-        first `| MEDIUM | CLOSED |` in the file would reopen whichever finding
-        happens to be written first, leave the latest closed, and prove nothing.
+        The mutation is anchored to the LATEST finding's own row (replacing the
+        first status cell in the file would flip whichever finding happens to
+        be written first, leave the latest's own status untouched, and prove
+        nothing) and flips it to the OPPOSITE of whatever the real record
+        currently states -- not hardcoded to CLOSED-to-OPEN, so this proves the
+        same property whether the latest finding is genuinely open (e.g.
+        governance-convergence session findings not yet repaired) or closed at
+        the time this runs.
         """
-        latest, severity = truth["latest_id"], truth["latest_severity"]
+        latest, severity, status = truth["latest_id"], truth["latest_severity"], truth["latest_status"]
+        opposite = "OPEN" if status == "CLOSED" else "CLOSED"
         row = next(
             line for line in FINDINGS.read_text(encoding="utf-8").splitlines()
             if line.startswith(f"| {latest} |")
         )
-        cells = f"| {severity} | CLOSED |"
+        cells = f"| {severity} | {status} |"
         assert cells in row, "the latest finding's row does not declare a status"
-        with record_mutated(row.replace(cells, f"| {severity} | OPEN |", 1), row):
+        with record_mutated(row.replace(cells, f"| {severity} | {opposite} |", 1), row):
             names = drift_names(validator, handoff_text)
-        assert f"the live finding summary states {latest} as OPEN" in names
+        assert f"the live finding summary states {latest} as {opposite}" in names
         assert f"the live finding summary does not contradict {latest}'s declared status" \
             in names
 
