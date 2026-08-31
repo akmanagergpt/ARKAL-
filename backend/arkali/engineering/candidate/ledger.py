@@ -263,6 +263,30 @@ class CandidateLedger:
         latest = self.latest(candidate_id)
         return LEGACY_UNVERIFIED if latest is None else str(latest["state"])
 
+    def accepted_candidate_for_goal(self, goal_hash: str) -> str | None:
+        """The first real candidate_id whose own recorded `goal_hash`
+        (its ALLOCATED entry's `GenerationProvenance.goal_hash`, the
+        existing authoritative goal identity this ledger already carries
+        per candidate -- never a second, parallel identity) equals
+        `goal_hash` AND whose latest recorded lifecycle state is exactly
+        `ACCEPTED`. `None` for a fresh goal, or a goal whose every
+        candidate so far failed, was interrupted, or never finished --
+        those are legitimately re-generatable.
+
+        Reads only this ledger's own real, append-only entries. A goal's
+        acceptance is never inferred from prose, a docstring, a file name,
+        or any state held anywhere else -- only a real terminal `ACCEPTED`
+        entry, recorded by `run_golden_acceptance.py`'s own real journey,
+        counts.
+        """
+        for candidate_id in self.all_candidate_ids():
+            entries = self.history(candidate_id)
+            if not entries or str(entries[0].get("goal_hash", "")) != goal_hash:
+                continue
+            if str(entries[-1]["state"]) == ACCEPTED:
+                return candidate_id
+        return None
+
     def _append(self, entry: dict[str, object]) -> None:
         with self._log.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True) + "\n")

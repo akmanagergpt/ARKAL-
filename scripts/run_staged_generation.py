@@ -33,6 +33,7 @@ from arkali.engineering.candidate.campaign_budget import (  # noqa: E402
     FAILURE_CLASSES,
     GenerationCampaignLedger,
 )
+from arkali.engineering.candidate.errors import GoalAlreadyAcceptedError  # noqa: E402
 from arkali.engineering.candidate.ledger import (  # noqa: E402
     CandidateLedger,
     FINAL_GATE_FAILED,
@@ -183,6 +184,24 @@ def main(argv: list[str]) -> int:
     provider_model = f"{args.runtime}/{args.model}"
 
     goal_text = args.goal_file.read_text(encoding="utf-8") if args.goal_file else GOAL
+    goal_hash = hash_text(goal_text)
+
+    # Accepted-goal termination invariant: checked first, before deriving a
+    # blueprint, before loading the campaign ledger, before claiming a
+    # candidate identity, and before any model/provider is invoked. Reads
+    # the existing, authoritative per-candidate goal identity this ledger
+    # already carries (`GenerationProvenance.goal_hash`) -- no second goal
+    # registry, no new ledger.
+    candidates_root = ROOT / "var" / "factory" / "candidates"
+    ledger = CandidateLedger(candidates_root / "_ledger")
+    already_accepted = ledger.accepted_candidate_for_goal(goal_hash)
+    if already_accepted is not None:
+        raise GoalAlreadyAcceptedError(
+            f"goal {goal_hash!r} already has an ACCEPTED candidate "
+            f"({already_accepted!r}); a normal new generation campaign for "
+            "the same goal is refused"
+        )
+
     blueprint = derive_blueprint(goal_text, AuthorityMap.load(ROOT))
     vocabulary = StageVocabulary.load(ROOT)
 
@@ -197,10 +216,8 @@ def main(argv: list[str]) -> int:
     )
     campaign.refuse_new_candidate_unless_permitted(override_confirmed=args.confirm_budget_override)
 
-    candidates_root = ROOT / "var" / "factory" / "candidates"
-    ledger = CandidateLedger(candidates_root / "_ledger")
     provenance = GenerationProvenance(
-        goal_hash=hash_text(goal_text), source_commit=_source_commit(),
+        goal_hash=goal_hash, source_commit=_source_commit(),
         runtime=args.runtime, endpoint=args.endpoint or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
         model=args.model,
         model_parameters={

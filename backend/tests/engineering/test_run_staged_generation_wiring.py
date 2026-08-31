@@ -58,3 +58,34 @@ def test_provenance_captures_goal_hash_source_commit_model_and_runtime() -> None
     provenance_call = source[source.index("GenerationProvenance(") : source.index("ledger.allocate(")]
     for field in ("goal_hash=", "source_commit=", "runtime=args.runtime", "model=args.model"):
         assert field in provenance_call
+
+
+def test_the_accepted_goal_check_runs_before_any_candidate_identity_or_model_invocation() -> None:
+    """Human governance decision (session record): a normal new generation
+    campaign for an already-ACCEPTED goal must be refused before the
+    candidate identity is claimed and before any model/provider is
+    invoked. Same reasoning as the campaign-budget ordering test above --
+    `main()` cannot safely be unit-tested end to end without mutating real
+    `var/factory/` state or a real Ollama call, so this asserts the one
+    property that mechanically matters: strict source order. The
+    underlying refusal logic itself is unit-tested directly in
+    test_candidate_ledger.py::TestAcceptedGoalTermination."""
+    source = _source()
+    accepted_goal_check = source.index("ledger.accepted_candidate_for_goal(goal_hash)")
+    budget_gate = source.index("campaign.refuse_new_candidate_unless_permitted")
+    ledger_allocate = source.index("ledger.allocate(args.candidate_id")
+    workspace_allocate = source.index("WorkspaceAuthority(candidates_root).allocate(")
+    model_invocation = source.index("generate_staged_model_product(")
+    assert (
+        accepted_goal_check < budget_gate < ledger_allocate
+        < workspace_allocate < model_invocation
+    )
+
+
+def test_the_accepted_goal_check_raises_before_deriving_a_blueprint() -> None:
+    """The refusal must happen before any further work on the goal begins
+    at all -- not merely before the candidate/model steps."""
+    source = _source()
+    accepted_goal_check = source.index("raise GoalAlreadyAcceptedError")
+    blueprint_derivation = source.index("derive_blueprint(goal_text")
+    assert accepted_goal_check < blueprint_derivation

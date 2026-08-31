@@ -9,6 +9,8 @@ from arkali.engineering.candidate.errors import (
     CandidateIntegrityError,
 )
 from arkali.engineering.candidate.ledger import (
+    ACCEPTANCE_RUNNING,
+    ACCEPTED,
     ALLOCATED,
     CandidateLedger,
     GenerationProvenance,
@@ -257,6 +259,109 @@ class TestProvenanceCapture:
         c = ledger.history("golden-work-c")[0]
         d = ledger.history("golden-work-d")[0]
         assert (c["model"], c["runtime"]) != (d["model"], d["runtime"])
+
+
+def _accept(ledger: CandidateLedger, candidate_id: str, work: pathlib.Path, *, goal_hash: str) -> None:
+    """Drives a real candidate through every real transition to `ACCEPTED`
+    (`ALLOCATED -> GENERATING -> STAGED_GENERATION_PASS -> ACCEPTANCE_RUNNING
+    -> ACCEPTED`) using the ledger's own real `record_state`, exactly the
+    sequence `run_staged_generation.py` and `run_golden_acceptance.py`
+    together produce for a real ACCEPTED candidate -- never a shortcut
+    state."""
+    work.mkdir(parents=True, exist_ok=True)
+    ledger.allocate(candidate_id, provenance=_provenance(goal_hash=goal_hash))
+    ledger.record_state(candidate_id, GENERATING, work)
+    ledger.record_state(candidate_id, STAGED_GENERATION_PASS, work)
+    ledger.record_state(candidate_id, ACCEPTANCE_RUNNING, work)
+    ledger.record_state(candidate_id, ACCEPTED, work)
+
+
+class TestAcceptedGoalTermination:
+    """Human governance decision (session record): once a real candidate
+    for a goal reaches ACCEPTED, a normal new generation campaign for the
+    identical goal identity must be refused. `accepted_candidate_for_goal`
+    is the one, existing-ledger-backed mechanism `run_staged_generation.py`
+    consults for this -- no second goal registry, no new ledger."""
+
+    def test_a_fresh_goal_with_no_prior_candidate_is_not_blocked(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Case A: same goal, no prior candidate at all -- generation allowed."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        assert ledger.accepted_candidate_for_goal(hash_text("goal never attempted")) is None
+
+    def test_a_goal_whose_only_candidates_failed_or_were_interrupted_is_not_blocked(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Case B: same goal, prior candidates exist but none reached
+        ACCEPTED -- generation remains allowed (these are legitimately
+        re-generatable, per campaign_budget.py's own separate budget/
+        anti-loop concern, not this invariant's)."""
+        goal_hash = hash_text("goal with only failures")
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        failed_work = tmp_path / "candidates" / "golden-work-fail"
+        failed_work.mkdir(parents=True)
+        ledger.allocate("golden-work-fail", provenance=_provenance(goal_hash=goal_hash))
+        ledger.record_state("golden-work-fail", GENERATING, failed_work)
+        ledger.record_state("golden-work-fail", STAGE_FAILED, failed_work)
+
+        interrupted_work = tmp_path / "candidates" / "golden-work-interrupted"
+        interrupted_work.mkdir(parents=True)
+        ledger.allocate("golden-work-interrupted", provenance=_provenance(goal_hash=goal_hash))
+        ledger.record_state("golden-work-interrupted", GENERATING, interrupted_work)
+        ledger.record_state("golden-work-interrupted", INTERRUPTED, interrupted_work)
+
+        assert ledger.accepted_candidate_for_goal(goal_hash) is None
+
+    def test_a_goal_with_a_real_accepted_candidate_is_blocked(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Case C: same goal, a prior candidate genuinely reached ACCEPTED
+        -- a normal new campaign for the identical goal is refused,
+        identified by the real candidate_id that earned it."""
+        goal_hash = hash_text("goal already accepted")
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        _accept(
+            ledger, "golden-work-accepted",
+            tmp_path / "candidates" / "golden-work-accepted", goal_hash=goal_hash,
+        )
+        assert ledger.accepted_candidate_for_goal(goal_hash) == "golden-work-accepted"
+
+    def test_a_different_goal_identity_is_never_blocked_by_an_unrelated_acceptance(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Case D: a real ACCEPTED candidate exists, but for a DIFFERENT
+        goal identity -- generation for the new, distinct goal remains
+        allowed. Proven with two goals whose only difference is one
+        character, so a substring or prefix match could not accidentally
+        pass this test."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        accepted_goal_hash = hash_text("goal already accepted")
+        _accept(
+            ledger, "golden-work-accepted",
+            tmp_path / "candidates" / "golden-work-accepted", goal_hash=accepted_goal_hash,
+        )
+        different_goal_hash = hash_text("goal already accepted ")  # trailing space -> different hash
+        assert different_goal_hash != accepted_goal_hash
+        assert ledger.accepted_candidate_for_goal(different_goal_hash) is None
+
+    def test_narrative_or_docstring_mentions_of_acceptance_have_no_effect(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Case E: text alone -- a comment, a candidate_id that merely looks
+        like an acceptance claim, a stray file -- must never be read as
+        acceptance. Only a real `ACCEPTED` entry in this ledger's own
+        append-only history counts. Proven by planting exactly that kind of
+        misleading text and confirming it changes nothing."""
+        goal_hash = hash_text("goal described as accepted only in prose")
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        work = tmp_path / "candidates" / "golden-work-claimed-accepted"
+        work.mkdir(parents=True)
+        _write(work, "NOTES.md", "# golden-work-claimed-accepted\nStatus: ACCEPTED (see team chat)")
+        ledger.allocate("golden-work-claimed-accepted", provenance=_provenance(goal_hash=goal_hash))
+        ledger.record_state("golden-work-claimed-accepted", GENERATING, work)
+        ledger.record_state("golden-work-claimed-accepted", STAGE_FAILED, work)
+        assert ledger.accepted_candidate_for_goal(goal_hash) is None
 
 
 class TestManifestDeterminism:

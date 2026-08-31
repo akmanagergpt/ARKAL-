@@ -92,3 +92,12 @@ class CandidateAcceptanceInProgressError(CandidateContractError):
     `begin_acceptance`'s file lock)."""
 
     code = "ARK-ERR-0115"
+
+
+class GoalAlreadyAcceptedError(CandidateContractError):
+    """A real, terminal `ACCEPTED` candidate already exists for this exact
+    goal identity (`ledger.py` `CandidateLedger.accepted_candidate_for_goal`);
+    a normal new generation campaign for the same goal is refused before any
+    candidate identity is claimed or any model/provider is invoked."""
+
+    code = "ARK-ERR-0116"
