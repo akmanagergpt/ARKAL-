@@ -192,6 +192,71 @@ class TestTheWholeBriefMustTargetTheCurrentPhase:
                    for d in drift_names(validator, mutated))
 
 
+class TestBuildStateCarriesItsOwnNextExactAction:
+    """F-0050 (`docs/build/OPEN_BLOCKERS.md`): `docs/build/BUILD_STATE.md`
+    carries its own, separate "Next exact action" section -- unnumbered,
+    unlike the handoff's "## 9. Next exact action" -- and nothing checked
+    it. It named `Phase 14` for sixteen real phases after the current work
+    phase moved on, with nothing to catch it: every existing control here
+    was scoped to the handoff alone. Same derivation, same function
+    (`check_next_action`, generalised with a `label` so two documents'
+    findings are told apart), applied a second time -- not a second
+    mechanism, and nothing here names a phase or a requirement id.
+    """
+
+    def test_the_real_build_state_names_the_current_work_phase(
+        self, validator: types.ModuleType, handoff_text: str, truth: dict,
+    ) -> None:
+        """The real, current document -- proves the live fix, not a mock."""
+        current = truth["current"]
+        assert current is not None
+        drift = drift_names(validator, handoff_text)
+        assert not any(d.startswith("BUILD_STATE.md: ") for d in drift), drift
+
+    def test_a_build_state_brief_naming_a_stale_phase_is_detected(
+        self, validator: types.ModuleType, transition_module: types.ModuleType,
+        truth: dict,
+    ) -> None:
+        """Reproduces the exact real defect found: BUILD_STATE.md's own
+        unnumbered heading, naming a phase that is not the current one."""
+        current = truth["current"]
+        assert current is not None
+        stale_phase = "14" if current != "14" else "13"
+        synthetic = (
+            "## Next exact action\n\n"
+            f"**Begin Phase {stale_phase} -- stale by construction for this test.**\n"
+        )
+        report = validator.Report()
+        transition_module.check_next_action(
+            REPO, synthetic, truth, report, label="BUILD_STATE.md: ",
+        )
+        assert any(
+            d == "BUILD_STATE.md: the next-exact-action section names the "
+                 "current work phase"
+            for d in report.drift
+        ), report.drift
+
+    def test_a_build_state_brief_naming_the_current_phase_is_not_flagged(
+        self, validator: types.ModuleType, transition_module: types.ModuleType,
+        truth: dict,
+    ) -> None:
+        """ANTI-VACUITY: the same shape, naming the real current phase and a
+        real denominator, must NOT be flagged -- proves the control above
+        fires on the mismatch, not on the document merely existing."""
+        current = truth["current"]
+        assert current is not None
+        synthetic = (
+            "## Next exact action\n\n"
+            f"**Continue Phase {current}.** denominator: "
+            f"{len(truth['current_denominator'])} requirements, all MANDATORY.\n"
+        )
+        report = validator.Report()
+        transition_module.check_next_action(
+            REPO, synthetic, truth, report, label="BUILD_STATE.md: ",
+        )
+        assert report.drift == [], report.drift
+
+
 class TestTheControlsAreDerived:
     def test_the_module_names_no_phase_requirement_or_contract(
         self, truth: dict

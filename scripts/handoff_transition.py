@@ -36,7 +36,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
 CURRENT_STATE_HEADING = r"^##\s*\d+\.\s*Current verified state\s*$"
-NEXT_ACTION_HEADING = r"^##\s*\d+\.\s*Next exact action\s*$"
+#: The numeric prefix is OPTIONAL so this one pattern matches both the
+#: handoff's own numbered section ("## 9. Next exact action") and
+#: `docs/build/BUILD_STATE.md`'s unnumbered section of the same name
+#: (F-0050: BUILD_STATE.md carries its own separate "Next exact action"
+#: section, and nothing checked it -- it named Phase 14 for sixteen real
+#: phases after the current phase moved on).
+NEXT_ACTION_HEADING = r"^##\s*(?:\d+\.\s*)?Next exact action\s*$"
 #: A requirement identifier as every canonical record spells one.
 _REQ_ID = re.compile(r"ARK-REQ-\d{4}")
 #: A contract identifier as CONTRACT_INVENTORY.md spells one.
@@ -53,6 +59,15 @@ _PARTIAL_PACKAGES = re.compile(
 #: A cumulative total stated in the live summary.
 _CUMULATIVE = re.compile(r"cumulative verified\s+(?:stays|is|remains)\s+(\d+)",
                          re.IGNORECASE)
+#: The marker this repository's own documents already use (verbatim, in both
+#: `ARKALI_HANDOFF.md` and `docs/build/BUILD_STATE.md`) to separate the live
+#: guidance in a "Next exact action" section from the historical entries kept
+#: below it for continuity. A brief is judged only up to the first one: an
+#: older entry's own foreign requirement ids and phase numbers are real
+#: history, not a residue the live brief is claiming as its own subject.
+_SUPERSEDED_MARKER = re.compile(
+    r"\(superseded guidance retained for continuity\)", re.IGNORECASE
+)
 
 
 def transition_truth(repo: pathlib.Path) -> dict[str, Any]:
@@ -95,6 +110,17 @@ def check_transition(repo: pathlib.Path, text: str, report: DriftReport) -> None
     if summary.strip():
         check_accepted_rows(summary, truth, report)
     check_next_action(repo, text, truth, report)
+
+    # F-0050: the identical control, re-applied to BUILD_STATE.md's own
+    # "Next exact action" section -- not a second mechanism, the same
+    # derivation and the same function, called a second time against a
+    # second document that makes the identical continuation claim.
+    build_state = repo / "docs" / "build" / "BUILD_STATE.md"
+    if build_state.is_file():
+        check_next_action(
+            repo, build_state.read_text(encoding="utf-8"), truth, report,
+            label="BUILD_STATE.md: ",
+        )
 
 
 def _row_for(summary: str, phase: str) -> str | None:
@@ -162,19 +188,31 @@ def check_accepted_rows(
 
 
 def check_next_action(
-    repo: pathlib.Path, text: str, truth: dict[str, Any], report: DriftReport
+    repo: pathlib.Path, text: str, truth: dict[str, Any], report: DriftReport,
+    *, label: str = "",
 ) -> None:
-    """The WHOLE brief must target the current phase, not just its opening."""
+    """The WHOLE brief must target the current phase, not just its opening.
+
+    `label` distinguishes which document's own "Next exact action" section a
+    finding is about when this same function is applied to more than one
+    (F-0050: `docs/build/BUILD_STATE.md` carries a second such section,
+    separate from the handoff's). The default `""` reproduces the exact
+    original, unlabelled messages this function always reported for the
+    handoff, so the handoff's own call site is unaffected.
+    """
     body = section(text, NEXT_ACTION_HEADING)
+    marker = _SUPERSEDED_MARKER.search(body)
+    if marker is not None:
+        body = body[: marker.start()]
     report.assert_true(
-        "a next-exact-action section exists", bool(body.strip())
+        f"{label}a next-exact-action section exists", bool(body.strip())
     )
     current = truth["current"]
     if not body.strip() or current is None:
         return
 
     report.assert_true(
-        "the next-exact-action section names the current work phase",
+        f"{label}the next-exact-action section names the current work phase",
         re.search(rf"\bPhase {re.escape(current)}\b", body) is not None,
         f"the live brief never names phase {current}",
     )
@@ -188,7 +226,7 @@ def check_next_action(
         if req in truth["foreign_ids"] and req not in denominator
     )
     report.assert_true(
-        "the live brief presents no discharged requirement as a continuation subject",
+        f"{label}the live brief presents no discharged requirement as a continuation subject",
         not stale,
         f"{stale} were discharged by accepted phase(s) "
         f"{sorted({truth['foreign_ids'][r] for r in stale})}",
@@ -202,7 +240,7 @@ def check_next_action(
     words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
              "seven": 7, "eight": 8, "nine": 9, "zero": 0}
     report.assert_true(
-        "the live brief states a denominator",
+        f"{label}the live brief states a denominator",
         stated is not None,
         f"phase {current} has {len(denominator)} registered requirements",
     )
@@ -211,6 +249,6 @@ def check_next_action(
         value = words.get(token, int(token) if token.isdigit() else None)
         if value is not None:
             report.check(
-                "the live brief states the current phase's denominator",
+                f"{label}the live brief states the current phase's denominator",
                 value, len(denominator),
             )
