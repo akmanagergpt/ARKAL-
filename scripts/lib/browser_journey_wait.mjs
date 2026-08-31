@@ -20,6 +20,22 @@
 export const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 /**
+ * The real path portion of a real `href` (relative or absolute), resolved
+ * against a placeholder base so a relative candidate-authored href (the
+ * common React Router shape, `href="/payments"`) and an absolute one both
+ * normalize the same way -- trailing slash stripped, empty path is `/`.
+ * `null` for a genuinely unparseable href, never thrown.
+ */
+export function pathnameOf(hrefOrUrl) {
+  try {
+    const path = new URL(hrefOrUrl, 'http://placeholder.invalid').pathname;
+    return path.replace(/\/+$/, '') || '/';
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The first of `locators` that is visible, retried until one is or `timeout`
  * elapses. `locators` are checked in order on every poll, so an earlier
  * locator that becomes visible always wins over a later one.
@@ -59,4 +75,50 @@ export async function waitForMutation(
     await wait(100);
   }
   throw new Error(message);
+}
+
+/**
+ * Real, requirement-backed reachability proof for one declared navigation
+ * destination -- ARK-REQ-0074, and STAGED_GENERATION_STAGES.md#8's own
+ * literal rule ("reachable through a real navigation element or a real
+ * interactive control"), nothing stronger. Proves exactly: declared route
+ * (the control's own real `href`, read from the candidate's own markup,
+ * never invented) -> a real click -> the browser's own URL actually
+ * transitioning to that real path. No heading, no ARIA role beyond
+ * link/button, no domain text -- a page.getByRole('heading', ...)
+ * assumption is exactly the over-assumption already found and removed once
+ * for the edit-page heading (module docstring, gap 3) and now removed a
+ * second time here for every top-level nav destination (golden-work-128,
+ * real evidence: a real, valid, reachable /payments route with no heading
+ * of any kind failed this journey under the assumption this function
+ * replaces).
+ *
+ * `control` may be a real `<Link>`/`<a>` (has a real `href`) or a real
+ * `<button>` driving `history.push` (no `href`) -- both are legal,
+ * observed candidate shapes. A link is verified against its own declared
+ * target path; a button is verified only by a real URL change, since no
+ * further real fact is available to check it against.
+ */
+export async function navigateAndVerifyReachable(page, control, timeout = 5_000, wait = delay) {
+  const before = page.url();
+  const href = await control.getAttribute('href');
+  await control.click();
+  const targetPath = href ? pathnameOf(href) : null;
+  const deadline = Date.now() + timeout;
+  while (true) {
+    const current = page.url();
+    if (targetPath !== null) {
+      if (pathnameOf(current) === targetPath) return;
+    } else if (current !== before) {
+      return;
+    }
+    if (Date.now() >= deadline) break;
+    await wait(100);
+  }
+  throw new Error(
+    targetPath !== null
+      ? `clicking a control declaring href=${JSON.stringify(href)} never navigated to a URL `
+        + `matching that path (stayed at ${page.url()})`
+      : `clicking a control produced no real navigation (URL stayed at ${before})`,
+  );
 }

@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { firstVisible } from './browser_journey_wait.mjs';
+import { firstVisible, navigateAndVerifyReachable, pathnameOf } from './browser_journey_wait.mjs';
 
 function fakeLocator({ count, visible }) {
   const resolved = { isVisible: async () => visible };
@@ -90,4 +90,74 @@ test('throws with a labelled error once the timeout elapses', async () => {
   } finally {
     Date.now = originalNow;
   }
+});
+
+test('pathnameOf normalizes a relative href and an absolute URL to the same path', () => {
+  assert.equal(pathnameOf('/payments'), '/payments');
+  assert.equal(pathnameOf('http://127.0.0.1:3000/payments'), '/payments');
+  assert.equal(pathnameOf('/payments/'), '/payments');
+  assert.equal(pathnameOf('/'), '/');
+});
+
+/** A fake page: `url()` reports whatever `navigateTo` last set, exactly the
+ * synchronous `Page.url()` shape `navigateAndVerifyReachable` relies on. */
+function fakePage(initialUrl) {
+  let current = initialUrl;
+  return {
+    url: () => current,
+    navigateTo(next) { current = next; },
+  };
+}
+
+function fakeControl({ href = null, onClick } = {}) {
+  return {
+    getAttribute: async (name) => (name === 'href' ? href : null),
+    click: async () => { if (onClick) await onClick(); },
+  };
+}
+
+test(
+  'a real link control is proved reachable once the URL matches its own declared href '
+  + '(golden-work-128 case A: a valid routable page with no heading passes)',
+  async () => {
+    const page = fakePage('http://127.0.0.1:3000/');
+    const control = fakeControl({
+      href: '/payments',
+      onClick: () => page.navigateTo('http://127.0.0.1:3000/payments'),
+    });
+    // Must not throw -- no heading, no page content, no domain text is
+    // inspected anywhere in this call.
+    await navigateAndVerifyReachable(page, control, 1000, instantWait);
+  },
+);
+
+test(
+  'a real link control is refused when the URL never transitions to its own declared href '
+  + '(case B: a declared destination that is genuinely unreachable fails)',
+  async () => {
+    const page = fakePage('http://127.0.0.1:3000/');
+    const control = fakeControl({ href: '/payments' }); // click does nothing
+    await assert.rejects(
+      () => navigateAndVerifyReachable(page, control, 500, instantWait),
+      /never navigated to a URL matching that path/,
+    );
+  },
+);
+
+test('a control with no href (a button-driven route push) is proved reachable by a real URL change', async () => {
+  const page = fakePage('http://127.0.0.1:3000/students');
+  const control = fakeControl({
+    href: null,
+    onClick: () => page.navigateTo('http://127.0.0.1:3000/dashboard'),
+  });
+  await navigateAndVerifyReachable(page, control, 1000, instantWait);
+});
+
+test('a control with no href that produces no real navigation is refused', async () => {
+  const page = fakePage('http://127.0.0.1:3000/students');
+  const control = fakeControl({ href: null }); // click does nothing
+  await assert.rejects(
+    () => navigateAndVerifyReachable(page, control, 500, instantWait),
+    /produced no real navigation/,
+  );
 });

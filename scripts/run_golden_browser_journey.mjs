@@ -8,7 +8,7 @@
  * from the scenario file. The four real gaps below, and the fixes for
  * them, are domain-independent and apply to any scenario this drives.
  *
- * FOUR REAL GAPS, EACH FOUND LIVE AGAINST A REAL CANDIDATE BUILD, ARE CLOSED
+ * SIX REAL GAPS, EACH FOUND LIVE AGAINST A REAL CANDIDATE BUILD, ARE CLOSED
  * HERE - never by relaxing what this journey actually proves.
  *
  * (1) NO ASSERTION ON A TRANSIENT "SUCCESS" TEXT. A generated candidate that
@@ -72,6 +72,33 @@
  * pattern. The handler below accepts every dialog unconditionally - this
  * journey drives no destructive action it does not itself intend, so
  * there is nothing to decline.
+ *
+ * (6) A VISIBLE PAGE HEADING IS NOT A CANONICAL REQUIREMENT OF A ROUTABLE
+ * PAGE. golden-work-128 (real evidence, frozen): its own real `Payments.js`
+ * and `Courses.js` are both real, correct, reachable read-only views -- a
+ * real `<Link to='/payments'>`, a real `<Route>`, real rendered content --
+ * with no heading element of any kind, the same real, valid, minimal
+ * implementation choice gap 3 already established for an edit page's own
+ * missing heading. Neither `ARK-REQ-0072`/`0311`/`0312` nor
+ * `STAGED_GENERATION_STAGES.md#8` ("every declared navigation destination
+ * ... must be reachable through a real navigation element or a real
+ * interactive control") names a heading, an ARIA role, or any page-identity
+ * text; `frontend_ux_preflight.py`'s own structural reachability check
+ * (`_navigation_reconciliation_findings`) already, deliberately, checks
+ * only that the nav label's text appears somewhere in the frontend, not
+ * that a heading exists -- this journey's own three heading assertions
+ * (primary/related/dashboard) were strictly stronger than every layer
+ * above them, unbacked by any of them. Human governance decision (session
+ * record): a page heading is required only when a goal/spec/requirement or
+ * the candidate's own declared acceptance contract requires one -- it is
+ * not ARKALI's general product invariant. Replaced with
+ * `navigateAndVerifyReachable` (`lib/browser_journey_wait.mjs`): reads the
+ * real `href` the candidate's own nav control declares, clicks it, and
+ * proves the browser's own URL actually transitioned to that real path --
+ * declared route -> real navigation -> observed URL, nothing about the
+ * destination page's content is assumed. A control with no `href` (a
+ * `<button>` driving `history.push`) is verified by a real URL change
+ * instead, since no further real fact exists to check it against.
  */
 
 import { createRequire } from 'node:module';
@@ -80,7 +107,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { firstVisible, waitForMutation } from './lib/browser_journey_wait.mjs';
+import { firstVisible, navigateAndVerifyReachable, waitForMutation } from './lib/browser_journey_wait.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -132,6 +159,17 @@ async function clickNamed(page, pattern) {
   await control.click();
 }
 
+/** A declared top-level navigation destination's reachability, proved by a
+ * real URL transition -- never a heading, an ARIA role beyond link/button,
+ * or any domain text (module docstring, gap 6 / STAGED_GENERATION_STAGES.md#8). */
+async function navigateTo(page, pattern) {
+  const control = await firstVisible([
+    page.getByRole('link', { name: pattern }),
+    page.getByRole('button', { name: pattern }),
+  ]);
+  await navigateAndVerifyReachable(page, control);
+}
+
 async function fillByLabel(page, pattern, value) {
   const input = await firstVisible([
     page.getByLabel(pattern), page.getByPlaceholder(pattern),
@@ -179,8 +217,7 @@ page.on('response', (response) => {
 try {
   await page.goto(BASE, { waitUntil: 'networkidle' });
   await expect(page.getByRole('navigation')).toBeVisible();
-  await clickNamed(page, navPattern(primary.navigation_label));
-  await expect(page.getByRole('heading', { name: navPattern(primary.navigation_label) })).toBeVisible();
+  await navigateTo(page, navPattern(primary.navigation_label));
 
   const createValues = scenario.browser_create_values || {};
   await clickNamed(page, createButtonPattern(primary.singular_label));
@@ -244,8 +281,7 @@ try {
   );
 
   if (related) {
-    await clickNamed(page, navPattern(related.navigation_label));
-    await expect(page.getByRole('heading', { name: navPattern(related.navigation_label) })).toBeVisible();
+    await navigateTo(page, navPattern(related.navigation_label));
     const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
     if (await relatedCreate.count()) {
       await relatedCreate.first().click();
@@ -263,8 +299,7 @@ try {
     }
   }
 
-  await clickNamed(page, navPattern(dashboardLabel));
-  await expect(page.getByRole('heading', { name: navPattern(dashboardLabel) })).toBeVisible();
+  await navigateTo(page, navPattern(dashboardLabel));
   if (consoleErrors.length || pageErrors.length || failedRequests.length) {
     throw new Error(JSON.stringify({ consoleErrors, pageErrors, failedRequests }));
   }
