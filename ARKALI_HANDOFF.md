@@ -713,6 +713,32 @@ families, formalize this candidate's evidence toward Phase 30's own
 requirements, or stop here is an explicit human decision, not implied by
 this campaign's success.
 
+**Golden Repair infrastructure (not a real run) implemented and
+behaviorally tested this session.** The canonical 8-class defect corpus
+(`docs/canonical/GOLDEN_REPAIR_CORPUS_DEFINITION.md` §2) now has a real,
+versioned instantiation (`golden/repair/golden_repair_corpus.json`, 8/8
+classes, exactly one entry declared `repairable: false` per §4), structural
+domain-independent injectors/detectors for every class
+(`engineering.repair.golden_corpus`/`golden_corpus_injectors`), a bounded
+per-defect convergence loop with automatic terminal ESCALATED
+(`engineering.repair.golden_repair_runner`: real `RepeatedFailedStrategyError`/
+`RepairBudgetExceededError`, never an operator flag), and a no-test-weakening
+manifest comparison. `CandidateLedger` gained `GOLDEN_REPAIR_RUNNING`/
+`GOLDEN_REPAIR_PASS` as an explicit alternative to `GENERATING`/
+`STAGED_GENERATION_PASS`, so a repair child can enter the existing,
+unmodified `run_golden_acceptance.py` through `begin_acceptance`'s widened
+(strict-superset) eligibility check — normal staged-generation candidates
+are unaffected, and no second acceptance authority was created.
+`scripts/run_golden_repair.py` was rewritten to remove every
+golden-work-007-era hardcode and wire the above together for real model use.
+**All of this is infrastructure and tests only: no model was invoked, no
+repair workspace was allocated, and `golden-work-129` was not touched**
+(mechanically re-verified this session: its ledger history is unchanged at
+5 entries ending `ACCEPTED`, and its live content still matches that
+recorded manifest exactly). Whether to authorize a real Golden Repair
+benchmark run against `golden-work-129` remains, as before, an explicit
+human decision.
+
 *(superseded guidance retained for continuity — every entry below was the
 live brief at some earlier point in this phase and is preserved as history,
 not deleted; none of it names the current continuation subject)*
