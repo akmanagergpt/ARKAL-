@@ -92,13 +92,42 @@ ACCEPTED = "ACCEPTED"
 #: reconciling caller must treat as recoverable/unknown, never silently
 #: as failure or success.
 INTERRUPTED = "INTERRUPTED"
+#: Non-terminal: a Golden Repair run's own bounded attempts/convergence loop
+#: is actively running against an isolated repair child workspace (never the
+#: accepted parent itself). Deliberately NOT `GENERATING`: that state's own
+#: docstring says "staged generation is actively running", which would be a
+#: real, false claim for a candidate a repair run produced instead -- the
+#: exact class of error F-0002/F-0011 exist to prevent, now applied to
+#: process provenance rather than a transcribed number. `ALLOCATED`'s own
+#: transition set is widened to permit this as an alternative to
+#: `GENERATING`, never a replacement for it.
+GOLDEN_REPAIR_RUNNING = "GOLDEN_REPAIR_RUNNING"
+#: Generation-terminal, but NOT lifecycle-terminal: a Golden Repair run
+#: produced a workspace whose files pass the same whole-product gate
+#: (`product_preflight.inspect_product_files`) `STAGED_GENERATION_PASS`
+#: requires -- never claiming "staged generation" happened, since it did
+#: not. `begin_acceptance` accepts this as an alternative predecessor to
+#: `STAGED_GENERATION_PASS`, both permitting the identical single transition
+#: to `ACCEPTANCE_RUNNING`; nothing about `STAGED_GENERATION_PASS`'s own
+#: eligibility, integrity, or locking behaviour changes.
+GOLDEN_REPAIR_PASS = "GOLDEN_REPAIR_PASS"
 
 #: Every state with zero permitted outgoing transitions -- once recorded,
 #: nothing further may ever be recorded for that candidate_id.
 TERMINAL_STATES = frozenset({
     STAGE_FAILED, FINAL_GATE_FAILED, ACCEPTANCE_FAILED, ACCEPTED, INTERRUPTED,
 })
-ALL_STATES = frozenset({ALLOCATED, GENERATING, STAGED_GENERATION_PASS, ACCEPTANCE_RUNNING}) | TERMINAL_STATES
+ALL_STATES = frozenset({
+    ALLOCATED, GENERATING, STAGED_GENERATION_PASS, ACCEPTANCE_RUNNING,
+    GOLDEN_REPAIR_RUNNING, GOLDEN_REPAIR_PASS,
+}) | TERMINAL_STATES
+#: Every latest state `begin_acceptance` may start real acceptance from.
+#: A strict superset check, never a relaxation of either member's own
+#: eligibility: `STAGED_GENERATION_PASS`'s own behaviour is byte-for-byte
+#: unchanged (still refused from every other state, including this new
+#: one), and `GOLDEN_REPAIR_PASS` is held to the identical integrity and
+#: locking checks -- only the name of the accepted predecessor state widens.
+_ACCEPTANCE_ELIGIBLE_STATES = frozenset({STAGED_GENERATION_PASS, GOLDEN_REPAIR_PASS})
 
 #: The complete lifecycle graph. `record_state` (and `begin_acceptance`,
 #: which calls it) refuses any transition not listed here for the
@@ -106,11 +135,16 @@ ALL_STATES = frozenset({ALLOCATED, GENERATING, STAGED_GENERATION_PASS, ACCEPTANC
 #: STAGED_GENERATION_PASS -> ACCEPTANCE_RUNNING -> {ACCEPTED,
 #: ACCEPTANCE_FAILED, INTERRUPTED} the only path acceptance can ever take,
 #: and what makes STAGE_FAILED, FINAL_GATE_FAILED, ACCEPTANCE_FAILED,
-#: ACCEPTED, and INTERRUPTED true dead ends.
+#: ACCEPTED, and INTERRUPTED true dead ends. GOLDEN_REPAIR_RUNNING and
+#: GOLDEN_REPAIR_PASS mirror GENERATING and STAGED_GENERATION_PASS exactly,
+#: on a fully separate branch from ALLOCATED -- a candidate_id takes one
+#: branch or the other, never both, since each is allocated once.
 _TRANSITIONS: dict[str, frozenset[str]] = {
-    ALLOCATED: frozenset({GENERATING}),
+    ALLOCATED: frozenset({GENERATING, GOLDEN_REPAIR_RUNNING}),
     GENERATING: frozenset({STAGE_FAILED, FINAL_GATE_FAILED, STAGED_GENERATION_PASS, INTERRUPTED}),
+    GOLDEN_REPAIR_RUNNING: frozenset({FINAL_GATE_FAILED, GOLDEN_REPAIR_PASS, INTERRUPTED}),
     STAGED_GENERATION_PASS: frozenset({ACCEPTANCE_RUNNING}),
+    GOLDEN_REPAIR_PASS: frozenset({ACCEPTANCE_RUNNING}),
     ACCEPTANCE_RUNNING: frozenset({ACCEPTED, ACCEPTANCE_FAILED, INTERRUPTED}),
     STAGE_FAILED: frozenset(),
     FINAL_GATE_FAILED: frozenset(),
@@ -380,10 +414,11 @@ class CandidateLedger:
         """The strict, atomic gate for starting real acceptance
         (`run_golden_acceptance.py`). Combines three checks that must all
         happen as one indivisible operation -- eligibility (latest
-        recorded state must be exactly STAGED_GENERATION_PASS; a
-        STAGE_FAILED or already-ACCEPTED candidate is refused just as
-        surely as a tampered one), integrity (live content must match the
-        manifest recorded at that STAGED_GENERATION_PASS state), and the
+        recorded state must be in `_ACCEPTANCE_ELIGIBLE_STATES` --
+        `STAGED_GENERATION_PASS` or `GOLDEN_REPAIR_PASS`; a STAGE_FAILED
+        or already-ACCEPTED candidate is refused just as surely as a
+        tampered one, for either), integrity (live content must match the
+        manifest recorded at that state), and the
         ACCEPTANCE_RUNNING transition itself -- behind one atomic,
         cross-platform file lock (`os.O_CREAT | os.O_EXCL`, portable to
         both Windows and POSIX) keyed on `candidate_id`. A second caller
@@ -415,11 +450,11 @@ class CandidateLedger:
         try:
             latest = self.latest(candidate_id)
             current_state = LEGACY_UNVERIFIED if latest is None else str(latest["state"])
-            if current_state != STAGED_GENERATION_PASS:
+            if current_state not in _ACCEPTANCE_ELIGIBLE_STATES:
                 raise CandidateIntegrityError(
                     f"CANDIDATE_INTEGRITY_FAILED: {candidate_id!r} is not acceptance-"
                     f"eligible (latest recorded state: {current_state!r}; acceptance "
-                    f"only ever begins from {STAGED_GENERATION_PASS!r})"
+                    f"only ever begins from {sorted(_ACCEPTANCE_ELIGIBLE_STATES)!r})"
                 )
             recorded = latest["manifest"]
             live = file_manifest(workspace_root)
@@ -448,6 +483,8 @@ __all__ = [
     "FINAL_GATE_FAILED",
     "GENERATING",
     "GenerationProvenance",
+    "GOLDEN_REPAIR_PASS",
+    "GOLDEN_REPAIR_RUNNING",
     "INTERRUPTED",
     "InvalidLifecycleTransitionError",
     "LEGACY_UNVERIFIED",

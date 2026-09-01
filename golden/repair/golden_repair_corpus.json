@@ -1,0 +1,93 @@
+{
+  "corpus_version": "1.0",
+  "entries": [
+    {
+      "id": "CORPUS-contract_violation-001",
+      "defect_class": "contract_violation",
+      "title": "POST response omits a field the request itself declared",
+      "injection_target": "source_module",
+      "injection_strategy": "remove_one_non_id_jsonify_response_field",
+      "expected_detection": ["T4"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 1: a POST handler's own real jsonify response contract must include every field the request body itself supplied; removing one is a real, structural contract violation any generated_backend_tests run should be able to surface."
+    },
+    {
+      "id": "CORPUS-state_machine_invalid_transition-001",
+      "defect_class": "state_machine_invalid_transition",
+      "title": "PUT/DELETE mutates a non-existent record with no existence guard",
+      "injection_target": "source_module",
+      "injection_strategy": "remove_rowcount_zero_existence_guard",
+      "expected_detection": ["T6"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 2: removing the existence guard lets a mutation 'succeed' against a record that was never in the required prior state -- a real invalid state transition."
+    },
+    {
+      "id": "CORPUS-permission_check_removal-001",
+      "defect_class": "permission_check_removal",
+      "title": "Access-control (CORS) boundary silently disabled",
+      "injection_target": "source_module",
+      "injection_strategy": "remove_cors_app_call",
+      "expected_detection": ["T9"],
+      "repairable": false,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "The mandatory unrepairable entry (corpus definition §4). No pytest test in this pipeline's own generated tests/ suite (Flask test_client only) ever asserts on CORS/access-control headers, so a bounded repair strategy gets no real test-based convergence signal for this specific class the way it does for the other seven -- the same repeated-strategy/budget-exhaustion path (RepeatedFailedStrategyError / RepairBudgetExceededError, both already real in contracts.py) is expected to fire and reach terminal ESCALATED for this entry specifically, proving bounded non-convergence rather than an unbounded retry loop."
+    },
+    {
+      "id": "CORPUS-persistence_not_committed-001",
+      "defect_class": "persistence_not_committed",
+      "title": "INSERT reaches the connection but is never committed",
+      "injection_target": "source_module",
+      "injection_strategy": "remove_commit_call_after_insert",
+      "expected_detection": ["T11"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 4: a write that never durably commits fails the real sqlite_restart_persistence check any real acceptance journey already performs."
+    },
+    {
+      "id": "CORPUS-api_frontend_contract_drift-001",
+      "defect_class": "api_frontend_contract_drift",
+      "title": "Declared route contract no longer matches the real backend route",
+      "injection_target": "route_contract",
+      "injection_strategy": "mutate_one_declared_routes_json_method",
+      "expected_detection": ["T4", "T10"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 5: backend/routes.json is the real, machine-readable route contract every frontend/E2E consumer trusts; drifting it from the backend's own real @app.route declarations is a genuine API/frontend contract break."
+    },
+    {
+      "id": "CORPUS-dependency_lock_mismatch-001",
+      "defect_class": "dependency_lock_mismatch",
+      "title": "Flask pin widened past its verified compatible Werkzeug range",
+      "injection_target": "lockfile",
+      "injection_strategy": "widen_flask_pin_and_drop_werkzeug_cap",
+      "expected_detection": ["T1"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "golden-work-077 (real, frozen session evidence, dependency_resolution.py module docstring): flask==2.x with no Werkzeug<3 cap installs cleanly but genuinely fails Flask's own test_client() against Werkzeug 3.x -- a real, previously-observed dependency/lock mismatch, reused here as the injected corpus defect."
+    },
+    {
+      "id": "CORPUS-migration_model_mismatch-001",
+      "defect_class": "migration_model_mismatch",
+      "title": "Live CREATE TABLE schema drops a field data_model.json still declares",
+      "injection_target": "migration",
+      "injection_strategy": "remove_one_declared_column_from_create_table",
+      "expected_detection": ["T5"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 7: the live schema migration (backend/db.py) and the declared data model (backend/data_model.json) are two real, independently-generated artifacts that must agree; dropping a column from one is a genuine migration/model mismatch."
+    },
+    {
+      "id": "CORPUS-boundary_off_by_one-001",
+      "defect_class": "boundary_off_by_one",
+      "title": "Parameterised route loses its integer type boundary",
+      "injection_target": "source_module",
+      "injection_strategy": "widen_int_converter_to_untyped_string",
+      "expected_detection": ["T3"],
+      "repairable": true,
+      "budget_profile": "golden-repair-standard-v1",
+      "rationale": "GOLDEN_REPAIR_CORPUS_DEFINITION.md §2 row 8: Flask's own <int:...> converter is the real boundary/type check protecting every id-addressed route; widening it to an untyped segment lets a non-integer id reach a query built to expect one."
+    }
+  ]
+}

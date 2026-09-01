@@ -16,6 +16,18 @@ from arkali.engineering.repair.errors import (
 from arkali.kernel.contracts.content_address import address_of
 
 CONTRACT_VERSION: Final[str] = "1.0.0"
+
+
+def content_hash(payload: bytes) -> str:
+    """`engineering.repair`'s one real import of `kernel.contracts.content_
+    address` -- every other real content hash this context needs (a golden
+    repair corpus instance included) goes through this, rather than each
+    caller adding its own separate import edge to an already fan-in-
+    constrained kernel module (`architecture_budget_violation`,
+    `max_fan_in_per_module`)."""
+    return address_of(payload)
+
+
 Declared = Annotated[str, Field(min_length=1)]
 Count = Annotated[int, Field(ge=0)]
 PositiveCount = Annotated[int, Field(gt=0)]
