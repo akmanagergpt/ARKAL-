@@ -36,7 +36,16 @@ from arkali.engineering.repair.golden_corpus_injectors import DETECTORS
 
 @dataclass(frozen=True)
 class RepairRunResult:
-    ledger: RepairBudgetLedger
+    """`ledgers` is keyed by corpus entry id, one real `RepairBudgetLedger`
+    per defect (`docs/contracts/repair.md`: "a ledger is scoped to one
+    candidate's convergence attempt on one defect") -- never one shared
+    ledger for the whole corpus (F-0057). Each entry's own consumption,
+    fingerprints, and anti-loop history are visible only through its own
+    ledger; no entry's budget is spent by another's attempts. A run-level
+    total is a derived sum over `ledgers.values()`, computed by a caller
+    that wants one -- never stored here as a second, parallel figure."""
+
+    ledgers: Mapping[str, RepairBudgetLedger]
     resolved: tuple[str, ...]
     escalated: tuple[str, ...]
     files: Mapping[str, str]
@@ -83,6 +92,19 @@ def run_corpus_repair(
     `RepairBudgetExceededError`, both already real in `contracts.py`) --
     never an operator-supplied flag.
 
+    ONE `RepairBudgetLedger` PER CORPUS ENTRY (F-0057), not one shared
+    across the whole run: `docs/contracts/repair.md`'s own anti-loop section
+    states plainly that "a ledger is scoped to one candidate's convergence
+    attempt on one defect", and the Master Specification's own Golden Repair
+    Benchmark PASS conditions name each repairable defect resolved "within
+    ITS declared budget" and the unrepairable defect escalated "within
+    budget" -- singular defect, singular budget, never a shared pool. Every
+    entry starts its own ledger fresh from `budget` (the same declared
+    numeric ceiling, reused by every entry, exactly as the corpus schema's
+    own per-entry `budget_profile` field already implies each entry
+    references that ceiling independently) -- entry 1 consuming its own
+    full budget can never pre-empt entry 2's own first attempt.
+
     Budget enforcement is POST-consumption, by design (`docs/contracts/
     repair.md`: "Recording returns a new immutable ledger and refuses any
     candidate that would cross a ceiling") -- `attempt_repair` itself always
@@ -91,18 +113,19 @@ def run_corpus_repair(
     `attempt_repair` call; this is the documented contract, not a bug, and
     is left unchanged here.
     """
-    ledger = RepairBudgetLedger(candidate_id=candidate_id, budget=budget)
     current: Mapping[str, str] = dict(files)
     resolved: list[str] = []
     escalated: list[str] = []
+    ledgers: dict[str, RepairBudgetLedger] = {}
     for entry in sorted(entries, key=lambda e: e.id):
         detector = DETECTORS[entry.defect_class]
+        entry_ledger = RepairBudgetLedger(candidate_id=candidate_id, budget=budget)
         while detector(current):
             started = time.monotonic()
             candidate_files, fingerprint = attempt_repair(entry, current)
             elapsed_seconds = max(0, math.ceil(time.monotonic() - started))
             try:
-                ledger = ledger.record(
+                entry_ledger = entry_ledger.record(
                     fingerprint,
                     ai_calls=1, elapsed_seconds=elapsed_seconds, cost=Decimal(0),
                     touched_files=_changed_file_count(current, candidate_files),
@@ -117,8 +140,9 @@ def run_corpus_repair(
                 break
         else:
             resolved.append(entry.id)
+        ledgers[entry.id] = entry_ledger
     return RepairRunResult(
-        ledger=ledger, resolved=tuple(resolved), escalated=tuple(escalated), files=current,
+        ledgers=ledgers, resolved=tuple(resolved), escalated=tuple(escalated), files=current,
     )
 
 

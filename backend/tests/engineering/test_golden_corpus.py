@@ -523,7 +523,9 @@ class TestBudgetAccountingFixes:
         )
         assert set(result.resolved) == {e.id for e in entries}
         assert result.escalated == ()
-        assert result.ledger.consumption.touched_files == 2  # 1 real changed file x 2 entries
+        # 1 real changed file per entry, each entry's own independent ledger.
+        assert result.ledgers[entries[0].id].consumption.touched_files == 1
+        assert result.ledgers[entries[1].id].consumption.touched_files == 1
 
     def test_a_real_touch_count_that_genuinely_exceeds_the_ceiling_still_escalates(self) -> None:
         """item E: a real, correctly-measured touched_files count that
@@ -556,7 +558,7 @@ class TestBudgetAccountingFixes:
         # 2 attempts x 3 files = 6 (within 7); the 3rd attempt's own 3 more
         # would bring it to 9 > 7, so RepairBudgetExceededError fires there.
         assert attempt_index == 3
-        assert result.ledger.consumption.touched_files == 6
+        assert result.ledgers[entry.id].consumption.touched_files == 6
 
     def test_elapsed_seconds_reflects_a_real_measured_delta_not_a_constant(
         self, monkeypatch: pytest.MonkeyPatch,
@@ -577,7 +579,7 @@ class TestBudgetAccountingFixes:
         result = gr.run_corpus_repair(
             (entry,), broken, _budget(), resolves, candidate_id="test-candidate-elapsed-1",
         )
-        assert result.ledger.consumption.elapsed_seconds == 5  # ceil(4.6) == 5, never the old constant 1
+        assert result.ledgers[entry.id].consumption.elapsed_seconds == 5  # ceil(4.6) == 5, never the old constant 1
 
     def test_elapsed_seconds_accumulates_across_multiple_real_attempts(
         self, monkeypatch: pytest.MonkeyPatch,
@@ -612,7 +614,153 @@ class TestBudgetAccountingFixes:
         # ceil(2.4)=3, ceil(3.1)=4, ceil(4.0)=4 -> cumulative 11; the 4th
         # attempt's own ceil(1.0)=1 is never added (its record() call was
         # refused by the attempts ceiling before assignment).
-        assert result.ledger.consumption.elapsed_seconds == 11
+        assert result.ledgers[entry.id].consumption.elapsed_seconds == 11
+
+
+# ---------------------------------------------------------------------------
+# Surgical per-class undo patches for the REAL corpus's own 5 defects that
+# share backend/app.py (contract_violation, state_machine_invalid_transition,
+# permission_check_removal, persistence_not_committed, boundary_off_by_one) --
+# a targeted string replace per class, never a full-file restore, so fixing
+# one class's own defect can never silently resolve a sibling class still
+# present in the same file (the exact collapse F-0057's own audit warned
+# about). Safe specifically because each targets a disjoint substring of the
+# fixture's own known content (verified by inspection, not assumed).
+# ---------------------------------------------------------------------------
+
+_SURGICAL_APP_PY_FIX: dict[str, Callable[[str], str]] = {
+    gc.BOUNDARY_OFF_BY_ONE: lambda src: src.replace("<id>", "<int:id>"),
+    gc.CONTRACT_VIOLATION: lambda src: src.replace(
+        "jsonify({'id': new_id, 'name': data['name']})",
+        "jsonify({'id': new_id, 'name': data['name'], 'extra': data['extra']})",
+    ),
+    gc.PERSISTENCE_NOT_COMMITTED: lambda src: src.replace(
+        "    new_id = cursor.lastrowid",
+        "    conn.commit()\n    new_id = cursor.lastrowid",
+    ),
+    gc.STATE_MACHINE_INVALID_TRANSITION: lambda src: src.replace(
+        "(data['name'], data['extra'], id),\n    )\n    conn.commit()",
+        "(data['name'], data['extra'], id),\n    )\n    if cursor.rowcount == 0:\n"
+        "        return jsonify({'error': 'not found'}), 404\n    conn.commit()",
+    ),
+}
+_SIMPLE_RESTORE_TARGET = {
+    gc.API_FRONTEND_CONTRACT_DRIFT: "backend/routes.json",
+    gc.DEPENDENCY_LOCK_MISMATCH: "backend/requirements.txt",
+    gc.MIGRATION_MODEL_MISMATCH: "backend/db.py",
+}
+
+
+class TestRealCorpusFeasibilityWithPerEntryLedgers:
+    """F-0057: the real committed corpus (golden/repair/golden_repair_corpus.
+    json) run through the real golden-repair-standard-v1 numeric profile
+    against the real run_corpus_repair -- the exact combination the F-0057
+    audit proved mathematically infeasible under the old shared-ledger scope
+    (at most 6 of 8 entries could ever record even one successful attempt),
+    and proves feasible here under the fixed per-entry scope. The model call
+    is a deterministic fake callback; no real Ollama is used."""
+
+    def test_the_real_8_entry_corpus_is_processable_under_the_real_profile(self) -> None:
+        entries = gc.load_corpus_instance(CORPUS_INSTANCE_PATH)
+        pristine = _candidate_files()
+        broken = gi.apply_corpus(pristine, entries)
+        attempt_log: dict[str, list[str]] = {e.id: [] for e in entries}
+
+        def attempt_repair(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            attempt_log[entry.id].append(entry.defect_class)
+            if entry.defect_class == gc.PERMISSION_CHECK_REMOVAL:
+                # item C/L: the real declared-unrepairable entry -- never
+                # resolves, the identical strategy every time -> a genuine
+                # anti-loop ESCALATED on its own 2nd attempt.
+                return None, _fingerprint(strategy="never-converges")
+            if entry.defect_class == gc.API_FRONTEND_CONTRACT_DRIFT:
+                # item D/F: deliberately exhausts its OWN full budget (never
+                # resolves, a distinct strategy every attempt) -- proves
+                # later entries are unaffected by this entry's own ceiling.
+                return None, _fingerprint(strategy=f"drift-attempt-{len(attempt_log[entry.id])}")
+            if entry.defect_class in _SURGICAL_APP_PY_FIX:
+                fixed_app_py = _SURGICAL_APP_PY_FIX[entry.defect_class](current["backend/app.py"])
+                fixed = {**current, "backend/app.py": fixed_app_py}
+            else:
+                path = _SIMPLE_RESTORE_TARGET[entry.defect_class]
+                fixed = {**current, path: pristine[path]}
+            return fixed, _fingerprint(strategy=f"restore-{entry.defect_class}")
+
+        # The real declared numeric profile -- not loosened for this test.
+        real_profile_budget = _budget(
+            attempts=6, ai_calls=6, elapsed_seconds=3600, touched_files=64, regression_delta=0,
+        )
+        result = gr.run_corpus_repair(
+            entries, broken, real_profile_budget, attempt_repair,
+            candidate_id="test-real-corpus-feasibility",
+        )
+
+        # A: 8/8 entries each own a real, independent ledger.
+        assert set(result.ledgers) == {e.id for e in entries}
+        assert len(entries) == 8
+
+        # E: the whole corpus is processed -- every entry reaches a real
+        # verdict, none silently skipped, under the REAL 6/6 profile.
+        assert set(result.resolved) | set(result.escalated) == {e.id for e in entries}
+
+        # B: every one of the 7 repairable entries gets at least one real
+        # attempt -- opportunity, not a guarantee of resolution (one of
+        # them, drift_id below, is deliberately made to exhaust its own
+        # budget instead, to prove F/D directly).
+        repairable_ids = {e.id for e in entries if e.repairable}
+        assert len(repairable_ids) == 7
+        for entry_id in repairable_ids:
+            assert len(attempt_log[entry_id]) >= 1
+
+        # C/L: the real declared-unrepairable entry reached genuine
+        # anti-loop ESCALATED in exactly 2 real calls -- never force-resolved,
+        # never pre-empted by any other entry's own consumption.
+        unrepairable = next(e for e in entries if not e.repairable)
+        assert unrepairable.defect_class == gc.PERMISSION_CHECK_REMOVAL
+        assert unrepairable.id in result.escalated
+        assert len(attempt_log[unrepairable.id]) == 2
+
+        # F: the entry deliberately made to exhaust its OWN ceiling
+        # (repairable: true, but never resolved here) escalated via its own
+        # budget alone (6 recorded, a 7th real attempt that exceeded the
+        # ceiling) -- independent of the unrepairable entry's own separate
+        # escalation, proving a real repairable entry can still genuinely
+        # escalate on its own real, isolated consumption.
+        drift_id = next(e.id for e in entries if e.defect_class == gc.API_FRONTEND_CONTRACT_DRIFT)
+        assert drift_id in result.escalated
+        assert len(attempt_log[drift_id]) == 7
+        assert result.ledgers[drift_id].consumption.attempts == 6
+
+        # D: every OTHER repairable entry -- several processed AFTER the
+        # budget-exhausted entry -- genuinely resolved with its own single,
+        # minimal attempt, proving the exhausted entry's full consumption
+        # never reduced any later entry's own independent budget.
+        resolved_repairable_ids = repairable_ids - {drift_id}
+        assert set(result.resolved) == resolved_repairable_ids
+        for entry in entries:
+            if entry.id in resolved_repairable_ids:
+                assert len(attempt_log[entry.id]) == 1
+                assert result.ledgers[entry.id].consumption.attempts == 1
+
+        # G: fingerprints never cross entries -- each entry's own ledger
+        # carries only fingerprints this exact entry's own attempts produced.
+        _own_strategy_prefix = {
+            unrepairable.id: "never-converges",
+            drift_id: "drift-attempt-",
+        }
+        for entry in entries:
+            expected = _own_strategy_prefix.get(entry.id, f"restore-{entry.defect_class}")
+            for fp in result.ledgers[entry.id].fingerprints:
+                assert fp.strategy.startswith(expected)
+
+        # H: touched_files/elapsed consumption never crosses entries -- the
+        # exhausted entry's own high real cost is confined to its own
+        # ledger; every quick-resolving entry's own ledger reflects only
+        # its own tiny, independent, real cost.
+        for entry in entries:
+            if entry.id in resolved_repairable_ids:
+                assert result.ledgers[entry.id].consumption.touched_files >= 1
+                assert result.ledgers[entry.id].consumption.touched_files < 10
 
 
 # ---------------------------------------------------------------------------

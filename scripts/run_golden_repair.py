@@ -418,24 +418,44 @@ def main(argv: list[str]) -> int:
     elapsed = round(time.monotonic() - started, 3)
 
     declared_unrepairable = tuple(e.id for e in entries if not e.repairable)
+    ledgers = outcome.repair_result.ledgers
+
+    def _outcome_for(entry_id: str) -> str:
+        if entry_id in outcome.repair_result.resolved:
+            return "resolved"
+        if entry_id in outcome.repair_result.escalated:
+            return "escalated"
+        return "not_reached"
+
+    # AUTHORITATIVE: one real per-defect ledger per corpus entry (F-0057 --
+    # a single shared ledger across the whole corpus previously made this
+    # figure meaningless). "aggregate_consumption" below is a DERIVED sum
+    # over these, computed for convenience only -- never the source of
+    # truth a caller should read budget-exhaustion decisions from.
+    per_defect_evidence = {
+        entry.id: {
+            "defect_class": entry.defect_class,
+            "declared_budget_profile": entry.budget_profile,
+            "repairable": entry.repairable,
+            "outcome": _outcome_for(entry.id),
+            "consumption": ledgers[entry.id].consumption.model_dump(mode="json"),
+            "fingerprints": [fp.model_dump(mode="json") for fp in ledgers[entry.id].fingerprints],
+        }
+        for entry in entries
+    }
+    aggregate_consumption = {
+        field: sum(getattr(ledgers[e.id].consumption, field) for e in entries)
+        for field in ("attempts", "ai_calls", "elapsed_seconds", "touched_files", "regression_delta")
+    }
     evidence_payload = {
         "candidate_id": args.candidate_id,
         "parent_revision": args.source_candidate_id,
         "corpus_hash": corpus_hash(entries),
         "declared_budget": budget.model_dump(mode="json"),
-        "per_defect_outcome": {
-            entry.id: (
-                "resolved" if entry.id in outcome.repair_result.resolved
-                else "escalated" if entry.id in outcome.repair_result.escalated
-                else "not_reached"
-            )
-            for entry in entries
-        },
-        "budget_consumption": outcome.repair_result.ledger.consumption.model_dump(mode="json"),
-        "regression_delta": outcome.repair_result.ledger.consumption.regression_delta,
+        "per_defect_evidence": per_defect_evidence,
+        "aggregate_consumption": aggregate_consumption,
         "declared_unrepairable_entries": declared_unrepairable,
         "escalated_entries": outcome.repair_result.escalated,
-        "fingerprints": [fp.model_dump(mode="json") for fp in outcome.repair_result.ledger.fingerprints],
         "protected_path_violations": outcome.protected_path_violations,
         "gate_passed": outcome.gate_passed,
         "gate_findings": outcome.gate_findings,
