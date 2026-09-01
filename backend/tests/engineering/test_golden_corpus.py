@@ -454,6 +454,167 @@ class TestRunCorpusRepairConvergence:
         assert attempt_index == 3  # 2 recorded normally, 3rd exceeds the ceiling
 
 
+class TestChangedFileCount:
+    """`_changed_file_count` -- the real touched_files diff, proven directly
+    (items A/B/C): golden-work-129-repair-1's real terminal state was
+    FINAL_GATE_FAILED because the old code charged an attempt for every
+    file in the returned mapping, not the files it actually changed."""
+
+    def test_one_changed_file_out_of_a_full_returned_mapping_counts_as_one(self) -> None:
+        """item A."""
+        before = _candidate_files()
+        after = {**before, "backend/app.py": "# changed\n"}
+        assert gr._changed_file_count(before, after) == 1
+
+    def test_an_unchanged_returned_mapping_counts_as_zero(self) -> None:
+        """item B."""
+        before = _candidate_files()
+        after = dict(before)
+        assert gr._changed_file_count(before, after) == 0
+
+    def test_added_removed_and_changed_paths_are_all_counted(self) -> None:
+        """item C."""
+        before = {"a.txt": "1", "b.txt": "2", "c.txt": "3"}
+        after = {"a.txt": "1", "b.txt": "CHANGED", "d.txt": "new"}
+        # b.txt changed, c.txt removed, d.txt added -- a.txt untouched.
+        assert gr._changed_file_count(before, after) == 3
+
+    def test_a_failed_attempt_with_no_files_touches_nothing(self) -> None:
+        before = _candidate_files()
+        assert gr._changed_file_count(before, None) == 0
+
+
+class TestBudgetAccountingFixes:
+    """Behavioral proof of the touched_files/elapsed_seconds fix found by
+    the real golden-work-129-repair-1 benchmark run (BENCHMARK_SEMANTICS_GAP):
+    the old code counted the whole returned file-set size and a constant
+    elapsed_seconds=1 per attempt, exhausting the declared touched_files
+    budget after ~3 attempts regardless of what a real attempt actually
+    changed, and never reflecting real wall-clock cost."""
+
+    def test_a_small_real_touch_count_does_not_pre_empt_a_later_entry(self) -> None:
+        """item D: two entries in two DIFFERENT files, each attempt
+        changing only that one file (~ real cost 1, not ~17) -- a budget
+        that would have been exhausted by the old whole-mapping-size
+        accounting after 3-4 attempts now comfortably covers both entries
+        resolving on their own first real attempt. Deliberately different
+        files (app.py vs requirements.txt): restoring one must not
+        accidentally resolve the other, which would collapse this test's
+        own proof that entry 2 still gets its own real attempt."""
+        files = _candidate_files()
+        entries = (_entry(gc.CONTRACT_VIOLATION), _entry(gc.DEPENDENCY_LOCK_MISMATCH))
+        restore_path = {
+            gc.CONTRACT_VIOLATION: "backend/app.py",
+            gc.DEPENDENCY_LOCK_MISMATCH: "backend/requirements.txt",
+        }
+        broken = gi.apply_corpus(files, entries)
+
+        def restore_relevant_file(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            path = restore_path[entry.defect_class]
+            fixed = {**current, path: files[path]}
+            return fixed, _fingerprint(strategy=f"restore-{entry.defect_class}")
+
+        # A tight budget that the OLD (whole-mapping-size) accounting could
+        # never have satisfied for two entries (2 attempts x ~6 files each
+        # already exceeds it), but the real per-attempt cost here is 1 file.
+        tight_budget = _budget(touched_files=4, attempts=5)
+        result = gr.run_corpus_repair(
+            entries, broken, tight_budget, restore_relevant_file, candidate_id="test-candidate-touch-1",
+        )
+        assert set(result.resolved) == {e.id for e in entries}
+        assert result.escalated == ()
+        assert result.ledger.consumption.touched_files == 2  # 1 real changed file x 2 entries
+
+    def test_a_real_touch_count_that_genuinely_exceeds_the_ceiling_still_escalates(self) -> None:
+        """item E: a real, correctly-measured touched_files count that
+        genuinely crosses the declared ceiling must still terminate the
+        entry via RepairBudgetExceededError -- the fix corrects what is
+        counted, not whether the ceiling is enforced."""
+        files = _candidate_files()
+        entry = _entry(gc.CONTRACT_VIOLATION, repairable=False)
+        broken = {**files, "backend/app.py": gi.INJECTORS[gc.CONTRACT_VIOLATION](files)["backend/app.py"]}
+        attempt_index = 0
+
+        def touches_many_files(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            nonlocal attempt_index
+            attempt_index += 1
+            # A real, distinct 3-file change every attempt (still failing
+            # to resolve the defect) -- genuinely touches 3 files/attempt.
+            fixed = {
+                **current,
+                "backend/db.py": current["backend/db.py"] + f"\n# attempt {attempt_index}",
+                "backend/data_model.json": current["backend/data_model.json"] + " ",
+                "backend/requirements.txt": current["backend/requirements.txt"] + f"# {attempt_index}\n",
+            }
+            return fixed, _fingerprint(strategy=f"strategy-{attempt_index}")
+
+        result = gr.run_corpus_repair(
+            (entry,), broken, _budget(touched_files=7, attempts=10), touches_many_files,
+            candidate_id="test-candidate-touch-2",
+        )
+        assert result.escalated == (entry.id,)
+        # 2 attempts x 3 files = 6 (within 7); the 3rd attempt's own 3 more
+        # would bring it to 9 > 7, so RepairBudgetExceededError fires there.
+        assert attempt_index == 3
+        assert result.ledger.consumption.touched_files == 6
+
+    def test_elapsed_seconds_reflects_a_real_measured_delta_not_a_constant(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """item F/G: a controlled fake monotonic clock proves the recorded
+        elapsed_seconds is a real ceil'd wall-clock delta, deterministically,
+        with no real sleep involved."""
+        ticks = iter([100.0, 104.6])  # a single attempt spanning 4.6s
+        monkeypatch.setattr(gr.time, "monotonic", lambda: next(ticks))
+        files = _candidate_files()
+        entry = _entry(gc.CONTRACT_VIOLATION)
+        broken = {**files, "backend/app.py": gi.INJECTORS[gc.CONTRACT_VIOLATION](files)["backend/app.py"]}
+
+        def resolves(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            fixed = {**current, "backend/app.py": files["backend/app.py"]}
+            return fixed, _fingerprint(strategy="resolve")
+
+        result = gr.run_corpus_repair(
+            (entry,), broken, _budget(), resolves, candidate_id="test-candidate-elapsed-1",
+        )
+        assert result.ledger.consumption.elapsed_seconds == 5  # ceil(4.6) == 5, never the old constant 1
+
+    def test_elapsed_seconds_accumulates_across_multiple_real_attempts(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """item H: cumulative semantics across several attempts -- each
+        attempt's own real delta is added to the running total, matching
+        touched_files'/ai_calls' own already-cumulative RepairConsumption
+        field semantics (docs/contracts/repair.md's six-dimensional
+        budget), never reset or overwritten between attempts. A tight
+        attempts=3 ceiling forces a real 4th attempt whose own delta must
+        NOT be added (its recording is refused before assignment)."""
+        # 4 attempts: deltas of 2.4s, 3.1s, 4.0s (all recorded), then a 4th
+        # (1.0s) whose recording itself is refused by the attempts ceiling.
+        ticks = iter([0.0, 2.4, 10.0, 13.1, 20.0, 24.0, 30.0, 31.0])
+        monkeypatch.setattr(gr.time, "monotonic", lambda: next(ticks))
+        files = _candidate_files()
+        entry = _entry(gc.CONTRACT_VIOLATION, repairable=False)
+        broken = {**files, "backend/app.py": gi.INJECTORS[gc.CONTRACT_VIOLATION](files)["backend/app.py"]}
+        attempt_index = 0
+
+        def never_fixes(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            nonlocal attempt_index
+            attempt_index += 1
+            return None, _fingerprint(strategy=f"strategy-{attempt_index}")
+
+        result = gr.run_corpus_repair(
+            (entry,), broken, _budget(attempts=3), never_fixes,
+            candidate_id="test-candidate-elapsed-2",
+        )
+        assert attempt_index == 4
+        assert result.escalated == (entry.id,)
+        # ceil(2.4)=3, ceil(3.1)=4, ceil(4.0)=4 -> cumulative 11; the 4th
+        # attempt's own ceil(1.0)=1 is never added (its record() call was
+        # refused by the attempts ceiling before assignment).
+        assert result.ledger.consumption.elapsed_seconds == 11
+
+
 # ---------------------------------------------------------------------------
 # run_isolated_golden_repair -- the real lifecycle wired against a real
 # CandidateLedger/WorkspaceAuthority on tmp_path. No real model, no real
