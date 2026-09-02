@@ -167,12 +167,14 @@ def _candidate_files() -> dict[str, str]:
     }
 
 
-def _entry(defect_class: str, *, repairable: bool = True) -> gc.RepairCorpusEntry:
+def _entry(
+    defect_class: str, *, repairable: bool = True, injection_target: str = "source_module",
+) -> gc.RepairCorpusEntry:
     return gc.RepairCorpusEntry(
         id=f"CORPUS-{defect_class}-001",
         defect_class=defect_class,
         title=defect_class,
-        injection_target="source_module",
+        injection_target=injection_target,
         injection_strategy="structural",
         expected_detection=("generated_backend_tests",),
         repairable=repairable,
@@ -816,12 +818,23 @@ def _accept_parent(
     return root
 
 
-_PASSING_GATE = lambda files: SimpleNamespace(passed=True, findings=())  # noqa: E731
+# F-0059: real production code now calls `inspect_gate(files, baseline=...)`
+# -- a fake gate must accept the same real keyword, never just `files`.
+_PASSING_GATE = lambda files, baseline=None: SimpleNamespace(passed=True, findings=())  # noqa: E731
+
+# F-0059: `run_isolated_golden_repair` now requires a real `measure_regression`
+# callable (the same DI seam `inspect_gate` already uses) -- this fixture
+# default is an explicit, honest "no regression measured for this test", never
+# a stand-in for the real dynamic pytest-based measurement `_measure_regression`
+# (exercised directly and end-to-end by TestRegressionMeasurement below).
+_NO_REGRESSION = lambda parent_files, child_files: 0  # noqa: E731
 
 
 def _run_repair(
     ledger: CandidateLedger, candidates_root: pathlib.Path, *, parent_id: str, child_id: str,
     attempt_repair=None, inspect_gate=_PASSING_GATE, budget: RepairBudget | None = None,
+    entries: tuple[gc.RepairCorpusEntry, ...] | None = None,
+    measure_regression=_NO_REGRESSION,
 ) -> rgr.GoldenRepairOutcome:
     if attempt_repair is None:
         def attempt_repair(entry: gc.RepairCorpusEntry, current: dict[str, str]):
@@ -829,13 +842,14 @@ def _run_repair(
             return fixed, _fingerprint(strategy=f"restore-{entry.defect_class}")
     request = rgr.GoldenRepairRequest(
         parent_id=parent_id, child_id=child_id,
-        entries=(_entry(gc.CONTRACT_VIOLATION),),
+        entries=entries or (_entry(gc.CONTRACT_VIOLATION),),
         budget=budget or _budget(),
         attempt_repair=attempt_repair,
         provenance=_provenance(),
     )
     return rgr.run_isolated_golden_repair(
-        ledger, candidates_root, request, inspect_gate=inspect_gate,
+        ledger, candidates_root, request,
+        inspect_gate=inspect_gate, measure_regression=measure_regression,
     )
 
 
@@ -1033,3 +1047,509 @@ class TestChangedProtectedPaths:
             "backend/app.py": {"sha256": "changed", "byte_length": 6},
         }
         assert gc.changed_protected_paths(parent, child) == ()
+
+
+# ---------------------------------------------------------------------------
+# F-0058/59/60/61 -- OPEN_BLOCKERS.md. `run_isolated_golden_repair`'s real
+# promotion predicate, the real dynamic regression signal, the real
+# structurally-relevant prompt context, and real per-target fingerprint
+# evidence, each proven against the real production code in scripts/
+# run_golden_repair.py -- never a re-derivation of it in test-only logic.
+#
+# Three independent-file defect classes are used throughout so a multi-entry
+# scenario's own fake attempt_repair can resolve/fail one entry without ever
+# touching another entry's own file (contract_violation -> backend/app.py,
+# dependency_lock_mismatch -> backend/requirements.txt, migration_model_
+# mismatch -> backend/db.py -- confirmed against golden_corpus_injectors.py's
+# own real injector targets, not assumed).
+# ---------------------------------------------------------------------------
+
+_MATRIX_RESTORE_PATH = {
+    gc.CONTRACT_VIOLATION: "backend/app.py",
+    gc.DEPENDENCY_LOCK_MISMATCH: "backend/requirements.txt",
+    gc.MIGRATION_MODEL_MISMATCH: "backend/db.py",
+}
+
+
+def _matrix_attempt_repair(resolve: frozenset[str]):
+    """Resolves every entry whose defect_class is in `resolve` by restoring
+    the exact real file that class's own injector targets (never a whole-
+    candidate restore, so resolving one entry can never accidentally also
+    fix another entry's own independent defect). Every other entry gets the
+    identical fixed fingerprint strategy on every call -- the same real
+    anti-loop mechanism TestRunCorpusRepairConvergence's own `never_fixes`
+    already relies on -- so it reaches ESCALATED automatically, never via an
+    operator-supplied flag."""
+
+    def attempt_repair(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+        if entry.defect_class in resolve:
+            path = _MATRIX_RESTORE_PATH[entry.defect_class]
+            fixed = {**current, path: _candidate_files()[path]}
+            return fixed, _fingerprint(strategy=f"restore-{entry.defect_class}")
+        return None, _fingerprint(strategy=f"always-fails-{entry.defect_class}")
+
+    return attempt_repair
+
+
+def _matrix_entries(*specs: tuple[str, bool]) -> tuple[gc.RepairCorpusEntry, ...]:
+    """`(defect_class, repairable)` pairs -> real corpus entries."""
+    return tuple(_entry(cls, repairable=repairable) for cls, repairable in specs)
+
+
+class TestPromotionMatrix:
+    """F-0058: `GOLDEN_REPAIR_PASS` now means every repairable entry
+    RESOLVED, every declared-unrepairable entry ESCALATED, no protected-path
+    violation, zero measured regression, and the structural gate PASS --
+    ALL of them, not just `not violations and gate_passed`. Any single
+    failure routes to the existing `FINAL_GATE_FAILED` state."""
+
+    def test_a_all_canonical_conditions_true_promotes(self, tmp_path: pathlib.Path) -> None:
+        """item A: every repairable entry resolved, the unrepairable entry
+        escalated, no violations, zero regression, gate PASS -> PASS."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries(
+            (gc.CONTRACT_VIOLATION, True), (gc.DEPENDENCY_LOCK_MISMATCH, False),
+        )
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+        )
+        assert outcome.repair_result.resolved == (entries[0].id,)
+        assert outcome.repair_result.escalated == (entries[1].id,)
+        assert outcome.all_repairable_resolved is True
+        assert outcome.unrepairable_escalated is True
+        assert outcome.regression_count == 0
+        assert outcome.state == GOLDEN_REPAIR_PASS
+        assert ledger.classify("golden-work-child") == GOLDEN_REPAIR_PASS
+
+    def test_b_partial_resolution_of_repairable_entries_fails(self, tmp_path: pathlib.Path) -> None:
+        """item B: a generic proxy for golden-work-129-repair-2's own real
+        "6/7 resolved" shape -- not every repairable entry reached RESOLVED
+        -> FINAL_GATE_FAILED, never GOLDEN_REPAIR_PASS."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries(
+            (gc.CONTRACT_VIOLATION, True), (gc.DEPENDENCY_LOCK_MISMATCH, False),
+        )
+        # Only the unrepairable entry's own target is "fixed" here -- the
+        # repairable entry never resolves.
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset()),
+        )
+        assert outcome.all_repairable_resolved is False
+        assert outcome.state == FINAL_GATE_FAILED
+        assert ledger.classify("golden-work-child") == FINAL_GATE_FAILED
+
+    def test_c_a_repairable_entry_reaching_escalated_fails(self, tmp_path: pathlib.Path) -> None:
+        """item C: a repairable entry that itself reaches ESCALATED (rather
+        than RESOLVED) must fail promotion, even though every OTHER
+        predicate -- gate, regression, protected paths -- genuinely holds."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries((gc.CONTRACT_VIOLATION, True), (gc.MIGRATION_MODEL_MISMATCH, True))
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+        )
+        assert entries[1].id in outcome.repair_result.escalated
+        assert outcome.all_repairable_resolved is False
+        assert outcome.state == FINAL_GATE_FAILED
+
+    def test_d_an_unrepairable_entry_that_resolves_instead_of_escalating_fails(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """item D: a declared-unrepairable entry that the loop actually
+        resolves (never ESCALATED at all) must still fail promotion -- the
+        canonical predicate requires the DECLARED-unrepairable entry to be
+        the one that is ESCALATED, not merely "something got resolved"."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries(
+            (gc.CONTRACT_VIOLATION, True), (gc.DEPENDENCY_LOCK_MISMATCH, False),
+        )
+        # Both entries resolve this time -- including the declared-unrepairable one.
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries,
+            attempt_repair=_matrix_attempt_repair(
+                frozenset({gc.CONTRACT_VIOLATION, gc.DEPENDENCY_LOCK_MISMATCH})
+            ),
+        )
+        assert entries[1].id in outcome.repair_result.resolved
+        assert outcome.unrepairable_escalated is False
+        assert outcome.state == FINAL_GATE_FAILED
+
+    def test_e_a_measured_regression_fails_promotion(self, tmp_path: pathlib.Path) -> None:
+        """item E: every other predicate genuinely holds; only the real
+        dynamic regression measurement reports a non-zero delta -> FAIL."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries((gc.CONTRACT_VIOLATION, True),)
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+            measure_regression=lambda parent_files, child_files: 1,
+        )
+        assert outcome.regression_count == 1
+        assert outcome.state == FINAL_GATE_FAILED
+
+    def test_f_a_protected_test_mutation_fails_promotion(self, tmp_path: pathlib.Path) -> None:
+        """item F: re-stated here (alongside TestNoTestWeakening above) as
+        part of the one canonical promotion-matrix suite -- no-test-weakening
+        remains a real, independent predicate under the new F-0058 logic."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+
+        def weakens_tests(entry: gc.RepairCorpusEntry, current: dict[str, str]):
+            fixed = {
+                **current,
+                "backend/app.py": _candidate_files()["backend/app.py"],
+                "tests/test_app.py": "# weakened\n",
+            }
+            return fixed, _fingerprint(strategy="weaken-tests")
+
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            attempt_repair=weakens_tests,
+        )
+        assert outcome.all_repairable_resolved is True
+        assert outcome.state == FINAL_GATE_FAILED
+
+    def test_g_a_structural_gate_failure_fails_promotion(self, tmp_path: pathlib.Path) -> None:
+        """item G: every OTHER predicate genuinely holds; only the whole-
+        product structural gate itself reports a real finding -> FAIL."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        failing_gate = lambda files, baseline=None: SimpleNamespace(  # noqa: E731
+            passed=False,
+            findings=(SimpleNamespace(code="STRUCT", path="backend/app.py", detail="synthetic finding"),),
+        )
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            inspect_gate=failing_gate,
+        )
+        assert outcome.all_repairable_resolved is True
+        assert outcome.gate_passed is False
+        assert outcome.state == FINAL_GATE_FAILED
+
+    def test_h_full_pass_preserves_acceptance_eligibility(self, tmp_path: pathlib.Path) -> None:
+        """item H: the normal fully-passing path still promotes AND the
+        resulting GOLDEN_REPAIR_PASS child remains begin_acceptance-eligible
+        (item 11's own real gate, unmodified)."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries(
+            (gc.CONTRACT_VIOLATION, True), (gc.DEPENDENCY_LOCK_MISMATCH, False),
+        )
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+        )
+        assert outcome.state == GOLDEN_REPAIR_PASS
+        ledger.begin_acceptance("golden-work-child", outcome.workspace_root)  # must not raise
+        assert ledger.classify("golden-work-child") == ACCEPTANCE_RUNNING
+
+    def test_a_child_that_must_not_get_golden_repair_pass_is_not_begin_acceptance_eligible(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """The negative half of item E/H: a child correctly refused
+        promotion must never be begin_acceptance-eligible either."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries((gc.CONTRACT_VIOLATION, True),)
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+            measure_regression=lambda parent_files, child_files: 1,
+        )
+        assert outcome.state == FINAL_GATE_FAILED
+        with pytest.raises(CandidateIntegrityError):
+            ledger.begin_acceptance("golden-work-child", outcome.workspace_root)
+
+    def test_the_normal_staged_generation_promotion_predicate_is_unaffected(self) -> None:
+        """CandidateLedger's own staged-generation logic is a completely
+        separate authority from this run_isolated_golden_repair-local
+        promotion predicate -- proven by the fact this predicate lives
+        entirely in scripts/run_golden_repair.py, never inside
+        CandidateLedger itself (grep confirms no F-0058 changes touched
+        ledger.py)."""
+        import inspect
+        from arkali.engineering.candidate import ledger as ledger_module
+        source = inspect.getsource(ledger_module)
+        assert "all_repairable_resolved" not in source
+        assert "regression_count" not in source
+
+
+class TestF0058RegressionTest:
+    """F-0058's own direct regression test (item 16): a GENERIC proxy for
+    golden-work-129-repair-2's real shape (2 of 7 corpus entries resolved,
+    the other 5 escalated, all 6 repairable entries present, structural gate
+    PASS, no protected-path violation) -- never hardcoding repair-2's own
+    exact fixture data, but reproducing the same structural shape: SOME
+    repairable entries resolved, SOME repairable entries escalated,
+    structural gate PASS -> must NOT promote to GOLDEN_REPAIR_PASS."""
+
+    def test_some_repairable_resolved_some_repairable_escalated_never_promotes(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries(
+            (gc.CONTRACT_VIOLATION, True),
+            (gc.DEPENDENCY_LOCK_MISMATCH, True),
+            (gc.MIGRATION_MODEL_MISMATCH, True),
+        )
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+        )
+        assert outcome.repair_result.resolved == (entries[0].id,)
+        assert set(outcome.repair_result.escalated) == {entries[1].id, entries[2].id}
+        # No unrepairable entry exists in this scenario at all -- so
+        # `unrepairable_escalated` is vacuously true, isolating exactly
+        # F-0058's own real bug: the OLD code (`not violations and
+        # gate_passed`) would have wrongly granted GOLDEN_REPAIR_PASS here,
+        # exactly as it did for the real golden-work-129-repair-2 run.
+        assert outcome.unrepairable_escalated is True
+        assert outcome.all_repairable_resolved is False
+        assert outcome.state == FINAL_GATE_FAILED
+        assert ledger.classify("golden-work-child") == FINAL_GATE_FAILED
+
+
+class TestStaticRegressionBaselineWiring:
+    """F-0059 (static half): `run_isolated_golden_repair` must pass a real
+    baseline into `inspect_gate` -- the missing `baseline=` keyword argument
+    that made `inspect_product_files`'s own `_regression_findings` check
+    permanently vacuous (`for path, original in (baseline or {}).items():`
+    iterates zero times when `baseline` defaults to `None`)."""
+
+    def test_a_real_parent_baseline_reaches_inspect_gate(self, tmp_path: pathlib.Path) -> None:
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        captured: dict[str, object] = {}
+
+        def spy_inspect(files, *, baseline=None):
+            captured["baseline"] = baseline
+            return SimpleNamespace(passed=True, findings=())
+
+        _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            inspect_gate=spy_inspect,
+        )
+        assert captured["baseline"] == _candidate_files()
+        assert captured["baseline"] is not None
+
+
+class TestRegressionMeasurement:
+    """F-0059 (dynamic half): the real, dynamic pre-existing-test-suite
+    comparison `_measure_regression` performs -- never a hardcoded
+    synthetic 0. Exercises the real `_run_pytest_probe` subprocess against
+    a real, minimal `tests/test_app.py`."""
+
+    def test_identical_parent_and_child_files_measure_zero_regression(self) -> None:
+        files = _candidate_files()
+        assert rgr._measure_regression(files, files) == 0
+
+    def test_a_child_that_newly_breaks_a_passing_test_is_a_real_measured_regression(self) -> None:
+        parent = _candidate_files()
+        child = {**parent, "tests/test_app.py": "def test_items_placeholder():\n    assert False\n"}
+        assert rgr._measure_regression(parent, child) == 1
+
+    def test_an_unmeasurable_probe_never_silently_becomes_zero(self, monkeypatch) -> None:
+        """A probe that cannot complete must propagate None, never a
+        synthetic zero a caller could mistake for a real clean measurement."""
+        monkeypatch.setattr(rgr, "_run_pytest_probe", lambda files, timeout=120.0: None)
+        files = _candidate_files()
+        assert rgr._measure_regression(files, files) is None
+
+
+class TestContextSelection:
+    """F-0060: only the real, structurally-relevant file(s) for a defect's
+    own declared `injection_target` enter the repair prompt -- never the
+    whole candidate, and derived purely from the corpus's own generic
+    `injection_target` vocabulary, never a domain-specific file name."""
+
+    def test_a_single_file_defect_gets_only_its_own_file(self) -> None:
+        files = _candidate_files()
+        entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        context = rgr._context_files(entry, files)
+        assert set(context) == {"backend/app.py"}
+
+    def test_a_cross_file_defect_gets_both_sides_of_the_contract(self) -> None:
+        files = _candidate_files()
+        entry = _entry(gc.API_FRONTEND_CONTRACT_DRIFT, injection_target="route_contract")
+        context = rgr._context_files(entry, files)
+        assert set(context) == {"backend/app.py", "backend/routes.json"}
+
+    def test_a_migration_defect_gets_both_real_schema_files(self) -> None:
+        files = _candidate_files()
+        entry = _entry(gc.MIGRATION_MODEL_MISMATCH, injection_target="migration")
+        context = rgr._context_files(entry, files)
+        assert set(context) == {"backend/db.py", "backend/data_model.json"}
+
+    def test_unrelated_files_never_enter_the_context(self) -> None:
+        files = _candidate_files()
+        entry = _entry(gc.DEPENDENCY_LOCK_MISMATCH, injection_target="lockfile")
+        context = rgr._context_files(entry, files)
+        assert set(context) == {"backend/requirements.txt"}
+        assert "backend/app.py" not in context
+        assert "tests/test_app.py" not in context
+
+    def test_an_unrecognised_injection_target_falls_back_to_the_whole_candidate(self) -> None:
+        """Never silently sends nothing for a target this run's own static
+        mapping does not recognise."""
+        files = _candidate_files()
+        entry = _entry(gc.BOUNDARY_OFF_BY_ONE, injection_target="a_future_target_category")
+        context = rgr._context_files(entry, files)
+        assert context == dict(files)
+
+
+class _FakeOllamaAdapter:
+    """A real DI seam replacement for `rgr.OllamaAdapter` -- never a live
+    network call. Captures exactly what production code passed it, and
+    returns a scripted, honest `InferenceResult`-shaped response."""
+
+    last_constructed: dict[str, object] | None = None
+
+    def __init__(self, *, json_mode: bool, max_output_tokens: int) -> None:
+        self._max_output_tokens = max_output_tokens
+        type(self).last_constructed = {"json_mode": json_mode, "max_output_tokens": max_output_tokens}
+
+    def infer(self, model: str, prompt: str, *, timeout_seconds: float):
+        type(self).last_infer = {"model": model, "prompt": prompt, "timeout_seconds": timeout_seconds}
+        return SimpleNamespace(
+            state=SimpleNamespace(value=self._state_value),
+            output=self._output,
+            detail=self._detail,
+        )
+
+
+def _fake_adapter_class(state_value: str, output: str = "", detail: str = "synthetic"):
+    return type(
+        "_ScriptedFakeOllamaAdapter", (_FakeOllamaAdapter,),
+        {"_state_value": state_value, "_output": output, "_detail": detail},
+    )
+
+
+class TestOllamaContextWiring:
+    """F-0060: `resolve_output_budget`/`DEFAULT_NUM_CTX` must really reach
+    the `OllamaAdapter` construction this run's own attempt makes -- proven
+    by intercepting the real DI seam `rgr.OllamaAdapter`, never by re-
+    deriving the arithmetic in test-only code."""
+
+    def test_the_real_safe_output_budget_reaches_the_adapter_constructor(
+        self, monkeypatch,
+    ) -> None:
+        fake_cls = _fake_adapter_class(
+            "PASS", json.dumps({"files": {"backend/app.py": _candidate_files()["backend/app.py"]}}),
+        )
+        monkeypatch.setattr(rgr, "OllamaAdapter", fake_cls)
+        attempt_repair = rgr._make_attempt_repair("qwen2.5-coder:14b", 8192, 30.0)
+        entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        files = _candidate_files()
+
+        changed, fingerprint = attempt_repair(entry, files)
+
+        constructed = fake_cls.last_constructed
+        assert constructed is not None
+        assert constructed["json_mode"] is True
+        # The exact real invariant F-0060 requires: never a fixed
+        # max_output_tokens that could silently exceed num_ctx once the
+        # real estimated input is accounted for.
+        expected_prompt = fake_cls.last_infer["prompt"]
+        expected_budget = rgr.resolve_output_budget(
+            expected_prompt, num_ctx=rgr.DEFAULT_NUM_CTX, desired_output_tokens=8192,
+        )
+        assert constructed["max_output_tokens"] == expected_budget
+        assert constructed["max_output_tokens"] <= rgr.DEFAULT_NUM_CTX
+        assert fake_cls.last_infer["model"] == "qwen2.5-coder:14b"
+        assert changed is not None
+
+    def test_an_infeasible_prompt_is_refused_before_any_network_call(self, monkeypatch) -> None:
+        """F-0060's own safety half: `resolve_output_budget` raises rather
+        than silently constructing an adapter with a doomed request. A tiny
+        `DEFAULT_NUM_CTX` makes ANY real prompt infeasible, regardless of
+        its own size -- proving the refusal is the real arithmetic, not a
+        coincidence of this fixture's particular prompt length."""
+        called = []
+        monkeypatch.setattr(
+            rgr, "OllamaAdapter",
+            lambda **kwargs: called.append(kwargs) or _fake_adapter_class("PASS")(**kwargs),
+        )
+        monkeypatch.setattr(rgr, "DEFAULT_NUM_CTX", 10)
+        attempt_repair = rgr._make_attempt_repair("qwen2.5-coder:14b", 8192, 30.0)
+        entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        with pytest.raises(ValueError):
+            attempt_repair(entry, _candidate_files())
+        assert called == []
+
+
+class TestFingerprintTargetAccuracy:
+    """F-0061: root-cause and fingerprint evidence must be grounded in the
+    entry's own real resolved context, never a hardcoded `backend/app.py`
+    for every defect class."""
+
+    def test_two_different_defect_targets_get_different_fingerprint_files(self, monkeypatch) -> None:
+        files = _candidate_files()
+        monkeypatch.setattr(
+            rgr, "OllamaAdapter",
+            _fake_adapter_class("PASS", json.dumps({"files": {"backend/app.py": files["backend/app.py"]}})),
+        )
+        attempt_repair = rgr._make_attempt_repair("fake-model", 8192, 30.0)
+        source_entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        _, source_fp = attempt_repair(source_entry, files)
+        assert source_fp.files == ("backend/app.py",)
+
+        monkeypatch.setattr(
+            rgr, "OllamaAdapter",
+            _fake_adapter_class(
+                "PASS", json.dumps({"files": {"backend/requirements.txt": files["backend/requirements.txt"]}}),
+            ),
+        )
+        lockfile_entry = _entry(gc.DEPENDENCY_LOCK_MISMATCH, injection_target="lockfile")
+        _, lockfile_fp = attempt_repair(lockfile_entry, files)
+        assert lockfile_fp.files == ("backend/requirements.txt",)
+        assert lockfile_fp.files != source_fp.files
+        # F-0061: the Python-AST analyzer is never mis-applied to a
+        # non-Python/non-entrypoint target -- the existing generic fallback
+        # vocabulary is used instead, never an invented class.
+        assert lockfile_fp.root_cause_class == "unclassified_runtime_failure"
+
+    def test_a_rejected_attempt_still_points_at_the_correct_target(self, monkeypatch) -> None:
+        files = _candidate_files()
+        monkeypatch.setattr(rgr, "OllamaAdapter", _fake_adapter_class("EXTERNAL_UNAVAILABLE"))
+        attempt_repair = rgr._make_attempt_repair("fake-model", 8192, 30.0)
+        lockfile_entry = _entry(gc.DEPENDENCY_LOCK_MISMATCH, injection_target="lockfile")
+
+        changed, fingerprint = attempt_repair(lockfile_entry, files)
+
+        assert changed is None
+        assert fingerprint.files == ("backend/requirements.txt",)
+        assert fingerprint.outcome.startswith("rejected:")
+
+    def test_anti_loop_strategy_identity_is_unaffected_by_the_target_fix(self, monkeypatch) -> None:
+        """F-0056/anti-loop identity depends only on `strategy` staying a
+        deterministic function of `entry.defect_class` -- unchanged by
+        F-0061's own real-target fix."""
+        files = _candidate_files()
+        monkeypatch.setattr(rgr, "OllamaAdapter", _fake_adapter_class("EXTERNAL_UNAVAILABLE"))
+        attempt_repair = rgr._make_attempt_repair("fake-model", 8192, 30.0)
+        entry = _entry(gc.MIGRATION_MODEL_MISMATCH, injection_target="migration")
+
+        _, fp1 = attempt_repair(entry, files)
+        _, fp2 = attempt_repair(entry, files)
+
+        assert fp1.strategy == fp2.strategy == f"model_repair_{gc.MIGRATION_MODEL_MISMATCH}"

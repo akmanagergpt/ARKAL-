@@ -16,8 +16,10 @@ candidate's own real generated files.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -46,7 +48,11 @@ from arkali.engineering.candidate.ledger import (  # noqa: E402
 )
 from arkali.engineering.candidate.workspace import WorkspaceAuthority  # noqa: E402
 from arkali.engineering.factory.product_preflight import inspect_product_files  # noqa: E402
-from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
+from arkali.engineering.localai.ollama_adapter import (  # noqa: E402
+    DEFAULT_NUM_CTX,
+    OllamaAdapter,
+    resolve_output_budget,
+)
 from arkali.engineering.repair.contracts import RepairBudget, RepairFingerprint  # noqa: E402
 from arkali.engineering.repair.golden_corpus import (  # noqa: E402
     RepairCorpusEntry,
@@ -61,6 +67,7 @@ from arkali.engineering.repair.golden_repair_runner import (  # noqa: E402
     run_corpus_repair,
 )
 from arkali.engineering.repair.product_root_cause import (  # noqa: E402
+    ProductRootCause,
     analyze_python_product_failure,
 )
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
@@ -90,6 +97,48 @@ BUDGET_PROFILES: dict[str, RepairBudget] = {
         cost=Decimal(0), touched_files=64, regression_delta=0,
     ),
 }
+
+#: F-0060: which real, canonical-convention files (STAGED_GENERATION_STAGES.
+#: md's own required paths -- never a domain-specific name) are structurally
+#: relevant to each corpus `injection_target` category. Generic across any
+#: real candidate this pipeline produces, not this one: a different product
+#: family still names its backend entrypoint `backend/app.py`, its route
+#: contract `backend/routes.json`, and so on, by the same canonical
+#: convention. `route_contract`/`migration` are deliberately two-file
+#: (cross-file drift/mismatch classes need both sides visible to reason
+#: about the mismatch itself, not just one side of it).
+_TARGET_FILES: dict[str, tuple[str, ...]] = {
+    "source_module": ("backend/app.py",),
+    "route_contract": ("backend/app.py", "backend/routes.json"),
+    "lockfile": ("backend/requirements.txt",),
+    "migration": ("backend/db.py", "backend/data_model.json"),
+}
+
+
+def _context_files(entry: RepairCorpusEntry, current: Mapping[str, str]) -> dict[str, str]:
+    """The real, structurally-relevant slice of the candidate for this
+    entry's own declared `injection_target` -- never the whole candidate
+    (F-0060: a real ~17-file candidate's full text runs the real prompt
+    into the same context window `max_output_tokens` also has to fit in).
+    Falls back to the whole candidate for an `injection_target` this
+    mapping does not recognise, rather than silently sending nothing."""
+    paths = _TARGET_FILES.get(entry.injection_target)
+    if paths is None:
+        return dict(current)
+    return {path: current[path] for path in paths if path in current}
+
+
+def _budget_has_convergence_headroom(budget: RepairBudget, timeout_seconds: float) -> bool:
+    """True only if a call that times out on every single attempt still
+    cannot alone exhaust the declared elapsed-time ceiling before the
+    declared attempts ceiling would -- i.e. `attempts` is genuinely what
+    bounds convergence, not an accidental coincidence with `elapsed_
+    seconds` (F-0060: golden-work-129-repair-2's own real evidence showed
+    `6 attempts x 600s timeout == 3600s == elapsed_seconds`, exactly, for
+    the declared `golden-repair-standard-v1` profile). Documentation/test
+    tooling only -- not wired into a hard refusal here, since correcting a
+    numeric budget default is a decision this narrow turn defers."""
+    return timeout_seconds * budget.attempts < budget.elapsed_seconds
 
 
 def _source_commit() -> str:
@@ -136,13 +185,16 @@ def _freeze(
         engine.dispose()
 
 
-def _real_test_failure_text(files: dict[str, str]) -> str:
-    """Real, captured subprocess output -- never a hardcoded string. Runs
-    the candidate's own real `tests/` suite against ARKALI's own interpreter
-    (no fresh venv: this is a repair-strategy SIGNAL for the model, not the
-    regression-validation verdict itself -- that stays run_golden_
-    acceptance.py's job alone, per approved scope item H) and returns
-    whatever it genuinely printed, pass or fail."""
+def _run_pytest_probe(
+    files: Mapping[str, str], *, timeout: float = 120.0,
+) -> subprocess.CompletedProcess | None:
+    """The one real, shared subprocess mechanism every pytest-based probe
+    below reuses -- against ARKALI's own interpreter (no fresh venv: this
+    is a repair-strategy SIGNAL for the model, and F-0059's own regression
+    signal, not the full acceptance verdict -- that stays run_golden_
+    acceptance.py's job alone, a documented, non-hidden trade-off). `None`
+    means the probe itself could not complete (OS error or timeout); every
+    caller must treat that as genuinely UNMEASURED, never as zero."""
     with tempfile.TemporaryDirectory(prefix="golden-repair-probe-") as raw:
         scratch = pathlib.Path(raw)
         for relative, text in files.items():
@@ -150,13 +202,97 @@ def _real_test_failure_text(files: dict[str, str]) -> str:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(text.encode("utf-8"))
         try:
-            result = subprocess.run(
-                [sys.executable, "-m", "pytest", "tests", "-q"],
-                cwd=scratch, capture_output=True, text=True, timeout=120,
+            return subprocess.run(
+                [sys.executable, "-m", "pytest", "tests", "-q", "--tb=no"],
+                cwd=scratch, capture_output=True, text=True, timeout=timeout,
             )
-            return (result.stdout + result.stderr).strip()[-4000:]
-        except (OSError, subprocess.TimeoutExpired) as error:
-            return f"probe run could not complete: {error}"
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+
+def _real_test_failure_text(files: Mapping[str, str]) -> str:
+    """Real, captured subprocess output -- never a hardcoded string."""
+    result = _run_pytest_probe(files)
+    if result is None:
+        return "probe run could not complete"
+    return (result.stdout + result.stderr).strip()[-4000:]
+
+
+_PYTEST_FAILED = re.compile(r"(\d+) failed")
+_PYTEST_ERROR = re.compile(r"(\d+) error")
+
+
+def _pytest_failure_and_error_count(files: Mapping[str, str]) -> int | None:
+    """The real count of failed + errored tests pytest's own summary line
+    reports (a collection failure such as a missing import counts as an
+    error, not silently ignored). `None` -- never `0` -- when the probe
+    itself could not complete."""
+    result = _run_pytest_probe(files)
+    if result is None:
+        return None
+    summary = result.stdout + result.stderr
+    failed = sum(int(m) for m in _PYTEST_FAILED.findall(summary))
+    errors = sum(int(m) for m in _PYTEST_ERROR.findall(summary))
+    return failed + errors
+
+
+def _measure_regression(
+    parent_files: Mapping[str, str], child_files: Mapping[str, str],
+) -> int | None:
+    """F-0059: the real, dynamic regression signal ARK-REQ-0093's "zero
+    regressions in the pre-existing accepted test suite" condition asks
+    for -- the parent's own real accepted files re-run once as a live
+    baseline (never assumed to be 0), the final repair child's own files
+    re-run the same way, real NEW failures/errors counted as the delta.
+    Measured ONCE, at the final whole-candidate level, never forced into a
+    per-attempt figure: a per-attempt run would still be confounded by
+    every OTHER corpus entry's own not-yet-resolved injected defect
+    (present in `current` throughout the whole corpus run), so it could
+    not isolate what any single attempt itself changed. `RepairBudgetLedger.
+    consumption.regression_delta` (`golden_repair_runner.py`) stays 0 for
+    every attempt by the same reasoning -- a deliberate, documented scope
+    choice, not a synthetic value masquerading as a real one: this
+    function, not that field, is Golden Repair's one authoritative
+    regression fact. `None` -- never `0` -- propagates if either real run
+    could not complete, so a caller can refuse promotion rather than
+    silently trust an unmeasured "zero"."""
+    baseline = _pytest_failure_and_error_count(parent_files)
+    current = _pytest_failure_and_error_count(child_files)
+    if baseline is None or current is None:
+        return None
+    return max(0, current - baseline)
+
+
+def _analyze_repair_target(
+    entry: RepairCorpusEntry, context: Mapping[str, str], probe_failure: str,
+) -> ProductRootCause:
+    """F-0061: root-cause analysis grounded in this entry's own real
+    resolved context, never a hardcoded `backend/app.py`. `analyze_python_
+    product_failure` is a Python-AST-specific backend-module-vs-test-import
+    analyzer; it is only called when `backend/app.py` is genuinely part of
+    this entry's own context (source_module, route_contract). For any other
+    target (lockfile, migration -- neither is "the backend module" this
+    analyzer means), a real `ProductRootCause` is still returned, but with
+    `unclassified_runtime_failure` -- the exact same fallback vocabulary
+    `product_root_cause._classify` already uses when nothing more specific
+    applies -- never an invented class, and never a mis-applied Python
+    parse over a non-Python or non-entrypoint file."""
+    if "backend/app.py" in context:
+        test_path = next((p for p in sorted(context) if p.startswith("tests/")), "tests/")
+        return analyze_python_product_failure(
+            "backend/app.py", context["backend/app.py"], context.get(test_path, ""),
+            probe_failure or entry.title,
+        )
+    target_path = next(iter(sorted(context)), entry.injection_target)
+    signature = hashlib.sha256((probe_failure or entry.title).encode("utf-8")).hexdigest()
+    return ProductRootCause(
+        failure_signature=f"sha256:{signature}",
+        root_cause_classes=("unclassified_runtime_failure",),
+        imported_module=None,
+        backend_module=target_path,
+        expected_exports=(), actual_exports=(), missing_exports=(),
+        uses_sqlite=False, creates_schema=False,
+    )
 
 
 def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float):
@@ -164,19 +300,16 @@ def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float)
     call per attempt, grounded in this specific entry's own real detector
     output and a real captured test-probe failure -- no candidate-specific
     text, no fabricated failure string."""
-    adapter = OllamaAdapter(json_mode=True, max_output_tokens=output_tokens)
 
     def attempt_repair(
         entry: RepairCorpusEntry, current: dict[str, str],
     ) -> tuple[dict[str, str] | None, RepairFingerprint]:
-        backend_path = "backend/app.py"
-        backend_source = current.get(backend_path, "")
-        test_path = next((p for p in sorted(current) if p.startswith("tests/")), "tests/")
-        test_source = current.get(test_path, "")
+        # F-0060: only this entry's own structurally-relevant files, never
+        # the whole candidate.
+        context = _context_files(entry, current)
+        context_paths = tuple(sorted(context)) or (entry.injection_target,)
         probe_failure = _real_test_failure_text(current)
-        cause = analyze_python_product_failure(
-            backend_path, backend_source, test_source, probe_failure or entry.title,
-        )
+        cause = _analyze_repair_target(entry, context, probe_failure)
         prompt = json.dumps({
             "role": "bounded golden-repair worker",
             "instruction": (
@@ -191,14 +324,20 @@ def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float)
             "injection_target": entry.injection_target,
             "root_cause_evidence": cause.model_dump(mode="json"),
             "real_test_probe_output": probe_failure,
-            "current_files": current,
+            "current_files": context,
         }, ensure_ascii=False)
+        # F-0060: input + output + margin <= num_ctx, always -- never a
+        # fixed max_output_tokens that can silently exceed the real window.
+        safe_output_tokens = resolve_output_budget(
+            prompt, num_ctx=DEFAULT_NUM_CTX, desired_output_tokens=output_tokens,
+        )
+        adapter = OllamaAdapter(json_mode=True, max_output_tokens=safe_output_tokens)
         outcome = adapter.infer(model, prompt, timeout_seconds=timeout_seconds)
         if outcome.state.value != "PASS":
             fingerprint = RepairFingerprint(
                 failure_signature=cause.failure_signature,
                 root_cause_class="+".join(cause.root_cause_classes),
-                files=(backend_path,),
+                files=context_paths,
                 strategy=f"model_repair_{entry.defect_class}",
                 provider_model=f"ollama/{model}",
                 outcome=f"rejected: {outcome.state.value}: {outcome.detail}",
@@ -210,7 +349,7 @@ def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float)
             fingerprint = RepairFingerprint(
                 failure_signature=cause.failure_signature,
                 root_cause_class="+".join(cause.root_cause_classes),
-                files=(backend_path,),
+                files=context_paths,
                 strategy=f"model_repair_{entry.defect_class}",
                 provider_model=f"ollama/{model}",
                 outcome=f"rejected: malformed response: {error}",
@@ -220,7 +359,7 @@ def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float)
         fingerprint = RepairFingerprint(
             failure_signature=cause.failure_signature,
             root_cause_class="+".join(cause.root_cause_classes),
-            files=tuple(sorted(proposed)) or (backend_path,),
+            files=tuple(sorted(proposed)) or context_paths,
             strategy=f"model_repair_{entry.defect_class}",
             provider_model=f"ollama/{model}",
             outcome="candidate-fix-proposed",
@@ -277,6 +416,9 @@ class GoldenRepairOutcome:
     protected_path_violations: tuple[str, ...]
     gate_passed: bool
     gate_findings: tuple[str, ...]
+    all_repairable_resolved: bool
+    unrepairable_escalated: bool
+    regression_count: int | None
 
 
 def run_isolated_golden_repair(
@@ -285,6 +427,7 @@ def run_isolated_golden_repair(
     request: GoldenRepairRequest,
     *,
     inspect_gate,
+    measure_regression,
 ) -> GoldenRepairOutcome:
     """The real Golden Repair lifecycle, end to end, against a real
     `CandidateLedger` and `WorkspaceAuthority` -- no second candidate,
@@ -317,6 +460,18 @@ def run_isolated_golden_repair(
     before `GOLDEN_REPAIR_PASS` may ever be recorded -- any protected-path
     change routes to `FINAL_GATE_FAILED` instead, the same terminal state
     a real whole-product gate failure already uses.
+
+    F-0058: `GOLDEN_REPAIR_PASS` now means what the canonical benchmark
+    verdict (`docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md` §Golden
+    Repair Benchmark, ARK-REQ-0093) means, not only "the generic
+    structural gate happened to find nothing" -- it requires ALL of:
+    every repairable entry RESOLVED, every declared-unrepairable entry
+    ESCALATED, no protected-path violation, zero measured regressions
+    (`measure_regression`, F-0059), and the structural whole-product gate
+    itself PASS (now given a real `baseline=parent_files`, so its own
+    `_regression_findings` sub-check is no longer vacuous). Any single
+    failure routes to the existing `FINAL_GATE_FAILED` terminal state --
+    no new lifecycle state.
     """
     parent_id, child_id = request.parent_id, request.child_id
     parent_root = candidates_root / parent_id
@@ -348,28 +503,49 @@ def run_isolated_golden_repair(
     child_manifest = file_manifest(workspace.root)
     violations = changed_protected_paths(parent_latest["manifest"], child_manifest)
 
-    gate_report = inspect_gate(repair_result.files)
+    gate_report = inspect_gate(repair_result.files, baseline=parent_files)
     gate_passed = bool(getattr(gate_report, "passed", gate_report))
     gate_findings = tuple(
         f"{item.code}:{item.path}:{item.detail}" for item in getattr(gate_report, "findings", ())
     )
 
-    if violations or not gate_passed:
-        ledger.record_state(
-            child_id, FINAL_GATE_FAILED, workspace.root,
-            detail={"protected_path_violations": violations, "gate_findings": gate_findings},
-        )
+    all_repairable_resolved = all(
+        e.id in repair_result.resolved for e in request.entries if e.repairable
+    )
+    unrepairable_escalated = all(
+        e.id in repair_result.escalated for e in request.entries if not e.repairable
+    )
+    regression_count = measure_regression(parent_files, repair_result.files)
+
+    canonical_pass = (
+        all_repairable_resolved and unrepairable_escalated
+        and not violations and regression_count == 0 and gate_passed
+    )
+    detail = {
+        "protected_path_violations": violations,
+        "gate_findings": gate_findings,
+        "all_repairable_resolved": all_repairable_resolved,
+        "unrepairable_escalated": unrepairable_escalated,
+        "regression_count": regression_count,
+    }
+
+    if not canonical_pass:
+        ledger.record_state(child_id, FINAL_GATE_FAILED, workspace.root, detail=detail)
         return GoldenRepairOutcome(
             child_id=child_id, workspace_root=workspace.root, state=FINAL_GATE_FAILED,
             repair_result=repair_result, protected_path_violations=violations,
             gate_passed=gate_passed, gate_findings=gate_findings,
+            all_repairable_resolved=all_repairable_resolved,
+            unrepairable_escalated=unrepairable_escalated, regression_count=regression_count,
         )
 
-    ledger.record_state(child_id, GOLDEN_REPAIR_PASS, workspace.root)
+    ledger.record_state(child_id, GOLDEN_REPAIR_PASS, workspace.root, detail=detail)
     return GoldenRepairOutcome(
         child_id=child_id, workspace_root=workspace.root, state=GOLDEN_REPAIR_PASS,
         repair_result=repair_result, protected_path_violations=violations,
         gate_passed=gate_passed, gate_findings=gate_findings,
+        all_repairable_resolved=all_repairable_resolved,
+        unrepairable_escalated=unrepairable_escalated, regression_count=regression_count,
     )
 
 
@@ -413,7 +589,8 @@ def main(argv: list[str]) -> int:
     )
     started = time.monotonic()
     outcome = run_isolated_golden_repair(
-        ledger, CANDIDATES, request, inspect_gate=inspect_product_files,
+        ledger, CANDIDATES, request,
+        inspect_gate=inspect_product_files, measure_regression=_measure_regression,
     )
     elapsed = round(time.monotonic() - started, 3)
 
@@ -459,6 +636,9 @@ def main(argv: list[str]) -> int:
         "protected_path_violations": outcome.protected_path_violations,
         "gate_passed": outcome.gate_passed,
         "gate_findings": outcome.gate_findings,
+        "all_repairable_resolved": outcome.all_repairable_resolved,
+        "unrepairable_escalated": outcome.unrepairable_escalated,
+        "regression_count": outcome.regression_count,
         "lifecycle_state": outcome.state,
         "elapsed_seconds": elapsed,
     }
@@ -477,6 +657,9 @@ def main(argv: list[str]) -> int:
         "escalated": outcome.repair_result.escalated,
         "protected_path_violations": outcome.protected_path_violations,
         "gate_passed": outcome.gate_passed,
+        "all_repairable_resolved": outcome.all_repairable_resolved,
+        "unrepairable_escalated": outcome.unrepairable_escalated,
+        "regression_count": outcome.regression_count,
         "evidence_ref": evidence_ref,
         "elapsed_seconds": elapsed,
     }, ensure_ascii=False))

@@ -57,6 +57,36 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 DEFAULT_NUM_CTX = 8192
 
 
+def estimate_tokens(text: str) -> int:
+    """chars/4 -- the same real, conservative estimation method the
+    golden-work-125 investigation above used, restated here as reusable
+    code rather than prose. Not a real tokenizer; good enough to catch a
+    genuinely infeasible request before it ever reaches the server."""
+    return max(1, len(text) // 4)
+
+
+def resolve_output_budget(
+    prompt: str, *, num_ctx: int, desired_output_tokens: int, safety_margin: int = 256,
+) -> int:
+    """The generic invariant every real Ollama call must satisfy: input and
+    requested output compete for the SAME window (golden-work-125,
+    documented above), so `input_tokens + output_tokens + safety_margin`
+    must never exceed `num_ctx`. Returns the largest safe `num_predict`
+    value for `desired_output_tokens`, clamped down if the prompt leaves
+    less room than requested -- never silently returning a value that,
+    combined with the real estimated input, would exceed `num_ctx`.
+    Raises rather than returning a degenerate near-zero budget when even
+    a small output genuinely does not fit."""
+    input_tokens = estimate_tokens(prompt)
+    available = num_ctx - input_tokens - safety_margin
+    if available < 64:
+        raise ValueError(
+            f"prompt (~{input_tokens} estimated tokens) leaves no safe output "
+            f"budget within num_ctx={num_ctx} (safety_margin={safety_margin})"
+        )
+    return max(64, min(desired_output_tokens, available))
+
+
 def _is_loopback(endpoint: str) -> bool:
     return urlparse(endpoint).hostname in _LOOPBACK_HOSTS
 
@@ -209,4 +239,7 @@ class OllamaAdapter:
         )
 
 
-__all__ = ["OllamaAdapter", "RUNTIME", "DEFAULT_ENDPOINT"]
+__all__ = [
+    "DEFAULT_ENDPOINT", "DEFAULT_NUM_CTX", "OllamaAdapter", "RUNTIME",
+    "estimate_tokens", "resolve_output_budget",
+]
