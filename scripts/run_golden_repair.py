@@ -391,6 +391,16 @@ def _measure_regression(
     return max(0, current - baseline), "measured"
 
 
+#: F-0064: the one safe, non-leaking fallback when the real pytest probe
+#: itself captured no text at all (in practice never observed -- pytest
+#: always emits at least a summary line -- but a defensive default is still
+#: needed). MUST NEVER be `entry.title`/`entry.rationale`: those are
+#: corpus-authored, evaluator-only ground truth, never a real candidate
+#: observation, and root-cause evidence must be derived only from what the
+#: candidate itself genuinely produced.
+_NO_CAPTURED_FAILURE_TEXT = "no test failure text was captured by the real probe"
+
+
 def _analyze_repair_target(
     entry: RepairCorpusEntry, context: Mapping[str, str], probe_failure: str,
 ) -> ProductRootCause:
@@ -404,15 +414,20 @@ def _analyze_repair_target(
     `unclassified_runtime_failure` -- the exact same fallback vocabulary
     `product_root_cause._classify` already uses when nothing more specific
     applies -- never an invented class, and never a mis-applied Python
-    parse over a non-Python or non-entrypoint file."""
+    parse over a non-Python or non-entrypoint file.
+
+    F-0064: never falls back to `entry.title`/`entry.rationale` -- those are
+    corpus-authored, evaluator-only ground truth, not a real candidate
+    observation; a genuinely empty probe falls back to a fixed, generic,
+    non-leaking placeholder instead."""
+    probe_text = probe_failure or _NO_CAPTURED_FAILURE_TEXT
     if "backend/app.py" in context:
         test_path = next((p for p in sorted(context) if p.startswith("tests/")), "tests/")
         return analyze_python_product_failure(
-            "backend/app.py", context["backend/app.py"], context.get(test_path, ""),
-            probe_failure or entry.title,
+            "backend/app.py", context["backend/app.py"], context.get(test_path, ""), probe_text,
         )
     target_path = next(iter(sorted(context)), entry.injection_target)
-    signature = hashlib.sha256((probe_failure or entry.title).encode("utf-8")).hexdigest()
+    signature = hashlib.sha256(probe_text.encode("utf-8")).hexdigest()
     return ProductRootCause(
         failure_signature=f"sha256:{signature}",
         root_cause_classes=("unclassified_runtime_failure",),
@@ -438,18 +453,24 @@ def _make_attempt_repair(model: str, output_tokens: int, timeout_seconds: float)
         context_paths = tuple(sorted(context)) or (entry.injection_target,)
         probe_failure = _real_test_failure_text(current)
         cause = _analyze_repair_target(entry, context, probe_failure)
+        # F-0064: the prompt carries ONLY observable, candidate-derived
+        # evidence -- never corpus-authored evaluator metadata. No
+        # `defect_class`/`defect_title`/`defect_rationale`/`injection_target`:
+        # all four are benchmark-authoring/ground-truth fields (what was
+        # injected, what it's called, why the evaluator expects a given
+        # outcome, which category the evaluator assigned) that a real-world
+        # repairer would never have. `entry` itself stays available to this
+        # closure for real evaluator-side bookkeeping only (fingerprint
+        # strategy, evidence records) -- never serialized into the prompt.
         prompt = json.dumps({
             "role": "bounded golden-repair worker",
             "instruction": (
                 "Return one JSON object only: {\"files\": {\"relative/posix/path\": "
-                "\"complete file text\"}}. Fix ONLY the defect described below. Do "
-                "not weaken, delete, or rewrite anything under tests/ or config/. "
-                "Change only the files genuinely required."
+                "\"complete file text\"}}. Fix the defect evidenced by the real test "
+                "failure and the files below. Do not weaken, delete, or rewrite "
+                "anything under tests/ or config/. Change only the files genuinely "
+                "required."
             ),
-            "defect_class": entry.defect_class,
-            "defect_title": entry.title,
-            "defect_rationale": entry.rationale,
-            "injection_target": entry.injection_target,
             "root_cause_evidence": cause.model_dump(mode="json"),
             "real_test_probe_output": probe_failure,
             "current_files": context,

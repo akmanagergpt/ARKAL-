@@ -1680,3 +1680,128 @@ class TestFingerprintTargetAccuracy:
         _, fp2 = attempt_repair(entry, files)
 
         assert fp1.strategy == fp2.strategy == f"model_repair_{gc.MIGRATION_MODEL_MISMATCH}"
+
+
+class TestPromptFairness:
+    """F-0064: the real repair prompt `_make_attempt_repair` sends must carry
+    only observable, candidate-derived evidence -- never corpus-authored
+    evaluator metadata (what was injected, what it's called, why the
+    evaluator expects a given outcome, which category the evaluator
+    assigned). A real information-leak audit found `defect_title`/
+    `defect_rationale` sent verbatim for all 8 real corpus entries -- one
+    entry's own rationale even named internal benchmark mechanics
+    (`RepeatedFailedStrategyError`) and stated outright that it was "the
+    mandatory unrepairable entry". Tests the REAL constructed payload
+    object (parsed JSON), not substring matching alone, per the explicit
+    instruction that produced this fix."""
+
+    def _capture_prompt(self, entry: gc.RepairCorpusEntry, monkeypatch, files=None):
+        files = files if files is not None else _candidate_files()
+        fake_cls = _fake_adapter_class(
+            "PASS", json.dumps({"files": {"backend/app.py": files["backend/app.py"]}}),
+        )
+        monkeypatch.setattr(rgr, "OllamaAdapter", fake_cls)
+        attempt_repair = rgr._make_attempt_repair("fake-model", 8192, 30.0)
+        attempt_repair(entry, files)
+        prompt_text = fake_cls.last_infer["prompt"]
+        return prompt_text, json.loads(prompt_text)
+
+    def test_a_prompt_omits_corpus_title(self, monkeypatch) -> None:
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL).model_copy(
+            update={"title": "UNIQUE_TITLE_MARKER_XYZ"}
+        )
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "UNIQUE_TITLE_MARKER_XYZ" not in prompt_text
+        assert "defect_title" not in payload
+
+    def test_b_prompt_omits_corpus_rationale(self, monkeypatch) -> None:
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL).model_copy(
+            update={"rationale": "UNIQUE_RATIONALE_MARKER_XYZ"}
+        )
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "UNIQUE_RATIONALE_MARKER_XYZ" not in prompt_text
+        assert "defect_rationale" not in payload
+
+    def test_c_prompt_omits_repairable_flag(self, monkeypatch) -> None:
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL, repairable=False)
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "repairable" not in payload
+        assert "repairable" not in prompt_text.lower()
+        import inspect
+        source = inspect.getsource(rgr._make_attempt_repair) + inspect.getsource(rgr._analyze_repair_target)
+        assert "entry.repairable" not in source
+
+    def test_d_prompt_construction_never_reads_injection_strategy(self) -> None:
+        import inspect
+        source = inspect.getsource(rgr._make_attempt_repair) + inspect.getsource(rgr._analyze_repair_target)
+        assert "injection_strategy" not in source
+
+    def test_e_prompt_construction_never_reads_expected_detection(self) -> None:
+        import inspect
+        source = inspect.getsource(rgr._make_attempt_repair) + inspect.getsource(rgr._analyze_repair_target)
+        assert "expected_detection" not in source
+
+    def test_f_prompt_omits_defect_class_and_injection_target(self, monkeypatch) -> None:
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL, injection_target="source_module")
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "defect_class" not in payload
+        assert "injection_target" not in payload
+        assert "permission_check_removal" not in prompt_text
+
+    def test_g_legitimate_current_files_present(self, monkeypatch) -> None:
+        entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "current_files" in payload
+        assert "backend/app.py" in payload["current_files"]
+
+    def test_h_legitimate_real_failure_output_present(self, monkeypatch) -> None:
+        entry = _entry(gc.CONTRACT_VIOLATION, injection_target="source_module")
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        assert "real_test_probe_output" in payload
+        assert isinstance(payload["real_test_probe_output"], str)
+        assert payload["real_test_probe_output"]
+
+    def test_i_root_cause_evidence_contains_only_candidate_derived_facts(self, monkeypatch) -> None:
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL).model_copy(
+            update={"title": "MARK_TITLE_XYZ", "rationale": "MARK_RATIONALE_XYZ"}
+        )
+        prompt_text, payload = self._capture_prompt(entry, monkeypatch)
+        rce_text = json.dumps(payload["root_cause_evidence"])
+        assert "MARK_TITLE_XYZ" not in rce_text
+        assert "MARK_RATIONALE_XYZ" not in rce_text
+
+    def test_i2_empty_probe_never_falls_back_to_corpus_text(self, monkeypatch) -> None:
+        """F-0064's own second leak vector: `_analyze_repair_target` used to
+        fall back to `entry.title` when the real probe captured no text.
+        Proven directly against the real function, bypassing the probe, for
+        both branches (backend/app.py in context, and the non-Python
+        fallback branch)."""
+        import hashlib
+
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL).model_copy(
+            update={"title": "MARK_TITLE_XYZ", "rationale": "MARK_RATIONALE_XYZ"}
+        )
+        app_context = {"backend/app.py": _candidate_files()["backend/app.py"]}
+        app_cause = rgr._analyze_repair_target(entry, app_context, "")
+        app_cause_text = json.dumps(app_cause.model_dump(mode="json"))
+        assert "MARK_TITLE_XYZ" not in app_cause_text
+        assert "MARK_RATIONALE_XYZ" not in app_cause_text
+
+        non_python_entry = _entry(gc.DEPENDENCY_LOCK_MISMATCH, injection_target="lockfile").model_copy(
+            update={"title": "MARK_TITLE_XYZ", "rationale": "MARK_RATIONALE_XYZ"}
+        )
+        lockfile_context = {"backend/requirements.txt": "flask==2.3.2\n"}
+        fallback_cause = rgr._analyze_repair_target(non_python_entry, lockfile_context, "")
+        expected_signature = hashlib.sha256(rgr._NO_CAPTURED_FAILURE_TEXT.encode("utf-8")).hexdigest()
+        assert fallback_cause.failure_signature == f"sha256:{expected_signature}"
+
+    def test_j_corpus_metadata_still_recoverable_from_corpus_entry(self) -> None:
+        """Evaluator-side: title/rationale/repairable/injection_strategy all
+        remain real fields on the corpus entry itself and in the real
+        corpus file -- removing them from the prompt loses no evidence,
+        only stops it from reaching the repair agent."""
+        entry = _entry(gc.PERMISSION_CHECK_REMOVAL, repairable=False)
+        assert entry.title
+        assert entry.rationale
+        assert entry.repairable is False
+        assert entry.injection_strategy
