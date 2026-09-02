@@ -17,7 +17,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -221,6 +223,13 @@ def _real_test_failure_text(files: Mapping[str, str]) -> str:
 _PYTEST_FAILED = re.compile(r"(\d+) failed")
 _PYTEST_ERROR = re.compile(r"(\d+) error")
 
+#: The one real finding code `regression_preflight._regression_findings`
+#: emits (F-0059-ENV item 9: evidence must clearly distinguish the static
+#: structural regression check from the dynamic one) -- restated as a
+#: string constant rather than a second import, since only the code
+#: itself, never the function, is needed here.
+_STATIC_REGRESSION_CODE = "removed_parent_symbols"
+
 
 def _pytest_failure_and_error_count(files: Mapping[str, str]) -> int | None:
     """The real count of failed + errored tests pytest's own summary line
@@ -236,31 +245,150 @@ def _pytest_failure_and_error_count(files: Mapping[str, str]) -> int | None:
     return failed + errors
 
 
-def _measure_regression(
-    parent_files: Mapping[str, str], child_files: Mapping[str, str],
-) -> int | None:
-    """F-0059: the real, dynamic regression signal ARK-REQ-0093's "zero
-    regressions in the pre-existing accepted test suite" condition asks
-    for -- the parent's own real accepted files re-run once as a live
-    baseline (never assumed to be 0), the final repair child's own files
-    re-run the same way, real NEW failures/errors counted as the delta.
-    Measured ONCE, at the final whole-candidate level, never forced into a
-    per-attempt figure: a per-attempt run would still be confounded by
-    every OTHER corpus entry's own not-yet-resolved injected defect
-    (present in `current` throughout the whole corpus run), so it could
-    not isolate what any single attempt itself changed. `RepairBudgetLedger.
-    consumption.regression_delta` (`golden_repair_runner.py`) stays 0 for
-    every attempt by the same reasoning -- a deliberate, documented scope
-    choice, not a synthetic value masquerading as a real one: this
-    function, not that field, is Golden Repair's one authoritative
-    regression fact. `None` -- never `0` -- propagates if either real run
-    could not complete, so a caller can refuse promotion rather than
-    silently trust an unmeasured "zero"."""
-    baseline = _pytest_failure_and_error_count(parent_files)
-    current = _pytest_failure_and_error_count(child_files)
-    if baseline is None or current is None:
+def _load_run_golden_acceptance():
+    """F-0059-ENV: reuses `run_golden_acceptance.py`'s own real `_run`
+    subprocess helper -- the exact venv/pip-install/pytest mechanism a
+    real `GOLDEN_ACCEPTANCE_PASS` already proves works -- rather than a
+    second, divergent environment-preparation implementation. Loaded the
+    same dynamic-by-path way `test_golden_corpus.py` already loads this
+    very module, exactly once per process."""
+    module_name = "scripts_run_golden_acceptance"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+    spec = importlib.util.spec_from_file_location(
+        module_name, pathlib.Path(__file__).resolve().parent / "run_golden_acceptance.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _parent_test_files(parent_files: Mapping[str, str]) -> dict[str, str]:
+    return {path: text for path, text in parent_files.items() if path.startswith("tests/")}
+
+
+def _with_parent_test_suite(
+    candidate_files: Mapping[str, str], parent_files: Mapping[str, str],
+) -> dict[str, str]:
+    """The real product files a candidate produced, with every `tests/`
+    path forced back to the PARENT's own real accepted bytes -- the one
+    authoritative ARK-REQ-0093 baseline suite, never the child's own
+    (possibly test-weakened) `tests/`. Non-`tests/` paths (the product
+    genuinely under test, including any repaired `backend/requirements.
+    txt`) are the candidate's own real files, unchanged."""
+    merged = {k: v for k, v in candidate_files.items() if not k.startswith("tests/")}
+    merged.update(_parent_test_files(parent_files))
+    return merged
+
+
+def _prepare_real_environment(
+    scratch: pathlib.Path, *, timeout_seconds: float,
+) -> pathlib.Path | None:
+    """Real `venv` + real `pip install -r backend/requirements.txt`,
+    reusing `run_golden_acceptance.py`'s own `_run` helper -- never
+    ARKALI's own interpreter, which does not (and must not) carry every
+    candidate family's own runtime dependency. Returns the venv's own
+    python executable, or `None` if preparation itself could not
+    complete -- never conflated with a genuine test result."""
+    acceptance = _load_run_golden_acceptance()
+    venv = scratch / ".venv"
+    python = venv / "Scripts" / "python.exe" if os.name == "nt" else venv / "bin" / "python"
+    try:
+        acceptance._run([sys.executable, "-m", "venv", str(venv)], cwd=scratch, timeout_seconds=timeout_seconds)
+        acceptance._run(
+            [str(python), "-m", "pip", "install", "-r", "backend/requirements.txt"],
+            cwd=scratch, timeout_seconds=timeout_seconds,
+        )
+    except (RuntimeError, OSError):
         return None
-    return max(0, current - baseline)
+    return python
+
+
+def _run_pytest_probe_real_env(
+    files: Mapping[str, str], *, timeout_seconds: float = 300.0,
+) -> subprocess.CompletedProcess | None:
+    """F-0059-ENV: the real-environment counterpart to `_run_pytest_probe`
+    above -- same real subprocess/tempdir shape, but against a genuine,
+    freshly-prepared venv with the candidate's own real dependencies
+    installed, never ARKALI's own interpreter. `None` -- never a
+    fabricated pass/fail -- propagates when environment preparation
+    itself could not complete."""
+    with tempfile.TemporaryDirectory(prefix="golden-repair-regression-env-") as raw:
+        scratch = pathlib.Path(raw)
+        for relative, text in files.items():
+            path = scratch / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(text.encode("utf-8"))
+        python = _prepare_real_environment(scratch, timeout_seconds=timeout_seconds)
+        if python is None:
+            return None
+        try:
+            return subprocess.run(
+                [str(python), "-m", "pytest", "tests", "-q", "--tb=no"],
+                cwd=scratch, capture_output=True, text=True, timeout=timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+
+def _pytest_failure_and_error_count_real_env(
+    files: Mapping[str, str], *, timeout_seconds: float = 300.0,
+) -> int | None:
+    result = _run_pytest_probe_real_env(files, timeout_seconds=timeout_seconds)
+    if result is None:
+        return None
+    summary = result.stdout + result.stderr
+    failed = sum(int(m) for m in _PYTEST_FAILED.findall(summary))
+    errors = sum(int(m) for m in _PYTEST_ERROR.findall(summary))
+    return failed + errors
+
+
+def _measure_regression(
+    parent_files: Mapping[str, str], child_files: Mapping[str, str], *, timeout_seconds: float = 300.0,
+) -> tuple[int | None, str]:
+    """F-0059-ENV FIX: the real, dynamic regression signal ARK-REQ-0093's
+    "zero regressions in the pre-existing accepted test suite" condition
+    asks for, now executed in a real isolated environment reusing
+    `run_golden_acceptance.py`'s own real venv/pip-install/pytest
+    sequence -- never ARKALI's own interpreter. A real inference-
+    feasibility preflight found the ARKALI-interpreter probe (still used
+    unchanged above for the fast, non-authoritative per-attempt prompt
+    hint) reported the SAME generic `ModuleNotFoundError: No module named
+    'flask'` collection error for `golden-work-129`'s own real, genuinely
+    ACCEPTED parent -- this host's own interpreter has no `flask`
+    installed, so that probe could never have produced a usable
+    zero-regression fact for a Flask-based candidate family, only ever a
+    degenerate "both sides fail identically" non-signal.
+
+    TEST-SUITE IDENTITY: both real runs execute the PARENT's own accepted
+    `tests/` bytes -- `_with_parent_test_suite` substitutes them into the
+    child's own product files before the child run, so a child that
+    changed or weakened its own `tests/` can never affect this
+    measurement (the existing `changed_protected_paths` no-test-weakening
+    guard is unaffected and independent). The child's own real product
+    code -- including any repaired `backend/requirements.txt` -- is what
+    is genuinely under test.
+
+    Measured ONCE, at the final whole-candidate level, never forced into
+    a per-attempt figure: a per-attempt run would still be confounded by
+    every OTHER corpus entry's own not-yet-resolved injected defect.
+    `RepairBudgetLedger.consumption.regression_delta` (`golden_repair_
+    runner.py`) stays 0 for every attempt by the same reasoning -- a
+    deliberate, documented scope choice: this function is Golden Repair's
+    one authoritative regression fact.
+
+    Returns `(delta, status)`: `status` is `"measured"` only when BOTH
+    real runs completed; `"unavailable"` when either could not (real
+    environment preparation or the pytest run itself failed to complete)
+    -- a caller must never read `delta` as real, and must never treat
+    `"unavailable"` as `delta == 0`, when `status` is `"unavailable"`."""
+    child_run_files = _with_parent_test_suite(child_files, parent_files)
+    baseline = _pytest_failure_and_error_count_real_env(parent_files, timeout_seconds=timeout_seconds)
+    current = _pytest_failure_and_error_count_real_env(child_run_files, timeout_seconds=timeout_seconds)
+    if baseline is None or current is None:
+        return None, "unavailable"
+    return max(0, current - baseline), "measured"
 
 
 def _analyze_repair_target(
@@ -419,6 +547,7 @@ class GoldenRepairOutcome:
     all_repairable_resolved: bool
     unrepairable_escalated: bool
     regression_count: int | None
+    regression_status: str
 
 
 def run_isolated_golden_repair(
@@ -515,18 +644,23 @@ def run_isolated_golden_repair(
     unrepairable_escalated = all(
         e.id in repair_result.escalated for e in request.entries if not e.repairable
     )
-    regression_count = measure_regression(parent_files, repair_result.files)
+    regression_count, regression_status = measure_regression(parent_files, repair_result.files)
+    static_regression_findings = tuple(
+        f for f in gate_findings if f.startswith(f"{_STATIC_REGRESSION_CODE}:")
+    )
 
     canonical_pass = (
-        all_repairable_resolved and unrepairable_escalated
-        and not violations and regression_count == 0 and gate_passed
+        all_repairable_resolved and unrepairable_escalated and not violations
+        and regression_status == "measured" and regression_count == 0 and gate_passed
     )
     detail = {
         "protected_path_violations": violations,
         "gate_findings": gate_findings,
+        "static_regression_findings": static_regression_findings,
         "all_repairable_resolved": all_repairable_resolved,
         "unrepairable_escalated": unrepairable_escalated,
-        "regression_count": regression_count,
+        "dynamic_regression_count": regression_count,
+        "dynamic_regression_measurement_status": regression_status,
     }
 
     if not canonical_pass:
@@ -537,6 +671,7 @@ def run_isolated_golden_repair(
             gate_passed=gate_passed, gate_findings=gate_findings,
             all_repairable_resolved=all_repairable_resolved,
             unrepairable_escalated=unrepairable_escalated, regression_count=regression_count,
+            regression_status=regression_status,
         )
 
     ledger.record_state(child_id, GOLDEN_REPAIR_PASS, workspace.root, detail=detail)
@@ -546,6 +681,7 @@ def run_isolated_golden_repair(
         gate_passed=gate_passed, gate_findings=gate_findings,
         all_repairable_resolved=all_repairable_resolved,
         unrepairable_escalated=unrepairable_escalated, regression_count=regression_count,
+        regression_status=regression_status,
     )
 
 
@@ -636,9 +772,19 @@ def main(argv: list[str]) -> int:
         "protected_path_violations": outcome.protected_path_violations,
         "gate_passed": outcome.gate_passed,
         "gate_findings": outcome.gate_findings,
+        "static_regression_findings": tuple(
+            f for f in outcome.gate_findings if f.startswith(f"{_STATIC_REGRESSION_CODE}:")
+        ),
         "all_repairable_resolved": outcome.all_repairable_resolved,
         "unrepairable_escalated": outcome.unrepairable_escalated,
-        "regression_count": outcome.regression_count,
+        "dynamic_regression_count": outcome.regression_count,
+        "dynamic_regression_measurement_status": outcome.regression_status,
+        "regression_evidence_note": (
+            "aggregate_consumption.regression_delta is a per-attempt RepairBudgetLedger sum, "
+            "always 0 by design (see docs/build/OPEN_BLOCKERS.md F-0059); "
+            "dynamic_regression_count/dynamic_regression_measurement_status is the one "
+            "authoritative ARK-REQ-0093 zero-regression fact"
+        ),
         "lifecycle_state": outcome.state,
         "elapsed_seconds": elapsed,
     }
@@ -659,7 +805,8 @@ def main(argv: list[str]) -> int:
         "gate_passed": outcome.gate_passed,
         "all_repairable_resolved": outcome.all_repairable_resolved,
         "unrepairable_escalated": outcome.unrepairable_escalated,
-        "regression_count": outcome.regression_count,
+        "dynamic_regression_count": outcome.regression_count,
+        "dynamic_regression_measurement_status": outcome.regression_status,
         "evidence_ref": evidence_ref,
         "elapsed_seconds": elapsed,
     }, ensure_ascii=False))

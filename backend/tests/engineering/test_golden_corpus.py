@@ -827,7 +827,7 @@ _PASSING_GATE = lambda files, baseline=None: SimpleNamespace(passed=True, findin
 # default is an explicit, honest "no regression measured for this test", never
 # a stand-in for the real dynamic pytest-based measurement `_measure_regression`
 # (exercised directly and end-to-end by TestRegressionMeasurement below).
-_NO_REGRESSION = lambda parent_files, child_files: 0  # noqa: E731
+_NO_REGRESSION = lambda parent_files, child_files: (0, "measured")  # noqa: E731
 
 
 def _run_repair(
@@ -1195,10 +1195,33 @@ class TestPromotionMatrix:
         outcome = _run_repair(
             ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
             entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
-            measure_regression=lambda parent_files, child_files: 1,
+            measure_regression=lambda parent_files, child_files: (1, "measured"),
         )
         assert outcome.regression_count == 1
+        assert outcome.regression_status == "measured"
         assert outcome.state == FINAL_GATE_FAILED
+
+    def test_e2_an_unmeasurable_regression_fails_promotion(self, tmp_path: pathlib.Path) -> None:
+        """F-0059-ENV item D: environment preparation failing to complete
+        (e.g. a real venv/pip-install failure) must produce `status=
+        "unavailable"`, never a value a caller could mistake for a real
+        `0` -- and, critically, `run_isolated_golden_repair` must refuse
+        promotion on it, exactly as it refuses a genuine positive delta,
+        even though every OTHER predicate genuinely holds."""
+        ledger = CandidateLedger(tmp_path / "_ledger")
+        candidates_root = tmp_path / "candidates"
+        _accept_parent(ledger, candidates_root, "golden-work-parent")
+        entries = _matrix_entries((gc.CONTRACT_VIOLATION, True),)
+        outcome = _run_repair(
+            ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
+            entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
+            measure_regression=lambda parent_files, child_files: (None, "unavailable"),
+        )
+        assert outcome.regression_count is None
+        assert outcome.regression_status == "unavailable"
+        assert outcome.state == FINAL_GATE_FAILED
+        with pytest.raises(CandidateIntegrityError):
+            ledger.begin_acceptance("golden-work-child", outcome.workspace_root)
 
     def test_f_a_protected_test_mutation_fails_promotion(self, tmp_path: pathlib.Path) -> None:
         """item F: re-stated here (alongside TestNoTestWeakening above) as
@@ -1271,7 +1294,7 @@ class TestPromotionMatrix:
         outcome = _run_repair(
             ledger, candidates_root, parent_id="golden-work-parent", child_id="golden-work-child",
             entries=entries, attempt_repair=_matrix_attempt_repair(frozenset({gc.CONTRACT_VIOLATION})),
-            measure_regression=lambda parent_files, child_files: 1,
+            measure_regression=lambda parent_files, child_files: (1, "measured"),
         )
         assert outcome.state == FINAL_GATE_FAILED
         with pytest.raises(CandidateIntegrityError):
@@ -1353,27 +1376,131 @@ class TestStaticRegressionBaselineWiring:
         assert captured["baseline"] is not None
 
 
+#: A minimal, fast-installing real candidate for the real-environment
+#: regression tests below -- deliberately NOT `_candidate_files()` (which
+#: needs flask/flask_cors/Werkzeug, slow to install and irrelevant to what
+#: these tests prove). Only `pytest` itself is declared, so a real `pip
+#: install -r backend/requirements.txt` stays fast.
+_REAL_ENV_APP_PY = "def add(a, b):\n    return a + b\n"
+_REAL_ENV_TESTS_PY = "from backend.app import add\n\n\ndef test_add():\n    assert add(2, 3) == 5\n"
+_REAL_ENV_REQUIREMENTS = "pytest==7.4.0\n"
+
+
+def _real_env_files(**overrides: str) -> dict[str, str]:
+    files = {
+        "backend/app.py": _REAL_ENV_APP_PY,
+        "backend/requirements.txt": _REAL_ENV_REQUIREMENTS,
+        "tests/test_app.py": _REAL_ENV_TESTS_PY,
+    }
+    files.update(overrides)
+    return files
+
+
+class TestParentTestSuiteIdentity:
+    """F-0059-ENV item 5/6: the child's own `tests/` must never become the
+    oracle -- only the parent's own real accepted `tests/` bytes are ever
+    the baseline suite, for both the baseline run and the child run."""
+
+    def test_child_non_test_files_are_kept_as_the_childs_own(self) -> None:
+        parent = _real_env_files()
+        child = _real_env_files(**{"backend/app.py": "def add(a, b):\n    return a - b\n"})
+        merged = rgr._with_parent_test_suite(child, parent)
+        assert merged["backend/app.py"] == child["backend/app.py"]
+
+    def test_child_test_files_are_forced_back_to_the_parents_own_bytes(self) -> None:
+        parent = _real_env_files()
+        child = _real_env_files(**{"tests/test_app.py": "def test_add():\n    assert True\n"})
+        merged = rgr._with_parent_test_suite(child, parent)
+        assert merged["tests/test_app.py"] == parent["tests/test_app.py"]
+        assert merged["tests/test_app.py"] != child["tests/test_app.py"]
+
+    def test_a_new_test_file_the_child_planted_never_enters_the_merged_suite(self) -> None:
+        parent = _real_env_files()
+        child = _real_env_files(**{"tests/test_planted.py": "def test_always_passes():\n    assert True\n"})
+        merged = rgr._with_parent_test_suite(child, parent)
+        assert "tests/test_planted.py" not in merged
+
+
+class TestRegressionMeasurementNoLifecycleSideEffect:
+    """F-0059-ENV item F: the real-environment regression mechanism must
+    never touch CandidateLedger, WorkspaceAuthority or ArtifactStore --
+    a bare subprocess sequence only, proven structurally rather than by
+    trying to catch a side effect at runtime."""
+
+    def test_the_real_environment_functions_never_reference_the_ledger_or_workspace(self) -> None:
+        import inspect
+        source = "".join(
+            inspect.getsource(fn) for fn in (
+                rgr._prepare_real_environment, rgr._run_pytest_probe_real_env,
+                rgr._pytest_failure_and_error_count_real_env, rgr._measure_regression,
+            )
+        )
+        for forbidden in ("CandidateLedger", "WorkspaceAuthority", "ArtifactStore", "begin_acceptance", "ACCEPTANCE_RUNNING"):
+            assert forbidden not in source, f"{forbidden!r} must never appear in the regression-measurement path"
+
+
+class TestExistingAcceptanceBehaviorUnchanged:
+    """F-0059-ENV item G/7: reuse, never modify. `run_golden_acceptance.py`
+    itself is untouched by this session (its own `_accept`/`main` own
+    real lifecycle -- begin_acceptance, ACCEPTANCE_RUNNING, the browser
+    journey -- are never invoked here); only its already-private, already
+    lifecycle-free `_run` subprocess helper is reused."""
+
+    def test_the_loader_reuses_the_real_run_golden_acceptance_module(self) -> None:
+        acceptance = rgr._load_run_golden_acceptance()
+        assert callable(acceptance._run)
+        assert callable(acceptance._accept)
+        assert callable(acceptance.main)
+
+    def test_the_regression_path_never_calls_accept_or_main(self) -> None:
+        import inspect
+        source = "".join(
+            inspect.getsource(fn) for fn in (
+                rgr._prepare_real_environment, rgr._run_pytest_probe_real_env,
+            )
+        )
+        assert "_accept(" not in source
+        assert ".main(" not in source
+
+
 class TestRegressionMeasurement:
-    """F-0059 (dynamic half): the real, dynamic pre-existing-test-suite
-    comparison `_measure_regression` performs -- never a hardcoded
-    synthetic 0. Exercises the real `_run_pytest_probe` subprocess against
-    a real, minimal `tests/test_app.py`."""
+    """F-0059-ENV (real-environment fix): the real, dynamic pre-existing-
+    test-suite comparison `_measure_regression` performs, now executed in
+    a real venv with the candidate's own real dependencies installed --
+    reusing `run_golden_acceptance.py`'s own real venv/pip-install/pytest
+    sequence, never ARKALI's own interpreter (which this repository's own
+    real inference-feasibility preflight found lacks `flask`, making the
+    OLD interpreter-based probe unable to produce a usable zero-regression
+    fact for a Flask-based candidate family at all)."""
 
-    def test_identical_parent_and_child_files_measure_zero_regression(self) -> None:
-        files = _candidate_files()
-        assert rgr._measure_regression(files, files) == 0
+    def test_a_identical_parent_and_child_genuinely_pass_in_a_real_environment(self) -> None:
+        """items A+B: the parent's own real accepted suite genuinely runs,
+        genuinely passes, in a real prepared environment, and an unchanged
+        child measures a real, non-synthetic zero."""
+        files = _real_env_files()
+        delta, status = rgr._measure_regression(files, files)
+        assert status == "measured"
+        assert delta == 0
 
-    def test_a_child_that_newly_breaks_a_passing_test_is_a_real_measured_regression(self) -> None:
-        parent = _candidate_files()
-        child = {**parent, "tests/test_app.py": "def test_items_placeholder():\n    assert False\n"}
-        assert rgr._measure_regression(parent, child) == 1
+    def test_c_a_child_that_really_breaks_the_parents_own_test_is_a_real_measured_regression(self) -> None:
+        """item C: the child's own product code is genuinely broken; the
+        PARENT's own unchanged test (never the child's) genuinely fails
+        against it in a real environment."""
+        parent = _real_env_files()
+        broken_child = _real_env_files(**{"backend/app.py": "def add(a, b):\n    return a - b\n"})
+        delta, status = rgr._measure_regression(parent, broken_child)
+        assert status == "measured"
+        assert delta == 1
 
-    def test_an_unmeasurable_probe_never_silently_becomes_zero(self, monkeypatch) -> None:
-        """A probe that cannot complete must propagate None, never a
-        synthetic zero a caller could mistake for a real clean measurement."""
-        monkeypatch.setattr(rgr, "_run_pytest_probe", lambda files, timeout=120.0: None)
-        files = _candidate_files()
-        assert rgr._measure_regression(files, files) is None
+    def test_d_environment_preparation_failure_is_reported_unavailable_never_zero(self, monkeypatch) -> None:
+        """item D: environment preparation itself failing to complete must
+        propagate `"unavailable"`, never a synthetic zero a caller could
+        mistake for a real clean measurement."""
+        monkeypatch.setattr(rgr, "_prepare_real_environment", lambda scratch, *, timeout_seconds: None)
+        files = _real_env_files()
+        delta, status = rgr._measure_regression(files, files)
+        assert delta is None
+        assert status == "unavailable"
 
 
 class TestContextSelection:
