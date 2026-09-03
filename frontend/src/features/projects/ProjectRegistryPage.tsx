@@ -20,7 +20,7 @@ export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliA
       </div>
 
       {registry.notice === null ? null : (
-        <Callout tone="success" title="Done">
+        <Callout tone="success" title="Tamamlandı">
           <p>{registry.notice}</p>
         </Callout>
       )}
@@ -40,6 +40,7 @@ export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliA
             onReload={registry.reload}
           />
           <CreateProjectForm
+            showTechnical={showTechnical}
             submitting={registry.submitting}
             onCreate={registry.createProject}
           />

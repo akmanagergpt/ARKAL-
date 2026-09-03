@@ -6,7 +6,7 @@ export function CommandCenterHome({ navigate, mode }: { navigate: (area: AreaId)
     <section className="overflow-hidden rounded-2xl bg-slate-950 px-6 py-8 text-white shadow-sm sm:px-8">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-300">Command Center</p>
       <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">Bugün ne üzerinde çalışmak istiyorsunuz?</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">Projelerinizi yönetin veya gelişmiş bir iş akışı oluşturun. Yalnızca gerçek ARKALI servislerine bağlı alanlar kullanılabilir.</p>
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{mode === 'expert' ? 'Projelerinizi yönetin veya gelişmiş bir iş akışı oluşturun. Yalnızca gerçek ARKALI servislerine bağlı alanlar kullanılabilir.' : 'Uygulamalarınızı buradan yönetin. Yalnızca gerçek ARKALI servislerine bağlı alanlar kullanılabilir.'}</p>
       <div className="mt-6 flex flex-wrap gap-3">
         <button className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-sky-50" onClick={() => navigate('products')}>Projeleri aç</button>
         {mode === 'expert' ? <button className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800" onClick={() => navigate('workflow')}>Gelişmiş stüdyoyu aç</button> : null}

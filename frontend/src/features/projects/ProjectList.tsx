@@ -20,28 +20,28 @@ export function ProjectList({
 }) {
   return (
     <Panel
-      title="Projects"
+      title="Uygulamalarım"
       actions={
         <Button onClick={onReload} disabled={loading}>
-          Refresh
+          Yenile
         </Button>
       }
     >
       {loading ? (
         <p className="py-6 text-center">
-          <Spinner label="Loading the project registry…" />
+          <Spinner label="Uygulamalar yükleniyor…" />
         </p>
       ) : failure !== null ? (
-        <Callout tone="error" title="The registry could not be read">
+        <Callout tone="error" title="Kayıtlar okunamadı">
           <p>{failure.message}</p>
           <p className="mt-1 font-mono text-xs opacity-80">{failure.code}</p>
         </Callout>
       ) : projects.length === 0 ? (
         <div className="py-6 text-center">
-          <p className="text-sm font-medium text-slate-800">No projects yet</p>
+          <p className="text-sm font-medium text-slate-800">Henüz uygulama yok</p>
           <p className="mt-1 text-sm text-slate-500">
-            Register the first project to begin. Nothing is stored in this browser —
-            the registry lives in the ARKALI database.
+            Başlamak için ilk uygulamanızı ekleyin. Hiçbir şey bu tarayıcıda saklanmaz —
+            kayıtlar ARKALI veritabanında tutulur.
           </p>
         </div>
       ) : (
@@ -64,7 +64,7 @@ export function ProjectList({
                     </span>
                     {showTechnical ? <span className="block font-mono text-xs text-slate-500">{project.project_id}</span> : null}
                   </span>
-                  <StateBadge state={project.lifecycle_state} />
+                  <StateBadge state={project.lifecycle_state} showTechnical={showTechnical} />
                 </button>
               </li>
             );

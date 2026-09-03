@@ -77,7 +77,7 @@ export function Field({
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm font-medium text-slate-800">
         {label}
-        {required ? <span className="text-slate-500"> (required)</span> : null}
+        {required ? <span className="text-slate-500"> (zorunlu)</span> : null}
       </label>
       <input
         id={id}
@@ -150,12 +150,39 @@ export function Panel({ title, actions, children }: {
  *
  * Rendered as an opaque value on purpose: there is no per-state styling,
  * because a style table keyed by state name would be this file holding an
- * opinion about the machine's states.
+ * opinion about the machine's states. `showTechnical` (default true, so
+ * every existing caller that predates this prop is unaffected) only ever
+ * swaps the LABEL for a plain Turkish word — the real `state` string this
+ * component receives, and would render literally, is never altered,
+ * invented or hidden from anyone who asks for it (Uzman mode still shows
+ * it verbatim). A state absent from the map (any real state the machine
+ * could ever add) falls back to the raw value rather than silently
+ * showing nothing — this file still holds no opinion about which states
+ * exist, only about how five already-canonical ones read in Turkish.
  */
-export function StateBadge({ state }: { state: string }) {
+const PROJECT_STATE_LABELS_TR: Readonly<Record<string, string>> = {
+  DRAFT: 'Taslak',
+  SPECIFIED: 'Belirlendi',
+  ACTIVE: 'Aktif',
+  SUSPENDED: 'Askıya Alındı',
+  ARCHIVED: 'Arşivlendi',
+};
+
+/** Exported so any other real caller needing this same translation (e.g. a
+ * lifecycle-transition picker) reuses one table rather than growing a
+ * second copy of it. */
+export function projectStateLabel(state: string): string {
+  return PROJECT_STATE_LABELS_TR[state] ?? state;
+}
+
+export function StateBadge({ state, showTechnical = true }: { state: string; showTechnical?: boolean }) {
+  const label = showTechnical ? state : projectStateLabel(state);
   return (
-    <span className="inline-flex rounded-full bg-slate-900 px-2.5 py-0.5 font-mono text-xs font-medium text-white">
-      {state}
+    <span
+      className="inline-flex rounded-full bg-slate-900 px-2.5 py-0.5 font-mono text-xs font-medium text-white"
+      title={showTechnical ? undefined : state}
+    >
+      {label}
     </span>
   );
 }

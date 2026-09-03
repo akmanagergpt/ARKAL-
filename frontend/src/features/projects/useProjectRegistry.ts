@@ -15,6 +15,7 @@ import type {
   ProjectDetailResponse,
   ProjectResponse,
 } from '@/api/contracts';
+import { projectStateLabel } from '@/components/ui';
 
 export interface Failure {
   /** Backend error code where one was given; `UNREACHABLE` for transport. */
@@ -51,7 +52,7 @@ function asFailure(error: unknown): Failure {
   if (error instanceof ApiUnavailable) {
     return { code: 'UNREACHABLE', message: error.message };
   }
-  return { code: 'UNEXPECTED', message: 'An unexpected error occurred.' };
+  return { code: 'UNEXPECTED', message: 'Beklenmeyen bir hata oluştu.' };
 }
 
 export function useProjectRegistry(client: ArkaliApiClient): RegistryState & RegistryActions {
@@ -160,7 +161,7 @@ export function useProjectRegistry(client: ArkaliApiClient): RegistryState & Reg
     (projectId: string, name: string) =>
       mutate(
         () => client.createProject({ project_id: projectId, name }),
-        (detail) => `Project ${detail.project_id} registered in ${detail.lifecycle_state}.`,
+        (detail) => `${detail.project_id} kaydedildi (${projectStateLabel(detail.lifecycle_state)}).`,
       ),
     [client, mutate],
   );
@@ -169,7 +170,7 @@ export function useProjectRegistry(client: ArkaliApiClient): RegistryState & Reg
     (projectId: string, target: string) =>
       mutate(
         () => client.transitionProject(projectId, { target }),
-        (detail) => `${detail.project_id} is now ${detail.lifecycle_state}.`,
+        (detail) => `${detail.project_id} artık ${projectStateLabel(detail.lifecycle_state)} durumunda.`,
       ),
     [client, mutate],
   );
@@ -178,7 +179,7 @@ export function useProjectRegistry(client: ArkaliApiClient): RegistryState & Reg
     (projectId: string, revisionId: string) =>
       mutate(
         () => client.createRevision(projectId, { revision_id: revisionId, provenance_ref: null }),
-        (detail) => `Revision ${revisionId} recorded for ${detail.project_id}.`,
+        (detail) => `${detail.project_id} için ${revisionId} sürümü kaydedildi.`,
       ),
     [client, mutate],
   );

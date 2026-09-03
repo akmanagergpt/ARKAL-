@@ -1,11 +1,19 @@
 import { useState } from 'react';
 
 import type { ProjectDetailResponse } from '@/api/contracts';
-import { Button, Callout, Field, Panel, Spinner, StateBadge } from '@/components/ui';
+import { Button, Callout, Field, Panel, Spinner, StateBadge, projectStateLabel } from '@/components/ui';
 
 function formatTimestamp(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+/** The same real derivation shape `CreateProjectForm.deriveProjectId` uses,
+ * scoped to one project's own next real sequence number rather than a name
+ * — a beginner never invents a raw revision identifier by hand; the
+ * registry (never this function) still decides whether it is accepted. */
+function deriveRevisionId(nextSequence: number): string {
+  return `surum-${nextSequence}-${Date.now().toString(36)}`;
 }
 
 /**
@@ -16,6 +24,11 @@ function formatTimestamp(value: string): string {
  * is the Project state machine's answer and this component is not entitled to
  * pre-empt it. An illegal request is sent, refused by the backend, and the
  * refusal is shown. That is slower than a disabled button and it is correct.
+ *
+ * `showTechnical` only ever changes which VALUES are shown (raw identifiers,
+ * raw state strings, a free-text revision id) — never the UI language. The
+ * chrome around them stays Turkish in both modes, matching the rest of the
+ * panel.
  */
 export function ProjectDetail({
   project,
@@ -41,9 +54,9 @@ export function ProjectDetail({
 
   if (loading) {
     return (
-      <Panel title="Project detail">
+      <Panel title="Uygulama Bilgileri">
         <p className="py-6 text-center">
-          <Spinner label="Loading the project…" />
+          <Spinner label="Uygulama yükleniyor…" />
         </p>
       </Panel>
     );
@@ -51,13 +64,13 @@ export function ProjectDetail({
 
   if (project === null) {
     return (
-      <Panel title="Project detail">
+      <Panel title="Uygulama Bilgileri">
         {failure === null ? (
           <p className="py-6 text-center text-sm text-slate-500">
-            Select a project to see its lifecycle state and revisions.
+            Durumunu ve sürümlerini görmek için bir uygulama seçin.
           </p>
         ) : (
-          <Callout tone="error" title="The project could not be loaded">
+          <Callout tone="error" title="Uygulama yüklenemedi">
             <p>{failure.message}</p>
             <p className="mt-1 font-mono text-xs opacity-80">{failure.code}</p>
           </Callout>
@@ -67,49 +80,50 @@ export function ProjectDetail({
   }
 
   return (
-    <Panel title="Project detail" actions={<StateBadge state={project.lifecycle_state} />}>
+    <Panel
+      title="Uygulama Bilgileri"
+      actions={<StateBadge state={project.lifecycle_state} showTechnical={showTechnical} />}
+    >
       <div className="flex flex-col gap-6">
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Name</dt>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Ad</dt>
             <dd className="text-sm font-medium text-slate-900">{project.name}</dd>
           </div>
           {showTechnical ? <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Identifier</dt>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Kimlik</dt>
             <dd className="font-mono text-sm text-slate-900">{project.project_id}</dd>
           </div> : null}
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Registered</dt>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Kayıt tarihi</dt>
             <dd className="text-sm text-slate-700">{formatTimestamp(project.created_at)}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Last change</dt>
+            <dt className="text-xs uppercase tracking-wide text-slate-500">Son değişiklik</dt>
             <dd className="text-sm text-slate-700">{formatTimestamp(project.updated_at)}</dd>
           </div>
         </dl>
 
         {failure === null ? null : (
-          <Callout tone="error" title="The operation was refused">
+          <Callout tone="error" title="İşlem reddedildi">
             <p>{failure.message}</p>
             <p className="mt-1 font-mono text-xs opacity-80">{failure.code}</p>
           </Callout>
         )}
 
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">Revisions</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Sürümler</h3>
           {project.revisions.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No revisions recorded for this project yet.
-            </p>
+            <p className="text-sm text-slate-500">Bu uygulama için henüz sürüm kaydedilmedi.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[28rem] text-left text-sm">
                 <thead className="text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th scope="col" className="py-1 pr-4 font-medium">#</th>
-                    <th scope="col" className="py-1 pr-4 font-medium">Revision</th>
-                    <th scope="col" className="py-1 pr-4 font-medium">Recorded</th>
-                    <th scope="col" className="py-1 font-medium">Provenance</th>
+                    <th scope="col" className="py-1 pr-4 font-medium">Sürüm</th>
+                    <th scope="col" className="py-1 pr-4 font-medium">Kayıt tarihi</th>
+                    <th scope="col" className="py-1 font-medium">Kaynak</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -127,40 +141,56 @@ export function ProjectDetail({
               </table>
             </div>
           )}
-          <form
-            className="flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (revisionId.trim() === '') {
-                return;
-              }
-              void onCreateRevision(project.project_id, revisionId.trim()).then(() =>
-                setRevisionId(''),
-              );
-            }}
-          >
-            <div className="min-w-[14rem] flex-1">
-              <Field
-                id="new-revision-id"
-                label="New revision identifier"
-                value={revisionId}
-                onChange={setRevisionId}
-                disabled={submitting}
-              />
+          {showTechnical ? (
+            <form
+              className="flex flex-wrap items-end gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (revisionId.trim() === '') {
+                  return;
+                }
+                void onCreateRevision(project.project_id, revisionId.trim()).then(() =>
+                  setRevisionId(''),
+                );
+              }}
+            >
+              <div className="min-w-[14rem] flex-1">
+                <Field
+                  id="new-revision-id"
+                  label="Yeni sürüm tanımlayıcısı"
+                  value={revisionId}
+                  onChange={setRevisionId}
+                  disabled={submitting}
+                />
+              </div>
+              <Button type="submit" busy={submitting} disabled={revisionId.trim() === ''}>
+                Sürümü kaydet
+              </Button>
+            </form>
+          ) : (
+            <div>
+              <Button
+                busy={submitting}
+                onClick={() =>
+                  void onCreateRevision(
+                    project.project_id,
+                    deriveRevisionId(project.revisions.length + 1),
+                  )
+                }
+              >
+                Yeni sürüm kaydet
+              </Button>
             </div>
-            <Button type="submit" busy={submitting} disabled={revisionId.trim() === ''}>
-              Record revision
-            </Button>
-          </form>
+          )}
         </section>
 
         <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
-          <h3 className="text-sm font-semibold text-slate-800">Lifecycle</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Durum</h3>
           {lifecycleStates.length === 0 ? (
-            <Callout tone="muted" title="Lifecycle vocabulary unavailable">
+            <Callout tone="muted" title="Durum listesi alınamadı">
               <p>
-                The state vocabulary could not be read from the Command Center API, so no
-                transition can be requested. It is not reconstructed here.
+                Olası durumlar Command Center API üzerinden okunamadı, bu yüzden bir durum
+                değişikliği istenemiyor.
               </p>
             </Callout>
           ) : (
@@ -176,7 +206,7 @@ export function ProjectDetail({
             >
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="transition-target" className="text-sm font-medium text-slate-800">
-                  Requested state
+                  Yeni durum
                 </label>
                 <select
                   id="transition-target"
@@ -185,20 +215,20 @@ export function ProjectDetail({
                   onChange={(event) => setTarget(event.target.value)}
                   className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:bg-slate-100"
                 >
-                  <option value="">Select a state…</option>
+                  <option value="">Bir durum seçin…</option>
                   {lifecycleStates.map((state) => (
                     <option key={state} value={state}>
-                      {state}
+                      {showTechnical ? state : projectStateLabel(state)}
                     </option>
                   ))}
                 </select>
               </div>
               <Button type="submit" variant="primary" busy={submitting} disabled={target === ''}>
-                Request transition
+                Durumu değiştir
               </Button>
               <p className="basis-full text-xs text-slate-500">
-                Whether a move is permitted is decided by ARKALI, not by this screen.
-                A refused request is reported above with the reason it was refused.
+                Bu değişikliğe izin verilip verilmeyeceğine bu ekran değil, ARKALI karar verir.
+                İstek reddedilirse nedeni yukarıda gösterilir.
               </p>
             </form>
           )}
