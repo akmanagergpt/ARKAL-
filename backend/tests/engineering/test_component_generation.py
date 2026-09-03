@@ -63,12 +63,20 @@ class _QueueModel:
         )
 
 
-def _factory(per_stage: dict[str, list[tuple[HonestState, str]]]):  # noqa: ANN202
+def _factory(  # noqa: ANN202
+    per_stage: dict[str, list[tuple[HonestState, str]]], *, model_cls: type = _QueueModel,
+):
+    """`model_cls` (F-0070): additive, defaults to the real `_QueueModel`
+    every existing caller already used before this parameter existed --
+    zero behavior change for any of them. A caller may pass a subclass
+    (e.g. one that also implements the real, optional `record_attempt`
+    hook `component_generation._notify_attempt` discovers structurally)
+    to prove the real per-attempt observability wiring end to end."""
     models: dict[str, _QueueModel] = {}
 
     def factory(stage_name: str) -> tuple[_QueueModel, str]:
         if stage_name not in models:
-            models[stage_name] = _QueueModel(per_stage[stage_name])
+            models[stage_name] = model_cls(per_stage[stage_name])
         return models[stage_name], "test-model"
 
     factory.models = models  # type: ignore[attr-defined]

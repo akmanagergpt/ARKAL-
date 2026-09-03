@@ -39,6 +39,7 @@ from __future__ import annotations
 import json
 import platform
 import re
+import warnings
 from collections.abc import Callable, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -288,6 +289,52 @@ def _parse_stage_envelope(
         return None, f"stage response violates the contract: {error}"
 
 
+#: F-0070. `generate_staged_model_product` is already at its own real,
+#: measured `max_parameters_per_public_function` ceiling (6 of 6) --
+#: adding a seventh, `on_attempt`, would breach it the same way bundling
+#: `model_factory` to return `(model, model_id)` together already avoided
+#: a seventh parameter once before (this module's own docstring). Rather
+#: than repeat that bundling trick awkwardly (a caller-supplied
+#: `on_attempt` has no natural home inside `model_factory`'s own
+#: per-stage `(model, model_id)` return shape), this reuses the one
+#: object already flowing through the ENTIRE per-stage retry loop at
+#: exactly attempt granularity: `model: ModelSource`. `ModelSource` is a
+#: structural `Protocol` (`model_product_generation.py`) whose only
+#: REQUIRED method is `infer` -- a caller's own real model object may
+#: freely implement an ADDITIONAL, entirely optional `record_attempt`
+#: method alongside it without widening the Protocol's own required
+#: shape or touching any existing `ModelSource` implementation (every
+#: test's own `_QueueModel`, which implements only `infer`, is completely
+#: unaffected). `_generate_one_stage` (private, no public-parameter
+#: budget) checks for it structurally; `run_staged_generation.py` is free
+#: to wrap its own real model source with one that also freezes each
+#: real attempt as diagnostic provenance via the same `ArtifactStore`/
+#: `_freeze()` mechanism the terminal outcome already uses -- never a
+#: second authoritative store, never a substitute for the candidate
+#: ledger, terminal evidence, or campaign ledger.
+def _notify_attempt(
+    model: ModelSource, stage_name: str, attempt_number: int, repair_strategy: str,
+    prompt: str, raw_output: str, findings: tuple[tuple[str, str, str], ...],
+    fingerprint: str | None,
+) -> None:
+    observe = getattr(model, "record_attempt", None)
+    if observe is None:
+        return
+    try:
+        observe(stage_name, attempt_number, repair_strategy, prompt, raw_output, findings, fingerprint)
+    except Exception as error:  # noqa: BLE001 -- diagnostic-only (F-0070): a
+        # caller-supplied observability hook must never abort or alter a
+        # real, in-progress generation attempt, regardless of what it
+        # itself does internally; an explicit warning, never a silent
+        # swallow and never a crash, is the honest degraded-evidence
+        # signal (`KeyboardInterrupt`/`SystemExit` are BaseException, not
+        # Exception, and still propagate normally).
+        warnings.warn(
+            f"F-0070 attempt-observability hook failed for stage {stage_name!r} "
+            f"attempt {attempt_number}: {error}", RuntimeWarning, stacklevel=2,
+        )
+
+
 def _generate_one_stage(
     declaration: StageDeclaration,
     blueprint: RequirementBlueprint,
@@ -337,9 +384,17 @@ def _generate_one_stage(
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
+                    _notify_attempt(
+                        model, declaration.name, attempt_number, strategy, prompt,
+                        outcome.output, (), None,
+                    )
                     return stage_files
                 last_findings = tuple((f.code, f.path, f.detail) for f in findings)
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
+        _notify_attempt(
+            model, declaration.name, attempt_number, strategy, prompt,
+            outcome.output, last_findings, failure,
+        )
         # ANTI-LOOP, generic across every stage: two consecutive attempts
         # rejected for the identical normalized reason (same code, path
         # and detail) will not resolve on a blind third/fourth retry —

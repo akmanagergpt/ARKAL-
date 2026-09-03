@@ -121,6 +121,53 @@ def _freeze(
         engine.dispose()
 
 
+class _ObservedModel:
+    """F-0070. Wraps a real `ModelSource`, delegating `infer` unchanged,
+    and additionally freezing each real attempt's own diagnostic facts as
+    a real, content-addressed artifact via the exact same `_freeze()`/
+    `ArtifactStore` mechanism the terminal outcome already uses above --
+    never a second authoritative store, and never a substitute for the
+    candidate ledger, the terminal stage evidence, or the campaign
+    ledger, none of which this touches. `ModelSource` itself
+    (`model_product_generation.py`) declares only `infer` as its real,
+    required method; `record_attempt` is a real, additional, entirely
+    optional method `component_generation._notify_attempt` discovers
+    structurally (`getattr(model, "record_attempt", None)`) -- every
+    existing `ModelSource` implementation that does not define it,
+    including every test's own `_QueueModel`, is completely unaffected.
+    A failure inside `record_attempt` is caught by `_notify_attempt`
+    itself, never here: this class stays a thin, honest wrapper, not a
+    second place that decides what "diagnostic-only, never fatal" means.
+    """
+
+    def __init__(self, inner: object, candidate_id: str, provider_model: str) -> None:
+        self._inner = inner
+        self._candidate_id = candidate_id
+        self._provider_model = provider_model
+
+    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0):  # noqa: ANN201
+        return self._inner.infer(model_id, prompt, timeout_seconds=timeout_seconds)  # type: ignore[attr-defined]
+
+    def record_attempt(
+        self, stage_name: str, attempt_number: int, repair_strategy: str,
+        prompt: str, raw_output: str, findings: tuple[tuple[str, str, str], ...],
+        fingerprint: str | None,
+    ) -> None:
+        payload = json.dumps({
+            "candidate_id": self._candidate_id, "stage": stage_name,
+            "attempt_number": attempt_number, "repair_strategy": repair_strategy,
+            "prompt": prompt, "raw_output": raw_output,
+            "findings": [{"code": c, "path": p, "detail": d} for c, p, d in findings],
+            "fingerprint": fingerprint,
+        }, sort_keys=True).encode()
+        _freeze(
+            payload, self._candidate_id,
+            f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
+            ("real staged-generation attempt evidence -- diagnostic provenance only (F-0070)",),
+            self._provider_model,
+        )
+
+
 def _source_commit() -> str:
     try:
         return subprocess.run(
@@ -244,9 +291,13 @@ def main(argv: list[str]) -> int:
                 endpoint=args.endpoint or OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
                 max_output_tokens=args.max_output_tokens, json_mode=True,
             )
-            return adapter, args.model
-        adapter = OllamaAdapter(json_mode=True, max_output_tokens=args.max_output_tokens)
-        return adapter, args.model
+        else:
+            adapter = OllamaAdapter(json_mode=True, max_output_tokens=args.max_output_tokens)
+        # F-0070: every real attempt's own diagnostic facts are frozen as
+        # real, content-addressed evidence -- diagnostic provenance only,
+        # never changing what this run reports or how it is classified.
+        observed = _ObservedModel(adapter, args.candidate_id, provider_model)
+        return observed, args.model
 
     started = time.monotonic()
     try:
