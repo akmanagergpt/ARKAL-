@@ -17,7 +17,9 @@ import type {
   ApproveExecutionRequest,
   CreateProjectRequest,
   CreateRevisionRequest,
+  _FactoryGoalRequest,
   FactoryHistorySnapshot,
+  _FactoryIntakeResponse,
   HealthResponse,
   LifecycleMachineResponse,
   OperationsSnapshot,
@@ -68,6 +70,7 @@ export const ENDPOINTS = {
   },
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
+  submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
 } as const;
 
 /**
@@ -341,6 +344,17 @@ export class ArkaliApiClient {
       ENDPOINTS.factoryHistory,
       signal === undefined ? {} : { signal },
     );
+  }
+
+  /**
+   * Submit one real goal to `ProductionFactory.submit_goal`. Always returns
+   * `202` with an honest `ProductionIntake` — `governed_stop`, `escalated`
+   * or `queued` — never a promise that generation began. This is the same
+   * real intake `POST /api/factory/goals` already offers; nothing here
+   * re-derives or guesses at a blueprint.
+   */
+  submitFactoryGoal(body: _FactoryGoalRequest): Promise<_FactoryIntakeResponse> {
+    return this.request<_FactoryIntakeResponse>(ENDPOINTS.submitFactoryGoal, { body });
   }
 }
 

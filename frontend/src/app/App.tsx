@@ -37,7 +37,7 @@ export function App({ client }: { client: ArkaliApiClient }) {
       : area === 'operations'
         ? <OperationsPage client={client} />
         : area === 'factory'
-          ? <FactoryHistoryPage client={client} />
+          ? <FactoryHistoryPage client={client} showTechnical={mode === 'expert'} />
           : <CommandCenterHome navigate={setArea} mode={mode} />;
 
   return (

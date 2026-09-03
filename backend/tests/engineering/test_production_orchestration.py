@@ -68,6 +68,36 @@ def test_unresolved_goal_never_reaches_routing_or_durable_sink() -> None:
     assert sink.calls == []
 
 
+def test_unresolved_reasons_are_real_and_match_the_count() -> None:
+    """The ARKALI COMMAND CENTER — LIVE SOFTWARE FACTORY USER FLOW turn
+    extended `ProductionIntake` so a caller can explain a `GOVERNED_STOP`
+    instead of only counting it. `unresolved` must carry the same
+    `UnresolvedQuestion` values `blueprint.unresolved` derived — not a
+    fabricated or truncated copy."""
+    sink = RecordingSink()
+    result = ProductionFactory(AuthorityMap.load(REPO)).submit_goal(
+        _request("It should be fast."), sink
+    )
+
+    assert len(result.unresolved) == result.unresolved_count
+    assert all(question.detail for question in result.unresolved)
+
+
+def test_a_resolved_goal_carries_no_unresolved_reasons() -> None:
+    def query(capability_id: str) -> CapabilityQueryResult:
+        return CapabilityQueryResult(
+            capability_id=capability_id, state=HonestState.PASS,
+            reason="real local runtime configured",
+        )
+
+    sink = RecordingSink()
+    result = ProductionFactory(AuthorityMap.load(REPO), query).submit_goal(
+        _request(), sink
+    )
+
+    assert result.unresolved == ()
+
+
 def test_absent_runtime_escalates_without_fabricating_a_job() -> None:
     sink = RecordingSink()
     result = ProductionFactory(AuthorityMap.load(REPO)).submit_goal(_request(), sink)

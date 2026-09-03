@@ -18,7 +18,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from arkali.control.architecture.authority_map import AuthorityMap
 from arkali.control.capability.capability_graph import CapabilityQueryResult
-from arkali.control.specification.blueprint_contracts import RequirementBlueprint
+from arkali.control.specification.blueprint_contracts import (
+    RequirementBlueprint,
+    UnresolvedQuestion,
+)
 from arkali.control.specification.blueprint_engine import derive_blueprint
 from arkali.engineering.factory.execution_routing import (
     ExecutionTier,
@@ -59,6 +62,11 @@ class ProductionIntake(BaseModel):
     state: FactoryIntakeState
     selected_tier: ExecutionTier | None = None
     unresolved_count: int = Field(ge=0)
+    #: The real, mechanically-derived reasons behind `unresolved_count` — the
+    #: same `UnresolvedQuestion` values `blueprint.unresolved` already holds,
+    #: reused unmodified rather than restated, so a caller can explain a
+    #: `GOVERNED_STOP` instead of only counting it.
+    unresolved: tuple[UnresolvedQuestion, ...] = ()
     durable_job_id: str | None = None
 
 
@@ -119,6 +127,7 @@ class ProductionFactory:
             state=state,
             selected_tier=selection.selected if selection is not None else None,
             unresolved_count=len(blueprint.unresolved),
+            unresolved=blueprint.unresolved,
             durable_job_id=durable_job_id,
         )
 

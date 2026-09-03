@@ -1,18 +1,23 @@
 /**
- * AI Software Factory — read-only production history.
+ * AI Software Factory — real goal intake, plus read-only production history.
  *
- * READ-ONLY. This page renders `GET /api/factory/history` and nothing
- * else — no button here starts a new `golden-work-*` run. DEF-009
- * (`docs/build/OPEN_BLOCKERS.md`) records that no live orchestrator wires
- * this repository's real staged-generation pipeline to a Command Center
- * trigger yet; this page does not claim otherwise. It shows what the
- * pipeline's own CLI-driven runs have already recorded, honestly.
+ * TWO REAL THINGS, NOT ONE. "Yeni Uygulama" (`NewApplicationIntake`) is a
+ * genuine write path: it calls the real `POST /api/factory/goals`. The
+ * history below it stays exactly what it always was — `GET
+ * /api/factory/history`, a read of the staged-generation pipeline's own
+ * ledgers, with no button here that starts a new `golden-work-*` run.
+ * DEF-009 (`docs/build/OPEN_BLOCKERS.md`) records that no live orchestrator
+ * wires this repository's real staged-generation pipeline to a Command
+ * Center trigger yet, and neither section claims otherwise — see
+ * `NewApplicationIntake.tsx`'s own doc comment for exactly how far the
+ * real intake path reaches today.
  */
 
 import type { ArkaliApiClient } from '@/api/client';
 import type { FactoryCampaignSummary, FactoryCandidateSummary } from '@/api/contracts';
 import { Button, Callout, Panel, Spinner, StateBadge } from '@/components/ui';
 
+import { NewApplicationIntake } from './NewApplicationIntake';
 import { useFactoryHistory } from './useFactoryHistory';
 
 function CandidateRow({ candidate }: { candidate: FactoryCandidateSummary }) {
@@ -96,8 +101,8 @@ function Header({
           AI Software Factory <span className="text-base font-normal text-slate-500">(Yapay Zekâ Yazılım Fabrikası)</span>
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Üretim geçmişi — gerçek `golden-work-*` çalışmalarının kaydı. Salt okunur:
-          burada yeni bir üretim başlatılamaz.
+          Yeni bir uygulama isteği gönderin veya gerçek `golden-work-*`
+          üretim geçmişini görüntüleyin.
         </p>
       </div>
       <Button onClick={onRefresh} busy={refreshing}>
@@ -107,13 +112,20 @@ function Header({
   );
 }
 
-export function FactoryHistoryPage({ client }: { client: ArkaliApiClient }) {
+export function FactoryHistoryPage({
+  client,
+  showTechnical,
+}: {
+  client: ArkaliApiClient;
+  showTechnical: boolean;
+}) {
   const state = useFactoryHistory(client);
 
   if (state.loading) {
     return (
       <div className="flex flex-col gap-6">
         <Header onRefresh={state.reload} refreshing={state.refreshing} />
+        <NewApplicationIntake client={client} showTechnical={showTechnical} />
         <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-white py-16">
           <Spinner label="Üretim geçmişi yükleniyor…" />
         </div>
@@ -125,6 +137,7 @@ export function FactoryHistoryPage({ client }: { client: ArkaliApiClient }) {
     return (
       <div className="flex flex-col gap-6">
         <Header onRefresh={state.reload} refreshing={state.refreshing} />
+        <NewApplicationIntake client={client} showTechnical={showTechnical} />
         <Callout tone="error" title="Üretim geçmişi okunamadı">
           <p>{state.failure?.message ?? 'Bilinmeyen bir hata oluştu.'}</p>
           <div className="mt-3">
@@ -145,6 +158,8 @@ export function FactoryHistoryPage({ client }: { client: ArkaliApiClient }) {
     <div className="flex flex-col gap-6">
       <Header onRefresh={state.reload} refreshing={state.refreshing} />
 
+      <NewApplicationIntake client={client} showTechnical={showTechnical} />
+
       {state.stale ? (
         <Callout tone="error" title="Veri güncel değil">
           <p>
@@ -155,11 +170,15 @@ export function FactoryHistoryPage({ client }: { client: ArkaliApiClient }) {
         </Callout>
       ) : null}
 
-      <Callout tone="muted" title="Bu ekran salt okunurdur (read-only)">
+      <Callout tone="muted" title="Aşağıdaki geçmiş salt okunurdur (read-only)">
         <p>
           Canlı bir orkestratör (orchestrator) veya sağlayıcı kaydı henüz yok
           (bkz. DEF-009, <code className="font-mono">docs/build/OPEN_BLOCKERS.md</code>).
-          Aşağıdakiler yalnızca üretim hattının kendi kayıt defterlerinden okunur.
+          Aşağıdaki adaylar ve kampanyalar yalnızca üretim hattının kendi kayıt
+          defterlerinden okunur; burada yeni bir `golden-work-*` çalışması
+          başlatılamaz. Yukarıdaki "Yeni Uygulama" isteğiniz gerçektir ve
+          gerçekten gönderilir — ancak bugün bu ortamda onu otomatik olarak
+          işleyecek bir üretim kapasitesi bulunmuyor.
         </p>
       </Callout>
 

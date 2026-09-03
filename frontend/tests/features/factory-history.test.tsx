@@ -45,11 +45,21 @@ describe('AI Software Factory history page', () => {
     expect(screen.getByText('1 / 1')).toBeInTheDocument();
   });
 
-  it('never renders a trigger for starting a new run', async () => {
+  it('never renders a trigger for starting a new golden-work run', async () => {
     mount({ [HISTORY]: { status: 200, body: FACTORY_HISTORY_SNAPSHOT } });
     await screen.findAllByText('golden-work-127');
 
-    expect(screen.queryByRole('button', { name: /başlat|üret|create/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /golden-work|başlat.*(çalışma|run)/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the real goal-intake form above the read-only history', async () => {
+    mount({ [HISTORY]: { status: 200, body: FACTORY_HISTORY_SNAPSHOT } });
+    await screen.findAllByText('golden-work-127');
+
+    expect(screen.getByLabelText(/nasıl bir uygulama yapmak istiyorsunuz/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Uygulamayı Oluştur' })).toBeInTheDocument();
   });
 
   it('shows an honest empty state with no candidates or campaigns', async () => {

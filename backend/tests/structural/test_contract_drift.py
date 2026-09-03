@@ -34,7 +34,7 @@ from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.engineering.localai import host_probe
 from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.surfaces.command import contracts, factory_history, workflow_contracts
+from arkali.surfaces.command import contracts, factory, factory_history, workflow_contracts
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
     BROWSER_SLICE,
@@ -119,6 +119,43 @@ def _operations_wiring(pdp: PolicyDecisionPoint):
     return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
 
 
+def _factory_submitter_wiring(pdp: PolicyDecisionPoint):
+    """Mirrors `scripts/run_command_center.py`'s own `_factory_submitter`
+    exactly, so `/api/factory/goals` is drift-tested against the same real
+    `ProductionFactory` composition a live caller reaches - not a narrower
+    stand-in. No `capability_query` is supplied here either: the real
+    launcher wires none today, and this fixture must not silently claim a
+    capability the running application does not have.
+    """
+    from arkali.control.architecture.authority_map import AuthorityMap
+    from arkali.control.policy.pep import PolicyEnforcementPoint
+    from arkali.engineering.factory.production_orchestration import (
+        ProductionFactory,
+        ProductionGoalRequest,
+    )
+    from arkali.execution.durable.job_store import JobStore, JobSubmission
+
+    class _DurableFactorySink:
+        def __init__(self, store: JobStore) -> None:
+            self._store = store
+
+        def enqueue(self, request_id: str, payload: dict[str, object]) -> str:
+            record = self._store.submit(JobSubmission(
+                job_id=request_id, job_type="software_factory.production",
+                idempotency_key=request_id, payload=payload,
+            ))
+            return record.job_id
+
+    factory = ProductionFactory(AuthorityMap.load(REPO))
+
+    def submit(session, body):  # noqa: ANN001
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
+        request = ProductionGoalRequest(**body.model_dump())
+        return factory.submit_goal(request, _DurableFactorySink(JobStore(session, pep)))
+
+    return submit
+
+
 def _factory_history_wiring(var_root: pathlib.Path):
     """Mirrors `scripts/run_command_center.py`'s own `_factory_candidate_
     history`/`_factory_campaign_history` exactly, over an isolated root -
@@ -187,6 +224,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             operations_wiring=_operations_wiring(pdp), operations_repo_root=REPO,
             factory_candidate_history=candidate_history,
             factory_campaign_history=campaign_history,
+            factory_submitter=_factory_submitter_wiring(pdp),
         ),
     )
 
@@ -277,7 +315,7 @@ def surface_contract_names() -> frozenset[str]:
     this surface publishes even though `surfaces.command` does not declare
     the class.
     """
-    modules = (contracts, workflow_contracts, operations_contracts, factory_history)
+    modules = (contracts, workflow_contracts, operations_contracts, factory_history, factory)
     return frozenset(
         name
         for module in modules
@@ -355,6 +393,9 @@ class TestTransportTypesMatchTheBackend:
             "HardwareSnapshot",
             "StorageSnapshot",
             "OperationsSnapshot",
+            "_FactoryGoalRequest",
+            "_FactoryIntakeResponse",
+            "_UnresolvedQuestionShape",
         }
         assert exchanged <= declared
 

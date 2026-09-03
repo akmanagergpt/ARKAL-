@@ -247,6 +247,45 @@ export interface FactoryHistorySnapshot {
   campaigns: FactoryCampaignSummary[];
 }
 
+/**
+ * The real `POST /api/factory/goals` intake — `ProductionFactory.submit_goal`
+ * composed unmodified. `capability_id` is optional and, in the real running
+ * Command Center today, has no route to an automated tier: no
+ * `capability_query` is wired into `scripts/run_command_center.py`'s own
+ * `ProductionFactory`, so every real submission resolves `governed_stop` or
+ * `escalated`, never `queued`. This type does not paper over that — see
+ * `NewApplicationIntake.tsx`.
+ *
+ * NAMED WITH A LEADING UNDERSCORE, MATCHING THE BACKEND. `surfaces.command`
+ * has no `max_public_surface_per_context` headroom to spare, so the backend
+ * models stay underscore-prefixed (uncounted); FastAPI still publishes each
+ * one's literal `__name__` as its OpenAPI component name, and
+ * `test_contract_drift.py` compares by that name.
+ */
+export interface _FactoryGoalRequest {
+  request_id: string;
+  goal_text: string;
+  capability_id: string | null;
+}
+
+/** One real, mechanically-derived reason a goal did not fully resolve. */
+export interface _UnresolvedQuestionShape {
+  subject_index: number | null;
+  kind: string;
+  detail: string;
+}
+
+export interface _FactoryIntakeResponse {
+  request_id: string;
+  goal_id: string;
+  blueprint_id: string;
+  state: string;
+  selected_tier: string | null;
+  unresolved_count: number;
+  unresolved: _UnresolvedQuestionShape[];
+  durable_job_id: string | null;
+}
+
 export interface WorkflowExecutionDetailResponse {
   execution_id: string;
   workflow_id: string;
