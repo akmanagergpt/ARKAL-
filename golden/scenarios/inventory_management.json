@@ -8,7 +8,8 @@
       "singular_label": "Product",
       "editable_form_fields": ["name", "price"],
       "success_indicator_text": "success",
-      "destructive_confirmation_required": true
+      "destructive_confirmation_required": true,
+      "actions": ["create", "delete", "edit"]
     },
     {
       "name": "categories",
@@ -17,7 +18,8 @@
       "singular_label": "Category",
       "editable_form_fields": ["name"],
       "success_indicator_text": "success",
-      "destructive_confirmation_required": false
+      "destructive_confirmation_required": false,
+      "actions": ["create", "edit"]
     },
     {
       "name": "stock_movements",
@@ -27,7 +29,8 @@
       "editable_form_fields": ["quantity", "movement_type"],
       "success_indicator_text": "success",
       "destructive_confirmation_required": false,
-      "relationship_fields": {"product_id": "products"}
+      "relationship_fields": {"product_id": "products"},
+      "actions": ["create"]
     }
   ],
   "primary_resource": "products",

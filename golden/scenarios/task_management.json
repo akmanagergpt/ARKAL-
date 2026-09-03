@@ -8,7 +8,8 @@
       "singular_label": "Project",
       "editable_form_fields": ["title"],
       "success_indicator_text": "success",
-      "destructive_confirmation_required": true
+      "destructive_confirmation_required": true,
+      "actions": ["create", "delete", "edit"]
     },
     {
       "name": "tasks",
@@ -18,7 +19,8 @@
       "editable_form_fields": ["title", "due_date"],
       "success_indicator_text": "success",
       "destructive_confirmation_required": true,
-      "relationship_fields": {"project_id": "projects"}
+      "relationship_fields": {"project_id": "projects"},
+      "actions": ["create", "delete", "edit"]
     }
   ],
   "primary_resource": "projects",

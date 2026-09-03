@@ -52,6 +52,19 @@ class _ResourceScenario(BaseModel):
     #: earlier resource in the same scenario (a real foreign-key
     #: relationship, e.g. a payment's own `student_id`).
     relationship_fields: dict[str, str] = Field(default_factory=dict)
+    #: The real, reconciled MUTATION action set (`acceptance_plan_compiler.
+    #: _resolved_actions`'s own already-computed result -- the subset of
+    #: "create"/"edit"/"delete" BOTH the candidate's own `product_ux_spec.
+    #: json` declares for this resource AND a real matching backend route/
+    #: method actually backs; "view" is deliberately never a member -- it
+    #: names no verb `_ACTION_TO_VERB` maps and a resource being rendered
+    #: on a page at all already IS its own "view" observable, needing no
+    #: separate coverage signal). This is the one real, domain-independent
+    #: signal for "declared mandatory" a coverage check may use: an action
+    #: present here is a real, backed promise the candidate made about
+    #: itself, never something the runner or the browser journey invents
+    #: or assumes.
+    actions: tuple[str, ...] = ()
 
 
 class _AcceptanceScenario(BaseModel):

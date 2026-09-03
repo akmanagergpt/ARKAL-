@@ -259,6 +259,7 @@ def _build_resource(
         editable_form_fields=tuple(f for f in editable if f not in relationship_fields) or (route_param or "value",),
         destructive_confirmation_required="delete" in actions,
         relationship_fields=relationship_fields,
+        actions=tuple(sorted(actions)),
     )
     return resource, create_payload, update_payload, browser_create, browser_update
 

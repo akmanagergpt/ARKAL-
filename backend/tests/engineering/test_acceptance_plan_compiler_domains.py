@@ -161,6 +161,12 @@ class TestCompilerMatchesTheOracleShapeAcrossThreeDomains:
                 assert resource.destructive_confirmation_required == oracle_resource[
                     "destructive_confirmation_required"
                 ], resource.name
+                # F-0064-preflight: `actions` (the real, spec+backend-
+                # reconciled mutation-capability signal the acceptance
+                # journey's own declared-capability coverage check now
+                # keys on) is genuinely derived per domain -- proven here
+                # across all three, never assumed from one.
+                assert set(resource.actions) == set(oracle_resource.get("actions", ())), resource.name
 
     def test_every_compiled_domain_reconciles_cleanly_against_its_own_source(self) -> None:
         for build_files in _DOMAINS.values():

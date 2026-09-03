@@ -99,6 +99,40 @@
  * destination page's content is assumed. A control with no `href` (a
  * `<button>` driving `history.push`) is verified by a real URL change
  * instead, since no further real fact exists to check it against.
+ *
+ * (7) DECLARED-MANDATORY CAPABILITIES MUST NEVER SILENTLY SKIP, AND EDIT
+ * MUST BE PROVEN TO SHOW REAL DATA BEFORE IT IS OVERWRITTEN. A real ARKALI
+ * LIVE PRODUCT CHECKPOINT (golden-work-129, historical specimen, real
+ * evidence -- not a rule about that one product) found two real, distinct
+ * measurement-truth gaps in this journey itself, neither a defect in the
+ * candidate this journey was driving:
+ *   (a) the related-resource create step below used to run only
+ *   `if (await relatedCreate.count())` -- a genuinely MISSING create
+ *   control for a resource whose own `_AcceptanceScenario.actions`
+ *   (`acceptance_plan_compiler.py`'s own real, spec+backend-reconciled
+ *   result -- never guessed here) already, mechanically declares "create"
+ *   produced no failure at all, just a silently skipped verification
+ *   block. `golden-work-129`'s own real `Payments.js` has exactly this
+ *   shape: `apiClient.js` exports a real, working `createPayment`, the
+ *   real backend genuinely accepts `POST /payments`, and no UI control
+ *   anywhere calls either -- a real, reachable, but entirely unexercised
+ *   capability gap this journey's own old guard let straight through.
+ *   (b) the edit step below filled the form with `browser_update_values`
+ *   and asserted only the POST-mutation result -- never reading what the
+ *   form showed BEFORE typing. `golden-work-129`'s own real `StudentForm`
+ *   accepts an `initialData` prop its caller passes but never reads it
+ *   inside the component -- the edit form silently renders blank on every
+ *   real load. A journey that only checks the post-submit result cannot
+ *   tell "the form was correctly pre-filled, then edited" from "the form
+ *   was blank, then filled from scratch" -- both produce an identical PUT
+ *   and an identical post-submit list. Only reading the form's own real
+ *   values before this journey types anything new can distinguish them.
+ * The fix for both is the same real invariant, never a per-product
+ * special case: a spec+backend-declared MANDATORY capability's own
+ * observable (a control, a pre-filled value) must genuinely exist and be
+ * exercised -- SKIP is legitimate only for a capability neither the
+ * candidate's own `product_ux_spec.json` nor its own real backend routes
+ * ever declared.
  */
 
 import { createRequire } from 'node:module';
@@ -256,6 +290,27 @@ try {
   await clickInRow(page, createdText, /edit/i);
   const collectionSegment = primary.collection_route.replace(/^\//, '');
   await expect(page).toHaveURL(new RegExp(`/${collectionSegment}/edit/${createdId}(?:[/?]|$)`));
+
+  // Gap 7(b), module docstring: prove the edit form genuinely shows this
+  // real record's own real data BEFORE any new value is typed over it --
+  // never inferred from the post-submit result alone, which a form that
+  // was blank all along would satisfy identically.
+  for (const fieldName of primary.editable_form_fields) {
+    if (!Object.prototype.hasOwnProperty.call(createValues, fieldName)) continue;
+    const input = await firstVisible([
+      page.getByLabel(fieldPattern(fieldName)), page.getByPlaceholder(fieldPattern(fieldName)),
+    ]);
+    const currentValue = (await input.inputValue()).trim();
+    const expectedValue = String(createValues[fieldName]).trim();
+    if (currentValue !== expectedValue) {
+      throw new Error(
+        `edit form field "${fieldName}" does not show this record's own real value before mutation `
+        + `(expected "${expectedValue}", found "${currentValue}") -- the edit form is not genuinely `
+        + 'pre-populated'
+      );
+    }
+  }
+
   const updateValues = scenario.browser_update_values || {};
   await fillFields(page, primary.editable_form_fields, updateValues);
   await clickNamed(page, /update|save|submit/i);
@@ -282,8 +337,24 @@ try {
 
   if (related) {
     await navigateTo(page, navPattern(related.navigation_label));
+    // Gap 7(a), module docstring: "create" declared in `related.actions`
+    // is a real, spec+backend-reconciled promise (`acceptance_plan_
+    // compiler.py`'s own `_resolved_actions`) -- a missing control for a
+    // declared-mandatory capability is a real FAIL, never a silent skip.
+    // SKIP stays legitimate only when neither the candidate's own
+    // product_ux_spec.json nor its own real backend routes ever declared
+    // "create" for this resource in the first place.
+    const relatedMustCreate = (related.actions || []).includes('create');
     const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
-    if (await relatedCreate.count()) {
+    const relatedCreateCount = await relatedCreate.count();
+    if (relatedMustCreate && relatedCreateCount === 0) {
+      throw new Error(
+        `${related.name} declares a mandatory "create" capability (both product_ux_spec.json and the `
+        + 'real backend agree it exists) but no reachable create control was found anywhere on the '
+        + `${related.navigation_label} page`
+      );
+    }
+    if (relatedCreateCount) {
       await relatedCreate.first().click();
       const relationshipField = Object.keys(related.relationship_fields || {})[0];
       if (relationshipField) {

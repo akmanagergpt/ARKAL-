@@ -8,7 +8,8 @@
       "singular_label": "Student",
       "editable_form_fields": ["name", "email"],
       "success_indicator_text": "success",
-      "destructive_confirmation_required": true
+      "destructive_confirmation_required": true,
+      "actions": ["create", "delete", "edit"]
     },
     {
       "name": "payments",
@@ -18,7 +19,8 @@
       "editable_form_fields": ["amount", "due_date"],
       "success_indicator_text": "success",
       "destructive_confirmation_required": false,
-      "relationship_fields": {"student_id": "students"}
+      "relationship_fields": {"student_id": "students"},
+      "actions": ["create"]
     }
   ],
   "primary_resource": "students",
