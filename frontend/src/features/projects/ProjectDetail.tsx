@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import type { ProjectDetailResponse } from '@/api/contracts';
-import { Button, Callout, Field, Panel, Spinner, StateBadge, projectStateLabel } from '@/components/ui';
+import { Button, Callout, Field, Panel, Spinner, StateBadge } from '@/components/ui';
 
 function formatTimestamp(value: string): string {
   const parsed = new Date(value);
@@ -82,7 +82,7 @@ export function ProjectDetail({
   return (
     <Panel
       title="Uygulama Bilgileri"
-      actions={<StateBadge state={project.lifecycle_state} showTechnical={showTechnical} />}
+      actions={<StateBadge state={project.lifecycle_state} />}
     >
       <div className="flex flex-col gap-6">
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
@@ -218,7 +218,7 @@ export function ProjectDetail({
                   <option value="">Bir durum seçin…</option>
                   {lifecycleStates.map((state) => (
                     <option key={state} value={state}>
-                      {showTechnical ? state : projectStateLabel(state)}
+                      {state}
                     </option>
                   ))}
                 </select>

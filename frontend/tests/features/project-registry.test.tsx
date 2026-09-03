@@ -16,7 +16,6 @@ import { describe, expect, it } from 'vitest';
 
 import { App } from '@/app/App';
 import { ArkaliApiClient } from '@/api/client';
-import { projectStateLabel } from '@/components/ui';
 import {
   DRAFT_PROJECT,
   EMPTY_LIST,
@@ -68,7 +67,7 @@ describe('Project Registry page', () => {
 
     expect(await screen.findByText('Alpha Programme')).toBeInTheDocument();
     expect(screen.queryByText('prj-alpha')).not.toBeInTheDocument();
-    expect(screen.getByText(projectStateLabel('DRAFT'))).toBeInTheDocument();
+    expect(screen.getByText('DRAFT')).toBeInTheDocument();
   });
 
   it('presents a backend failure instead of an empty registry', async () => {
@@ -167,9 +166,7 @@ describe('Project Registry page', () => {
     // Every state the machine declares is offered, including ones that are not
     // reachable from DRAFT. Filtering them here would be a second authority.
     for (const state of LIFECYCLE.states) {
-      expect(
-        within(select).getByRole('option', { name: projectStateLabel(state) }),
-      ).toBeInTheDocument();
+      expect(within(select).getByRole('option', { name: state })).toBeInTheDocument();
     }
   });
 
@@ -190,13 +187,13 @@ describe('Project Registry page', () => {
     await user.click(screen.getByRole('button', { name: /durumu değiştir/i }));
 
     expect(
-      await screen.findByText(`prj-alpha artık ${projectStateLabel('SPECIFIED')} durumunda.`),
+      await screen.findByText('prj-alpha artık SPECIFIED durumunda.'),
     ).toBeInTheDocument();
     expect(calls.find((call) => call.url.endsWith('/transitions'))?.body).toEqual({
       target: 'SPECIFIED',
     });
     await waitFor(() =>
-      expect(screen.getAllByText(projectStateLabel('SPECIFIED')).length).toBeGreaterThan(0),
+      expect(screen.getAllByText('SPECIFIED').length).toBeGreaterThan(0),
     );
   });
 
@@ -224,7 +221,7 @@ describe('Project Registry page', () => {
     expect(await screen.findByText('Project: DRAFT -> ACTIVE is forbidden')).toBeInTheDocument();
     expect(screen.getByText('FORBIDDEN_TRANSITION')).toBeInTheDocument();
     // The displayed state is unchanged: the refusal did not mutate the view.
-    expect(screen.getAllByText(projectStateLabel('DRAFT')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DRAFT').length).toBeGreaterThan(0);
   });
 
   it('offers no lifecycle action when the vocabulary cannot be read', async () => {

@@ -148,41 +148,20 @@ export function Panel({ title, actions, children }: {
 /**
  * The lifecycle state as the backend reported it.
  *
- * Rendered as an opaque value on purpose: there is no per-state styling,
- * because a style table keyed by state name would be this file holding an
- * opinion about the machine's states. `showTechnical` (default true, so
- * every existing caller that predates this prop is unaffected) only ever
- * swaps the LABEL for a plain Turkish word — the real `state` string this
- * component receives, and would render literally, is never altered,
- * invented or hidden from anyone who asks for it (Uzman mode still shows
- * it verbatim). A state absent from the map (any real state the machine
- * could ever add) falls back to the raw value rather than silently
- * showing nothing — this file still holds no opinion about which states
- * exist, only about how five already-canonical ones read in Turkish.
+ * Rendered as an opaque value, deliberately never translated. A Turkish
+ * label table keyed by state name was tried and reverted
+ * (`test_frontend_boundaries.py::TestNoShadowStateMachine`): naming a
+ * canonical state literally in production frontend source — even only to
+ * translate it — is exactly the shadow vocabulary that control exists to
+ * catch, because the Project machine in `control.registry.project` is the
+ * only authority for which states exist. Showing the raw value in every
+ * mode is the honest choice, not a downgrade: nothing here can drift from
+ * a state the backend renames, removes, or adds.
  */
-const PROJECT_STATE_LABELS_TR: Readonly<Record<string, string>> = {
-  DRAFT: 'Taslak',
-  SPECIFIED: 'Belirlendi',
-  ACTIVE: 'Aktif',
-  SUSPENDED: 'Askıya Alındı',
-  ARCHIVED: 'Arşivlendi',
-};
-
-/** Exported so any other real caller needing this same translation (e.g. a
- * lifecycle-transition picker) reuses one table rather than growing a
- * second copy of it. */
-export function projectStateLabel(state: string): string {
-  return PROJECT_STATE_LABELS_TR[state] ?? state;
-}
-
-export function StateBadge({ state, showTechnical = true }: { state: string; showTechnical?: boolean }) {
-  const label = showTechnical ? state : projectStateLabel(state);
+export function StateBadge({ state }: { state: string }) {
   return (
-    <span
-      className="inline-flex rounded-full bg-slate-900 px-2.5 py-0.5 font-mono text-xs font-medium text-white"
-      title={showTechnical ? undefined : state}
-    >
-      {label}
+    <span className="inline-flex rounded-full bg-slate-900 px-2.5 py-0.5 font-mono text-xs font-medium text-white">
+      {state}
     </span>
   );
 }

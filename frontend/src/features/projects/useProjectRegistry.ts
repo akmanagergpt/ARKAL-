@@ -15,7 +15,6 @@ import type {
   ProjectDetailResponse,
   ProjectResponse,
 } from '@/api/contracts';
-import { projectStateLabel } from '@/components/ui';
 
 export interface Failure {
   /** Backend error code where one was given; `UNREACHABLE` for transport. */
@@ -161,7 +160,7 @@ export function useProjectRegistry(client: ArkaliApiClient): RegistryState & Reg
     (projectId: string, name: string) =>
       mutate(
         () => client.createProject({ project_id: projectId, name }),
-        (detail) => `${detail.project_id} kaydedildi (${projectStateLabel(detail.lifecycle_state)}).`,
+        (detail) => `${detail.project_id} kaydedildi (${detail.lifecycle_state}).`,
       ),
     [client, mutate],
   );
@@ -170,7 +169,7 @@ export function useProjectRegistry(client: ArkaliApiClient): RegistryState & Reg
     (projectId: string, target: string) =>
       mutate(
         () => client.transitionProject(projectId, { target }),
-        (detail) => `${detail.project_id} artık ${projectStateLabel(detail.lifecycle_state)} durumunda.`,
+        (detail) => `${detail.project_id} artık ${detail.lifecycle_state} durumunda.`,
       ),
     [client, mutate],
   );

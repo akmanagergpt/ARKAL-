@@ -64,7 +64,7 @@ export function ProjectList({
                     </span>
                     {showTechnical ? <span className="block font-mono text-xs text-slate-500">{project.project_id}</span> : null}
                   </span>
-                  <StateBadge state={project.lifecycle_state} showTechnical={showTechnical} />
+                  <StateBadge state={project.lifecycle_state} />
                 </button>
               </li>
             );
