@@ -314,11 +314,34 @@ def _module_parity_findings(spec: _ProductUxSpec, files: Mapping[str, str]) -> l
     rule was never disclosed. `missing` now reports the real backend name
     (the exact string a corrected module's own "name" field should use);
     `invented` still reports the model's own already-real, self-declared
-    name -- it never needed to guess that half."""
-    normalized_to_real = {_normalize(name): name for name in _backend_declared_models(files)}
-    module_names = {_normalize(module.name) for module in spec.modules}
+    name -- it never needed to guess that half.
+
+    F-0068 (`golden-work-130`, real repository evidence, frozen, a THIRD
+    independent real occurrence of the identical class): disclosing the
+    literal real name was still not enough. `backend/task_model.json`
+    declared no `table_name`, so `_backend_declared_models`'s own fallback
+    (`_path_stem`) named it "task_model" -- an awkward, redundant real name
+    no reasonable UX module would naturally choose. The stage's own retry
+    feedback correctly showed "['task_model']" as a real, literal,
+    copy-pasteable string on every attempt, and the real model still wrote
+    "task" as its own module name on the final attempt rather than copying
+    it verbatim -- an EXACT match was never going to converge against a
+    name this artificial. `_matching_methods` (below) already solves the
+    identical asymmetry for action/route reconciliation by stripping a
+    genuine trailing "model" suffix via `_resource_matching_name` before
+    comparing; this function now reuses that exact same helper, unchanged,
+    for its own comparison, rather than inventing a second normalization
+    rule. `missing`/`invented` still report the real, un-stripped original
+    names -- `_resource_matching_name` is used only to decide whether two
+    real names refer to the same real concept, never surfaced as a string
+    the model would have to reproduce."""
+    real_models = _backend_declared_models(files)
+    matching_to_real = {_resource_matching_name(name): name for name in real_models}
+    module_matching_names = {_resource_matching_name(module.name) for module in spec.modules}
     findings: list[SemanticFinding] = []
-    missing = sorted(normalized_to_real[key] for key in normalized_to_real if key not in module_names)
+    missing = sorted(
+        matching_to_real[key] for key in matching_to_real if key not in module_matching_names
+    )
     if missing:
         findings.append(SemanticFinding(
             code="ux_spec_missing_module", path=_UX_SPEC_PATH,
@@ -328,7 +351,7 @@ def _module_parity_findings(spec: _ProductUxSpec, files: Mapping[str, str]) -> l
         ))
     invented = sorted({
         module.name for module in spec.modules
-        if _normalize(module.name) not in normalized_to_real
+        if _resource_matching_name(module.name) not in matching_to_real
     })
     if invented:
         findings.append(SemanticFinding(

@@ -180,6 +180,154 @@ def test_missing_module_feedback_names_the_real_backend_name_not_the_normalized_
     assert "taskmodel" not in missing.detail
 
 
+def test_a_task_module_matches_a_task_model_fallback_name() -> None:
+    """F-0068 property A. golden-work-130 (real repository evidence,
+    frozen): the real model's own module name ("task") against
+    backend_contract's own fallback-derived model name ("task_model",
+    from a real task_model.json with no table_name) is a real parity
+    match, not a mismatch -- the same real concept, spelled two
+    idiomatically different ways."""
+    files = _task_spec_files(["view"])
+    spec = json.loads(files["product/ux_spec.json"])
+    spec["modules"][0]["name"] = "task"
+    files["product/ux_spec.json"] = json.dumps(spec)
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+
+
+def test_b_and_h_an_inventory_module_matches_an_inventory_model_fallback_name() -> None:
+    """F-0068 properties B/H: a second, structurally different domain
+    (never task/student) reproduces the identical behavior -- proves the
+    fix carries no domain-specific logic."""
+    files = {
+        "backend/inventory_model.json": json.dumps(
+            {"fields": {"id": {"type": "integer"}, "quantity": {"type": "integer"}}}
+        ),
+        "backend/routes.json": json.dumps([
+            {"path": "/inventory", "method": "GET"},
+            {"path": "/inventory", "method": "POST"},
+        ]),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Inventory System", "primary_roles": ["staff"],
+            "modules": [_module("inventory", ["create", "view"], forms=[
+                {"name": "InventoryForm", "fields": ["quantity"]},
+            ])],
+            "navigation_destinations": ["Inventory"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+
+
+def test_c_explicit_table_name_still_takes_precedence_over_the_filename() -> None:
+    """F-0068 property C: a model file whose own real, deliberate
+    `table_name` differs from its filename is still compared by that
+    explicit name, never the filename -- `_model_names_in_document`'s own
+    existing precedence is unchanged by this fix."""
+    files = {
+        "backend/tbl1.json": json.dumps(
+            {"table_name": "products", "fields": {"id": {"type": "integer"}}}
+        ),
+        "backend/routes.json": json.dumps([{"path": "/products", "method": "GET"}]),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Shop", "primary_roles": ["staff"],
+            "modules": [_module("products", ["view"])],
+            "navigation_destinations": ["Products"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+
+
+def test_d_genuinely_different_resource_names_still_fail() -> None:
+    """F-0068 property D: normalization narrows a real spelling gap, it
+    never widens the check into accepting an unrelated resource."""
+    files = _task_spec_files(["view"])
+    spec = json.loads(files["product/ux_spec.json"])
+    spec["modules"][0]["name"] = "payment"
+    files["product/ux_spec.json"] = json.dumps(spec)
+    findings = _ux_spec_stage_findings(files)
+    assert any(f.code == "ux_spec_missing_module" for f in findings)
+    assert any(f.code == "ux_spec_invented_module" for f in findings)
+
+
+def test_e_a_natural_word_only_containing_model_is_not_wrongly_stripped() -> None:
+    """F-0068 property E: `_resource_matching_name` only strips a genuine
+    TRAILING "model" suffix -- a resource whose real name merely contains
+    the substring "model" elsewhere (never at the very end, e.g. a hobby
+    shop's real "modeltrain" resource) reconciles using its own real,
+    complete name, never wrongly truncated."""
+    files = {
+        "backend/modeltrain_model.json": json.dumps(
+            {"table_name": "modeltrain", "fields": {"id": {"type": "integer"}}}
+        ),
+        "backend/routes.json": json.dumps([{"path": "/modeltrain", "method": "GET"}]),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Hobby Shop", "primary_roles": ["staff"],
+            "modules": [_module("modeltrain", ["view"])],
+            "navigation_destinations": ["Modeltrain"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+
+
+def test_f_action_route_mismatch_still_fails_independent_of_name_parity() -> None:
+    """F-0068 property F: golden-work-130's own real second half. The
+    module name now correctly parity-matches ("task" <-> the backend's
+    fallback-derived "task_model"), but the real backend still has no
+    DELETE route for /tasks -- the pre-existing, untouched
+    over-declared-action check must still fire exactly as before; this
+    fix is scoped to name parity only, never touching action/route
+    reconciliation."""
+    files = _task_spec_files(["create", "edit", "delete", "view"])
+    spec = json.loads(files["product/ux_spec.json"])
+    spec["modules"][0]["name"] = "task"
+    files["product/ux_spec.json"] = json.dumps(spec)
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+    over = next(f for f in findings if f.code == "ux_spec_action_over_declared")
+    assert "delete" in over.detail
+
+
+def test_g_golden_work_130s_own_real_model_artifact_no_longer_fails_on_name_parity() -> None:
+    """F-0068 property G: `golden-work-130`'s own real, frozen, unmodified
+    `backend/task_model.json` and `backend/routes.json` bytes (copied
+    verbatim, never re-typed) -- the exact real evidence this fix was
+    written from -- reconciled against a module genuinely named "task",
+    the real model's own final real choice. Read-only evidence: this test
+    never touches `var/factory/candidates/golden-work-130` itself."""
+    files = {
+        "backend/task_model.json": json.dumps({
+            "fields": {
+                "id": {"type": "integer", "primary_key": True},
+                "title": {"type": "string"},
+                "description": {"type": "string"},
+                "completed": {"type": "boolean"},
+            },
+        }),
+        "backend/routes.json": json.dumps([
+            {"path": "/tasks", "method": "GET"},
+            {"path": "/tasks", "method": "POST"},
+            {"path": "/tasks/{id}", "method": "GET"},
+            {"path": "/tasks/{id}", "method": "PUT"},
+        ]),
+        "product/ux_spec.json": json.dumps({
+            "product_title": "Task Management System", "primary_roles": ["Task Manager"],
+            "modules": [_module("task", ["create", "edit", "view"], forms=[
+                {"name": "TaskForm", "fields": ["title", "description", "completed"]},
+            ])],
+            "navigation_destinations": ["Tasks"],
+            "design_system": _DESIGN_SYSTEM,
+        }),
+    }
+    findings = _ux_spec_stage_findings(files)
+    assert not any(f.code in ("ux_spec_missing_module", "ux_spec_invented_module") for f in findings)
+
+
 def test_a_module_under_declaring_a_real_backend_action_is_refused() -> None:
     """The backend exposes POST /products (real create capability); a spec
     that only declares "view" for the products module under-claims it."""
