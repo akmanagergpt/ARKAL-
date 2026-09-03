@@ -304,26 +304,41 @@ def _generate_one_stage(
     failure: str | None = None
     previous_failure: str | None = None
     last_raw_output: str = ""
+    #: F-0069. The most recent attempt's own real, structured findings, as
+    #: plain `(code, path, detail)` facts -- never the real `SemanticFinding`
+    #: type itself, so this module's own existing import of it is not
+    #: duplicated into `stage_prompting.py` (whose own fan-in has no room
+    #: for a new direct edge; routed through `product_preflight`'s
+    #: established re-export once already, for the same reason, this
+    #: session). Reset to empty whenever the most recent attempt produced no
+    #: real findings at all (inference failure, contract violation) --
+    #: mirrors `failure`'s own "always reflects the most recent attempt"
+    #: semantics exactly, never carrying a stale attempt's own facts
+    #: forward past one that produced none.
+    last_findings: tuple[tuple[str, str, str], ...] = ()
     for attempt_number in range(1, max_attempts + 1):
         strategy = _repair_strategy_for_attempt(attempt_number)
         prompt = _stage_prompt(
             declaration, blueprint, visible_files, failure, target_runtime,
-            repair_strategy=strategy,
+            repair_strategy=strategy, prior_findings=last_findings,
         )
         outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
         last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
+            last_findings = ()
         else:
             envelope, parse_failure = _parse_stage_envelope(declaration.name, outcome.output)
             if envelope is None:
                 failure = parse_failure
+                last_findings = ()
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
                     return stage_files
+                last_findings = tuple((f.code, f.path, f.detail) for f in findings)
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
         # ANTI-LOOP, generic across every stage: two consecutive attempts
         # rejected for the identical normalized reason (same code, path

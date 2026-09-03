@@ -28,6 +28,30 @@ a named forbidden pattern, rather than resending the identical prompt
 template on every retry with only `prior_attempt_failure`'s text
 changed -- confirmed, before this fix, to be the ENTIRE difference
 between one attempt's prompt and the next.
+
+F-0069 (`FRONTEND_FORMS_MULTI_FINDING_CONVERGENCE_GAP`, real repository
+evidence: `golden-work-088/089` and, independently, `golden-work-131` --
+a real, fresh Task/Work Management attempt, a different family, same
+class). The structured-hint escalation above was scoped to exactly one
+of `frontend_forms`'s own several real, independently-enforced structural
+invariants (callback arity / route-identifier binding). Every OTHER
+finding class this stage's own preflight suite enforces -- a declared
+parameterized route never reached by any real navigation control, the
+application root never resolving to anything, a form missing its own
+validation markers, a component calling a client function it never
+imports -- retried with nothing beyond the raw `prior_attempt_failure`
+string, the exact "resending the identical prompt template on every
+retry" shape already named above as the pre-fix callback-arity problem.
+`_prior_finding_hint_blocks` extends coverage to those four real,
+already-existing finding codes, additively: the original callback-arity
+hint text is byte-unchanged, and each new block is built only from real
+facts this candidate's own already-computed `SemanticFinding`s already
+carry (`code`/`path`/`detail`) paired with one fixed, domain-independent
+sentence per code naming WHICH kind of structural invariant needs
+restoring -- never a literal repair, never a code snippet, never a
+domain-specific example. The real repair decision stays the model's own,
+exactly as `mutation_contracts`'s own worked example already leaves the
+exact code unstated for every other stage.
 """
 
 from __future__ import annotations
@@ -82,9 +106,61 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
     )
 
 
-def _structured_hint_text(mutation_contracts: list[dict[str, object]]) -> str:
+#: F-0069. One fixed, domain-independent sentence per real, already-existing
+#: `frontend_forms` finding code -- names WHICH structural invariant a real
+#: candidate violated, never a literal repair. Deliberately closed and small:
+#: only codes this stage's own preflight suite already enforces belong here,
+#: never a new check invented to have something to hint about.
+_SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    "frontend_route_unreachable": (
+        "a declared parameterized route must be reachable through a real Link, "
+        "button, or navigation call somewhere else in the frontend, built from "
+        "the same static path prefix the route itself declares"
+    ),
+    "frontend_root_path_unreachable": (
+        "the application's own root path (\"/\") must resolve to a real render "
+        "or a real redirect to an existing route -- a router with no route or "
+        "redirect matching \"/\" leaves a real user's own base URL blank"
+    ),
+    "frontend_ui_form_missing_validation": (
+        "a rendered form's own required fields must carry real, generated "
+        "validation/error semantics -- a visible marker shown for an empty or "
+        "invalid required field, not merely present as plain markup"
+    ),
+    "frontend_client_call_missing_import": (
+        "every client function a component's own code calls must be imported "
+        "(or otherwise defined) in that same file's own scope -- calling an "
+        "undeclared name is a real runtime error, not a syntax error"
+    ),
+}
+
+
+def _prior_finding_hint_blocks(prior_findings: tuple[tuple[str, str, str], ...]) -> list[str]:
+    """One structured hint block per real, supported finding code the
+    previous attempt actually produced (`(code, path, detail)`, the same
+    real facts `_generate_one_stage` already computed and would otherwise
+    only ever fold into the raw `prior_attempt_failure` string) -- never
+    invented, never a repeat of an unsupported code, never more than one
+    block for the same code. Each block pairs that real, candidate-owned
+    fact with the fixed invariant sentence naming what kind of structural
+    fix restores it; the real repair decision stays the model's own."""
+    blocks: list[str] = []
+    seen_codes: set[str] = set()
+    for code, path, detail in prior_findings:
+        invariant = _SUPPORTED_HINT_INVARIANTS.get(code)
+        if invariant is None or code in seen_codes:
+            continue
+        seen_codes.add(code)
+        blocks.append(f"- {code} ({invariant}). Observed at {path!r}: {detail}")
+    return blocks
+
+
+def _structured_hint_text(
+    mutation_contracts: list[dict[str, object]],
+    prior_findings: tuple[tuple[str, str, str], ...] = (),
+) -> str:
     example = _worked_example_from_contracts(mutation_contracts)
-    return (
+    text = (
         "This is a retry. Do not simply reword the previous attempt -- apply this "
         "exact pattern. For any resource's edit or delete action, the route (not "
         "the form) supplies the record's real identifier: read it as the FIRST "
@@ -101,12 +177,22 @@ def _structured_hint_text(mutation_contracts: list[dict[str, object]]) -> str:
         "user-entered form field -- do not render an input for it; "
         "mutation_contracts.form_fields already excludes it."
     )
+    blocks = _prior_finding_hint_blocks(prior_findings)
+    if blocks:
+        text += (
+            "\n\nThe previous attempt's own real findings also include the "
+            "following -- each names a real structural invariant THIS candidate's "
+            "own generated code violates; resolve every one below without "
+            "reintroducing any defect already fixed:\n" + "\n".join(blocks)
+        )
+    return text
 
 
 def _stage_prompt(
     declaration: StageDeclaration, blueprint: RequirementBlueprint,
     visible_files: Mapping[str, str], prior_failure: str | None,
     target_runtime: str | None = None, repair_strategy: str = _DEFAULT_REPAIR_STRATEGY,
+    prior_findings: tuple[tuple[str, str, str], ...] = (),
 ) -> str:
     payload: dict[str, object] = {
         "role": "You are one bounded stage of a multi-stage software factory.",
@@ -142,5 +228,5 @@ def _stage_prompt(
         payload["mutation_contracts"] = mutation_contracts
         payload["repair_strategy"] = repair_strategy
         if repair_strategy == _STRUCTURED_HINT_REPAIR_STRATEGY:
-            payload["repair_hint"] = _structured_hint_text(mutation_contracts)
+            payload["repair_hint"] = _structured_hint_text(mutation_contracts, prior_findings)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))

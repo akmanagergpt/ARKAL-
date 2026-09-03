@@ -17,9 +17,12 @@ from arkali.engineering.factory.frontend_mutation_contract import (
 from arkali.engineering.factory.generation_stages import StageVocabulary
 from arkali.engineering.factory.stage_prompting import (
     _DEFAULT_REPAIR_STRATEGY,
+    _prior_finding_hint_blocks,
     _repair_strategy_for_attempt,
     _STRUCTURED_HINT_REPAIR_STRATEGY,
     _stage_prompt,
+    _structured_hint_text,
+    _SUPPORTED_HINT_INVARIANTS,
 )
 from arkali.engineering.localai.adapter import HonestState
 from tests.engineering.test_component_generation import (
@@ -83,6 +86,16 @@ _FIXED_APP_JS = (
     "import React from 'react';\n"
     "import { useParams } from 'react-router-dom';\n"
     "import { updateWork } from './client';\n" + _WORK_FORM_JS +
+    "<WorkForm onSubmit={async (title) => { const { id } = useParams(); "
+    "await updateWork(id, title); }} />"
+)
+#: F-0069. A real call to a real client export (`updateWork(id, title)`,
+#: never a bare reference -- that's the callback-arity class above), with
+#: no import of it anywhere in this file -- the exact real
+#: `frontend_client_call_missing_import` shape `golden-work-131`'s own
+#: real `App.js` independently reproduced.
+_MISSING_IMPORT_APP_JS = (
+    "import React from 'react';\n" + _WORK_FORM_JS +
     "<WorkForm onSubmit={async (title) => { const { id } = useParams(); "
     "await updateWork(id, title); }} />"
 )
@@ -380,3 +393,202 @@ class TestConvergence:
             generate_staged_model_product(
                 _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
             )
+
+
+#: F-0069. `golden-work-131`'s own real, frozen `(code, path, detail)` --
+#: never re-typed by hand, copied verbatim from the real evidence blob
+#: (`sha256:35d6183c...`) the STAGE_FAILED outcome froze.
+_GOLDEN_WORK_131_FINDINGS: tuple[tuple[str, str, str], ...] = (
+    (
+        "frontend_route_unreachable", "frontend/src/App.js",
+        "<Route path='/tasks/edit/:id'> in frontend/src/App.js is never reached from "
+        "anywhere else in the real frontend -- '/tasks/edit/' appears nowhere but this "
+        "exact declaration, so no real Link, button or navigation call anywhere ever "
+        "constructs a matching URL",
+    ),
+    (
+        "frontend_root_path_unreachable", "frontend/src/App.js",
+        "frontend/src/App.js declares a <Switch> with <Route> children but none of "
+        "them ever matches the bare root path \"/\" -- a real end user landing on the "
+        "app's own base URL sees a blank page",
+    ),
+    (
+        "frontend_ui_form_missing_validation", "frontend/src/",
+        "a <form> exists but the frontend shows no required/error/invalid validation marker",
+    ),
+    (
+        "frontend_client_call_missing_import", "frontend/src/App.js",
+        "frontend/src/App.js calls ['getTask', 'updateTask'] but never imports them "
+        "from the real frontend_client module that declares them -- a real runtime "
+        "ReferenceError, not a syntax error `node --check` can see",
+    ),
+)
+
+
+class TestMultiFindingHintCoverage:
+    """F-0069 (`FRONTEND_FORMS_MULTI_FINDING_CONVERGENCE_GAP`). Additive
+    coverage: the exact original callback-arity hint text stays
+    byte-unchanged; a new block is appended per real, supported prior
+    finding code."""
+
+    def test_a_attempt_1_default_strategy_is_unaffected_by_prior_findings(self) -> None:
+        """`prior_findings` is a `structured_hint`-only concern -- passing
+        it alongside the default strategy (attempt 1's own real shape)
+        changes nothing, exactly like `prior_failure` itself already
+        never appears in the default-strategy payload's own repair_hint."""
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, None, prior_findings=_GOLDEN_WORK_131_FINDINGS,
+        ))
+        assert payload["repair_strategy"] == _DEFAULT_REPAIR_STRATEGY
+        assert "repair_hint" not in payload
+
+    @pytest.mark.parametrize(
+        ("code", "path", "detail"), _GOLDEN_WORK_131_FINDINGS, ids=lambda v: v if isinstance(v, str) else None,
+    )
+    def test_b_through_e_each_real_golden_work_131_finding_gets_its_own_correct_hint(
+        self, code: str, path: str, detail: str,
+    ) -> None:
+        text = _structured_hint_text([], ((code, path, detail),))
+        assert _SUPPORTED_HINT_INVARIANTS[code] in text
+        assert path in text
+        assert detail in text
+
+    def test_f_multiple_supported_findings_are_all_represented(self) -> None:
+        """All four of `golden-work-131`'s own real, simultaneous findings
+        -- never just the first one a naive implementation might stop at."""
+        text = _structured_hint_text([], _GOLDEN_WORK_131_FINDINGS)
+        for code, path, detail in _GOLDEN_WORK_131_FINDINGS:
+            assert code in text
+            assert detail in text
+
+    def test_g_an_unsupported_finding_is_dropped_from_the_structured_block_but_not_from_raw_evidence(
+        self,
+    ) -> None:
+        """A real code this hint mechanism does not (yet) cover must never
+        appear in the new structured block section -- but the FULL prompt
+        payload's own `prior_attempt_failure` (built independently,
+        unconditionally, from every real finding) must still carry it in
+        full: no evidence is ever discarded, only the NEW enrichment is
+        selective."""
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        unsupported = ("frontend_ui_missing_success_feedback", "frontend/src/", "no success marker anywhere")
+        prior_findings = (_GOLDEN_WORK_131_FINDINGS[0], unsupported)
+        raw_failure = "; ".join(f"{c}:{p}:{d}" for c, p, d in prior_findings)
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, raw_failure,
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY, prior_findings=prior_findings,
+        ))
+        assert unsupported[0] in payload["prior_attempt_failure"]
+        assert _GOLDEN_WORK_131_FINDINGS[0][0] in payload["repair_hint"]
+        assert unsupported[0] not in payload["repair_hint"]
+
+    def test_h_the_original_callback_arity_hint_text_is_byte_unchanged(self) -> None:
+        """No regression: with no prior_findings (every existing call
+        site's own real shape, this field's default), the hint is
+        byte-identical to the original, pre-F-0069 text."""
+        original = (
+            "This is a retry. Do not simply reword the previous attempt -- apply this "
+            "exact pattern. For any resource's edit or delete action, the route (not "
+            "the form) supplies the record's real identifier: read it as the FIRST "
+            "line of the routed component's own function body via "
+            "`const { id } = useParams();` (imported from 'react-router-dom'), then "
+            "pass it explicitly, in order, to the real client function named in "
+            "mutation_contracts. If a form component is shared between create and "
+            "edit, wrap the mutation call in a closure that supplies every real "
+            "argument explicitly -- for example, derived from this candidate's own "
+            "real edit contract: `onSubmit={async (title) => { const { id } = useParams(); "
+            "await updateWork(id, title); }}`. NEVER bind a mutation prop directly to "
+            "a bare multi-parameter client function reference -- a bare reference "
+            "cannot supply the route's own identifier and silently shifts every "
+            "other positional argument. A route's own identifier is never a "
+            "user-entered form field -- do not render an input for it; "
+            "mutation_contracts.form_fields already excludes it."
+        )
+        contracts = _build_mutation_contracts(_UX_SPEC_JSON, _CLIENT_JS)
+        assert _structured_hint_text(contracts) == original
+
+    def test_i_two_structurally_different_domains_produce_the_identical_invariant_sentence(self) -> None:
+        """Only the real, candidate-owned path/detail facts vary between
+        domains -- the fixed invariant sentence itself must be byte
+        identical, proving no domain leaked into it."""
+        student_text = _structured_hint_text([], ((
+            "frontend_route_unreachable", "frontend/src/App.js",
+            "<Route path='/students/edit/:id'> is never reached",
+        ),))
+        inventory_text = _structured_hint_text([], ((
+            "frontend_route_unreachable", "frontend/src/App.js",
+            "<Route path='/products/edit/:id'> is never reached",
+        ),))
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert invariant in student_text
+        assert invariant in inventory_text
+        assert "/students/" not in invariant and "/products/" not in invariant
+
+    def test_j_no_golden_domain_token_in_the_invariant_sentences(self) -> None:
+        banned = ("student", "payment", "course", "task", "/tasks", "/students")
+        for invariant in _SUPPORTED_HINT_INVARIANTS.values():
+            lowered = invariant.lower()
+            for token in banned:
+                assert token not in lowered, (token, invariant)
+
+    def test_k_the_real_stage_prompt_payload_carries_the_extended_hint(self) -> None:
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, "some failure",
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY,
+            prior_findings=_GOLDEN_WORK_131_FINDINGS,
+        ))
+        for code, _path, _detail in _GOLDEN_WORK_131_FINDINGS:
+            assert code in payload["repair_hint"]
+        # The pre-existing callback-arity worked example is still present too.
+        assert "useParams()" in payload["repair_hint"]
+
+    def test_a_code_absent_from_the_supported_map_returns_no_blocks(self) -> None:
+        assert _prior_finding_hint_blocks((("some_unknown_code", "path", "detail"),)) == []
+
+    def test_the_same_code_twice_yields_only_one_block(self) -> None:
+        finding = _GOLDEN_WORK_131_FINDINGS[0]
+        blocks = _prior_finding_hint_blocks((finding, finding))
+        assert len(blocks) == 1
+
+
+class TestMultiFindingRealConvergence:
+    def test_l_a_real_missing_import_defect_converges_on_the_structured_hint_retry(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """F-0069's own real end-to-end proof, the same shape
+        `TestConvergence.test_12_...` already established for
+        callback-arity: a real, controlled `_QueueModel` reproduces
+        `golden-work-131`'s own real `frontend_client_call_missing_import`
+        shape on attempt 1, and a correctly-wired version on attempt 2 --
+        proving the extended retry mechanism actually converges within
+        budget, never merely that the checker rejects the broken shape
+        once in isolation."""
+        queues = _happy_path_queues()
+        queues["backend_contract"] = [(HonestState.PASS, _output(_BACKEND_CONTRACT_FILES))]
+        queues["product_ux_spec"] = [(HonestState.PASS, _output({
+            "product/ux_spec.json": _UX_SPEC_JSON,
+        }))]
+        queues["frontend_client"] = [(HonestState.PASS, _output({
+            "frontend/src/client.js": _CLIENT_JS,
+        }))]
+        broken = _output({"frontend/src/App.js": _MISSING_IMPORT_APP_JS})
+        fixed = _output({"frontend/src/App.js": _FIXED_APP_JS})
+        queues["frontend_forms"] = [(HonestState.PASS, broken), (HonestState.PASS, fixed)]
+
+        factory = _factory(queues)
+        result = generate_staged_model_product(
+            _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+        assert "frontend/src/App.js" in result.files
+
+        forms_model = factory.models["frontend_forms"]  # type: ignore[attr-defined]
+        assert len(forms_model.prompts) == 2
+        second_payload = json.loads(forms_model.prompts[1])
+        assert second_payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_client_call_missing_import" in second_payload["prior_attempt_failure"]
+        assert "frontend_client_call_missing_import" in second_payload["repair_hint"]
