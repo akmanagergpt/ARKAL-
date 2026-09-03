@@ -65,6 +65,7 @@ import posixpath
 import re
 from collections.abc import Mapping
 
+from arkali.engineering.factory.frontend_js_semantics import _component_destructured_props
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _REQUIRED_SCRIPTS = ("start", "build")
@@ -385,15 +386,7 @@ def _repair_missing_react_router_imports(stage_files: Mapping[str, str]) -> dict
 #: thread real data through); finding-only, feeding the model concrete
 #: instructions.
 _ROUTE_COMPONENT_PROP = re.compile(r"<Route\s[^>]*?component=\{(\w+)\}")
-_COMPONENT_PROPS_PATTERN = r"(?:const|function)\s+{name}\s*=?\s*\(\s*\{{\s*([^}}]*)\}}"
 _STANDARD_ROUTE_INJECTED_PROPS = frozenset({"match", "location", "history", "staticContext"})
-
-
-def _destructured_param_names(props_block: str) -> set[str]:
-    return {
-        part.strip().split(":")[0].split("=")[0].strip()
-        for part in props_block.split(",") if part.strip()
-    }
 
 
 def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -413,14 +406,10 @@ def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[Se
             continue
         for route_match in _ROUTE_COMPONENT_PROP.finditer(source):
             component_name = route_match.group(1)
-            def_match = re.search(
-                _COMPONENT_PROPS_PATTERN.format(name=component_name), all_source,
-            )
-            if def_match is None:
+            declared_props = _component_destructured_props(component_name, all_source)
+            if declared_props is None:
                 continue
-            unexpected = sorted(
-                _destructured_param_names(def_match.group(1)) - _STANDARD_ROUTE_INJECTED_PROPS
-            )
+            unexpected = sorted(declared_props - _STANDARD_ROUTE_INJECTED_PROPS)
             if unexpected:
                 findings.append(SemanticFinding(
                     code="frontend_route_component_missing_props", path=path,

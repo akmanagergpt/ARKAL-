@@ -10,6 +10,15 @@ INCONSISTENTLY: `frontend_mutation_contract._function_params` recognized
 function_definition_params` did not. Confirmed, reported, and consolidated
 here rather than left as two silently-diverging copies.
 
+`_component_destructured_props` and `_balanced_brace_body` are the same
+consolidation, one seam later: `frontend_manifest_preflight._route_
+component_missing_props_findings` and `frontend_callback_arity_preflight`
+each independently needed "a named component's own destructured prop
+names" / "the real body text following a brace" and each grew its own
+private copy first. Promoted here, unchanged in behavior, when
+`frontend_form_initial_state_preflight.py` needed both at once rather than
+writing a third copy of either.
+
 NOT A FULL AST/TREE-SITTER PARSER. `ARCHITECTURE.md` §11 already specifies
 one for real -- `engineering.codeintel`'s own frontend-contract graph,
 built via a Tree-sitter adapter (ARK-REQ-0066, Phase 11) -- and
@@ -90,4 +99,54 @@ def _all_function_definitions(source: str) -> dict[str, tuple[str, ...]]:
     return found
 
 
-__all__ = ["_all_function_definitions", "_function_parameters", "_function_parameters_across_files"]
+#: `function Name({ a, b })` or `const Name = ({ a, b }) =>` -- a component
+#: definition whose one real parameter is a destructured props object, the
+#: idiomatic shape every real evidenced generated component this pipeline
+#: has produced uses (`StudentForm`, `StudentEdit`, ...). Captures only the
+#: destructure block's own text; `_destructured_names` below splits it.
+_COMPONENT_DESTRUCTURED_PROPS_PATTERN = r"(?:const|function)\s+{name}\s*=?\s*\(\s*\{{\s*([^}}]*)\}}"
+
+
+def _destructured_names(props_block: str) -> set[str]:
+    """`{ a, b: renamed, c = 1 }` -> `{"a", "b", "c"}` -- the real local
+    prop NAME being bound, stripped of any rename (`:`) or default
+    value (`=`)."""
+    return {
+        part.strip().split(":")[0].split("=")[0].strip()
+        for part in props_block.split(",") if part.strip()
+    }
+
+
+def _component_destructured_props(name: str, source: str) -> set[str] | None:
+    """`name`'s own real destructured prop names, from its one real
+    definition anywhere in `source` -- `None` if `source` never defines
+    `name` this way (a class component, a non-destructured single prop,
+    or simply not present), never guessed."""
+    match = re.search(
+        _COMPONENT_DESTRUCTURED_PROPS_PATTERN.format(name=re.escape(name)), source,
+    )
+    if match is None:
+        return None
+    return _destructured_names(match.group(1))
+
+
+def _balanced_brace_body(text: str, open_brace_index: int) -> str:
+    """The real text strictly between the `{` at `open_brace_index` and its
+    own matching `}`, tracking nesting depth -- never a naive `[^}]*`
+    match, which stops at the first inner closing brace a nested object
+    or block already contains."""
+    depth = 0
+    for index in range(open_brace_index, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_brace_index + 1:index]
+    return text[open_brace_index + 1:]
+
+
+__all__ = [
+    "_all_function_definitions", "_balanced_brace_body", "_component_destructured_props",
+    "_function_parameters", "_function_parameters_across_files",
+]

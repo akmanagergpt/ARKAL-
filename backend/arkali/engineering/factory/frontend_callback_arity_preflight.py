@@ -77,7 +77,10 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.frontend_js_semantics import _function_parameters_across_files
+from arkali.engineering.factory.frontend_js_semantics import (
+    _balanced_brace_body,
+    _function_parameters_across_files,
+)
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _MUTATION_PROP = r"on(?:Submit|Create|Update|Edit|Save|Delete|Confirm)"
@@ -194,18 +197,6 @@ def _bare_reference_findings(
 _ROUTE_IDENTIFIER_PARAM_NAME = "id"
 _USE_PARAMS_ID_DESTRUCTURE = re.compile(r"\{\s*id\s*\}\s*=\s*useParams\s*\(\s*\)")
 _NON_MUTATION_CALL_NAMES = frozenset({"useParams", "useState", "useEffect", "useCallback", "useMemo"})
-
-
-def _balanced_brace_body(text: str, open_brace_index: int) -> str:
-    depth = 0
-    for index in range(open_brace_index, len(text)):
-        if text[index] == "{":
-            depth += 1
-        elif text[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return text[open_brace_index + 1:index]
-    return text[open_brace_index + 1:]
 
 
 def _route_id_read_but_not_passed_findings(path: str, source: str) -> list[SemanticFinding]:

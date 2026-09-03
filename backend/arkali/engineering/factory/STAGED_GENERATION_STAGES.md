@@ -274,7 +274,23 @@ narrowing the stage to exactly the mutation-UI concern is the fix, the
 same shape backend_cors_boundary's own split answered for backend
 routes+schema-vs-CORS. A product whose product_ux_spec declares no
 create/edit/delete action anywhere needs no change here — return
-frontend_ui's own files unchanged rather than inventing one.
+frontend_ui's own files unchanged rather than inventing one. When a form
+component reused for both create and edit is rendered at the edit route
+with the real record's own data (e.g. `initialData={student}`, this
+pipeline's own real, consistently-chosen convention name for it), that
+data must genuinely reach the form's own visible field values, not only
+exist as an unread prop: destructure it in the form component's own
+parameter list, seed its own field state from it (e.g.
+`useState(initialData || {})`), and resync that state in a
+`useEffect(() => setFormData(initialData || {}), [initialData])` so the
+real values populate once the caller's own async fetch actually resolves,
+not only on whatever the prop happened to be on first render
+(golden-work-127/128/129, session evidence, frozen: `StudentForm`'s own
+real definition, `({ onSubmit, fields }) => ...`, never destructured
+`initialData` at all across three independent real candidates, so its own
+`formData` state stayed `{}` unconditionally and every real edit route
+rendered a genuinely blank form, even though the caller had already
+fetched and correctly passed the real record).
 
 ### 10. frontend_tests_config
 Inputs: frontend_client, frontend_ui, frontend_forms

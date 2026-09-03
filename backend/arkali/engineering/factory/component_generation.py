@@ -77,6 +77,9 @@ from arkali.engineering.factory.frontend_root_route_preflight import (
 from arkali.engineering.factory.frontend_callback_arity_preflight import (
     _callback_prop_arity_mismatch_findings,
 )
+from arkali.engineering.factory.frontend_form_initial_state_preflight import (
+    _form_initial_data_ignored_findings,
+)
 from arkali.engineering.factory.frontend_route_param_preflight import _unread_route_param_findings
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
@@ -197,6 +200,7 @@ def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _invented_mutation_ui_findings(files)
         + _unread_route_param_findings(files)
         + _callback_prop_arity_mismatch_findings(files)
+        + _form_initial_data_ignored_findings(files)
     )
 
 
