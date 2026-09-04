@@ -95,6 +95,7 @@ MANIFEST
 pip-wheel-metadata/
 
 # Tooling caches
+graphify-out/
 .mypy_cache/
 .dmypy.json
 dmypy.json
