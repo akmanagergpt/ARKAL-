@@ -208,11 +208,12 @@ def test_populate_then_restore_round_trips_real_bytes(tmp_path: pathlib.Path, mo
 
 
 def test_populate_cache_discards_its_own_temp_copy_when_another_populate_already_won(
-    tmp_path: pathlib.Path,
+    tmp_path: pathlib.Path, monkeypatch,  # noqa: ANN001
 ) -> None:
     """Two previews racing on the identical content identity must not
     error -- content-addressed entries are interchangeable by construction,
     so the loser's own temp directory is simply discarded."""
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
     cache_dir = tmp_path / "cache-root" / "key-a"
     cache_dir.mkdir(parents=True)
     (cache_dir / "already-here.txt").write_text("first writer won", encoding="utf-8")
