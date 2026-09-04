@@ -67,15 +67,58 @@ class TestClassification:
 
 
 class TestAcceptanceCriteriaDerivation:
-    def test_a_quantified_modal_statement_yields_a_criterion(self) -> None:
+    """`derive_acceptance_criteria` is language-neutral (ARKALI COMMAND CENTER
+    — LIVE SOFTWARE FACTORY USER FLOW): the anchor is a comparison symbol or
+    an international unit abbreviation next to a number, never an English
+    modal verb — `ARK-REQ-0384`'s own canonical text names neither."""
+
+    def test_a_quantified_statement_yields_a_criterion(self) -> None:
         criteria = derive_acceptance_criteria("The system must respond within 200ms.")
         assert criteria == ("within 200ms",)
 
-    def test_a_statement_with_no_modal_yields_nothing(self) -> None:
+    def test_an_unquantified_statement_yields_nothing(self) -> None:
         assert derive_acceptance_criteria("The system is fast.") == ()
 
     def test_a_modal_statement_with_no_number_yields_nothing(self) -> None:
         assert derive_acceptance_criteria("The system must be fast.") == ()
+
+    def test_a_comparison_symbol_without_any_modal_verb_still_yields_a_criterion(
+        self,
+    ) -> None:
+        """No "must"/"shall"/"should" anywhere in the sentence."""
+        assert derive_acceptance_criteria("Response time <= 200ms.") != ()
+
+    @pytest.mark.parametrize(
+        "statement",
+        [
+            "The system must respond within 200ms.",
+            "Sistem en fazla 200ms icinde yanit vermelidir.",
+            "Le systeme doit repondre en 200ms.",
+        ],
+    )
+    def test_the_same_quantified_invariant_holds_across_languages(
+        self, statement: str
+    ) -> None:
+        """English, Turkish and French phrasings of the identical real
+        constraint (200ms) all resolve under the same language-neutral
+        rule — no per-language word list decides this, a number next to a
+        unit abbreviation does. The output is normalised to the same
+        phrase-anchored shape `product_generation.py` already parses back,
+        regardless of which language the input was ever written in."""
+        assert derive_acceptance_criteria(statement) == ("within 200ms",)
+
+    def test_conversational_text_with_no_quantified_structure_still_yields_nothing(
+        self,
+    ) -> None:
+        """The honest limit of a deterministic, no-Probabilistic-Edge engine
+        (D-025): a casual description with no number in it — in any
+        language — has no mechanically derivable structure to anchor on,
+        and none is invented."""
+        for statement in (
+            "I want an app to track my stock.",
+            "Stoklarimi takip edebilecegim bir uygulama istiyorum.",
+        ):
+            assert derive_acceptance_criteria(statement) == ()
 
 
 class TestArchitectureMapping:

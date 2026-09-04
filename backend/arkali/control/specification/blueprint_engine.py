@@ -108,6 +108,41 @@ _NUMERIC_CONSTRAINT: Final[re.Pattern[str]] = re.compile(
     r"[\d,]+(?:\.\d+)?\s*[a-zA-Z%]*", re.I
 )
 
+#: ADDITIONAL, LANGUAGE-NEUTRAL quantified/comparison detection for
+#: `derive_acceptance_criteria` — the anchor for `ARK-REQ-0384` ("mechanically
+#: derivable from declared structure"), which names no language and no modal
+#: verb in its own canonical text (`REQUIREMENT_REGISTER.md` row 385). The
+#: original `_NUMERIC_CONSTRAINT` rule required an English phrase ("at
+#: least"/"at most"/...) before the number, which made every non-English
+#: statement structurally unable to resolve regardless of content (ARKALI
+#: COMMAND CENTER — LIVE SOFTWARE FACTORY USER FLOW, live probe against the
+#: real running backend). These two patterns ADD two more paths to the same
+#: derivation — a comparison operator or an SI/technical unit abbreviation,
+#: neither an English word — WITHOUT removing or narrowing
+#: `_NUMERIC_CONSTRAINT` itself, so every statement that already resolved
+#: under the original English-phrase rule (the existing Golden Product goal
+#: corpus among them) keeps resolving exactly as it did.
+_COMPARISON_SYMBOL: Final[re.Pattern[str]] = re.compile(
+    r"(?P<symbol>>=|<=|==|≥|≤)\s*(?P<value>[\d,]+(?:\.\d+)?)\s*(?P<unit>[a-zA-Z%]*)"
+)
+_BARE_QUANTITY: Final[re.Pattern[str]] = re.compile(
+    r"(?P<value>[\d,]+(?:\.\d+)?)\s*(?P<unit>ms|msec|sec|secs|min|mins|hr|hrs|"
+    r"kb|mb|gb|tb|hz|khz|mhz|ghz|%)\b",
+    re.I,
+)
+#: Normalises a language-neutral match back to the phrase-anchored shape
+#: `product_generation.py`'s own `_NUMERIC_CRITERION` already parses
+#: (`^(?:at least|at most|...)\s+<value><unit>$`) — that module reads this
+#: string back rather than re-parsing prose, so the OUTPUT contract stays
+#: exactly what it always was; only which INPUTS can reach it changed. A
+#: bare quantity with no explicit comparison direction normalises to
+#: "within", the least specific and most common real default.
+_SYMBOL_PHRASE: Final[dict[str, str]] = {
+    ">=": "at least", "≥": "at least",
+    "<=": "at most", "≤": "at most",
+    "==": "exactly",
+}
+
 
 def decompose(goal_text: str) -> tuple[str, ...]:
     """Split a goal into candidate requirement statements (`ARK-REQ-0381`).
@@ -135,14 +170,33 @@ def classify(statement: str) -> RequirementCategory:
 def derive_acceptance_criteria(statement: str) -> tuple[str, ...]:
     """Mechanically derivable acceptance criteria (`ARK-REQ-0384`).
 
-    Only a statement anchored to a modal ("must"/"shall"/"should") AND a
-    numeric constraint pattern yields a criterion; everything else is left
-    empty rather than a paraphrase invented from prose.
+    STRICTLY ADDITIVE, NOW LANGUAGE-NEUTRAL TOO. The requirement's own
+    canonical text names no language and no modal verb; the original
+    English-phrase-anchored `_NUMERIC_CONSTRAINT` rule was an implementation
+    choice, not something the requirement mandated, and it made every
+    non-English statement structurally unable to resolve regardless of
+    content. This function tries `_NUMERIC_CONSTRAINT` FIRST, unchanged —
+    every statement that already resolved keeps resolving, byte-for-byte
+    the same output — and only adds two more paths when that one finds
+    nothing: `_COMPARISON_SYMBOL` (a language-neutral operator next to a
+    number) and `_BARE_QUANTITY` (a number next to an international unit
+    abbreviation). Neither needs a word in any language. Ordinary prose —
+    in any language — is left empty rather than a paraphrase invented
+    from it.
     """
-    if not re.search(r"\b(must|shall|should)\b", statement, re.I):
-        return ()
-    matches = _NUMERIC_CONSTRAINT.findall(statement)
-    return tuple(m.strip() for m in matches)
+    original = tuple(m.strip() for m in _NUMERIC_CONSTRAINT.findall(statement))
+    if original:
+        return original
+    criteria = [
+        f"{_SYMBOL_PHRASE[m.group('symbol')]} {m.group('value')}{m.group('unit')}"
+        for m in _COMPARISON_SYMBOL.finditer(statement)
+    ]
+    if criteria:
+        return tuple(criteria)
+    return tuple(
+        f"within {m.group('value')}{m.group('unit')}"
+        for m in _BARE_QUANTITY.finditer(statement)
+    )
 
 
 def _constraint_subject(statement: str) -> str | None:
