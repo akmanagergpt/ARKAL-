@@ -38,7 +38,7 @@ export function App({ client }: { client: ArkaliApiClient }) {
         ? <OperationsPage client={client} />
         : area === 'factory'
           ? <FactoryHistoryPage client={client} showTechnical={mode === 'expert'} />
-          : <CommandCenterHome navigate={setArea} mode={mode} />;
+          : <CommandCenterHome navigate={setArea} mode={mode} client={client} />;
 
   return (
     <div className="min-h-full bg-slate-50 lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
