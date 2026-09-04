@@ -107,7 +107,9 @@ def test_stopped_check_measures_a_listener_not_windows_bind_reuse(monkeypatch) -
             assert address == ("127.0.0.1", 5000)
             return 10061  # connection refused; TIME_WAIT may still block bind
 
-    monkeypatch.setattr(runner.socket, "socket", Socket)
+    import arkali.engineering.candidate.runtime_process as runtime_process
+
+    monkeypatch.setattr(runtime_process.socket, "socket", Socket)
     assert not runner._port_accepts_connections(5000)
 
 

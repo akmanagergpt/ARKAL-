@@ -14,11 +14,9 @@ import json
 import os
 import pathlib
 import shutil
-import socket
 import subprocess
 import sys
 import time
-import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
@@ -31,6 +29,12 @@ from arkali.engineering.candidate.ledger import (  # noqa: E402
     CandidateIntegrityError,
     CandidateLedger,
     INTERRUPTED,
+)
+from arkali.engineering.candidate.runtime_process import (  # noqa: E402
+    port_accepts_connections as _port_accepts_connections,
+    port_is_free as _port_is_free,
+    stop_process as _stop,
+    wait_http as _wait_http,
 )
 from arkali.engineering.factory.acceptance_plan_compiler import (  # noqa: E402
     _AcceptancePlanIncomplete,
@@ -130,21 +134,6 @@ def _candidate(candidate_id: str) -> pathlib.Path:
     return path
 
 
-def _port_is_free(port: int) -> bool:
-    with socket.socket() as probe:
-        try:
-            probe.bind(("127.0.0.1", port))
-        except OSError:
-            return False
-    return True
-
-
-def _port_accepts_connections(port: int) -> bool:
-    with socket.socket() as probe:
-        probe.settimeout(0.25)
-        return probe.connect_ex(("127.0.0.1", port)) == 0
-
-
 def _copy_candidate(source: pathlib.Path, destination: pathlib.Path) -> None:
     shutil.copytree(
         source, destination,
@@ -188,43 +177,6 @@ def _json_request(
     )
     with urllib.request.urlopen(request, timeout=10) as response:
         return response.status, json.loads(response.read().decode())
-
-
-def _wait_http(url: str, process: subprocess.Popen[str], timeout: float = 20.0) -> None:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise RuntimeError(f"owned process exited early with {process.returncode}")
-        try:
-            urllib.request.urlopen(url, timeout=1).close()
-            return
-        except (urllib.error.URLError, TimeoutError, OSError):
-            time.sleep(0.1)
-    raise RuntimeError(f"timed out waiting for {url}")
-
-
-def _stop(process: subprocess.Popen[str] | None) -> None:
-    if process is None or process.poll() is not None:
-        return
-    if os.name == "nt":
-        # A venv python.exe is a launcher which can leave the real interpreter
-        # alive after terminating only its wrapper. /T is deliberately scoped
-        # to this runner's own PID; no process-name/global kill is permitted.
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            text=True, capture_output=True, check=False,
-        )
-        try:
-            process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-        return
-    process.terminate()
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=5)
 
 
 def _backend_process(python: pathlib.Path, candidate: pathlib.Path, log) -> subprocess.Popen[str]:  # noqa: ANN001
