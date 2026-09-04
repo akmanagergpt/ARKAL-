@@ -52,6 +52,7 @@ export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliA
           failure={registry.actionFailure}
           onTransition={registry.requestTransition}
           onCreateRevision={registry.createRevision}
+          onChangePromoted={registry.select}
         />
       </div>
     </div>

@@ -42,6 +42,9 @@ from arkali.surfaces.command.job_error_mapping import DURABLE_STATUS_BY_ERROR
 from arkali.surfaces.command.preview_bridge_error_mapping import (
     PREVIEW_BRIDGE_STATUS_BY_ERROR,
 )
+from arkali.surfaces.command.product_change_error_mapping import (
+    PRODUCT_CHANGE_STATUS_BY_ERROR,
+)
 from arkali.surfaces.command.workflow_error_mapping import status_for_workflow_error
 
 #: The one base every mapped refusal derives from, re-exported so the
@@ -80,7 +83,7 @@ STATUS_BY_ERROR: Final[tuple[tuple[type[Exception], int], ...]] = (
     (TerminalStateEscape, 409),
     (ForbiddenTransition, 409),
     (IllegalTransition, 409),
-) + DURABLE_STATUS_BY_ERROR + PREVIEW_BRIDGE_STATUS_BY_ERROR
+) + DURABLE_STATUS_BY_ERROR + PREVIEW_BRIDGE_STATUS_BY_ERROR + PRODUCT_CHANGE_STATUS_BY_ERROR
 
 
 def status_for(error: Exception) -> int | None:

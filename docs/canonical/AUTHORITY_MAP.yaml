@@ -231,6 +231,7 @@ contexts:
   engineering.import:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/project_import}  # ERR-001: physical path only; logical id unchanged
   engineering.plugin:    {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/plugin}
   engineering.localai:   {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/localai}
+  engineering.product_change: {layer: engineering, protected_core: false, module_root: backend/arkali/engineering/product_change}  # D-030: Managed Product natural-language change composition
 
   lifecycle.release:     {layer: lifecycle,   protected_core: true,  module_root: backend/arkali/lifecycle/release}
   lifecycle.recovery:    {layer: lifecycle,   protected_core: true,  module_root: backend/arkali/lifecycle/recovery}

@@ -97,6 +97,45 @@ class TestIsolatedWorkspace:
             workspace.write("link/escaped.txt", b"escape")
         assert not (outside / "escaped.txt").exists()
 
+    def test_delete_removes_a_real_file_and_refuses_escape_or_missing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        stable = tmp_path / "stable"
+        stable.mkdir()
+        (stable / "app.py").write_text("stable", encoding="utf-8")
+        workspace = WorkspaceAuthority(tmp_path / "ephemeral").allocate(
+            workspace_id="ws-a", task_id="task-a", agent_id="agent-a",
+            stable_snapshot=stable,
+        )
+        with pytest.raises(WorkspaceIsolationError):
+            workspace.delete("../stable/app.py")
+        with pytest.raises(WorkspaceIsolationError, match="not an existing file"):
+            workspace.delete("snapshot/nonexistent.py")
+
+        workspace.delete("snapshot/app.py")
+        assert not (workspace.snapshot / "app.py").exists()
+        assert (stable / "app.py").exists()
+
+    def test_rename_moves_a_real_file_and_refuses_escape_or_missing_source(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        stable = tmp_path / "stable"
+        stable.mkdir()
+        (stable / "app.py").write_text("stable", encoding="utf-8")
+        workspace = WorkspaceAuthority(tmp_path / "ephemeral").allocate(
+            workspace_id="ws-a", task_id="task-a", agent_id="agent-a",
+            stable_snapshot=stable,
+        )
+        with pytest.raises(WorkspaceIsolationError):
+            workspace.rename("snapshot/app.py", "../escaped.py")
+        with pytest.raises(WorkspaceIsolationError, match="not an existing file"):
+            workspace.rename("snapshot/missing.py", "snapshot/renamed.py")
+
+        destination = workspace.rename("snapshot/app.py", "snapshot/sub/renamed.py")
+        assert destination == workspace.snapshot / "sub" / "renamed.py"
+        assert destination.read_text(encoding="utf-8") == "stable"
+        assert not (workspace.snapshot / "app.py").exists()
+
 
 class TestCandidateManifest:
     def test_manifest_is_canonical_deterministic_and_immutable(self) -> None:

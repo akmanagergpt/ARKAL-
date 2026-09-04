@@ -327,29 +327,42 @@ def run_preview(
     candidate_id: str, *, on_phase: _OnPhase | None = None,
     should_cancel: Callable[[], bool] | None = None,
 ) -> Iterator[_PreviewInfo]:
-    """Start `candidate_id`'s backend+frontend and yield their real URLs.
-    Always stops both processes and removes the isolated workspace on the
-    way out, on every exit path.
+    """Start `candidate_id`'s backend+frontend and yield their real URLs;
+    always stops both and removes the workspace on every exit path.
+    `on_phase`/`should_cancel` behave exactly as `_run_preview_over_source`
+    documents. Thin wrapper: the only candidate-specific work here is
+    eligibility (`_require_accepted`) and source resolution
+    (`_candidate_dir`) -- everything else is `_run_preview_over_source`,
+    the subject-generic runtime primitive a future Managed Product
+    proposed-revision preview reuses unchanged (D-030).
+    """
+    _require_accepted(candidate_id)
+    source = _candidate_dir(candidate_id)
+    with _run_preview_over_source(
+        candidate_id, source, on_phase=on_phase, should_cancel=should_cancel,
+    ) as info:
+        yield info
 
+
+@contextlib.contextmanager
+def _run_preview_over_source(
+    identity: str, source: pathlib.Path, *, on_phase: _OnPhase | None = None,
+    should_cancel: Callable[[], bool] | None = None,
+) -> Iterator[_PreviewInfo]:
+    """The real install/start/health/stop/cache sequence, over ANY real
+    resolved source directory -- candidate eligibility already decided by
+    the caller. `identity` is a plain label (workspace naming, the
+    `candidate_id` field of the yielded info) -- this function attaches no
+    lifecycle meaning to it and never reads `CandidateLedger` itself.
     `on_phase(name, detail)`, if given, is called synchronously right
-    after each real milestone below actually completes — never before,
-    never speculatively. A caller with no use for progress reporting (the
-    plain CLI) simply omits it.
-
-    `should_cancel`, if given, is polled roughly every
-    `_CANCEL_POLL_SECONDS` during the slow install/build steps below —
-    bounded cooperative cancellation, not a promise of instant response,
-    but nowhere close to "wait for npm to finish on its own" either. Raises
-    `PreviewCancelled` (caught here, cleanup still runs in `finally`
-    exactly as any other exit does) rather than returning a sentinel, so a
-    caller cannot forget to check it.
+    after each real milestone below completes. `should_cancel`, if given,
+    is polled roughly every `_CANCEL_POLL_SECONDS` during the slow
+    install/build steps and raises `PreviewCancelled` (cleanup still runs
+    in `finally`) rather than returning a sentinel.
     """
     def _report(phase: str, detail: dict[str, object]) -> None:
         if on_phase is not None:
             on_phase(phase, detail)
-
-    _require_accepted(candidate_id)
-    source = _candidate_dir(candidate_id)
 
     if not port_is_free(_BACKEND_PORT) or not port_is_free(_FRONTEND_PORT):
         raise PreviewRefused(
@@ -358,7 +371,7 @@ def run_preview(
         )
 
     _PREVIEWS.mkdir(parents=True, exist_ok=True)
-    workspace_id = f"{candidate_id}-{int(time.time())}"
+    workspace_id = f"{identity}-{int(time.time())}"
     workspace = WorkspaceAuthority(_PREVIEWS).allocate(
         workspace_id=workspace_id, task_id="candidate-preview",
         agent_id="command-center", stable_snapshot=source,
@@ -449,7 +462,7 @@ def run_preview(
         wait_http(f"http://127.0.0.1:{_FRONTEND_PORT}", frontend, timeout=30.0)
 
         info: _PreviewInfo = {
-            "candidate_id": candidate_id,
+            "candidate_id": identity,
             "backend_url": f"http://127.0.0.1:{_BACKEND_PORT}",
             "frontend_url": f"http://127.0.0.1:{_FRONTEND_PORT}",
             "workspace_root": str(workspace.root),

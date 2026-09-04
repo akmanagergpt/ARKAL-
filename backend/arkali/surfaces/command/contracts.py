@@ -212,6 +212,25 @@ class _JobCheckpointResponse(TransportModel):
     recorded_at: dt.datetime
 
 
+class _StartChangeRequest(BaseModel):
+    """One real natural-language Managed Product change request (D-030
+    V1) — the whole transport shape "Değişikliği Başlat" needs. Private:
+    `surfaces.command`'s aggregated public-symbol budget is already at its
+    ceiling, matching `_JobCheckpointResponse`'s own precedent."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    request_text: str = Field(min_length=1, max_length=4000)
+
+
+class _ChangePromotionResponse(TransportModel):
+    """The new `ProjectRevisionRecord` a real "Kabul Et" produced — never
+    the job reference (that stays `JobReferenceResponse`, unchanged)."""
+
+    revision_id: str
+    provenance_ref: str
+
+
 class ErrorResponse(BaseModel):
     """A refusal the client can act on.
 

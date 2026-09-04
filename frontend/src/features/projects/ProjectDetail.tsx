@@ -5,6 +5,8 @@ import type { ProjectDetailResponse } from '@/api/contracts';
 import { Button, Callout, Field, Panel, Spinner, StateBadge } from '@/components/ui';
 import { PreviewActionButton, PreviewStatusPanel } from '@/features/factory/PreviewControls';
 import { usePreview } from '@/features/factory/usePreview';
+import { ProductChangePanel } from './ProductChangePanel';
+import { useProductChange } from './useProductChange';
 
 function formatTimestamp(value: string): string {
   const parsed = new Date(value);
@@ -41,6 +43,7 @@ export function ProjectDetail({
   failure,
   onTransition,
   onCreateRevision,
+  onChangePromoted,
   showTechnical,
   client,
 }: {
@@ -51,6 +54,12 @@ export function ProjectDetail({
   failure: { code: string; message: string } | null;
   onTransition: (projectId: string, target: string) => Promise<void>;
   onCreateRevision: (projectId: string, revisionId: string) => Promise<void>;
+  /** Called after a real "Kabul Et" promotes a new revision, so the caller
+   * can re-fetch this project's own detail (the new revision otherwise
+   * only appears after an unrelated reload) — the identical "take the
+   * backend's answer as the new truth" discipline `onCreateRevision`
+   * already follows. */
+  onChangePromoted?: (projectId: string) => void;
   showTechnical: boolean;
   client: ArkaliApiClient;
 }) {
@@ -61,6 +70,10 @@ export function ProjectDetail({
   // subject id `usePreview` itself refuses to fetch for, never a request
   // sent with an empty id.
   const preview = usePreview(client, project?.project_id ?? '', 'project');
+  const change = useProductChange(
+    client, project?.project_id ?? '',
+    project === null ? undefined : () => onChangePromoted?.(project.project_id),
+  );
 
   if (loading) {
     return (
@@ -134,6 +147,8 @@ export function ProjectDetail({
             <p className="mt-1 font-mono text-xs opacity-80">{failure.code}</p>
           </Callout>
         )}
+
+        <ProductChangePanel change={change} showTechnical={showTechnical} />
 
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-slate-800">Sürümler</h3>

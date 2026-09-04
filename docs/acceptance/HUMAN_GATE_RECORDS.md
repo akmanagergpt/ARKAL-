@@ -368,16 +368,22 @@ identical binding `rescoring_authorization.py` already uses for GOV-001):
 
 **Operation-scope authorizations** (`gate + operation class + target identity +
 revision identity`, for runtime operations such as `APPLY_MIGRATION` — see
-`docs/contracts/human_gate_authorization.md`). Empty: no operation-scoped
-grant has been recorded. `HGR-003` grants `HUMAN_GATE_6` for `PHASE_ACCEPTANCE`
-of the Phase 20 candidate only (row above); a real future `APPLY_MIGRATION`
-call against real or stable data still requires its own separate
-`RUNTIME_OPERATION`-scope grant bound to the exact target identity and
-revision identity resolved at call time — none exists, and none is created
-by HGR-003.
+`docs/contracts/human_gate_authorization.md`). `HGR-003` grants `HUMAN_GATE_6`
+for `PHASE_ACCEPTANCE` of the Phase 20 candidate only (row above); a real
+future `APPLY_MIGRATION` call against real or stable data still requires its
+own separate `RUNTIME_OPERATION`-scope grant bound to the exact target
+identity and revision identity resolved at call time — none exists, and none
+is created by HGR-003. **HGR-007 (row below) is the first real row this table
+has ever carried**: a `MANAGED_PRODUCT_REVISION_PROMOTION` grant under D-030
+V1's own live proof, bound to the exact real changeset archive digest and
+base-revision identity `promote_modification` itself resolved at call time —
+scoped narrowly to that one changeset only, never a standing or global
+`HUMAN_GATE_3` grant, and never touching `PROMOTE_CHILD_PRODUCT`'s own,
+wholly separate scoping key (still ungranted).
 
 | ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
 |---|---|---|---|---|---|---|---|
+| HGR-007 | HUMAN_GATE_3 | MANAGED_PRODUCT_REVISION_PROMOTION | sha256:35b1ee66812479a1e9a2d16890887a3dc38fdf5159f1294649898bbbbe6909e2 | product-d4fca9d59fbe7a99279da307e0d8761c-initial | human operator | GRANTED | Real, live D-030 V1 proof against the real, historical, read-only Managed Product `product-d4fca9d59fbe7a99279da307e0d8761c` (`golden-work-129`). The human operator reviewed the real natural-language request ("Ana sayfadaki \"Dashboard\" başlığını \"Öğrenci Yönetim Paneli\" olarak değiştir"), the real `ready_for_review` checkpoint's own `verification_passed` verdict (0 failures), and the real live review preview the change job itself served (`http://127.0.0.1:3000`, confirmed rendering "Öğrenci Yönetim Paneli" in place of "Dashboard" — screenshot evidence, this session), before attempting promotion. The FIRST attempt, made before this row existed, was genuinely refused by `promote_modification` (`ARK-ERR-0173`/`ARK-ERR-0167`, real HTTP 403, shown verbatim in the Command Center UI) — proving the gate is real and not bypassable — and the exact `target`/`revision` values above are copied verbatim from that real refusal message, never guessed. This is a `RUNTIME_OPERATION`-scope grant only; it authorizes promotion of this one exact changeset archive against this one exact base revision, nothing else — a different request, a different base revision, or any other project still requires its own separate grant. |
 
 ## Outstanding gates
 

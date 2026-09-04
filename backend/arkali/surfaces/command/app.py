@@ -71,6 +71,8 @@ from arkali.surfaces.command.factory_history import (
     _build_factory_history_router,
 )
 from arkali.surfaces.command.jobs import build_jobs_router
+from arkali.surfaces.command.product_change_bridge import _ProductChangeWiring
+from arkali.surfaces.command.product_change_routes import _build_product_change_router
 from arkali.surfaces.command.product_preview_resolution import _PreviewBridgeWiring
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
@@ -103,6 +105,10 @@ class _CommandExtensions:
     #: own session dependency, separate from this app's own `engine`.
     #: `None` (the default) omits the bridge route entirely.
     preview_bridge: _PreviewBridgeWiring | None = None
+    #: The real promote verb for "Kabul Et" (D-030 V1) -- see `product_
+    #: change_bridge.py`'s own module docstring. `None` (the default)
+    #: omits the change-request routes entirely.
+    product_change: _ProductChangeWiring | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -381,4 +387,23 @@ def create_app(
                 guard, extensions.factory_candidate_history, extensions.factory_campaign_history,
             )
         )
+    # Managed Product change-request routes (D-030 V1): additive and
+    # optional, the identical shape every extension above already uses --
+    # extracted to its own function so this branch does not push
+    # `create_app`'s own cyclomatic complexity over budget.
+    _include_product_change_router(app, extensions, session_scope, guard, refuse, pep, clock)
     return app
+
+
+def _include_product_change_router(
+    app: FastAPI, extensions: _CommandExtensions | None, session_scope: Callable[[], Iterator[Session]],
+    guard: Callable[[str], None], refuse: Callable[[Exception], HTTPException],
+    pep: PolicyEnforcementPoint, clock: Callable[[], dt.datetime] | None,
+) -> None:
+    if extensions is None or extensions.product_change is None:
+        return
+    app.include_router(
+        _build_product_change_router(
+            session_scope, guard, refuse, pep, clock, extensions.product_change,
+        )
+    )

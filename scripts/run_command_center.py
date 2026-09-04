@@ -83,9 +83,26 @@ from arkali.surfaces.command.factory_history import (  # noqa: E402
     FactoryCampaignSummary,
     FactoryCandidateSummary,
 )
+from arkali.surfaces.command.product_change_bridge import (  # noqa: E402
+    _ChangeNotAuthorizedError,
+    _ChangeStaleBaseError,
+    _ChangeVerificationFailedError,
+    _ProductChangeWiring,
+)
 from arkali.surfaces.command.product_preview_resolution import (  # noqa: E402
     _PreviewBridgeWiring,
 )
+from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
+from arkali.engineering.product_change.change_plan import ChangePlan  # noqa: E402
+from arkali.engineering.product_change.errors import (  # noqa: E402
+    PromotionNotAuthorizedError,
+    StaleBaseRevisionError,
+    VerificationFailedError,
+)
+from arkali.engineering.product_change.modification import PreparedModification  # noqa: E402
+from arkali.engineering.product_change.promotion import promote_modification  # noqa: E402
+from arkali.engineering.product_change.verification import VerificationResult  # noqa: E402
+from arkali.evidence.artifact.store import ArtifactStore  # noqa: E402
 
 
 class _DurableFactorySink:
@@ -298,6 +315,78 @@ def _preview_bridge_wiring(repo_root: pathlib.Path) -> _PreviewBridgeWiring:
     )
 
 
+def _product_change_wiring(repo_root: pathlib.Path, command_center_db: pathlib.Path) -> _ProductChangeWiring:
+    """The real "Kabul Et" promote verb (D-030 V1), composed here -- outside
+    the measured architecture graph -- exactly as `_preview_bridge_wiring`
+    above is for its own bridge. Reconstructs a real `PreparedModification`
+    from the change job's own `ready_for_review` checkpoint (never
+    fabricated: `plan` is re-read from the already-registered artifact,
+    `verification` from the worker's own real recorded verdict) and calls
+    the real, unmodified `promote_modification`, translating its typed
+    refusals into the three local error classes `surfaces.command` may
+    map without importing `engineering.product_change` itself.
+    """
+    evidence_db = repo_root / "var" / "factory" / "evidence" / "repair-evidence.db"
+    pdp = PolicyDecisionPoint.load(repo_root)
+    blobs = ArtifactBlobStore(
+        repo_root / "var" / "factory" / "evidence" / "blobs",
+        PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store"),
+    )
+    governance = GovernanceState.load(repo_root)
+
+    class _RealChangePromoter:
+        def promote(self, project_id: str, ready: dict[str, Any]) -> dict[str, Any]:
+            evidence_engine = create_persistence_engine(sqlite_url(evidence_db))
+            registry_engine = create_persistence_engine(sqlite_url(command_center_db))
+            try:
+                with unit_of_work(create_session_factory(evidence_engine)) as evidence_session:
+                    artifacts = ArtifactStore(evidence_session, blobs)
+                    plan_ref = str(ready["plan_ref"])
+                    prepared = PreparedModification(
+                        workspace=_StubWorkspace(pathlib.Path(str(ready["workspace_root"]))),
+                        product_root=pathlib.Path(str(ready["workspace_root"])) / "snapshot",
+                        base_revision_id=str(ready["base_revision_id"]),
+                        plan=ChangePlan.model_validate_json(artifacts.content_of(plan_ref)),
+                        plan_ref=plan_ref, changeset_ref=str(ready["changeset_ref"]),
+                        verification=VerificationResult(
+                            passed=bool(ready["verification_passed"]), checked_paths=[],
+                            failures=list(ready.get("verification_failures", [])),
+                        ),
+                    )
+                    with unit_of_work(create_session_factory(registry_engine)) as registry_session:
+                        try:
+                            revision = promote_modification(
+                                project_id, prepared, registry=ProjectRegistry(registry_session),
+                                artifacts=artifacts, human_gates=governance,
+                                issuer_identity="command-center",
+                            )
+                        except VerificationFailedError as error:
+                            raise _ChangeVerificationFailedError(str(error)) from error
+                        except StaleBaseRevisionError as error:
+                            raise _ChangeStaleBaseError(str(error)) from error
+                        except PromotionNotAuthorizedError as error:
+                            raise _ChangeNotAuthorizedError(str(error)) from error
+                        return {
+                            "revision_id": revision.revision_id,
+                            "provenance_ref": revision.provenance_ref,
+                        }
+            finally:
+                evidence_engine.dispose()
+                registry_engine.dispose()
+
+    return _ProductChangeWiring(promoter=_RealChangePromoter())
+
+
+class _StubWorkspace:
+    """Satisfies `PreparedModification.workspace`'s own real need (`.root`
+    only -- `promote_modification` never reads it) without holding a real
+    `CandidateWorkspace`; the worker process that allocated one has
+    already exited by the time a human clicks "Kabul Et"."""
+
+    def __init__(self, root: pathlib.Path) -> None:
+        self.root = root
+
+
 def migrate(database: pathlib.Path) -> None:
     """Bring the database to head with the real migration chain."""
     config = Config(str(ROOT / "backend" / ALEMBIC_INI))
@@ -354,6 +443,7 @@ def main(argv: list[str]) -> int:
             factory_candidate_history=_factory_candidate_history(ROOT),
             factory_campaign_history=_factory_campaign_history(ROOT),
             preview_bridge=_preview_bridge_wiring(ROOT),
+            product_change=_product_change_wiring(ROOT, database),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")

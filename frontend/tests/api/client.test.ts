@@ -195,6 +195,9 @@ describe('ArkaliApiClient', () => {
       'GET /api/jobs/{job_id}',
       'GET /api/jobs/{job_id}/checkpoints',
       'POST /api/jobs/{job_id}/cancel',
+      'POST /api/projects/{project_id}/changes',
+      'GET /api/projects/{project_id}/changes',
+      'POST /api/projects/{project_id}/changes/{job_id}/promote',
     ]);
   });
 });

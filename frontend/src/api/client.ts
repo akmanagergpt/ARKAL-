@@ -15,6 +15,7 @@
 
 import type {
   ApproveExecutionRequest,
+  _ChangePromotionResponse,
   CreateProjectRequest,
   CreateRevisionRequest,
   _FactoryGoalRequest,
@@ -29,6 +30,7 @@ import type {
   ProjectListResponse,
   PublishWorkflowRevisionRequest,
   StartExecutionRequest,
+  _StartChangeRequest,
   TransitionRequest,
   WorkflowExecutionDetailResponse,
   WorkflowRevisionDetailResponse,
@@ -80,6 +82,11 @@ export const ENDPOINTS = {
   getJob: { method: 'GET', path: '/api/jobs/{job_id}' },
   listJobCheckpoints: { method: 'GET', path: '/api/jobs/{job_id}/checkpoints' },
   cancelJob: { method: 'POST', path: '/api/jobs/{job_id}/cancel' },
+  startProjectChange: { method: 'POST', path: '/api/projects/{project_id}/changes' },
+  findProjectChange: { method: 'GET', path: '/api/projects/{project_id}/changes' },
+  promoteProjectChange: {
+    method: 'POST', path: '/api/projects/{project_id}/changes/{job_id}/promote',
+  },
 } as const;
 
 /**
@@ -451,6 +458,42 @@ export class ArkaliApiClient {
   cancelJob(jobId: string): Promise<JobReferenceResponse> {
     return this.request<JobReferenceResponse>(ENDPOINTS.cancelJob, {
       params: { job_id: jobId },
+    });
+  }
+
+  /**
+   * "Değişikliği Başlat" (D-030 V1) — a real natural-language Managed
+   * Product change request. Idempotent the same way `startProjectPreview`
+   * is: a repeated call for a project with an already-active change cycle
+   * rediscovers it; a repeated call after the most recent one reached a
+   * real terminal state starts a genuinely new cycle.
+   */
+  startProjectChange(projectId: string, requestText: string): Promise<JobReferenceResponse> {
+    const body: _StartChangeRequest = { request_text: requestText };
+    return this.request<JobReferenceResponse>(ENDPOINTS.startProjectChange, {
+      params: { project_id: projectId }, body,
+    });
+  }
+
+  /**
+   * Whether a real change cycle already exists for this project, without
+   * creating one — `null` if nothing has ever been requested. The
+   * refresh-recovery counterpart to `startProjectChange`.
+   */
+  findProjectChange(projectId: string): Promise<JobReferenceResponse | null> {
+    return this.request<JobReferenceResponse | null>(ENDPOINTS.findProjectChange, {
+      params: { project_id: projectId },
+    });
+  }
+
+  /**
+   * "Kabul Et" — real, synchronous promotion of a ready change proposal
+   * into a new `ProjectRevisionRecord`. "Vazgeç" needs no method of its
+   * own: it is the existing `cancelJob`, called with the same job id.
+   */
+  promoteProjectChange(projectId: string, jobId: string): Promise<_ChangePromotionResponse> {
+    return this.request<_ChangePromotionResponse>(ENDPOINTS.promoteProjectChange, {
+      params: { project_id: projectId, job_id: jobId },
     });
   }
 }

@@ -242,6 +242,21 @@ def _preview_bridge_wiring(pdp: PolicyDecisionPoint, var_root: pathlib.Path):
     )
 
 
+def _product_change_wiring():
+    """Mirrors `scripts/run_command_center.py`'s own `_product_change_
+    wiring` shape -- only the Protocol matters for the drift control (route
+    signatures, never a real promote call), so the injected promoter is a
+    trivial stub rather than the real `engineering.product_change`
+    composition."""
+    from arkali.surfaces.command.product_change_bridge import _ProductChangeWiring
+
+    class _StubPromoter:
+        def promote(self, project_id: str, ready: dict) -> dict:  # pragma: no cover
+            raise NotImplementedError
+
+    return _ProductChangeWiring(promoter=_StubPromoter())
+
+
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
     """A real application, so the contract is generated and never transcribed."""
@@ -259,6 +274,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             factory_campaign_history=campaign_history,
             factory_submitter=_factory_submitter_wiring(pdp),
             preview_bridge=_preview_bridge_wiring(pdp, tmp_path_factory.mktemp("preview-bridge-var")),
+            product_change=_product_change_wiring(),
         ),
     )
 

@@ -316,6 +316,17 @@ export interface _JobCheckpointResponse {
   recorded_at: string;
 }
 
+/** One real natural-language Managed Product change request (D-030 V1). */
+export interface _StartChangeRequest {
+  request_text: string;
+}
+
+/** The new real `ProjectRevisionRecord` a "Kabul Et" produced. */
+export interface _ChangePromotionResponse {
+  revision_id: string;
+  provenance_ref: string;
+}
+
 export interface WorkflowExecutionDetailResponse {
   execution_id: string;
   workflow_id: string;
