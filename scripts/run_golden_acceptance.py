@@ -22,6 +22,11 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
 
+from alembic import command as _alembic_command  # noqa: E402
+from alembic.config import Config as _AlembicConfig  # noqa: E402
+from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
+from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
+from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
 from arkali.engineering.candidate.ledger import (  # noqa: E402
     ACCEPTANCE_FAILED,
     ACCEPTED,
@@ -42,6 +47,21 @@ from arkali.engineering.factory.acceptance_plan_compiler import (  # noqa: E402
 )
 from arkali.engineering.factory.acceptance_plan_reconciliation import _reconcile_scenario  # noqa: E402
 from arkali.engineering.factory.acceptance_scenario import _AcceptanceScenario  # noqa: E402
+from arkali.engineering.factory.errors import CandidateNotAcceptedError  # noqa: E402
+from arkali.engineering.factory.product_registration import (  # noqa: E402
+    register_accepted_candidate_as_managed_product,
+)
+from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
+from arkali.evidence.artifact.store import ArtifactStore  # noqa: E402
+from arkali.kernel.persistence.engine import (  # noqa: E402
+    create_persistence_engine,
+    sqlite_url,
+)
+from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
+from arkali.kernel.persistence.session import (  # noqa: E402
+    create_session_factory,
+    unit_of_work,
+)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CANDIDATES = ROOT / "var" / "factory" / "candidates"
@@ -190,6 +210,63 @@ def _backend_process(python: pathlib.Path, candidate: pathlib.Path, log) -> subp
         [str(python), "-c", code], cwd=candidate, stdout=log, stderr=subprocess.STDOUT,
         text=True, env={**os.environ, "FLASK_DEBUG": "0"},
     )
+
+
+def _upgraded_engine(db_path: pathlib.Path):  # noqa: ANN202
+    """Real, already-existing per-store persistence bootstrap -- the same
+    shape `run_factory_worker.py`'s own `_freeze` already uses for the
+    evidence store, applied here to both real stores this composition
+    touches. Never a new database; `command_center.db` and `repair-
+    evidence.db` are the same real, already-production files
+    `surfaces.command`'s own app and `run_factory_worker.py` already use."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = _AlembicConfig(str(ROOT / "backend" / ALEMBIC_INI))
+    cfg.set_main_option("script_location", str(ROOT / "backend" / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", sqlite_url(db_path))
+    _alembic_command.upgrade(cfg, "head")
+    return create_persistence_engine(sqlite_url(db_path))
+
+
+def _register_managed_product(candidate_id: str, ledger: CandidateLedger) -> dict[str, object]:
+    """The automatic Managed Product registration trigger: called only
+    after `ledger.record_state(candidate_id, ACCEPTED, ...)` has already
+    durably succeeded (see `_accept`'s `finally` block below), never
+    before and never independently. Failure here is reported, never
+    raised past this function -- a real acceptance that already succeeded
+    and was already recorded must not be turned into a crashed process by
+    a registration-side problem; `scripts/register_managed_product.py`
+    re-invokes the same idempotent composition standalone for recovery.
+    """
+    pdp = PolicyDecisionPoint.load(ROOT)
+    command_center_engine = _upgraded_engine(ROOT / "var" / "command_center.db")
+    evidence_engine = _upgraded_engine(ROOT / "var" / "factory" / "evidence" / "repair-evidence.db")
+    blobs = ArtifactBlobStore(
+        ROOT / "var" / "factory" / "evidence" / "blobs",
+        PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store"),
+    )
+    try:
+        with unit_of_work(create_session_factory(command_center_engine)) as project_session, \
+             unit_of_work(create_session_factory(evidence_engine)) as evidence_session:
+            outcome = register_accepted_candidate_as_managed_product(
+                candidate_id,
+                ledger=ledger,
+                registry=ProjectRegistry(project_session),
+                artifacts=ArtifactStore(evidence_session, blobs),
+            )
+            return {
+                "outcome": "REGISTERED",
+                "project_id": outcome.project.project_id,
+                "revision_id": outcome.revision.revision_id,
+                "provenance_ref": outcome.provenance_ref,
+                "created": outcome.created,
+            }
+    except CandidateNotAcceptedError as error:
+        return {"outcome": "CANDIDATE_NOT_ACCEPTED", "error": str(error)}
+    except Exception as error:  # noqa: BLE001 -- reported, never raised; see docstring
+        return {"outcome": "REGISTRATION_FAILED", "error": str(error)}
+    finally:
+        command_center_engine.dispose()
+        evidence_engine.dispose()
 
 
 def _accept(
@@ -406,6 +483,15 @@ def _accept(
                 "result_sha256": result_sha256,
             },
         )
+        # DECISION 2 (automatic trigger): only after the real ACCEPTED
+        # transition above has already durably succeeded -- never before,
+        # never for any other outcome. Reported on `result`, never allowed
+        # to change `result["outcome"]` or the already-written, already-
+        # hashed `result.json` evidence above.
+        if state == ACCEPTED:
+            result["managed_product_registration"] = _register_managed_product(
+                candidate_id, ledger,
+            )
     return result
 
 

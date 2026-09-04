@@ -109,9 +109,9 @@ def _import_findings(
     dependencies: frozenset[str],
 ) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
-    from arkali.engineering.factory.test_contract_preflight import plain_import_findings
+    from arkali.engineering.factory.test_contract_preflight import _plain_import_findings
 
-    findings.extend(plain_import_findings(path, tree, modules, dependencies))
+    findings.extend(_plain_import_findings(path, tree, modules, dependencies))
     for node in _nonstdlib_from_imports(tree):
         assert node.module is not None
         if node.module.split(".", 1)[0].lower() in dependencies:
@@ -196,11 +196,11 @@ def _test_findings(
             )
         findings.extend(_import_findings(path, tree, modules, dependencies))
         from arkali.engineering.factory.test_contract_preflight import (
-            fixture_findings,
+            _fixture_findings,
             _undefined_call_findings,
         )
 
-        findings.extend(fixture_findings(path, tree))
+        findings.extend(_fixture_findings(path, tree))
         findings.extend(_undefined_call_findings(path, tree))
     return findings
 
@@ -425,9 +425,9 @@ def inspect_product_files(
     findings: list[SemanticFinding] = []
     modules = _python_modules(files, findings)
     findings.extend(_test_findings(files, modules))
-    from arkali.engineering.factory.test_contract_preflight import lifecycle_findings
+    from arkali.engineering.factory.test_contract_preflight import _lifecycle_findings
 
-    findings.extend(lifecycle_findings(files))
+    findings.extend(_lifecycle_findings(files))
     findings.extend(_persistence_findings(files))
     from arkali.engineering.factory.backend_import_preflight import _backend_import_findings
 

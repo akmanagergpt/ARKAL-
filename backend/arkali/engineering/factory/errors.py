@@ -39,3 +39,11 @@ class StageVocabularyError(ContractViolation):
     """The staged-generation stage vocabulary document is missing or malformed."""
 
     code = "ARK-ERR-0118"
+
+
+class CandidateNotAcceptedError(ContractViolation):
+    """A Managed Product registration was requested for a `candidate_id`
+    whose `CandidateLedger`-recorded latest state is not a real terminal
+    `ACCEPTED` (`product_registration.py`)."""
+
+    code = "ARK-ERR-0119"

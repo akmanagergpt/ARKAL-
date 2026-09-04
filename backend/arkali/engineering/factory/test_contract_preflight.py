@@ -12,7 +12,7 @@ from arkali.engineering.factory.semantic_finding import SemanticFinding
 _BUILTIN_NAMES = frozenset(dir(builtins))
 
 
-def fixture_findings(path: str, tree: ast.Module) -> list[SemanticFinding]:
+def _fixture_findings(path: str, tree: ast.Module) -> list[SemanticFinding]:
     fixtures = {
         node.name
         for node in tree.body
@@ -40,7 +40,7 @@ def fixture_findings(path: str, tree: ast.Module) -> list[SemanticFinding]:
     return findings
 
 
-def plain_import_findings(
+def _plain_import_findings(
     path: str,
     tree: ast.AST,
     modules: Mapping[str, object],
@@ -75,7 +75,7 @@ def plain_import_findings(
     return findings
 
 
-def lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend = "\n".join(
         source
         for path, source in files.items()
@@ -196,5 +196,5 @@ def _is_test(node: ast.stmt) -> bool:
 
 
 __all__ = [
-    "fixture_findings", "lifecycle_findings", "plain_import_findings", "_undefined_call_findings",
+    "_fixture_findings", "_lifecycle_findings", "_plain_import_findings", "_undefined_call_findings",
 ]

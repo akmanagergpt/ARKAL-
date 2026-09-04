@@ -23,7 +23,7 @@ from arkali.engineering.factory.product_preflight import (
 from arkali.engineering.factory.route_response_preflight import (
     _missing_generated_id_findings, _raw_row_jsonify_findings,
 )
-from arkali.engineering.factory.test_contract_preflight import fixture_findings, lifecycle_findings
+from arkali.engineering.factory.test_contract_preflight import _fixture_findings, _lifecycle_findings
 
 
 def _backend_text(files: Mapping[str, str]) -> str:
@@ -157,6 +157,6 @@ def _backend_tests_stage_findings(files: Mapping[str, str]) -> list[SemanticFind
     findings: list[SemanticFinding] = []
     for path in test_paths:
         tree = ast.parse(files[path])
-        findings.extend(fixture_findings(path, tree))
-        findings.extend(lifecycle_findings(files))
+        findings.extend(_fixture_findings(path, tree))
+        findings.extend(_lifecycle_findings(files))
     return findings
