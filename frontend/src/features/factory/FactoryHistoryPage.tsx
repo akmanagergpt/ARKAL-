@@ -31,36 +31,9 @@ import type { FactoryCampaignSummary, FactoryCandidateSummary } from '@/api/cont
 import { Button, Callout, PageHeader, Panel, Spinner, StateBadge } from '@/components/ui';
 
 import { NewApplicationIntake } from './NewApplicationIntake';
+import { PreviewActionButton, PreviewStatusPanel } from './PreviewControls';
 import { useFactoryHistory } from './useFactoryHistory';
 import { usePreview } from './usePreview';
-
-//: Turkish UI projections of `usePreview`'s own real phase/state vocabulary
-//: — never a second copy of the C-19 Job machine's states themselves
-//: (`StateBadge` above already shows those raw, deliberately untranslated).
-//: A phase or state this map does not name falls back to the raw value.
-const PREVIEW_PHASE_TR: Readonly<Record<string, string>> = {
-  workspace_allocated: 'Ortam ayrılıyor',
-  restored_from_cache: 'Önceki kurulum yeniden kullanılıyor',
-  backend_installed: 'Arka uç bağımlılıkları kuruldu',
-  backend_started: 'Arka uç başlatıldı',
-  frontend_installed: 'Ön yüz bağımlılıkları kuruluyor',
-  frontend_built: 'Ön yüz derlendi',
-  ready: 'Hazır',
-  refused: 'Reddedildi',
-  crashed: 'Bir sorun oluştu',
-  stopped: 'Durduruldu',
-  auto_stopped: 'Zaman aşımıyla durduruldu',
-  cancelled_during_setup: 'Hazırlık sırasında durduruldu',
-};
-const PREVIEW_JOB_STATE_TR: Readonly<Record<string, string>> = {
-  QUEUED: 'Sırada bekliyor',
-  RUNNING: 'Hazırlanıyor',
-  CHECKPOINTED: 'Hazırlanıyor',
-  CANCELLED: 'Durduruldu',
-  FAILED: 'Hazırlanamadı',
-  SUCCEEDED: 'Hazır',
-  DEAD_LETTER: 'Durduruldu',
-};
 
 function CandidatePreview({
   candidate,
@@ -73,20 +46,6 @@ function CandidatePreview({
 }) {
   const preview = usePreview(client, candidate.candidate_id);
   const runnable = candidate.state === 'ACCEPTED';
-  const latestCheckpoint = preview.checkpoints.at(-1);
-  const latestPhase = latestCheckpoint === undefined ? null : latestCheckpoint.payload.phase;
-  const phaseLabel = typeof latestPhase === 'string' ? PREVIEW_PHASE_TR[latestPhase] : null;
-  const stateLabel = preview.job === null
-    ? null
-    : preview.stopRequested
-      ? 'Durdurma isteği gönderildi…'
-      : phaseLabel ?? PREVIEW_JOB_STATE_TR[preview.job.lifecycle_state] ?? preview.job.lifecycle_state;
-  const frontendUrl = preview.checkpoints.find((c) => c.payload.phase === 'ready')?.payload.frontend_url;
-  const isReady = preview.job?.lifecycle_state === 'SUCCEEDED'
-    || (typeof frontendUrl === 'string' && preview.job?.lifecycle_state !== 'CANCELLED'
-      && preview.job?.lifecycle_state !== 'FAILED');
-  const isDone = preview.job !== null
-    && ['SUCCEEDED', 'FAILED', 'CANCELLED', 'DEAD_LETTER'].includes(preview.job.lifecycle_state);
 
   return (
     <div className="flex flex-col gap-2 py-2.5">
@@ -95,75 +54,23 @@ function CandidatePreview({
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-500">{candidate.recorded_at}</span>
           <StateBadge state={candidate.state} />
-          {preview.job === null || preview.job.lifecycle_state === 'CANCELLED' ? (
-            <Button
-              variant="primary"
-              busy={preview.starting}
-              disabled={!runnable}
-              title={runnable ? undefined : `Yalnızca kabul edilmiş (ACCEPTED) adaylar açılabilir — bu adayın durumu: ${candidate.state}`}
-              onClick={() => void preview.open()}
-            >
-              Uygulamayı Aç
-            </Button>
-          ) : !isDone && !isReady ? (
-            // Once ready, the panel below owns the one real "Durdur" —
-            // rendering it here too would duplicate the same control.
-            <Button
-              busy={preview.cancelling}
-              disabled={preview.stopRequested}
-              onClick={() => void preview.stop()}
-            >
-              Durdur
-            </Button>
-          ) : null}
+          <PreviewActionButton
+            preview={preview}
+            runnable={runnable}
+            runnableHint={runnable ? undefined : `Yalnızca kabul edilmiş (ACCEPTED) adaylar açılabilir — bu adayın durumu: ${candidate.state}`}
+          />
         </div>
       </div>
-      {preview.job !== null ? (
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-          {!isDone ? (
-            <div className="flex items-center gap-2 text-slate-700">
-              <Spinner />
-              <span>{stateLabel}</span>
-            </div>
-          ) : preview.job.lifecycle_state === 'CANCELLED' ? (
-            <p className="text-slate-600">Bu önizleme durduruldu.</p>
-          ) : preview.job.lifecycle_state === 'FAILED' ? (
-            <p className="text-rose-700">Uygulama hazırlanamadı: {stateLabel}</p>
-          ) : null}
-          {isReady && typeof frontendUrl === 'string' ? (
-            <div className="mt-2 flex items-center gap-3">
-              <a
-                href={frontendUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
-              >
-                Çalışan uygulamayı aç ↗
-              </a>
-              {preview.job.lifecycle_state !== 'CANCELLED' ? (
-                <Button
-                  busy={preview.cancelling}
-                  disabled={preview.stopRequested}
-                  onClick={() => void preview.stop()}
-                >
-                  {preview.stopRequested ? 'Durduruluyor…' : 'Durdur'}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-          {showTechnical ? (
-            <p className="mt-2 font-mono text-xs text-slate-500">
-              job_id: {preview.job.job_id} · lifecycle_state: {preview.job.lifecycle_state}
-              {typeof frontendUrl === 'string' ? ` · url: ${frontendUrl}` : ''}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-      {preview.failure !== null ? (
-        <Callout tone="error" title="İstek gönderilemedi">
-          <p>{preview.failure.message}</p>
-        </Callout>
-      ) : null}
+      <PreviewStatusPanel
+        preview={preview}
+        showTechnical={showTechnical}
+        technicalDetail={preview.job === null ? undefined : (
+          `job_id: ${preview.job.job_id} · lifecycle_state: ${preview.job.lifecycle_state}`
+          + (preview.checkpoints.find((c) => c.payload.phase === 'ready')?.payload.frontend_url
+            ? ` · url: ${preview.checkpoints.find((c) => c.payload.phase === 'ready')?.payload.frontend_url}`
+            : '')
+        )}
+      />
     </div>
   );
 }

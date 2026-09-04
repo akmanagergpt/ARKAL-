@@ -209,6 +209,39 @@ def _factory_history_wiring(var_root: pathlib.Path):
     return candidate_history, campaign_history
 
 
+def _preview_bridge_wiring(pdp: PolicyDecisionPoint, var_root: pathlib.Path):
+    """Mirrors `scripts/run_command_center.py`'s own `_preview_bridge_
+    wiring` exactly, over an isolated root — so `/api/projects/{id}/preview`
+    is drift-tested against the same real composition a live caller
+    reaches, not omitted as though it were still unauthorized."""
+    from alembic import command
+    from alembic.config import Config
+    from arkali.engineering.candidate.ledger import CandidateLedger
+    from arkali.evidence.artifact.blob_store import ArtifactBlobStore
+    from arkali.kernel.persistence.migrations import ALEMBIC_INI
+    from arkali.kernel.persistence.session import create_session_factory, unit_of_work
+    from arkali.surfaces.command.product_preview_resolution import _PreviewBridgeWiring
+
+    evidence_db = var_root / "evidence.db"
+    config = Config(str(REPO / "backend" / ALEMBIC_INI))
+    config.set_main_option("script_location", str(REPO / "backend" / "alembic"))
+    config.set_main_option("sqlalchemy.url", sqlite_url(evidence_db))
+    command.upgrade(config, "head")
+    evidence_factory = create_session_factory(create_persistence_engine(sqlite_url(evidence_db)))
+
+    def artifact_session_scope():
+        with unit_of_work(evidence_factory) as session:
+            yield session
+
+    blobs = ArtifactBlobStore(
+        var_root / "blobs", PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store"),
+    )
+    ledger = CandidateLedger(var_root / "candidates" / "_ledger")
+    return _PreviewBridgeWiring(
+        artifact_session_scope=artifact_session_scope, artifact_blobs=blobs, ledger=ledger,
+    )
+
+
 @pytest.fixture(scope="module")
 def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
     """A real application, so the contract is generated and never transcribed."""
@@ -225,6 +258,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             factory_candidate_history=candidate_history,
             factory_campaign_history=campaign_history,
             factory_submitter=_factory_submitter_wiring(pdp),
+            preview_bridge=_preview_bridge_wiring(pdp, tmp_path_factory.mktemp("preview-bridge-var")),
         ),
     )
 

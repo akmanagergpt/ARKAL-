@@ -71,6 +71,7 @@ from arkali.surfaces.command.factory_history import (
     _build_factory_history_router,
 )
 from arkali.surfaces.command.jobs import build_jobs_router
+from arkali.surfaces.command.product_preview_resolution import _PreviewBridgeWiring
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
 from arkali.surfaces.command.workflow import (
@@ -96,6 +97,12 @@ class _CommandExtensions:
     factory_submitter: _FactorySubmitter | None = None
     factory_candidate_history: _CandidateHistorySource | None = None
     factory_campaign_history: _CampaignHistorySource | None = None
+    #: `(artifact_session_scope, artifact_blobs, ledger)` for the Product
+    #: Detail -> preview bridge (D-029's own follow-on) -- see `jobs.py`'s
+    #: `build_jobs_router` docstring for why the evidence store needs its
+    #: own session dependency, separate from this app's own `engine`.
+    #: `None` (the default) omits the bridge route entirely.
+    preview_bridge: _PreviewBridgeWiring | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -330,7 +337,10 @@ def create_app(
     # routes above use, so there is one enforcement path on this surface rather
     # than two. They live there because this module already touches three
     # bounded contexts, which is the whole budget.
-    app.include_router(build_jobs_router(session_scope, guard, refuse, pep, clock))
+    app.include_router(build_jobs_router(
+        session_scope, guard, refuse, pep, clock,
+        preview_bridge=extensions.preview_bridge if extensions is not None else None,
+    ))
     # The C-20 workflow routes are additive and optional at this composition
     # root: a caller that supplies no wiring gets exactly the pre-Phase-17
     # application, unchanged - no existing caller of `create_app` is required

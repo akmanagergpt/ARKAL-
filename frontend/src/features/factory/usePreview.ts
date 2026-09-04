@@ -3,23 +3,21 @@
  * durable job, never a second progress-state store.
  *
  * REFRESH RECOVERY IS A READ, NEVER A CLIENT-STORAGE GUESS. On mount, this
- * hook calls the real, read-only `GET /candidates/{id}/preview` — it
- * either rediscovers the real job C-19 already holds for this candidate
- * (opening, ready, or already stopped) or finds honestly nothing, and
- * either way nothing is created just by loading the page. "Uygulamayı Aç"
- * itself calls `POST /candidates/{id}/preview`, a real user action, which
- * is idempotent by the backend's own persisted unique constraint — the
- * same identity request after a refresh returns the real, already-running
- * job rather than a duplicate.
- *
- * KNOWN LIMIT (same shape as `useFactoryIntake`'s own documented one): once
- * this identity reaches a terminal state (CANCELLED, most commonly a real
- * "Durdur"), the same candidate cannot start a *new* preview under this
- * identity again this session — re-opening needs a fresh identity scheme,
- * not built this turn.
+ * hook calls the real, read-only `GET /candidates/{id}/preview` (or
+ * `/projects/{id}/preview` — see `PreviewResourceKind` below) — it either
+ * rediscovers the real, currently ACTIVE job C-19 already holds for this
+ * subject (opening, ready, or already stopped) or finds honestly nothing,
+ * and either way nothing is created just by loading the page. "Uygulamayı
+ * Aç" itself calls the matching `POST` route, a real user action, which is
+ * idempotent by the backend's own persisted unique constraint — the same
+ * request after a refresh returns the real, already-running job rather
+ * than a duplicate, and a request made after the most recent preview for
+ * this subject already reached a real terminal state (CANCELLED, most
+ * commonly a real "Durdur") starts a genuinely new one under the SAME
+ * subject — open, stop, open again, indefinitely.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiRefusal, ApiUnavailable, type ArkaliApiClient } from '@/api/client';
 import type { _JobCheckpointResponse, JobReferenceResponse } from '@/api/contracts';
@@ -65,9 +63,32 @@ function asFailure(error: unknown): Failure {
   return { code: 'UNEXPECTED', message: 'Beklenmeyen bir hata oluştu.' };
 }
 
+/**
+ * Which real backend resolution path to drive `open`/refresh-recovery
+ * through. `'candidate'` (the default, matching every existing caller
+ * byte-for-byte) is `POST`/`GET /api/candidates/{id}/preview`. `'project'`
+ * is `POST`/`GET /api/projects/{id}/preview` — Product Detail's own real
+ * "Uygulamayı Aç", resolved backend-side through the canonical D-029 chain
+ * (`ProjectRegistry` -> `provenance_ref` -> `ArtifactStore` ->
+ * `CandidateLedger` eligibility) rather than this hook ever knowing a
+ * candidate_id itself. Everything past the initial job reference — polling,
+ * checkpoints, cancel — is byte-identical either way, since both routes
+ * hand back the same real `JobReferenceResponse` for the same real
+ * `candidate.preview` job type.
+ */
+export type PreviewResourceKind = 'candidate' | 'project';
+
 export function usePreview(
-  client: ArkaliApiClient, candidateId: string,
+  client: ArkaliApiClient, resourceId: string, kind: PreviewResourceKind = 'candidate',
 ): PreviewState & PreviewActions {
+  const startPreview = useMemo(
+    () => (kind === 'project' ? client.startProjectPreview.bind(client) : client.startPreview.bind(client)),
+    [client, kind],
+  );
+  const findPreview = useMemo(
+    () => (kind === 'project' ? client.findProjectPreview.bind(client) : client.findPreview.bind(client)),
+    [client, kind],
+  );
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
@@ -118,11 +139,17 @@ export function usePreview(
   // Refresh recovery: a plain read on mount, never a client-storage guess
   // and never something that creates a job just by loading the page.
   useEffect(() => {
+    if (resourceId === '') {
+      // No real subject selected yet (e.g. Product Detail with nothing
+      // chosen) -- honestly nothing to rediscover, never a request for an
+      // empty id.
+      return undefined;
+    }
     let cancelled = false;
     void (async () => {
       let reference: JobReferenceResponse | null;
       try {
-        reference = await client.findPreview(candidateId);
+        reference = await findPreview(resourceId);
       } catch {
         return; // nothing rediscoverable is not an error the user needs to see
       }
@@ -145,7 +172,7 @@ export function usePreview(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per mounted candidate row
-  }, [candidateId]);
+  }, [resourceId]);
 
   const open = useCallback(async (): Promise<void> => {
     stopPolling();
@@ -153,7 +180,7 @@ export function usePreview(
     setFailure(null);
     setStopRequested(false);
     try {
-      const reference = await client.startPreview(candidateId);
+      const reference = await startPreview(resourceId);
       setJob(reference);
       setCheckpoints(await client.listJobCheckpoints(reference.job_id).catch(() => []));
       if (!DONE_STATES.has(reference.lifecycle_state)) {
@@ -166,7 +193,7 @@ export function usePreview(
     } finally {
       setStarting(false);
     }
-  }, [candidateId, client, pollOnce, stopPolling]);
+  }, [resourceId, startPreview, pollOnce, stopPolling]);
 
   const stop = useCallback(async (): Promise<void> => {
     if (job === null) {

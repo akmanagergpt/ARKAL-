@@ -1,7 +1,10 @@
 import { useState } from 'react';
 
+import type { ArkaliApiClient } from '@/api/client';
 import type { ProjectDetailResponse } from '@/api/contracts';
 import { Button, Callout, Field, Panel, Spinner, StateBadge } from '@/components/ui';
+import { PreviewActionButton, PreviewStatusPanel } from '@/features/factory/PreviewControls';
+import { usePreview } from '@/features/factory/usePreview';
 
 function formatTimestamp(value: string): string {
   const parsed = new Date(value);
@@ -39,6 +42,7 @@ export function ProjectDetail({
   onTransition,
   onCreateRevision,
   showTechnical,
+  client,
 }: {
   project: ProjectDetailResponse | null;
   lifecycleStates: readonly string[];
@@ -48,9 +52,15 @@ export function ProjectDetail({
   onTransition: (projectId: string, target: string) => Promise<void>;
   onCreateRevision: (projectId: string, revisionId: string) => Promise<void>;
   showTechnical: boolean;
+  client: ArkaliApiClient;
 }) {
   const [target, setTarget] = useState('');
   const [revisionId, setRevisionId] = useState('');
+  // Hooks run unconditionally, before the early returns below (React's own
+  // rule) -- `''` when nothing is selected yet is a real, safe no-op
+  // subject id `usePreview` itself refuses to fetch for, never a request
+  // sent with an empty id.
+  const preview = usePreview(client, project?.project_id ?? '', 'project');
 
   if (loading) {
     return (
@@ -103,6 +113,20 @@ export function ProjectDetail({
             <dd className="text-sm text-slate-700">{formatTimestamp(project.updated_at)}</dd>
           </div>
         </dl>
+
+        <section className="flex flex-col gap-2 border-t border-slate-200 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-800">Uygulama</h3>
+            <PreviewActionButton preview={preview} runnable={true} />
+          </div>
+          <PreviewStatusPanel
+            preview={preview}
+            showTechnical={showTechnical}
+            technicalDetail={preview.job === null ? undefined : (
+              `job_id: ${preview.job.job_id} · lifecycle_state: ${preview.job.lifecycle_state}`
+            )}
+          />
+        </section>
 
         {failure === null ? null : (
           <Callout tone="error" title="İşlem reddedildi">

@@ -44,6 +44,7 @@ export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliA
         </div>
         <ProjectDetail
           showTechnical={showTechnical}
+          client={client}
           project={registry.selected}
           lifecycleStates={registry.lifecycleStates}
           loading={registry.loadingDetail}

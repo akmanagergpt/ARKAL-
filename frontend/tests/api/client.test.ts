@@ -190,6 +190,8 @@ describe('ArkaliApiClient', () => {
       'POST /api/factory/goals',
       'POST /api/candidates/{candidate_id}/preview',
       'GET /api/candidates/{candidate_id}/preview',
+      'POST /api/projects/{project_id}/preview',
+      'GET /api/projects/{project_id}/preview',
       'GET /api/jobs/{job_id}',
       'GET /api/jobs/{job_id}/checkpoints',
       'POST /api/jobs/{job_id}/cancel',

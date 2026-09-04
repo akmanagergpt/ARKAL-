@@ -75,6 +75,8 @@ export const ENDPOINTS = {
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
   startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
   findPreview: { method: 'GET', path: '/api/candidates/{candidate_id}/preview' },
+  startProjectPreview: { method: 'POST', path: '/api/projects/{project_id}/preview' },
+  findProjectPreview: { method: 'GET', path: '/api/projects/{project_id}/preview' },
   getJob: { method: 'GET', path: '/api/jobs/{job_id}' },
   listJobCheckpoints: { method: 'GET', path: '/api/jobs/{job_id}/checkpoints' },
   cancelJob: { method: 'POST', path: '/api/jobs/{job_id}/cancel' },
@@ -387,6 +389,34 @@ export class ArkaliApiClient {
   findPreview(candidateId: string): Promise<JobReferenceResponse | null> {
     return this.request<JobReferenceResponse | null>(ENDPOINTS.findPreview, {
       params: { candidate_id: candidateId },
+    });
+  }
+
+  /**
+   * "Uygulamayı Aç" from Product Detail — the real Managed Product ->
+   * accepted candidate bridge (D-029's own follow-on). Resolves through
+   * the backend's own canonical chain (`ProjectRegistry` -> `provenance_ref`
+   * -> `ArtifactStore` -> `CandidateLedger` eligibility) and submits or
+   * recovers the same real preview job the candidate-direct route uses —
+   * never a second preview path. Idempotent the same way: a repeated call
+   * for a product with an already-active preview rediscovers it; a repeated
+   * call after that preview reached a real terminal state starts a genuinely
+   * new one.
+   */
+  startProjectPreview(projectId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.startProjectPreview, {
+      params: { project_id: projectId },
+    });
+  }
+
+  /**
+   * Whether a real preview job already exists for this Managed Product,
+   * without creating one — `null` if nothing has ever been opened. The
+   * refresh-recovery counterpart to `startProjectPreview`.
+   */
+  findProjectPreview(projectId: string): Promise<JobReferenceResponse | null> {
+    return this.request<JobReferenceResponse | null>(ENDPOINTS.findProjectPreview, {
+      params: { project_id: projectId },
     });
   }
 

@@ -69,12 +69,15 @@ ADR-0008 makes decomposition the answer.
 from __future__ import annotations
 
 import datetime as dt
+import itertools
 from collections.abc import Callable, Iterator
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from arkali.control.policy.pep import PolicyEnforcementPoint
+from arkali.control.registry.project.registry import ProjectRegistry
+from arkali.execution.durable.job_state_machine import DEFINITION as _JOB_MACHINE
 from arkali.execution.durable.job_store import READ, WRITE, JobStore, JobSubmission
 from arkali.execution.durable.records import (
     DurableJobRecord,
@@ -87,6 +90,10 @@ from arkali.surfaces.command.contracts import (
     EnqueueJobRequest,
     _JobCheckpointResponse,
     JobReferenceResponse,
+)
+from arkali.surfaces.command.product_preview_resolution import (
+    _PreviewBridgeWiring,
+    _resolve_candidate_for_project,
 )
 
 #: The one real `job_type` this route submits — the frontend never
@@ -124,6 +131,65 @@ def _reference(record: DurableJobRecord) -> JobReferenceResponse:
     )
 
 
+def _preview_scope_key(candidate_id: str, attempt: int) -> str:
+    """The idempotency scope for one preview cycle. `attempt == 1` keeps the
+    original, already-shipped identity byte-for-byte (`candidate_id` alone),
+    so an already-open or already-terminal FIRST preview is unaffected;
+    `attempt > 1` is a real, later preview cycle for the SAME candidate,
+    never a second candidate or a second job TYPE."""
+    return candidate_id if attempt == 1 else f"{candidate_id}#{attempt}"
+
+
+def _submit_or_recover_preview(store: JobStore, candidate_id: str) -> DurableJobRecord:
+    """"Uygulamayı Aç" for one candidate: rediscover the real active preview
+    if one exists, or mint the next real preview cycle if every prior one
+    for this candidate has already reached a real terminal state.
+
+    REUSES C-19's OWN idempotent `submit` for every write; the only new
+    logic is WHICH `(job_type, idempotency_key)` to ask for, derived purely
+    by reading existing rows through the already-public `find_submitted` --
+    no new table, no new column, no counter held anywhere but the real
+    `DurableJobRecord` rows already being asked about. `DEFINITION.terminal`
+    (`execution.durable.job_state_machine`, the SAME canonical Job machine
+    `JobStore.transition` itself defers to) is the one true "is this job
+    still active" fact reused here -- never a second, guessed vocabulary.
+    A job in `RECOVERABLE` is deliberately treated as still-active-enough-
+    to-rediscover: it is not in `DEFINITION.terminal` (the machine's own
+    docstring: "FAILED is deliberately not terminal so a failed job can
+    still reach... RECOVERABLE"), so a later real recovery could still move
+    it forward under the SAME identity, and minting a fresh one underneath
+    it would silently orphan that recovery path.
+    """
+    for attempt in itertools.count(1):
+        key = _preview_scope_key(candidate_id, attempt)
+        existing = store.find_submitted(_PREVIEW_JOB_TYPE, key)
+        if existing is None:
+            return store.submit(
+                JobSubmission(
+                    job_id=f"preview-{key}", job_type=_PREVIEW_JOB_TYPE,
+                    idempotency_key=key, payload={"candidate_id": candidate_id},
+                )
+            )
+        if existing.lifecycle_state not in _JOB_MACHINE.terminal:
+            return existing
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+def _find_current_preview(store: JobStore, candidate_id: str) -> DurableJobRecord | None:
+    """The most recent real preview cycle for this candidate — whether
+    still active or already terminal — never an old cycle a newer one has
+    superseded, and never a fabricated "still running" for a candidate
+    nobody has opened. `None` only when attempt 1 itself was never
+    submitted."""
+    latest: DurableJobRecord | None = None
+    for attempt in itertools.count(1):
+        found = store.find_submitted(_PREVIEW_JOB_TYPE, _preview_scope_key(candidate_id, attempt))
+        if found is None:
+            return latest
+        latest = found
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _checkpoint(record: JobCheckpointRecord) -> _JobCheckpointResponse:
     """Project one checkpoint row unchanged — the payload a worker recorded,
     never re-derived or paraphrased here."""
@@ -138,12 +204,25 @@ def build_jobs_router(
     refuse: _Refuse,
     pep: PolicyEnforcementPoint,
     clock: _Clock | None = None,
+    preview_bridge: _PreviewBridgeWiring | None = None,
 ) -> APIRouter:
     """The durable-job routes, over collaborators the application supplies.
 
     `clock` falls back to the same UTC default C-19 uses, so a caller that
     supplies nothing gets the shipping behaviour and a test can advance time
     deterministically without the surface holding a second time source.
+
+    `preview_bridge` is `(artifact_session_scope, artifact_blobs, ledger)`
+    for the one additional route below, `POST /projects/{project_id}/
+    preview` — see `product_preview_resolution.py`'s own module docstring
+    for why the evidence-store session is a second, separate dependency
+    from `session_scope` above (a real, separate database file, exactly as
+    every script already touching both `command_center.db` and the
+    evidence store keeps them). `None` (the default) omits that one route
+    entirely, so every existing caller of `build_jobs_router` is
+    unaffected — the identical `workflow_wiring`/`operations_wiring`
+    additive-and-optional shape `app.py` already uses for its own optional
+    capabilities.
     """
     # No router-level tag: the two original routes were both BACKEND_ONLY
     # (ARK-REQ-0027 is owned by `execution.durable`, no Phase 7 requirement
@@ -202,20 +281,18 @@ def build_jobs_router(
         never builds a `(job_type, idempotency_key)` pair itself, the same
         reason `POST /api/factory/goals` exists instead of a raw job POST.
 
-        The identity is entirely deterministic from `candidate_id`: calling
-        this again for the same candidate returns the real, already-running
-        job rather than a duplicate (C-19's own idempotent `submit`) — the
-        whole mechanism a browser refresh needs to rediscover a preview that
-        was already opening or already ready, with no second truth store.
+        Calling this while a real preview for this candidate is already
+        active (QUEUED/RUNNING/CHECKPOINTED/PAUSED/RESUMING/RECOVERABLE)
+        rediscovers that same real job — never a duplicate, and the whole
+        mechanism a browser refresh needs. Calling it again after the
+        candidate's most recent preview has reached a real terminal state
+        (`_JOB_MACHINE.terminal`) mints the next real preview cycle for the
+        SAME candidate instead of resurrecting the dead one — "Aç" after
+        "Durdur" genuinely starts a new run.
         """
         guard(WRITE)
         try:
-            record = store(session).submit(
-                JobSubmission(
-                    job_id=f"preview-{candidate_id}", job_type=_PREVIEW_JOB_TYPE,
-                    idempotency_key=candidate_id, payload={"candidate_id": candidate_id},
-                )
-            )
+            record = _submit_or_recover_preview(store(session), candidate_id)
         except Exception as error:
             raise refuse(error) from error
         return _reference(record)
@@ -236,8 +313,63 @@ def build_jobs_router(
         error — a fresh candidate nobody has opened is not a refusal.
         """
         guard(READ)
-        record = store(session).find_submitted(_PREVIEW_JOB_TYPE, candidate_id)
+        record = _find_current_preview(store(session), candidate_id)
         return None if record is None else _reference(record)
+
+    if preview_bridge is not None:
+
+        @router.post(
+            "/projects/{project_id}/preview", response_model=JobReferenceResponse,
+            status_code=202, tags=[BROWSER_SLICE],
+        )
+        def start_project_preview(
+            project_id: str,
+            session: Session = Depends(session_scope),
+            artifact_session: Session = Depends(preview_bridge.artifact_session_scope),
+        ) -> JobReferenceResponse:
+            """"Uygulamayı Aç" from Product Detail. Resolves the Managed
+            Product's one real accepted candidate through the canonical
+            D-029 chain (`ProjectRegistry` -> `provenance_ref` ->
+            `ArtifactStore` -> `CandidateLedger` eligibility,
+            `product_preview_resolution.py`), then submits/recovers its
+            real preview through the IDENTICAL `_submit_or_recover_preview`
+            the candidate-direct route above already uses — never a second
+            preview path, never a second identity for the same candidate.
+            """
+            guard(WRITE)
+            try:
+                candidate_id = _resolve_candidate_for_project(
+                    project_id, registry=ProjectRegistry(session),
+                    artifact_session=artifact_session, wiring=preview_bridge,
+                )
+                record = _submit_or_recover_preview(store(session), candidate_id)
+            except Exception as error:
+                raise refuse(error) from error
+            return _reference(record)
+
+        @router.get(
+            "/projects/{project_id}/preview", response_model=JobReferenceResponse | None,
+            tags=[BROWSER_SLICE],
+        )
+        def find_project_preview(
+            project_id: str,
+            session: Session = Depends(session_scope),
+            artifact_session: Session = Depends(preview_bridge.artifact_session_scope),
+        ) -> JobReferenceResponse | None:
+            """Read-only counterpart for browser refresh — the same real
+            shape `find_preview` already gives the candidate-direct route,
+            resolved through the same canonical chain as the POST above.
+            """
+            guard(READ)
+            try:
+                candidate_id = _resolve_candidate_for_project(
+                    project_id, registry=ProjectRegistry(session),
+                    artifact_session=artifact_session, wiring=preview_bridge,
+                )
+            except Exception as error:
+                raise refuse(error) from error
+            record = _find_current_preview(store(session), candidate_id)
+            return None if record is None else _reference(record)
 
     @router.get(
         "/jobs/{job_id}", response_model=JobReferenceResponse, tags=[BROWSER_SLICE],

@@ -57,6 +57,7 @@ from arkali.engineering.localai.capability_query import (  # noqa: E402
     compose_real_capability_authority,
 )
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
+from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
@@ -72,11 +73,18 @@ from arkali.kernel.persistence.engine import (  # noqa: E402
     sqlite_url,
 )
 from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
+from arkali.kernel.persistence.session import (  # noqa: E402
+    create_session_factory,
+    unit_of_work,
+)
 from arkali.surfaces.command.app import _CommandExtensions, create_app  # noqa: E402
 from arkali.surfaces.command.factory_history import (  # noqa: E402
     FactoryCampaignAttempt,
     FactoryCampaignSummary,
     FactoryCandidateSummary,
+)
+from arkali.surfaces.command.product_preview_resolution import (  # noqa: E402
+    _PreviewBridgeWiring,
 )
 
 
@@ -249,6 +257,47 @@ def _factory_campaign_history(repo_root: pathlib.Path) -> Callable[[], tuple[Fac
     return read
 
 
+def _preview_bridge_wiring(repo_root: pathlib.Path) -> _PreviewBridgeWiring:
+    """Real, unmodified `evidence.artifact` + `engineering.candidate.ledger.
+    CandidateLedger`, composed here (outside the measured architecture
+    graph, exactly as `_factory_candidate_history` above already is) for
+    the Product Detail -> preview bridge (D-029's own follow-on).
+
+    A SECOND real database, `var/factory/evidence/repair-evidence.db` --
+    the same file `product_registration.py`'s own callers
+    (`register_managed_product.py`, `run_golden_acceptance.py`) already
+    write provenance artifacts into, never a new one -- migrated and
+    engined exactly as `migrate`/`engine` above are for `command_center.
+    db`. `session_scope`'s own two-line shape is duplicated rather than
+    shared for the same reason `app.py`'s own `session_scope` closure is
+    private to `create_app`: each real database gets its own real
+    generator, and sharing one would blur which engine a given request's
+    session actually belongs to.
+    """
+    evidence_db = repo_root / "var" / "factory" / "evidence" / "repair-evidence.db"
+    evidence_db.parent.mkdir(parents=True, exist_ok=True)
+    config = Config(str(ROOT / "backend" / ALEMBIC_INI))
+    config.set_main_option("script_location", str(ROOT / "backend" / "alembic"))
+    config.set_main_option("sqlalchemy.url", sqlite_url(evidence_db))
+    command.upgrade(config, "head")
+    evidence_engine = create_persistence_engine(sqlite_url(evidence_db))
+    evidence_factory = create_session_factory(evidence_engine)
+
+    def artifact_session_scope() -> Any:
+        with unit_of_work(evidence_factory) as session:
+            yield session
+
+    pdp = PolicyDecisionPoint.load(repo_root)
+    blobs = ArtifactBlobStore(
+        repo_root / "var" / "factory" / "evidence" / "blobs",
+        PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store"),
+    )
+    ledger = CandidateLedger(repo_root / "var" / "factory" / "candidates" / "_ledger")
+    return _PreviewBridgeWiring(
+        artifact_session_scope=artifact_session_scope, artifact_blobs=blobs, ledger=ledger,
+    )
+
+
 def migrate(database: pathlib.Path) -> None:
     """Bring the database to head with the real migration chain."""
     config = Config(str(ROOT / "backend" / ALEMBIC_INI))
@@ -304,6 +353,7 @@ def main(argv: list[str]) -> int:
             factory_submitter=_factory_submitter(pdp, ROOT),
             factory_candidate_history=_factory_candidate_history(ROOT),
             factory_campaign_history=_factory_campaign_history(ROOT),
+            preview_bridge=_preview_bridge_wiring(ROOT),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")
