@@ -1,6 +1,14 @@
-"""The durable-job enqueue surface — `ARK-REQ-0027`.
+"""The durable-job enqueue and real-progress surface — `ARK-REQ-0027`.
 
 Owner: `surfaces.command`. Phase 7 Atomic Package 4.
+
+REAL FRONTEND CALLERS ON TWO OF THREE ROUTES. `GET /jobs/{job_id}` and
+`GET /jobs/{job_id}/checkpoints` are tagged `BROWSER_SLICE`: the Command
+Center's "Yeni Uygulama" screen polls them to show real progress for a
+real `software_factory.production` job (ARKALI COMMAND CENTER — DEF-009
+FLOW A CONVERGENCE AUTHORIZATION, item 9). `POST /jobs` stays
+`BACKEND_ONLY` — no Phase 7 requirement is owned by a surface context, so
+the raw generic enqueue route still owes no frontend of its own.
 
 WHAT THIS REQUIREMENT ACTUALLY SAYS. `MS §Constitution 8`: **no long AI work in
 HTTP requests.** The register assigns it to `execution.durable` with `arch` and
@@ -56,10 +64,16 @@ from sqlalchemy.orm import Session
 
 from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.execution.durable.job_store import READ, WRITE, JobStore, JobSubmission
-from arkali.execution.durable.records import DurableJobRecord, utc_now
+from arkali.execution.durable.records import (
+    DurableJobRecord,
+    JobCheckpointRecord,
+    utc_now,
+)
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
+    BROWSER_SLICE,
     EnqueueJobRequest,
+    _JobCheckpointResponse,
     JobReferenceResponse,
 )
 
@@ -93,6 +107,14 @@ def _reference(record: DurableJobRecord) -> JobReferenceResponse:
     )
 
 
+def _checkpoint(record: JobCheckpointRecord) -> _JobCheckpointResponse:
+    """Project one checkpoint row unchanged — the payload a worker recorded,
+    never re-derived or paraphrased here."""
+    return _JobCheckpointResponse(
+        sequence=record.sequence, payload=record.payload, recorded_at=record.recorded_at,
+    )
+
+
 def build_jobs_router(
     session_scope: _SessionScope,
     guard: _Guard,
@@ -106,18 +128,26 @@ def build_jobs_router(
     supplies nothing gets the shipping behaviour and a test can advance time
     deterministically without the surface holding a second time source.
     """
-    # BACKEND_ONLY is a declaration, not an excuse: `ARK-REQ-0027` is owned by
-    # `execution.durable` with `arch, integ` evidence and no Phase 7 requirement
-    # is owned by a surface context, so these routes owe no frontend. The
-    # contract-drift control reads this tag off the live OpenAPI document and
-    # fails on a route that declares no audience at all.
-    router = APIRouter(prefix="/api", tags=[BACKEND_ONLY])
+    # No router-level tag: the two original routes were both BACKEND_ONLY
+    # (ARK-REQ-0027 is owned by `execution.durable`, no Phase 7 requirement
+    # is owned by a surface context, so they owe no frontend), but
+    # `GET /jobs/{job_id}` and `GET /jobs/{job_id}/checkpoints` now have a
+    # real frontend caller (ARKALI COMMAND CENTER — DEF-009 FLOW A
+    # CONVERGENCE AUTHORIZATION, item 9) and must carry their OWN tag, or
+    # the router-level one would silently apply to every route. Each route
+    # below declares exactly one; the contract-drift control reads this off
+    # the live OpenAPI document and fails on a route that declares zero,
+    # two, or the wrong one.
+    router = APIRouter(prefix="/api")
     ticking: _Clock = clock or utc_now
 
     def store(session: Session) -> JobStore:
         return JobStore(session, pep, ticking)
 
-    @router.post("/jobs", response_model=JobReferenceResponse, status_code=202)
+    @router.post(
+        "/jobs", response_model=JobReferenceResponse, status_code=202,
+        tags=[BACKEND_ONLY],
+    )
     def enqueue_job(
         body: EnqueueJobRequest, session: Session = Depends(session_scope)
     ) -> JobReferenceResponse:
@@ -143,7 +173,9 @@ def build_jobs_router(
             raise refuse(error) from error
         return _reference(record)
 
-    @router.get("/jobs/{job_id}", response_model=JobReferenceResponse)
+    @router.get(
+        "/jobs/{job_id}", response_model=JobReferenceResponse, tags=[BROWSER_SLICE],
+    )
     def get_job(
         job_id: str, session: Session = Depends(session_scope)
     ) -> JobReferenceResponse:
@@ -160,5 +192,23 @@ def build_jobs_router(
         except Exception as error:
             raise refuse(error) from error
         return _reference(record)
+
+    @router.get(
+        "/jobs/{job_id}/checkpoints", response_model=list[_JobCheckpointResponse],
+        tags=[BROWSER_SLICE],
+    )
+    def list_checkpoints(
+        job_id: str, session: Session = Depends(session_scope)
+    ) -> list[_JobCheckpointResponse]:
+        """Every real checkpoint C-19 holds for this job, oldest first — the
+        real progress evidence a worker recorded. A read, and only a read;
+        this route derives nothing and stores nothing of its own."""
+        guard(READ)
+        job_store = store(session)
+        try:
+            job_store.require(job_id)
+        except Exception as error:
+            raise refuse(error) from error
+        return [_checkpoint(row) for row in job_store.checkpoints(job_id)]
 
     return router

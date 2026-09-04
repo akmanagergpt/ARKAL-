@@ -249,12 +249,13 @@ export interface FactoryHistorySnapshot {
 
 /**
  * The real `POST /api/factory/goals` intake — `ProductionFactory.submit_goal`
- * composed unmodified. `capability_id` is optional and, in the real running
- * Command Center today, has no route to an automated tier: no
- * `capability_query` is wired into `scripts/run_command_center.py`'s own
- * `ProductionFactory`, so every real submission resolves `governed_stop` or
- * `escalated`, never `queued`. This type does not paper over that — see
- * `NewApplicationIntake.tsx`.
+ * composed unmodified. `capability_id` is optional; when omitted, the real
+ * composition root (`scripts/run_command_center.py`) defaults it to a
+ * capability its own real, live Ollama probe found genuinely configured —
+ * never a UI-supplied or hard-coded model name. If no real local model is
+ * configured on the host running the Command Center, resolution still
+ * honestly falls through to `escalated`/`governed_stop`, never a
+ * fabricated `queued`. See `NewApplicationIntake.tsx`.
  *
  * NAMED WITH A LEADING UNDERSCORE, MATCHING THE BACKEND. `surfaces.command`
  * has no `max_public_surface_per_context` headroom to spare, so the backend
@@ -284,6 +285,35 @@ export interface _FactoryIntakeResponse {
   unresolved_count: number;
   unresolved: _UnresolvedQuestionShape[];
   durable_job_id: string | null;
+}
+
+/**
+ * A real C-19 durable job reference — never execution detail (no attempt
+ * number, owner, retry count or scheduling metadata; `jobs.py`'s own
+ * `JobReferenceResponse` contract refuses all of that). Polled by
+ * `NewApplicationIntake.tsx` when a real submission returns a
+ * `durable_job_id`.
+ */
+export interface JobReferenceResponse {
+  job_id: string;
+  job_type: string;
+  idempotency_key: string;
+  lifecycle_state: string;
+  created_at: string;
+}
+
+/**
+ * One real checkpoint a worker recorded for a job — the real progress
+ * evidence `GET /api/jobs/{job_id}/checkpoints` reads from C-19, never a
+ * second progress-state store. `payload` is deliberately untyped beyond
+ * `Record<string, unknown>`: its shape is whatever the real worker recorded
+ * (ARKALI COMMAND CENTER — DEF-009 FLOW A CONVERGENCE AUTHORIZATION,
+ * item 9), read defensively by the UI rather than assumed.
+ */
+export interface _JobCheckpointResponse {
+  sequence: number;
+  payload: Record<string, unknown>;
+  recorded_at: string;
 }
 
 export interface WorkflowExecutionDetailResponse {

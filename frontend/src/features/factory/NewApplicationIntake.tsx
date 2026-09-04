@@ -3,29 +3,32 @@
  *
  * WHAT THIS REALLY DOES. Submits the user's own words to the real, already
  * shipped `POST /api/factory/goals` (`ProductionFactory.submit_goal`):
- * a deterministic blueprint derivation, then a real tier-routing decision,
- * then — only if both resolve — a real durable job. Nothing here re-derives
- * a blueprint, guesses at routing, or invents a job.
+ * a deterministic blueprint derivation, then a real tier-routing decision
+ * against a real, live-probed local-model capability
+ * (`engineering.localai.capability_query`), then — only if both resolve —
+ * a real durable job. Nothing here re-derives a blueprint, guesses at
+ * routing, or invents a job.
  *
- * WHY THERE IS NO PROGRESS BAR. `select_execution_tier` can only reach an
- * automated tier through a `capability_id` that a live, configured
- * `capability_query` resolves `PASS` — and the real running Command Center
- * (`scripts/run_command_center.py`) wires `ProductionFactory` with none. So
- * every real submission today ends at `governed_stop` (the description
- * could not be fully resolved) or `escalated` (resolved, but nothing
- * automated is configured to build it) — never `queued`. Even in the
- * `queued` case, no worker in this repository consumes
- * `software_factory.production` jobs (`docs/build/OPEN_BLOCKERS.md`,
- * DEF-009), so a job would sit queued forever. Showing a staged "Backend
- * hazırlanıyor… Arayüz hazırlanıyor…" animation over any of that would be a
- * fabricated success this screen refuses to produce. What is shown instead
- * is the real terminal answer, honestly explained.
+ * WHY PROGRESS IS DERIVED, NEVER STAGED. When a submission reaches
+ * `queued`, this screen polls the real `GET /api/jobs/{job_id}` and
+ * `GET /api/jobs/{job_id}/checkpoints` (`useFactoryIntake`) — the real C-19
+ * job store, and the real checkpoints `scripts/run_factory_worker.py`
+ * records as it hands the job to the unchanged, real
+ * `generate_staged_model_product`. If no worker is running, the job simply
+ * stays `QUEUED` and this screen says so honestly — it never shows a
+ * staged "Backend hazırlanıyor… Arayüz hazırlanıyor…" animation over a job
+ * nothing is processing.
  */
 
 import { useState } from 'react';
 
 import type { ArkaliApiClient } from '@/api/client';
-import type { _FactoryIntakeResponse, _UnresolvedQuestionShape } from '@/api/contracts';
+import type {
+  _FactoryIntakeResponse,
+  _JobCheckpointResponse,
+  _UnresolvedQuestionShape,
+  JobReferenceResponse,
+} from '@/api/contracts';
 import { Button, Callout, Panel } from '@/components/ui';
 
 import { useFactoryIntake } from './useFactoryIntake';
@@ -38,6 +41,31 @@ const UNRESOLVED_REASON_TR: Readonly<Record<string, string>> = {
     'ARKALI bu ifadeden otomatik olarak doğrulanabilir bir kural çıkaramadı. ' +
     'Bugün yalnızca açık sayısal koşullar içeren, resmi şekilde yazılmış ' +
     'cümleleri anlayabiliyor (ör. "Sistem en az 500 ms içinde yanıt vermelidir").',
+};
+
+//: Turkish UI projections of the real durable-job lifecycle state and the
+//: real `phase` a worker checkpointed — never a second lifecycle vocabulary.
+//: A state or phase this map does not name falls back to showing the raw
+//: value rather than inventing a label for it.
+const JOB_STATE_TR: Readonly<Record<string, string>> = {
+  QUEUED: 'İstek alındı, sırada bekliyor',
+  RUNNING: 'Üretiliyor',
+  CHECKPOINTED: 'Üretiliyor',
+  PAUSED: 'Duraklatıldı',
+  RESUMING: 'Devam ediyor',
+  SUCCEEDED: 'Hazır',
+  FAILED: 'Sorun oluştu',
+  CANCELLED: 'İşlem durduruldu',
+  DEAD_LETTER: 'İşlem durduruldu',
+};
+const CHECKPOINT_PHASE_TR: Readonly<Record<string, string>> = {
+  claimed: 'Hazırlanıyor',
+  generating: 'Üretiliyor',
+  staged_generation_pass: 'İlk üretim aşaması tamamlandı',
+  stage_failed: 'Üretim sırasında bir sorun bulundu',
+  final_gate_failed: 'Son doğrulama sırasında bir sorun bulundu',
+  interrupted: 'İşlem durduruldu',
+  refused: 'Bu istek zaten daha önce üretilmiş bir uygulamayla eşleşiyor',
 };
 
 function unresolvedReason(kind: string, showTechnical: boolean): string {
@@ -66,6 +94,64 @@ function UnresolvedList({
         </li>
       ))}
     </ul>
+  );
+}
+
+function ProgressCallout({
+  job,
+  checkpoints,
+  showTechnical,
+}: {
+  job: JobReferenceResponse;
+  checkpoints: readonly _JobCheckpointResponse[];
+  showTechnical: boolean;
+}) {
+  const latest = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1] : null;
+  const phase = typeof latest?.payload.phase === 'string' ? latest.payload.phase : null;
+  const label = (phase !== null ? CHECKPOINT_PHASE_TR[phase] : null)
+    ?? JOB_STATE_TR[job.lifecycle_state]
+    ?? job.lifecycle_state;
+  const isDone = ['SUCCEEDED', 'FAILED', 'CANCELLED', 'DEAD_LETTER'].includes(job.lifecycle_state);
+  const tone = job.lifecycle_state === 'SUCCEEDED'
+    ? 'success'
+    : job.lifecycle_state === 'FAILED' || job.lifecycle_state === 'DEAD_LETTER'
+      ? 'error'
+      : 'muted';
+
+  return (
+    <Callout tone={tone} title={label}>
+      {job.lifecycle_state === 'QUEUED' ? (
+        <p>
+          İsteğiniz gerçek bir işe kaydedildi ve şu anda sırada bekliyor. Bu
+          ortamda onu işleyecek bir arka plan süreci (worker) çalışmıyorsa,
+          burada bekliyor kalır.
+        </p>
+      ) : !isDone ? (
+        <p>Uygulamanız gerçek zamanlı olarak üretiliyor. Bu işlem birkaç dakika sürebilir.</p>
+      ) : job.lifecycle_state === 'SUCCEEDED' ? (
+        <p>
+          İlk üretim aşaması ve son bütünlük kontrolü başarıyla tamamlandı.
+          Bu, uygulamanın tamamen doğrulandığı (kabul/acceptance) anlamına
+          henüz gelmiyor — o adım bu ortamda ayrıca çalıştırılmalıdır.
+        </p>
+      ) : (
+        <p>
+          ARKALI gerçek üretim sırasında bir sorun buldu ve uygulamayı
+          tamamlayamadı. Candidate elle düzeltilmedi, doğrulama kuralları
+          gevşetilmedi — bu, gerçek ve dürüst bir sonuçtur.
+        </p>
+      )}
+      {showTechnical ? (
+        <div className="mt-2 space-y-1 font-mono text-xs opacity-80">
+          <p>job_id: {job.job_id} · lifecycle_state: {job.lifecycle_state}</p>
+          {checkpoints.map((checkpoint) => (
+            <p key={checkpoint.sequence}>
+              #{checkpoint.sequence}: {JSON.stringify(checkpoint.payload)}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </Callout>
   );
 }
 
@@ -101,9 +187,9 @@ function ResultCallout({
         <p>
           Açıklamanız anlaşıldı, ancak ARKALI şu anda bu isteği kendiliğinden
           üretime alacak bir yapılandırmaya sahip değil (otomatik olarak
-          çalışabilecek bir yapay zekâ kapasitesi tanımlı değil). Bu, isteğinizin
-          reddedildiği anlamına gelmez — üretim otomasyonu henüz bu ortamda
-          etkinleştirilmedi.
+          çalışabilecek bir yapay zekâ kapasitesi tanımlı değil ya da bu host
+          üzerinde bulunamadı). Bu, isteğinizin reddedildiği anlamına gelmez —
+          üretim otomasyonu bu istek için etkinleştirilemedi.
         </p>
         {showTechnical ? (
           <p className="mt-2 font-mono text-xs opacity-80">
@@ -117,11 +203,7 @@ function ResultCallout({
 
   return (
     <Callout tone="success" title="İsteğiniz sıraya alındı">
-      <p>
-        Açıklamanız anlaşıldı ve gerçek bir işe kaydedildi. Ancak bu ortamda şu
-        anda bu işi otomatik olarak işleyecek bir arka plan süreci
-        bulunmuyor, bu yüzden burada bir ilerleme görünmeyecektir.
-      </p>
+      <p>Açıklamanız anlaşıldı ve gerçek bir işe kaydedildi.</p>
       {showTechnical ? (
         <p className="mt-2 font-mono text-xs opacity-80">
           durable_job_id: {result.durable_job_id ?? '—'}
@@ -189,6 +271,14 @@ export function NewApplicationIntake({
 
         {intake.result === null ? null : (
           <ResultCallout result={intake.result} showTechnical={showTechnical} />
+        )}
+
+        {intake.job === null ? null : (
+          <ProgressCallout
+            job={intake.job}
+            checkpoints={intake.checkpoints}
+            showTechnical={showTechnical}
+          />
         )}
       </form>
     </Panel>

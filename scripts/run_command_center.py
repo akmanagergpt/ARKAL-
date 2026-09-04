@@ -37,6 +37,7 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+from arkali.acceptance.governance_state import GovernanceState  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
@@ -52,6 +53,10 @@ from arkali.engineering.factory.production_orchestration import (  # noqa: E402
     ProductionGoalRequest,
 )
 from arkali.engineering.localai import host_probe  # noqa: E402
+from arkali.engineering.localai.capability_query import (  # noqa: E402
+    compose_real_capability_authority,
+)
+from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
@@ -90,11 +95,41 @@ class _DurableFactorySink:
 
 
 def _factory_submitter(pdp: PolicyDecisionPoint, repo_root: pathlib.Path) -> Callable[..., Any]:
-    factory = ProductionFactory(AuthorityMap.load(repo_root))
+    """DEF-009 FLOW A CONVERGENCE AUTHORIZATION, item 3: `ProductionFactory`
+    is composed with a real `capability_query` for the first time, derived
+    once here (not per request) by probing the real local Ollama runtime -
+    a bounded, read-only probe, the same kind every `LocalRuntimeAdapter`
+    caller already performs. Nothing about which model wins is decided by
+    this launcher or by the UI: `compose_real_capability_authority` derives
+    it entirely from what the real runtime and the real, hardware-aware
+    suitability verdict report right now. A request that already names a
+    `capability_id` is never overridden; only an absent one is defaulted,
+    and only to a capability this same probe found genuinely configured -
+    if none is, the default stays `None` and routing honestly escalates.
+    """
+    # `GovernanceState` (`acceptance.engine`) is asked here, not inside
+    # `capability_query.py`: that module lives in `engineering.localai`, a
+    # lower architecture layer, and importing `acceptance.engine` from it
+    # extended the repository's longest dependency chain past
+    # `max_orchestration_depth` (proven by trying it, not assumed). This
+    # script is outside the measured architecture graph, exactly like its
+    # own `host_probe`/`ProductionFactory` composition just below.
+    activation_phase = "9B"  # ARK-REQ-0048's own owning phase (register-verified in tests)
+    governance = GovernanceState.load(repo_root)
+    current_phase = (
+        activation_phase
+        if governance.phase(activation_phase).is_accepted
+        else str(governance.current_work_phase())
+    )
+    authority = compose_real_capability_authority(repo_root, OllamaAdapter(), current_phase)
+    factory = ProductionFactory(AuthorityMap.load(repo_root), authority.query)
 
     def submit(session: Session, body: Any) -> Any:
         pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
-        request = ProductionGoalRequest(**body.model_dump())
+        fields = body.model_dump()
+        if fields.get("capability_id") is None:
+            fields["capability_id"] = authority.default_capability_id
+        request = ProductionGoalRequest(**fields)
         return factory.submit_goal(request, _DurableFactorySink(JobStore(session, pep)))
 
     return submit

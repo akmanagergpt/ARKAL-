@@ -396,6 +396,8 @@ class TestTransportTypesMatchTheBackend:
             "_FactoryGoalRequest",
             "_FactoryIntakeResponse",
             "_UnresolvedQuestionShape",
+            "JobReferenceResponse",
+            "_JobCheckpointResponse",
         }
         assert exchanged <= declared
 

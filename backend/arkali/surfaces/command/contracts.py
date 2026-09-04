@@ -196,6 +196,22 @@ class JobReferenceResponse(TransportModel):
     created_at: dt.datetime
 
 
+class _JobCheckpointResponse(TransportModel):
+    """One real checkpoint C-19 already persisted for a job — deliberately
+    a SEPARATE shape from `JobReferenceResponse`, never a field added to
+    it: that class's own contract refuses execution detail, and a
+    checkpoint's `payload` is exactly that. Read-only, and never a second
+    progress-state store — `payload` is projected unchanged from
+    `JobCheckpointRecord`, whatever the producing worker put there
+    (ARKALI COMMAND CENTER — DEF-009 FLOW A CONVERGENCE AUTHORIZATION,
+    item 9).
+    """
+
+    sequence: int
+    payload: dict[str, object]
+    recorded_at: dt.datetime
+
+
 class ErrorResponse(BaseModel):
     """A refusal the client can act on.
 

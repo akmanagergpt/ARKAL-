@@ -118,9 +118,22 @@ describe('New Application intake', () => {
     expect(screen.getByText(/kendiliğinden üretime alacak bir yapılandırmaya sahip değil/)).toBeInTheDocument();
   });
 
-  it('explains a queued result without fabricating progress', async () => {
+  it('explains a queued result and polls the real job honestly, without fabricating progress', async () => {
     const user = userEvent.setup();
-    mount({ [GOALS]: { status: 202, body: QUEUED } });
+    const JOB = `GET ${BASE}/api/jobs/goal-3`;
+    const CHECKPOINTS = `GET ${BASE}/api/jobs/goal-3/checkpoints`;
+    mount({
+      [GOALS]: { status: 202, body: QUEUED },
+      [JOB]: {
+        status: 200,
+        body: {
+          job_id: 'goal-3', job_type: 'software_factory.production',
+          idempotency_key: 'goal-3', lifecycle_state: 'QUEUED',
+          created_at: '2026-09-04T00:00:00Z',
+        },
+      },
+      [CHECKPOINTS]: { status: 200, body: [] },
+    });
 
     await typeAndSubmit(
       user,
@@ -128,9 +141,50 @@ describe('New Application intake', () => {
     );
 
     expect(await screen.findByText('İsteğiniz sıraya alındı')).toBeInTheDocument();
-    expect(screen.getByText(/bu işi otomatik olarak işleyecek bir arka plan süreci/)).toBeInTheDocument();
-    // No progress bar, no stage list, no success claim beyond the real one.
-    expect(screen.queryByText(/hazır/i)).not.toBeInTheDocument();
+    // The real job's real state, read from the real job store — not a
+    // fabricated staged animation.
+    expect(await screen.findByText('İstek alındı, sırada bekliyor')).toBeInTheDocument();
+    expect(
+      screen.getByText(/onu işleyecek bir arka plan süreci \(worker\) çalışmıyorsa/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Hazır$/)).not.toBeInTheDocument();
+  });
+
+  it('shows a real SUCCEEDED job and its real checkpoints as done, in Uzman mode', async () => {
+    const user = userEvent.setup();
+    const JOB = `GET ${BASE}/api/jobs/goal-3`;
+    const CHECKPOINTS = `GET ${BASE}/api/jobs/goal-3/checkpoints`;
+    mount({
+      [GOALS]: { status: 202, body: QUEUED },
+      [JOB]: {
+        status: 200,
+        body: {
+          job_id: 'goal-3', job_type: 'software_factory.production',
+          idempotency_key: 'goal-3', lifecycle_state: 'SUCCEEDED',
+          created_at: '2026-09-04T00:00:00Z',
+        },
+      },
+      [CHECKPOINTS]: {
+        status: 200,
+        body: [
+          {
+            sequence: 1,
+            payload: { phase: 'staged_generation_pass', candidate_id: 'factory-goal-3' },
+            recorded_at: '2026-09-04T00:05:00Z',
+          },
+        ],
+      },
+    });
+    await user.click(screen.getByRole('button', { name: 'Uzman' }));
+
+    await typeAndSubmit(
+      user,
+      'The system must respond within at least 500 ms. The system must support at least 10 users.',
+    );
+
+    expect(await screen.findByText('İlk üretim aşaması tamamlandı')).toBeInTheDocument();
+    expect(screen.getByText(/lifecycle_state: SUCCEEDED/)).toBeInTheDocument();
+    expect(screen.getByText(/factory-goal-3/)).toBeInTheDocument();
   });
 
   it('reports a transport failure rather than a fabricated result', async () => {

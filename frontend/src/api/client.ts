@@ -21,6 +21,8 @@ import type {
   FactoryHistorySnapshot,
   _FactoryIntakeResponse,
   HealthResponse,
+  _JobCheckpointResponse,
+  JobReferenceResponse,
   LifecycleMachineResponse,
   OperationsSnapshot,
   ProjectDetailResponse,
@@ -71,6 +73,8 @@ export const ENDPOINTS = {
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
+  getJob: { method: 'GET', path: '/api/jobs/{job_id}' },
+  listJobCheckpoints: { method: 'GET', path: '/api/jobs/{job_id}/checkpoints' },
 } as const;
 
 /**
@@ -355,6 +359,28 @@ export class ArkaliApiClient {
    */
   submitFactoryGoal(body: _FactoryGoalRequest): Promise<_FactoryIntakeResponse> {
     return this.request<_FactoryIntakeResponse>(ENDPOINTS.submitFactoryGoal, { body });
+  }
+
+  /**
+   * The real, current lifecycle state of a durable job — a plain read,
+   * never a mutation. Used to poll a real `software_factory.production`
+   * job after a `queued` intake result.
+   */
+  getJob(jobId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.getJob, {
+      params: { job_id: jobId },
+    });
+  }
+
+  /**
+   * Every real checkpoint a worker recorded for a job, oldest first — the
+   * real progress evidence this slice derives its progress display from,
+   * never a second progress-state store.
+   */
+  listJobCheckpoints(jobId: string): Promise<_JobCheckpointResponse[]> {
+    return this.request<_JobCheckpointResponse[]>(ENDPOINTS.listJobCheckpoints, {
+      params: { job_id: jobId },
+    });
   }
 }
 
