@@ -47,11 +47,34 @@ workspace. There is nothing to remember once the context exits, because
 nothing it started is still running. A caller that needs real progress
 reporting (the durable-job worker) passes `on_phase`; this module records
 no progress of its own.
+
+THE BUILD CACHE IS A DISPOSABLE DERIVED ARTIFACT, NEVER A SECOND TRUTH
+STORE. `npm install`/`npm run build` measured 250+ of a real ~277s cold
+run — install/build outputs but not the venv or PID, port, log or job
+state, none of which is reproducible-input-derived. The cache key is
+`file_manifest` (`engineering.candidate.ledger`, already the same real,
+deterministic, sorted, symlink-safe hash this context uses to verify a
+candidate's real content at acceptance) over the candidate's own source
+tree — REUSED unchanged, not re-derived — folded through the same
+`content_identity.address_of` `evidence.artifact` already uses for its
+own content addresses, plus one explicit `_CACHE_SCHEMA_VERSION` constant
+so changing what this function caches or how invalidates every existing
+entry deterministically, the same way changing a candidate's own source,
+`requirements.txt`, `package.json` or lockfile does (all real files
+`file_manifest` already walks — nothing about them is special-cased).
+A cache entry is populated only by an atomic rename from a temp directory
+after a real successful build, so a crash or a cancel mid-populate never
+leaves a partial entry an unlucky later hit could restore. Deleting the
+whole cache directory at any time only ever costs the next preview a slow
+cold build — `CandidateLedger`'s real ACCEPTED verdict, the real source
+tree, and every other real fact this module reads are untouched by its
+presence, absence, or content.
 """
 
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import pathlib
 import shutil
@@ -59,10 +82,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from collections.abc import Callable, Iterator
 from typing import TypedDict
 
-from arkali.engineering.candidate.ledger import ACCEPTED, CandidateLedger
+from arkali.engineering.candidate.content_identity import address_of
+from arkali.engineering.candidate.ledger import ACCEPTED, CandidateLedger, file_manifest
 from arkali.engineering.candidate.runtime_process import (
     port_is_free,
     stop_process,
@@ -78,6 +103,19 @@ _PREVIEWS = _ROOT / "var" / "factory" / "previews"
 _BACKEND_PORT = 5000
 _FRONTEND_PORT = 3000
 
+#: Disposable derived build artifacts only -- see the module docstring's
+#: "THE BUILD CACHE" section. Deleting this whole directory at any time is
+#: always safe; the next preview just builds cold again.
+_BUILD_CACHE = _ROOT / "var" / "factory" / "preview-build-cache"
+#: Bump this to invalidate every existing cache entry deterministically
+#: when what gets cached, or how, ever changes -- the one build-recipe
+#: input `file_manifest` (a pure function of the candidate's own source
+#: tree) cannot see for itself.
+_CACHE_SCHEMA_VERSION = "1"
+_CACHE_VENV_DIR = "venv"
+_CACHE_NODE_MODULES_DIR = "node_modules"
+_CACHE_FRONTEND_BUILD_DIR = "frontend_build"
+
 #: Real, measured phase names a caller's `on_phase` may receive, in order.
 #: Not a second state vocabulary — these describe *sub-steps within one
 #: durable-job RUNNING state*, exactly the granularity a checkpoint
@@ -89,6 +127,10 @@ _PHASE_BACKEND_STARTED = "backend_started"
 _PHASE_FRONTEND_INSTALLED = "frontend_installed"
 _PHASE_FRONTEND_BUILT = "frontend_built"
 _PHASE_READY = "ready"
+#: Reported instead of the install/build phases above when a real prior
+#: build's cached output was restored -- never a claim that install or
+#: build ran again, since neither did.
+_PHASE_RESTORED_FROM_CACHE = "restored_from_cache"
 
 
 class _PreviewInfo(TypedDict):
@@ -140,6 +182,66 @@ def _require_accepted(candidate_id: str) -> None:
             f"candidate {candidate_id!r} is not ACCEPTED (real latest state: {state!r}); "
             "only a canonically accepted candidate may be shown to a user as a running app"
         )
+
+
+def _cache_key_for(source: pathlib.Path) -> str:
+    """The candidate's real, deterministic content identity -- REUSED,
+    never re-derived: `file_manifest` is the same sorted, symlink-safe hash
+    `CandidateLedger.verify_integrity` already trusts for this exact
+    candidate directory. Source content, `requirements.txt`, `package.json`
+    and any lockfile are all real files under `source` this already walks;
+    nothing about a build input is special-cased. `_CACHE_SCHEMA_VERSION`
+    is folded in so a change to what this module caches, independent of
+    the candidate's own content, still invalidates deterministically.
+    """
+    manifest = file_manifest(source)
+    canonical = json.dumps(
+        {"schema": _CACHE_SCHEMA_VERSION, "manifest": manifest},
+        sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")
+    return address_of(canonical)
+
+
+def _restore_from_cache(cache_dir: pathlib.Path, workspace_root: pathlib.Path, candidate: pathlib.Path) -> bool:
+    """True and restored if a complete prior build exists for this exact
+    content identity; False (nothing touched) otherwise. Copies, not
+    moves or links -- the cache entry must survive being read from
+    repeatedly, and this preview's own workspace is disposable regardless
+    of whether it came from a cache hit or a cold build."""
+    venv_src = cache_dir / _CACHE_VENV_DIR
+    node_modules_src = cache_dir / _CACHE_NODE_MODULES_DIR
+    build_src = cache_dir / _CACHE_FRONTEND_BUILD_DIR
+    if not (venv_src.is_dir() and node_modules_src.is_dir() and build_src.is_dir()):
+        return False
+    shutil.copytree(venv_src, workspace_root / ".venv")
+    frontend_dir = candidate / "frontend"
+    shutil.copytree(node_modules_src, frontend_dir / "node_modules")
+    shutil.copytree(build_src, frontend_dir / "build")
+    return True
+
+
+def _populate_cache(cache_dir: pathlib.Path, workspace_root: pathlib.Path, candidate: pathlib.Path) -> None:
+    """Called only after a real successful cold build. Builds the entry in
+    a temp directory and `os.replace`s it into place as the last step, so
+    a crash, a cancel, or two previews racing on the same content identity
+    can never leave -- or restore from -- a half-written entry. If another
+    process already completed this exact entry first, this one's own temp
+    copy is simply discarded rather than raising: same content identity
+    means the two builds are interchangeable by construction.
+    """
+    _BUILD_CACHE.mkdir(parents=True, exist_ok=True)
+    temp_dir = _BUILD_CACHE / f".tmp-{uuid.uuid4().hex}"
+    try:
+        temp_dir.mkdir()
+        shutil.copytree(workspace_root / ".venv", temp_dir / _CACHE_VENV_DIR)
+        frontend_dir = candidate / "frontend"
+        shutil.copytree(frontend_dir / "node_modules", temp_dir / _CACHE_NODE_MODULES_DIR)
+        shutil.copytree(frontend_dir / "build", temp_dir / _CACHE_FRONTEND_BUILD_DIR)
+        if cache_dir.exists():
+            return  # a concurrent populate for the identical content identity won the race
+        os.replace(temp_dir, cache_dir)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)  # a no-op once `os.replace` has moved it
 
 
 def _npm() -> str:
@@ -223,19 +325,29 @@ def run_preview(
     )
     _report(_PHASE_WORKSPACE_ALLOCATED, {"workspace_root": str(workspace.root)})
     candidate = workspace.snapshot
+    #: Computed once, up front, over the real source this workspace was
+    #: just snapshotted from -- never over the workspace copy itself,
+    #: which `WorkspaceAuthority` already proved identical to `source`.
+    cache_key = _cache_key_for(source)
+    cache_dir = _BUILD_CACHE / cache_key.replace(":", "_")
     backend = None
     frontend = None
     backend_log = None
     frontend_log = None
     try:
         venv = workspace.root / ".venv"
-        _run([sys.executable, "-m", "venv", str(venv)], cwd=_ROOT, should_cancel=should_cancel)
         python = venv / "Scripts" / "python.exe" if os.name == "nt" else venv / "bin" / "python"
-        _run(
-            [str(python), "-m", "pip", "install", "-r", "backend/requirements.txt"],
-            cwd=candidate, should_cancel=should_cancel,
-        )
-        _report(_PHASE_BACKEND_INSTALLED, {})
+        cache_hit = _restore_from_cache(cache_dir, workspace.root, candidate)
+        if cache_hit:
+            _report(_PHASE_RESTORED_FROM_CACHE, {"cache_key": cache_key})
+            _report(_PHASE_BACKEND_INSTALLED, {})
+        else:
+            _run([sys.executable, "-m", "venv", str(venv)], cwd=_ROOT, should_cancel=should_cancel)
+            _run(
+                [str(python), "-m", "pip", "install", "-r", "backend/requirements.txt"],
+                cwd=candidate, should_cancel=should_cancel,
+            )
+            _report(_PHASE_BACKEND_INSTALLED, {})
 
         backend_log = (workspace.root / "backend.log").open("w", encoding="utf-8")
         code = (
@@ -256,17 +368,26 @@ def run_preview(
         _report(_PHASE_BACKEND_STARTED, {"backend_url": f"http://127.0.0.1:{_BACKEND_PORT}"})
 
         frontend_dir = candidate / "frontend"
-        _run(
-            [_npm(), "install"], cwd=frontend_dir, timeout_seconds=600,
-            should_cancel=should_cancel,
-        )
-        _report(_PHASE_FRONTEND_INSTALLED, {})
-        build_env = {**os.environ, "NODE_OPTIONS": "--openssl-legacy-provider"}
-        _run(
-            [_npm(), "run", "build"], cwd=frontend_dir, env=build_env, timeout_seconds=300,
-            should_cancel=should_cancel,
-        )
-        _report(_PHASE_FRONTEND_BUILT, {})
+        if cache_hit:
+            _report(_PHASE_FRONTEND_INSTALLED, {})
+            _report(_PHASE_FRONTEND_BUILT, {})
+        else:
+            _run(
+                [_npm(), "install"], cwd=frontend_dir, timeout_seconds=600,
+                should_cancel=should_cancel,
+            )
+            _report(_PHASE_FRONTEND_INSTALLED, {})
+            build_env = {**os.environ, "NODE_OPTIONS": "--openssl-legacy-provider"}
+            _run(
+                [_npm(), "run", "build"], cwd=frontend_dir, env=build_env, timeout_seconds=300,
+                should_cancel=should_cancel,
+            )
+            _report(_PHASE_FRONTEND_BUILT, {})
+            #: Only a real, just-succeeded cold build is ever cached --
+            #: never a restored one (would just copy the cache onto
+            #: itself) and never a failed one (an exception above skips
+            #: this line entirely, `finally` still cleans up the workspace).
+            _populate_cache(cache_dir, workspace.root, candidate)
 
         frontend_log = (workspace.root / "frontend.log").open("w", encoding="utf-8")
         frontend = subprocess.Popen(

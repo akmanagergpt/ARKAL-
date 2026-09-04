@@ -40,6 +40,7 @@ import { usePreview } from './usePreview';
 //: A phase or state this map does not name falls back to the raw value.
 const PREVIEW_PHASE_TR: Readonly<Record<string, string>> = {
   workspace_allocated: 'Ortam ayrılıyor',
+  restored_from_cache: 'Önceki kurulum yeniden kullanılıyor',
   backend_installed: 'Arka uç bağımlılıkları kuruldu',
   backend_started: 'Arka uç başlatıldı',
   frontend_installed: 'Ön yüz bağımlılıkları kuruluyor',

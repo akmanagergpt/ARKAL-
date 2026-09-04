@@ -100,3 +100,131 @@ def test_require_accepted_allows_a_real_accepted_candidate(monkeypatch) -> None:
         lambda self, candidate_id: {"state": "ACCEPTED"},  # noqa: ARG005
     )
     preview_module._require_accepted("golden-work-129")  # does not raise
+
+
+# -- build cache: real filesystem operations over isolated tmp_path fixtures,
+# -- never the real candidate source under var/factory/candidates/ --------
+
+
+def _write_fake_candidate(root: pathlib.Path, *, requirement: str = "flask==2.3.2") -> None:
+    (root / "backend").mkdir(parents=True)
+    (root / "backend" / "requirements.txt").write_text(requirement, encoding="utf-8")
+    (root / "backend" / "app.py").write_text("app = object()", encoding="utf-8")
+    (root / "frontend").mkdir()
+    (root / "frontend" / "package.json").write_text('{"name": "x"}', encoding="utf-8")
+
+
+def test_cache_key_is_deterministic_for_identical_content(tmp_path: pathlib.Path) -> None:
+    one = tmp_path / "one"
+    two = tmp_path / "two"
+    _write_fake_candidate(one)
+    _write_fake_candidate(two)
+
+    assert preview_module._cache_key_for(one) == preview_module._cache_key_for(two)
+
+
+def test_cache_key_changes_when_source_content_changes(tmp_path: pathlib.Path) -> None:
+    """The deterministic-miss requirement: a real content difference must
+    produce a real, different key -- proven against an isolated fixture,
+    never the real historical candidate source."""
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    _write_fake_candidate(before)
+    _write_fake_candidate(after)
+    (after / "backend" / "app.py").write_text("app = object()  # changed", encoding="utf-8")
+
+    assert preview_module._cache_key_for(before) != preview_module._cache_key_for(after)
+
+
+def test_cache_key_changes_when_the_requirements_file_changes(tmp_path: pathlib.Path) -> None:
+    """A dependency-manifest change is a build-input change, not merely a
+    source-content change -- both must miss."""
+    one = tmp_path / "one"
+    two = tmp_path / "two"
+    _write_fake_candidate(one, requirement="flask==2.3.2")
+    _write_fake_candidate(two, requirement="flask==3.0.0")
+
+    assert preview_module._cache_key_for(one) != preview_module._cache_key_for(two)
+
+
+def test_cache_key_changes_with_the_schema_version(monkeypatch, tmp_path: pathlib.Path) -> None:  # noqa: ANN001
+    """A build-recipe change this module makes, independent of any candidate's
+    own content, must still invalidate every existing entry."""
+    source = tmp_path / "source"
+    _write_fake_candidate(source)
+
+    monkeypatch.setattr(preview_module, "_CACHE_SCHEMA_VERSION", "1")
+    key_v1 = preview_module._cache_key_for(source)
+    monkeypatch.setattr(preview_module, "_CACHE_SCHEMA_VERSION", "2")
+    key_v2 = preview_module._cache_key_for(source)
+
+    assert key_v1 != key_v2
+
+
+def _populate_fake_build_outputs(workspace_root: pathlib.Path, candidate: pathlib.Path) -> None:
+    (workspace_root / ".venv" / "Scripts").mkdir(parents=True)
+    (workspace_root / ".venv" / "Scripts" / "python.exe").write_bytes(b"fake-interpreter")
+    frontend = candidate / "frontend"
+    (frontend / "node_modules" / "some-package").mkdir(parents=True)
+    (frontend / "node_modules" / "some-package" / "index.js").write_text("x", encoding="utf-8")
+    (frontend / "build").mkdir()
+    (frontend / "build" / "index.html").write_text("<html></html>", encoding="utf-8")
+
+
+def test_restore_from_cache_is_false_for_a_key_that_was_never_populated(tmp_path: pathlib.Path) -> None:
+    cache_dir = tmp_path / "cache" / "sha256_does-not-exist"
+    workspace_root = tmp_path / "workspace"
+    candidate = tmp_path / "workspace" / "snapshot"
+    candidate.mkdir(parents=True)
+
+    assert preview_module._restore_from_cache(cache_dir, workspace_root, candidate) is False
+    assert not (workspace_root / ".venv").exists()
+
+
+def test_populate_then_restore_round_trips_real_bytes(tmp_path: pathlib.Path, monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
+    cache_dir = tmp_path / "cache-root" / "key-a"
+
+    build_workspace = tmp_path / "build-workspace"
+    build_candidate = build_workspace / "snapshot"
+    build_candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(build_workspace, build_candidate)
+
+    preview_module._populate_cache(cache_dir, build_workspace, build_candidate)
+
+    assert cache_dir.is_dir()
+    assert not list((tmp_path / "cache-root").glob(".tmp-*"))  # no leftover temp directory
+
+    restore_workspace = tmp_path / "restore-workspace"
+    restore_candidate = restore_workspace / "snapshot"
+    restore_candidate.mkdir(parents=True)
+
+    hit = preview_module._restore_from_cache(cache_dir, restore_workspace, restore_candidate)
+
+    assert hit is True
+    assert (restore_workspace / ".venv" / "Scripts" / "python.exe").read_bytes() == b"fake-interpreter"
+    assert (restore_candidate / "frontend" / "build" / "index.html").read_text(encoding="utf-8") == "<html></html>"
+    assert (restore_candidate / "frontend" / "node_modules" / "some-package" / "index.js").is_file()
+
+
+def test_populate_cache_discards_its_own_temp_copy_when_another_populate_already_won(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Two previews racing on the identical content identity must not
+    error -- content-addressed entries are interchangeable by construction,
+    so the loser's own temp directory is simply discarded."""
+    cache_dir = tmp_path / "cache-root" / "key-a"
+    cache_dir.mkdir(parents=True)
+    (cache_dir / "already-here.txt").write_text("first writer won", encoding="utf-8")
+
+    workspace = tmp_path / "workspace"
+    candidate = workspace / "snapshot"
+    candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(workspace, candidate)
+
+    preview_module._populate_cache(cache_dir, workspace, candidate)  # must not raise
+
+    # The pre-existing (first writer's) content is untouched.
+    assert (cache_dir / "already-here.txt").read_text(encoding="utf-8") == "first writer won"
+    assert not (cache_dir / preview_module._CACHE_VENV_DIR).exists()
+    assert not list(cache_dir.parent.glob(".tmp-*"))  # this writer's own temp dir was cleaned up
