@@ -1,5 +1,5 @@
 import type { ArkaliApiClient } from '@/api/client';
-import { Callout } from '@/components/ui';
+import { Callout, PageHeader } from '@/components/ui';
 
 import { CreateProjectForm } from './CreateProjectForm';
 import { ProjectDetail } from './ProjectDetail';
@@ -11,13 +11,10 @@ export function ProjectRegistryPage({ client, showTechnical }: { client: ArkaliA
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Projeler</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Projeleriniz doğrudan ARKALI kayıt sisteminden okunur. Durum ve sürüm bilgileri
-          bu ekranda yeniden üretilmez.
-        </p>
-      </div>
+      <PageHeader
+        title="Projeler"
+        subtitle="Projeleriniz doğrudan ARKALI kayıt sisteminden okunur. Durum ve sürüm bilgileri bu ekranda yeniden üretilmez."
+      />
 
       {registry.notice === null ? null : (
         <Callout tone="success" title="Tamamlandı">

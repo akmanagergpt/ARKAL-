@@ -36,7 +36,7 @@ def port_accepts_connections(port: int) -> bool:
         return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
-def wait_tcp(port: int, process: subprocess.Popen[str], timeout: float = 20.0) -> None:
+def _wait_tcp(port: int, process: subprocess.Popen[str], timeout: float = 20.0) -> None:
     """Block until something listens on `port`, or `process` exits early, or
     `timeout` elapses. For a caller with no known-good HTTP route to poll --
     unlike `wait_http`, a 404 here is not mistaken for "not ready"."""

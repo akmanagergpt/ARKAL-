@@ -283,7 +283,14 @@ class TestTheRouteDelegatesAndOwnsNoPersistence:
 
         An in-memory idempotency store would forget on restart, which is the
         one condition durability exists for. The guarantee is C-19's persisted
-        unique constraint and the route must simply call it.
+        unique constraint and an enqueue route must simply call `submit` —
+        never call `find_submitted` itself first to decide whether to.
+
+        `find_preview` is the one deliberate exception, not a loophole: its
+        entire declared job is that same read, exposed as its own real,
+        documented GET route so a browser refresh can rediscover a preview
+        without enqueuing one — never a pre-check bolted onto a write route.
+        Every OTHER route is still held to the negative control below.
         """
         source = code_only(read(JOBS))
         for shape in (
@@ -291,10 +298,13 @@ class TestTheRouteDelegatesAndOwnsNoPersistence:
             r"\bdefaultdict\b", r"\bset\(\)", r"\{\}\s*#",
         ):
             assert not re.search(shape, source), f"jobs.py matches {shape}"
-        assert "find_submitted" not in called(ast.parse(source)), (
-            "the route performs its own idempotency lookup; submit already is "
-            "idempotent by the persisted constraint"
-        )
+        for name, node in route_functions().items():
+            if name == "find_preview":
+                continue
+            assert "find_submitted" not in called(node), (
+                f"jobs.py::{name} performs its own idempotency lookup; submit "
+                "already is idempotent by the persisted constraint"
+            )
 
     def test_no_lifecycle_state_is_assigned_by_the_surface(self) -> None:
         """NEGATIVE CONTROL: the canonical machine is the only authority."""

@@ -73,8 +73,11 @@ export const ENDPOINTS = {
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
+  startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
+  findPreview: { method: 'GET', path: '/api/candidates/{candidate_id}/preview' },
   getJob: { method: 'GET', path: '/api/jobs/{job_id}' },
   listJobCheckpoints: { method: 'GET', path: '/api/jobs/{job_id}/checkpoints' },
+  cancelJob: { method: 'POST', path: '/api/jobs/{job_id}/cancel' },
 } as const;
 
 /**
@@ -362,6 +365,32 @@ export class ArkaliApiClient {
   }
 
   /**
+   * "Uygulamayı Aç" for one candidate — a real, domain-specific intake
+   * over C-19, the same shape `submitFactoryGoal` is for goals: the
+   * frontend never builds a `(job_type, idempotency_key)` pair itself.
+   * Idempotent by the backend's own persisted unique constraint: calling
+   * this again for the same candidate (e.g. after a browser refresh)
+   * returns the real, already-running job rather than a duplicate.
+   */
+  startPreview(candidateId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.startPreview, {
+      params: { candidate_id: candidateId },
+    });
+  }
+
+  /**
+   * Whether a real preview job already exists for this candidate, without
+   * creating one — `null` if nothing has ever been opened. The whole
+   * mechanism `usePreview.ts` uses to rediscover a real preview after a
+   * browser refresh: a plain read on mount, never a client-storage guess.
+   */
+  findPreview(candidateId: string): Promise<JobReferenceResponse | null> {
+    return this.request<JobReferenceResponse | null>(ENDPOINTS.findPreview, {
+      params: { candidate_id: candidateId },
+    });
+  }
+
+  /**
    * The real, current lifecycle state of a durable job — a plain read,
    * never a mutation. Used to poll a real `software_factory.production`
    * job after a `queued` intake result.
@@ -379,6 +408,18 @@ export class ArkaliApiClient {
    */
   listJobCheckpoints(jobId: string): Promise<_JobCheckpointResponse[]> {
     return this.request<_JobCheckpointResponse[]>(ENDPOINTS.listJobCheckpoints, {
+      params: { job_id: jobId },
+    });
+  }
+
+  /**
+   * Request early termination of a real job — Command Center's real
+   * "Durdur". Idempotent: cancelling an already-CANCELLED job returns its
+   * current reference rather than refusing, the same way the backend
+   * route itself treats it.
+   */
+  cancelJob(jobId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.cancelJob, {
       params: { job_id: jobId },
     });
   }

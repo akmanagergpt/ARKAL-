@@ -17,7 +17,7 @@ import type {
   RuntimeSnapshot,
   StorageSnapshot,
 } from '@/api/contracts';
-import { Button, Callout, Panel, Spinner } from '@/components/ui';
+import { Button, Callout, PageHeader, Panel, Spinner } from '@/components/ui';
 
 import { DimensionRow } from './DimensionRow';
 import { useOperationsSnapshot } from './useOperationsSnapshot';
@@ -86,15 +86,10 @@ function Header({
   lastUpdatedAt?: number | null;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Operasyonlar</h1>
-        <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Sistem ve çalışma durumu doğrudan ARKALI&apos;nin canlı servislerinden okunur;
-          burada hiçbir değer yeniden üretilmez.
-        </p>
-      </div>
-      {onRefresh === undefined ? null : (
+    <PageHeader
+      title="Operasyonlar"
+      subtitle="Sistem ve çalışma durumu doğrudan ARKALI'nin canlı servislerinden okunur; burada hiçbir değer yeniden üretilmez."
+      actions={onRefresh === undefined ? undefined : (
         <div className="flex items-center gap-3">
           {lastUpdatedAt == null ? null : (
             <span className="text-xs text-slate-500">
@@ -106,7 +101,7 @@ function Header({
           </Button>
         </div>
       )}
-    </div>
+    />
   );
 }
 

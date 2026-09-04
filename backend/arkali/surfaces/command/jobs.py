@@ -2,26 +2,38 @@
 
 Owner: `surfaces.command`. Phase 7 Atomic Package 4.
 
-REAL FRONTEND CALLERS ON TWO OF THREE ROUTES. `GET /jobs/{job_id}` and
+REAL FRONTEND CALLERS ON FIVE OF SIX ROUTES. `GET /jobs/{job_id}` and
 `GET /jobs/{job_id}/checkpoints` are tagged `BROWSER_SLICE`: the Command
 Center's "Yeni Uygulama" screen polls them to show real progress for a
 real `software_factory.production` job (ARKALI COMMAND CENTER — DEF-009
-FLOW A CONVERGENCE AUTHORIZATION, item 9). `POST /jobs` stays
-`BACKEND_ONLY` — no Phase 7 requirement is owned by a surface context, so
-the raw generic enqueue route still owes no frontend of its own.
+FLOW A CONVERGENCE AUTHORIZATION, item 9). The generic `POST /jobs` stays
+`BACKEND_ONLY` — no route here should hand the frontend a bare (job_type,
+idempotency_key, payload) triple to construct by hand, the same reason
+`POST /api/factory/goals` exists instead of the frontend calling
+`POST /jobs` directly for a goal. `POST /candidates/{candidate_id}/preview`
+is that same shape for "Uygulamayı Aç": a real, domain-specific intake
+that derives a deterministic job identity from `candidate_id` alone and
+submits it — nothing new for C-19 to learn, one more real caller of the
+same `submit`. `GET /candidates/{candidate_id}/preview` is its read-only
+counterpart, added so a browser refresh can rediscover a real preview
+without a page load itself enqueuing one. `POST /jobs/{job_id}/cancel` is
+"Durdur" — see its own docstring for why it checkpoints a request rather
+than transitioning anything itself.
 
 WHAT THIS REQUIREMENT ACTUALLY SAYS. `MS §Constitution 8`: **no long AI work in
 HTTP requests.** The register assigns it to `execution.durable` with `arch` and
 `integ` evidence, so the requirement is about the *architecture* that makes long
-work impossible in a request, not about a route being fast. The route below can
-only enqueue, because enqueueing is the only thing it is able to call.
+work impossible in a request, not about a route being fast. Every route below
+can only enqueue or checkpoint, because that is the only thing any of them is
+able to call.
 
-WHAT THE HANDLER DOES, IN FULL. Validate the transport shape, take a policy
-decision, hand three identities and an opaque payload to C-19, and return the
-durable reference. Then it ends. It opens no execution attempt, waits for
-nothing, polls nothing, transitions nothing and calls no provider, and a
+WHAT THE HANDLERS DO, IN FULL. Validate the transport shape, take a policy
+decision, hand identities and an opaque payload to C-19, and return the
+durable reference. Then they end. None opens an execution attempt, waits for
+anything, polls anything, transitions anything or calls a provider, and a
 structural control derives the forbidden call set from the durable services
-themselves rather than listing method names here.
+themselves (`transition` included) rather than listing method names here —
+`cancel_job` below is held to the exact same control as every other route.
 
 WHY THE RESPONSE IS `202 Accepted`. It is the honest status for this contract:
 the request has been accepted and the processing has **not** completed - which
@@ -76,6 +88,11 @@ from arkali.surfaces.command.contracts import (
     _JobCheckpointResponse,
     JobReferenceResponse,
 )
+
+#: The one real `job_type` this route submits — the frontend never
+#: constructs this string itself (ARK-REQ-0074-style: this surface names
+#: the identity shape, not a candidate domain fact).
+_PREVIEW_JOB_TYPE = "candidate.preview"
 
 #: Supplied by the composition root so this module neither builds a session nor
 #: decides policy: it receives the same guard and the same refusal mapping every
@@ -173,6 +190,55 @@ def build_jobs_router(
             raise refuse(error) from error
         return _reference(record)
 
+    @router.post(
+        "/candidates/{candidate_id}/preview", response_model=JobReferenceResponse,
+        status_code=202, tags=[BROWSER_SLICE],
+    )
+    def start_preview(
+        candidate_id: str, session: Session = Depends(session_scope)
+    ) -> JobReferenceResponse:
+        """Enqueue "Uygulamayı Aç" for one candidate. A real, domain-specific
+        intake over the same `submit` the generic route uses — the frontend
+        never builds a `(job_type, idempotency_key)` pair itself, the same
+        reason `POST /api/factory/goals` exists instead of a raw job POST.
+
+        The identity is entirely deterministic from `candidate_id`: calling
+        this again for the same candidate returns the real, already-running
+        job rather than a duplicate (C-19's own idempotent `submit`) — the
+        whole mechanism a browser refresh needs to rediscover a preview that
+        was already opening or already ready, with no second truth store.
+        """
+        guard(WRITE)
+        try:
+            record = store(session).submit(
+                JobSubmission(
+                    job_id=f"preview-{candidate_id}", job_type=_PREVIEW_JOB_TYPE,
+                    idempotency_key=candidate_id, payload={"candidate_id": candidate_id},
+                )
+            )
+        except Exception as error:
+            raise refuse(error) from error
+        return _reference(record)
+
+    @router.get(
+        "/candidates/{candidate_id}/preview", response_model=JobReferenceResponse | None,
+        tags=[BROWSER_SLICE],
+    )
+    def find_preview(
+        candidate_id: str, session: Session = Depends(session_scope)
+    ) -> JobReferenceResponse | None:
+        """Whether a real preview job already exists for this candidate,
+        without creating one. A read, and only a read — the whole mechanism
+        a browser refresh needs to rediscover a preview that was already
+        opening, already ready, or already stopped, without the page load
+        itself enqueuing anything: `start_preview` is a real user action
+        (a click), this is not. `null` means honestly nothing yet, not an
+        error — a fresh candidate nobody has opened is not a refusal.
+        """
+        guard(READ)
+        record = store(session).find_submitted(_PREVIEW_JOB_TYPE, candidate_id)
+        return None if record is None else _reference(record)
+
     @router.get(
         "/jobs/{job_id}", response_model=JobReferenceResponse, tags=[BROWSER_SLICE],
     )
@@ -210,5 +276,34 @@ def build_jobs_router(
         except Exception as error:
             raise refuse(error) from error
         return [_checkpoint(row) for row in job_store.checkpoints(job_id)]
+
+    @router.post(
+        "/jobs/{job_id}/cancel", response_model=JobReferenceResponse, tags=[BROWSER_SLICE],
+    )
+    def cancel_job(
+        job_id: str, session: Session = Depends(session_scope)
+    ) -> JobReferenceResponse:
+        """Request early termination of a real job — Command Center's real
+        "Durdur".
+
+        WHY THIS CHECKPOINTS RATHER THAN TRANSITIONS. `transition` is one of
+        this module's own forbidden calls (`test_enqueue_surface_authority.
+        py::TestTheRouteCannotExecuteTheWork`): an HTTP request may enqueue
+        durable work and record a real fact about it, but it may not itself
+        move a job's lifecycle state — only a worker, watching that state on
+        its own schedule, does that (`scripts/run_candidate_preview_worker.
+        py`). This route's whole job is to leave a real, durable `{"phase":
+        "cancel_requested"}` checkpoint the worker's own poll loop reads and
+        acts on. Idempotent for free: pressing "Durdur" twice just appends a
+        second identical checkpoint, never an error.
+        """
+        guard(WRITE)
+        job_store = store(session)
+        try:
+            record = job_store.require(job_id)
+            job_store.checkpoint(job_id, {"phase": "cancel_requested"})
+        except Exception as error:
+            raise refuse(error) from error
+        return _reference(record)
 
     return router

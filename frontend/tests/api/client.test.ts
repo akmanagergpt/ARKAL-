@@ -188,8 +188,11 @@ describe('ArkaliApiClient', () => {
       'GET /api/operations/snapshot',
       'GET /api/factory/history',
       'POST /api/factory/goals',
+      'POST /api/candidates/{candidate_id}/preview',
+      'GET /api/candidates/{candidate_id}/preview',
       'GET /api/jobs/{job_id}',
       'GET /api/jobs/{job_id}/checkpoints',
+      'POST /api/jobs/{job_id}/cancel',
     ]);
   });
 });

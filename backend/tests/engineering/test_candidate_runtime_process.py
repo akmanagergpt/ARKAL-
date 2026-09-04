@@ -52,21 +52,21 @@ def test_wait_http_times_out_rather_than_hanging_forever(monkeypatch) -> None:  
 
 
 def test_wait_tcp_returns_once_a_plain_tcp_listener_accepts_a_connection() -> None:
-    """The whole reason `wait_tcp` exists: a real listener needs no HTTP
+    """The whole reason `_wait_tcp` exists: a real listener needs no HTTP
     route at all to count as ready, unlike `wait_http`."""
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
     listener.listen(1)
     try:
         port = listener.getsockname()[1]
-        runtime_process.wait_tcp(port, _RunningProcess(), timeout=2.0)
+        runtime_process._wait_tcp(port, _RunningProcess(), timeout=2.0)
     finally:
         listener.close()
 
 
 def test_wait_tcp_raises_when_the_owned_process_exits_early() -> None:
     with pytest.raises(RuntimeError, match="exited early"):
-        runtime_process.wait_tcp(1, _DeadProcess(), timeout=1.0)
+        runtime_process._wait_tcp(1, _DeadProcess(), timeout=1.0)
 
 
 def test_wait_tcp_times_out_rather_than_hanging_forever() -> None:
@@ -75,7 +75,7 @@ def test_wait_tcp_times_out_rather_than_hanging_forever() -> None:
     port = listener.getsockname()[1]
     listener.close()
     with pytest.raises(RuntimeError, match="timed out"):
-        runtime_process.wait_tcp(port, _RunningProcess(), timeout=0.3)
+        runtime_process._wait_tcp(port, _RunningProcess(), timeout=0.3)
 
 
 def test_stop_process_is_a_no_op_for_none() -> None:

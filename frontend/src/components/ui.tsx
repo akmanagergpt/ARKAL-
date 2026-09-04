@@ -16,6 +16,7 @@ export function Button({
   disabled = false,
   busy = false,
   variant = 'secondary',
+  title,
 }: {
   children: ReactNode;
   type?: 'button' | 'submit';
@@ -23,6 +24,10 @@ export function Button({
   disabled?: boolean;
   busy?: boolean;
   variant?: 'primary' | 'secondary';
+  /** Shown on hover/focus — the one place a disabled control's plain-
+   * language reason lives, so a DISABLED_WITH_REASON control is never
+   * disabled with no reason a user can actually find. */
+  title?: string | undefined;
 }) {
   const palette =
     variant === 'primary'
@@ -34,6 +39,7 @@ export function Button({
       onClick={onClick}
       disabled={disabled || busy}
       aria-busy={busy}
+      title={title}
       className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${palette}`}
     >
       {busy ? <Spinner /> : null}
@@ -118,6 +124,32 @@ export function Callout({
     >
       <p className="font-semibold">{title}</p>
       {children === undefined ? null : <div className="mt-1">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * The one page-title pattern every real Command Center page uses: an `h1`,
+ * an optional muted parenthetical, an optional subtitle, and an optional
+ * action on the right. Extracted from `ProjectRegistryPage`/
+ * `FactoryHistoryPage`, which had each hand-rolled the identical
+ * `text-xl font-semibold` + `mt-1 max-w-2xl text-sm text-slate-600` markup —
+ * one real owner now, not a second design system.
+ */
+export function PageHeader({ title, subtitle, actions }: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
+        {subtitle === undefined ? null : (
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">{subtitle}</p>
+        )}
+      </div>
+      {actions}
     </div>
   );
 }
