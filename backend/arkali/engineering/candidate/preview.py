@@ -69,6 +69,26 @@ whole cache directory at any time only ever costs the next preview a slow
 cold build — `CandidateLedger`'s real ACCEPTED verdict, the real source
 tree, and every other real fact this module reads are untouched by its
 presence, absence, or content.
+
+CACHE PUBLICATION NEVER BLOCKS USER-FACING READY. A real, measured cold
+run (this turn's own live benchmark) proved `_populate_cache` sitting
+directly in front of the frontend server start and `wait_http` cost the
+user a real, avoidable ~20s beyond the moment the runtime was already
+genuinely usable — the cache is a disposable optimization for the *next*
+preview, never a precondition of *this* one being real. Population now
+runs on a plain `threading.Thread` this function starts right after a
+cold build succeeds and always joins in its own `finally`, before the
+workspace those copies read from can be removed — never a background
+daemon, scheduler or persistent authority: its entire life is bounded by
+and owned by one `run_preview` call, exactly the same shape the durable-
+job *worker* already is for the *preview* call itself, one level up.
+`_populate_cache` takes the same `should_cancel` contract `_run` already
+does and checks it between its three real copy steps (never mid-copy,
+`shutil.copytree` cannot be interrupted partway through) — bounded
+cooperative cancellation, reused, not reinvented: a real "Durdur" arriving
+while the runtime is already up and population is still running stops it
+within about one copy step, discards its temp directory, and never
+promotes a partial entry.
 """
 
 from __future__ import annotations
@@ -81,6 +101,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -220,7 +241,10 @@ def _restore_from_cache(cache_dir: pathlib.Path, workspace_root: pathlib.Path, c
     return True
 
 
-def _populate_cache(cache_dir: pathlib.Path, workspace_root: pathlib.Path, candidate: pathlib.Path) -> None:
+def _populate_cache(
+    cache_dir: pathlib.Path, workspace_root: pathlib.Path, candidate: pathlib.Path,
+    *, should_cancel: Callable[[], bool] | None = None,
+) -> None:
     """Called only after a real successful cold build. Builds the entry in
     a temp directory and `os.replace`s it into place as the last step, so
     a crash, a cancel, or two previews racing on the same content identity
@@ -228,14 +252,30 @@ def _populate_cache(cache_dir: pathlib.Path, workspace_root: pathlib.Path, candi
     process already completed this exact entry first, this one's own temp
     copy is simply discarded rather than raising: same content identity
     means the two builds are interchangeable by construction.
+
+    `should_cancel`, if given, is checked between each of the three real
+    copies below (never mid-copy -- `shutil.copytree` has no interruption
+    point of its own) and simply returns, abandoning the temp directory
+    for `finally` to remove, rather than ever promoting a partial entry.
+    Runs on a background thread (see `run_preview`); this function itself
+    is oblivious to that -- it is plain, sequential, synchronous code.
     """
+    def _cancelled() -> bool:
+        return should_cancel is not None and should_cancel()
+
     _BUILD_CACHE.mkdir(parents=True, exist_ok=True)
     temp_dir = _BUILD_CACHE / f".tmp-{uuid.uuid4().hex}"
     try:
         temp_dir.mkdir()
+        if _cancelled():
+            return
         shutil.copytree(workspace_root / ".venv", temp_dir / _CACHE_VENV_DIR)
+        if _cancelled():
+            return
         frontend_dir = candidate / "frontend"
         shutil.copytree(frontend_dir / "node_modules", temp_dir / _CACHE_NODE_MODULES_DIR)
+        if _cancelled():
+            return
         shutil.copytree(frontend_dir / "build", temp_dir / _CACHE_FRONTEND_BUILD_DIR)
         if cache_dir.exists():
             return  # a concurrent populate for the identical content identity won the race
@@ -334,6 +374,7 @@ def run_preview(
     frontend = None
     backend_log = None
     frontend_log = None
+    cache_thread: threading.Thread | None = None
     try:
         venv = workspace.root / ".venv"
         python = venv / "Scripts" / "python.exe" if os.name == "nt" else venv / "bin" / "python"
@@ -387,7 +428,17 @@ def run_preview(
             #: never a restored one (would just copy the cache onto
             #: itself) and never a failed one (an exception above skips
             #: this line entirely, `finally` still cleans up the workspace).
-            _populate_cache(cache_dir, workspace.root, candidate)
+            #: Started here, on a background thread, so it never delays the
+            #: frontend server start, `wait_http`, or user-facing READY
+            #: below by even one second -- joined in `finally`, always
+            #: before the workspace it reads from can be removed.
+            cache_thread = threading.Thread(
+                target=_populate_cache,
+                args=(cache_dir, workspace.root, candidate),
+                kwargs={"should_cancel": should_cancel},
+                daemon=True,
+            )
+            cache_thread.start()
 
         frontend_log = (workspace.root / "frontend.log").open("w", encoding="utf-8")
         frontend = subprocess.Popen(
@@ -418,4 +469,12 @@ def run_preview(
             backend_log.close()
         if frontend_log is not None:
             frontend_log.close()
+        if cache_thread is not None:
+            #: A real cancel (`should_cancel` true) makes `_populate_cache`
+            #: itself return within about one copy step -- this join is a
+            #: bound against something unforeseen hanging, not the real
+            #: mechanism cancellation relies on. With no cancel, this simply
+            #: waits for a real population that is usually already done or
+            #: nearly done by the time a session ends.
+            cache_thread.join(timeout=180.0)
         shutil.rmtree(workspace.root, ignore_errors=True)

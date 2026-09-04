@@ -171,6 +171,93 @@ def _populate_fake_build_outputs(workspace_root: pathlib.Path, candidate: pathli
     (frontend / "build" / "index.html").write_text("<html></html>", encoding="utf-8")
 
 
+def test_populate_cache_cancelled_before_any_copy_leaves_no_temp_dir_and_no_entry(
+    tmp_path: pathlib.Path, monkeypatch,  # noqa: ANN001
+) -> None:
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
+    cache_dir = tmp_path / "cache-root" / "key-a"
+    workspace = tmp_path / "workspace"
+    candidate = workspace / "snapshot"
+    candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(workspace, candidate)
+
+    preview_module._populate_cache(cache_dir, workspace, candidate, should_cancel=lambda: True)
+
+    assert not cache_dir.exists()
+    assert not list((tmp_path / "cache-root").glob(".tmp-*"))
+
+
+def test_populate_cache_cancelled_between_copy_steps_leaves_no_partial_entry(
+    tmp_path: pathlib.Path, monkeypatch,  # noqa: ANN001
+) -> None:
+    """The real bound cooperative cancellation gives: cancelling mid-way
+    through the three real copies still never promotes a half-built
+    entry -- exactly the "Durdur while runtime is up and population is
+    still running" scenario this turn is required to prove."""
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
+    cache_dir = tmp_path / "cache-root" / "key-a"
+    workspace = tmp_path / "workspace"
+    candidate = workspace / "snapshot"
+    candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(workspace, candidate)
+
+    calls = {"n": 0}
+
+    def should_cancel() -> bool:
+        calls["n"] += 1
+        return calls["n"] >= 2  # false the first check (before venv copy), true after
+
+    preview_module._populate_cache(cache_dir, workspace, candidate, should_cancel=should_cancel)
+
+    assert not cache_dir.exists()
+    assert not list((tmp_path / "cache-root").glob(".tmp-*"))
+    assert calls["n"] >= 2  # the cooperative check really did run more than once
+
+
+def test_populate_cache_with_should_cancel_always_false_completes_normally(
+    tmp_path: pathlib.Path, monkeypatch,  # noqa: ANN001
+) -> None:
+    """A caller with real cancellation support (the worker) whose user
+    never actually cancels must still get a real, complete cache entry --
+    the cooperative checks must never themselves cause a false cancel."""
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
+    cache_dir = tmp_path / "cache-root" / "key-a"
+    workspace = tmp_path / "workspace"
+    candidate = workspace / "snapshot"
+    candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(workspace, candidate)
+
+    preview_module._populate_cache(cache_dir, workspace, candidate, should_cancel=lambda: False)
+
+    assert cache_dir.is_dir()
+    assert (cache_dir / preview_module._CACHE_VENV_DIR / "Scripts" / "python.exe").read_bytes() == b"fake-interpreter"
+
+
+def test_populate_cache_runs_correctly_on_a_background_thread(
+    tmp_path: pathlib.Path, monkeypatch,  # noqa: ANN001
+) -> None:
+    """`run_preview` starts this on a `threading.Thread` -- proves the
+    function itself has no hidden main-thread-only assumption."""
+    import threading
+
+    monkeypatch.setattr(preview_module, "_BUILD_CACHE", tmp_path / "cache-root")
+    cache_dir = tmp_path / "cache-root" / "key-a"
+    workspace = tmp_path / "workspace"
+    candidate = workspace / "snapshot"
+    candidate.mkdir(parents=True)
+    _populate_fake_build_outputs(workspace, candidate)
+
+    thread = threading.Thread(
+        target=preview_module._populate_cache,
+        args=(cache_dir, workspace, candidate), kwargs={"should_cancel": None}, daemon=True,
+    )
+    thread.start()
+    thread.join(timeout=10.0)
+
+    assert not thread.is_alive()
+    assert cache_dir.is_dir()
+
+
 def test_restore_from_cache_is_false_for_a_key_that_was_never_populated(tmp_path: pathlib.Path) -> None:
     cache_dir = tmp_path / "cache" / "sha256_does-not-exist"
     workspace_root = tmp_path / "workspace"
