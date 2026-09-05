@@ -108,6 +108,25 @@ class _NeverGrant:
         return False
 
 
+class _ChildProductScopedGrant:
+    """A real `PROMOTE_CHILD_PRODUCT` grant under `HUMAN_GATE_3` -- the
+    identical shape a real `lifecycle.evolution` promotion would leave in
+    `HUMAN_GATE_RECORDS.md` -- mirroring `GovernanceState.operation_
+    grant`'s own exact 4-field match. Governance-scope audit: proves a
+    grant recorded for `PROMOTE_CHILD_PRODUCT` can never satisfy a
+    `MANAGED_PRODUCT_REVISION_PROMOTION` lookup, matching (gate,
+    operation_class, target, revision) exactly rather than by gate alone."""
+
+    def operation_grant(
+        self, gate_id: str, operation_class: str, target_identity: str, revision_identity: str,
+    ) -> bool:
+        return (
+            gate_id == "HUMAN_GATE_3" and operation_class == "PROMOTE_CHILD_PRODUCT"
+            and target_identity == "any-child-product-manifest-ref"
+            and revision_identity == "any-child-product-revision"
+        )
+
+
 @pytest.fixture()
 def registry_engine(tmp_path: pathlib.Path) -> Iterator[Engine]:
     built = create_persistence_engine(sqlite_url(tmp_path / "command_center.db"))
@@ -244,6 +263,37 @@ class TestMaterializedSource:
             ) as source:
                 assert (source / "app.py").read_text(encoding="utf-8") == "v2"
                 assert (source / "sub" / "util.py").read_text(encoding="utf-8") == "helper"
+
+    def test_corrupt_archive_fails_closed(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        """F-0074 Part F: a promoted revision whose registered artifact is
+        NOT a real, valid ZIP fails closed with a real exception -- never
+        a silent empty/partial materialization, and never a fallback to
+        any candidate source."""
+        with unit_of_work(create_session_factory(artifact_engine)) as evidence_session:
+            artifacts = ArtifactStore(evidence_session, blobs)
+            ref = artifacts.register(
+                b"this is not a real zip archive",
+                ProvenanceInput(
+                    producer_agent="engineering.product_change", provider_model="local",
+                    task_id="p3", specification_version=_MANAGED_PRODUCT_REVISION_SOURCE_SPEC,
+                    context_hash="corrupt",
+                ),
+            )
+        with unit_of_work(create_session_factory(registry_engine)) as session:
+            registry = ProjectRegistry(session)
+            registry.create_project("p3", "Corrupt Archive Product")
+            revision = registry.create_revision("p3", "p3-r1", provenance_ref=ref)
+
+        with unit_of_work(create_session_factory(artifact_engine)) as evidence_session, \
+             pytest.raises(zipfile.BadZipFile):
+            artifacts = ArtifactStore(evidence_session, blobs)
+            with materialized_source(
+                revision, artifacts=artifacts,
+                candidate_source_resolver=_StubCandidateSource(pathlib.Path(".")),
+            ):
+                pass
 
     def test_no_provenance_ref_is_refused(self, registry_engine: Engine, artifact_engine: Engine) -> None:
         with unit_of_work(create_session_factory(registry_engine)) as session:
@@ -529,6 +579,28 @@ class TestPromoteAndReject:
             promote_modification(
                 "p1", prepared, registry=ProjectRegistry(session),
                 artifacts=ArtifactStore(art_session, blobs), human_gates=_NeverGrant(),
+                issuer_identity="test-issuer",
+            )
+
+    def test_a_promote_child_product_grant_cannot_authorize_this_promotion(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        """Governance-scope audit (D-030): a real `HUMAN_GATE_3` grant
+        recorded for `PROMOTE_CHILD_PRODUCT` (C-36 child-product
+        promotion) must never satisfy `MANAGED_PRODUCT_REVISION_
+        PROMOTION` — the two are independently scoped by the identical
+        (gate, operation_class, target, revision) 4-tuple match
+        `GovernanceState.operation_grant` itself uses; `HUMAN_GATE_3`'s
+        own reuse as a gate NUMBER never broadens what any one recorded
+        grant actually authorizes."""
+        prepared = self._prepared(registry_engine, artifact_engine, blobs, tmp_path)
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as art_session, \
+             pytest.raises(PromotionNotAuthorizedError):
+            promote_modification(
+                "p1", prepared, registry=ProjectRegistry(session),
+                artifacts=ArtifactStore(art_session, blobs), human_gates=_ChildProductScopedGrant(),
                 issuer_identity="test-issuer",
             )
 

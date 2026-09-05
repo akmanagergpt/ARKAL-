@@ -46,12 +46,13 @@ from arkali.surfaces.command.jobs import (
 )
 from arkali.surfaces.command.product_preview_resolution import (
     _MANAGED_PRODUCT_PROVENANCE_SPEC,
+    _MANAGED_PRODUCT_REVISION_SOURCE_SPEC,
     _NoRevisionForProjectError,
     _PreviewBridgeWiring,
     _ProvenanceNotManagedProductError,
     _ReferencedCandidateNotEligibleError,
     _RevisionHasNoProvenanceError,
-    _resolve_candidate_for_project,
+    _resolve_preview_subject_for_project,
 )
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -106,27 +107,31 @@ class TestPreviewScopeKey:
         assert _preview_scope_key("golden-work-1", 3) == "golden-work-1#3"
 
 
+def _submit(store: JobStore, subject_id: str):  # noqa: ANN201
+    return _submit_or_recover_preview(store, subject_id, {"candidate_id": subject_id})
+
+
 class TestSubmitOrRecoverPreview:
     def test_the_first_open_creates_a_real_job_at_attempt_one(self, job_store: JobStore) -> None:
-        record = _submit_or_recover_preview(job_store, "golden-work-t1")
+        record = _submit(job_store, "golden-work-t1")
         assert record.idempotency_key == "golden-work-t1"
         assert record.job_id == "preview-golden-work-t1"
 
     def test_double_open_while_active_returns_the_same_job(self, job_store: JobStore) -> None:
         """Part I: double-click must never create two active runtimes."""
-        first = _submit_or_recover_preview(job_store, "golden-work-t2")
-        second = _submit_or_recover_preview(job_store, "golden-work-t2")
+        first = _submit(job_store, "golden-work-t2")
+        second = _submit(job_store, "golden-work-t2")
         assert first.job_id == second.job_id
         assert first.idempotency_key == second.idempotency_key
 
     def test_reopen_after_a_real_terminal_cancel_mints_a_new_job(self, job_store: JobStore) -> None:
         """The exact previously-verified limitation, now fixed: CANCELLED no
         longer masquerades as reusable."""
-        first = _submit_or_recover_preview(job_store, "golden-work-t3")
+        first = _submit(job_store, "golden-work-t3")
         job_store.transition(first.job_id, "RUNNING")
         job_store.transition(first.job_id, "CANCELLED")
 
-        second = _submit_or_recover_preview(job_store, "golden-work-t3")
+        second = _submit(job_store, "golden-work-t3")
         assert second.job_id != first.job_id
         assert second.idempotency_key == "golden-work-t3#2"
         assert second.lifecycle_state == "QUEUED"
@@ -134,13 +139,13 @@ class TestSubmitOrRecoverPreview:
     def test_a_second_reopen_after_another_terminal_cycle_mints_a_third(
         self, job_store: JobStore,
     ) -> None:
-        first = _submit_or_recover_preview(job_store, "golden-work-t4")
+        first = _submit(job_store, "golden-work-t4")
         job_store.transition(first.job_id, "RUNNING")
         job_store.transition(first.job_id, "CANCELLED")
-        second = _submit_or_recover_preview(job_store, "golden-work-t4")
+        second = _submit(job_store, "golden-work-t4")
         job_store.transition(second.job_id, "RUNNING")
         job_store.transition(second.job_id, "CANCELLED")
-        third = _submit_or_recover_preview(job_store, "golden-work-t4")
+        third = _submit(job_store, "golden-work-t4")
 
         assert third.idempotency_key == "golden-work-t4#3"
         assert len({first.job_id, second.job_id, third.job_id}) == 3
@@ -149,13 +154,22 @@ class TestSubmitOrRecoverPreview:
         """RECOVERABLE is not in the Job machine's own declared `terminal`
         set — a later real recovery could still move it forward, so minting
         a fresh identity underneath it would orphan that path."""
-        first = _submit_or_recover_preview(job_store, "golden-work-t5")
+        first = _submit(job_store, "golden-work-t5")
         job_store.transition(first.job_id, "RUNNING")
         job_store.transition(first.job_id, "FAILED")
         job_store.transition(first.job_id, "RECOVERABLE")
 
-        again = _submit_or_recover_preview(job_store, "golden-work-t5")
+        again = _submit(job_store, "golden-work-t5")
         assert again.job_id == first.job_id
+
+    def test_the_payload_is_passed_through_unchanged(self, job_store: JobStore) -> None:
+        """A revision-scoped subject's own payload (`project_id`/
+        `revision_id`, no `candidate_id`) is stored verbatim — this helper
+        never inspects or rewrites it."""
+        record = _submit_or_recover_preview(
+            job_store, "prj-rev2", {"project_id": "prj", "revision_id": "prj-r2"},
+        )
+        assert record.payload == {"project_id": "prj", "revision_id": "prj-r2"}
 
 
 class TestFindCurrentPreview:
@@ -163,10 +177,10 @@ class TestFindCurrentPreview:
         assert _find_current_preview(job_store, "golden-work-never-opened") is None
 
     def test_finds_the_active_job_not_an_old_terminal_one(self, job_store: JobStore) -> None:
-        first = _submit_or_recover_preview(job_store, "golden-work-t6")
+        first = _submit(job_store, "golden-work-t6")
         job_store.transition(first.job_id, "RUNNING")
         job_store.transition(first.job_id, "CANCELLED")
-        second = _submit_or_recover_preview(job_store, "golden-work-t6")
+        second = _submit(job_store, "golden-work-t6")
 
         found = _find_current_preview(job_store, "golden-work-t6")
         assert found is not None
@@ -174,7 +188,7 @@ class TestFindCurrentPreview:
         assert found.lifecycle_state == "QUEUED"
 
     def test_refresh_while_active_rediscovers_the_same_job(self, job_store: JobStore) -> None:
-        active = _submit_or_recover_preview(job_store, "golden-work-t7")
+        active = _submit(job_store, "golden-work-t7")
         found = _find_current_preview(job_store, "golden-work-t7")
         assert found is not None
         assert found.job_id == active.job_id
@@ -185,7 +199,7 @@ class TestFindCurrentPreview:
         """No newer cycle exists yet: the terminal one is the honest truth,
         never hidden and never pretended active (the caller reads
         `lifecycle_state` itself to know which)."""
-        first = _submit_or_recover_preview(job_store, "golden-work-t8")
+        first = _submit(job_store, "golden-work-t8")
         job_store.transition(first.job_id, "RUNNING")
         job_store.transition(first.job_id, "CANCELLED")
         found = _find_current_preview(job_store, "golden-work-t8")
@@ -265,14 +279,36 @@ def _register_unrelated_artifact(artifact_session: Session, blobs: ArtifactBlobS
     )
 
 
-def _accepted_ledger(candidate_id: str) -> _FakeLedger:
-    return _FakeLedger({candidate_id: [
-        {"candidate_id": candidate_id, "state": "ALLOCATED", "goal_hash": "sha256:" + "a" * 64},
-        {"candidate_id": candidate_id, "state": "ACCEPTED"},
-    ]})
+def _accepted_ledger(*candidate_ids: str) -> _FakeLedger:
+    return _FakeLedger({
+        candidate_id: [
+            {"candidate_id": candidate_id, "state": "ALLOCATED", "goal_hash": "sha256:" + "a" * 64},
+            {"candidate_id": candidate_id, "state": "ACCEPTED"},
+        ]
+        for candidate_id in candidate_ids
+    })
 
 
-class TestResolveCandidateForProject:
+def _register_revision_source_artifact(
+    artifact_session: Session, blobs: ArtifactBlobStore, *, payload: bytes = b"PK\x05\x06" + b"\x00" * 18,
+    context_hash: str = "sha256:" + "c" * 64,
+) -> str:
+    """A minimal, real, content-addressed `managed-product-revision-
+    source/1.0.0` artifact — an empty-but-structurally-valid ZIP's own end-
+    of-central-directory record by default, real enough for resolver-level
+    tests that never reach real extraction (that is `TestMaterializedSource`
+    /`test_product_change.py`'s own job)."""
+    return ArtifactStore(artifact_session, blobs).register(
+        payload,
+        ProvenanceInput(
+            producer_agent="engineering.product_change", provider_model="local",
+            task_id="prj", specification_version=_MANAGED_PRODUCT_REVISION_SOURCE_SPEC,
+            context_hash=context_hash,
+        ),
+    )
+
+
+class TestResolvePreviewSubjectForProject:
     def test_unknown_project_is_refused(
         self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
     ) -> None:
@@ -286,7 +322,7 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(UnknownProject):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "no-such-project", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -303,31 +339,43 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(_NoRevisionForProjectError):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-norev", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
 
-    def test_project_with_more_than_one_revision_is_refused(
+    def test_multiple_revisions_select_the_max_sequence_current_one(
         self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
     ) -> None:
-        """No canonical current-revision pointer exists — never silently
-        guessed."""
+        """F-0074: D-030's own ratified rule -- current = max(sequence) --
+        never the old "exactly one revision" refusal. The SECOND-created
+        revision (real, higher sequence) is deliberately given a
+        `revision_id` that sorts LEXICALLY BEFORE the first one
+        ("...-a-second" < "...-r1"), so a resolver that mistakenly picked
+        the lexically-greatest id would return the wrong revision here --
+        proving real sequence, never the id string, decides."""
         with unit_of_work(create_session_factory(registry_engine)) as session, \
              unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
             registry = ProjectRegistry(session)
             registry.create_project("prj-multirev", "Two Revisions")
-            registry.create_revision("prj-multirev", "prj-multirev-r1")
-            registry.create_revision("prj-multirev", "prj-multirev-r2")
+            ref1 = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-multirev",
+            )
+            ref2 = _register_revision_source_artifact(artifact_session, blobs)
+            registry.create_revision("prj-multirev", "prj-multirev-r1", provenance_ref=ref1)
+            registry.create_revision("prj-multirev", "prj-multirev-a-second", provenance_ref=ref2)
             wiring = _PreviewBridgeWiring(
                 artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
-                ledger=_accepted_ledger("golden-work-x"),
+                ledger=_accepted_ledger("golden-work-multirev"),
             )
-            with pytest.raises(_NoRevisionForProjectError):
-                _resolve_candidate_for_project(
-                    "prj-multirev", registry=registry,
-                    artifact_session=artifact_session, wiring=wiring,
-                )
+            subject = _resolve_preview_subject_for_project(
+                "prj-multirev", registry=registry,
+                artifact_session=artifact_session, wiring=wiring,
+            )
+            assert subject.revision_id == "prj-multirev-a-second"
+            assert subject.kind == "archive"
+            assert subject.subject_id == "prj-multirev-a-second"
+            assert "prj-multirev-a-second" < "prj-multirev-r1"  # lexically hostile, by construction
 
     def test_revision_without_provenance_ref_is_refused(
         self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
@@ -342,7 +390,7 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(_RevisionHasNoProvenanceError):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-noprov", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -364,7 +412,7 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(InvalidArtifactIdentity):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-badref", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -388,7 +436,7 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(UnknownArtifact):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-missing", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -407,7 +455,7 @@ class TestResolveCandidateForProject:
                 ledger=_accepted_ledger("golden-work-x"),
             )
             with pytest.raises(_ProvenanceNotManagedProductError):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-wrongkind", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -434,7 +482,7 @@ class TestResolveCandidateForProject:
                 ledger=not_accepted_ledger,
             )
             with pytest.raises(_ReferencedCandidateNotEligibleError):
-                _resolve_candidate_for_project(
+                _resolve_preview_subject_for_project(
                     "prj-notaccepted", registry=registry,
                     artifact_session=artifact_session, wiring=wiring,
                 )
@@ -454,11 +502,45 @@ class TestResolveCandidateForProject:
                 artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
                 ledger=_accepted_ledger("golden-work-real"),
             )
-            resolved = _resolve_candidate_for_project(
+            subject = _resolve_preview_subject_for_project(
                 "prj-good", registry=registry,
                 artifact_session=artifact_session, wiring=wiring,
             )
-            assert resolved == "golden-work-real"
+            assert subject.subject_id == "golden-work-real"
+            assert subject.revision_id == "prj-good-r1"
+            assert subject.kind == "candidate"
+
+    def test_a_promoted_revision_resolves_to_an_archive_subject_no_candidate_needed(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        """Revision 2+: no `CandidateLedger` identity is required at all --
+        a ledger double that RAISES the moment `.history()` is called
+        proves this mechanically, never merely by returning an empty
+        result a bug could also produce."""
+        class _RaisingLedger:
+            def history(self, candidate_id: str) -> tuple[dict[str, object], ...]:
+                raise AssertionError(
+                    f"CandidateLedger.history({candidate_id!r}) must never be called "
+                    "for an archive-backed (D-030 promoted) revision"
+                )
+
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            registry = ProjectRegistry(session)
+            registry.create_project("prj-archived", "A Promoted Revision")
+            ref = _register_revision_source_artifact(artifact_session, blobs)
+            registry.create_revision("prj-archived", "prj-archived-r2", provenance_ref=ref)
+            wiring = _PreviewBridgeWiring(
+                artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
+                ledger=_RaisingLedger(),
+            )
+            subject = _resolve_preview_subject_for_project(
+                "prj-archived", registry=registry,
+                artifact_session=artifact_session, wiring=wiring,
+            )
+            assert subject.kind == "archive"
+            assert subject.subject_id == "prj-archived-r2"
+            assert subject.revision_id == "prj-archived-r2"
 
 
 # ---------------------------------------------------------------------------
@@ -500,9 +582,21 @@ def http_app(
             )
         registry.create_revision("prj-http", "prj-http-r1", provenance_ref=ref)
 
+        # F-0074: a second real product, seeded with a Factory-origin r1
+        # (current at fixture setup) — later revised to r2 (archive-backed,
+        # `TestProjectPreviewMultiRevisionHttpRoute`'s own tests promote it
+        # mid-test to prove revision-scoped identity), never touching the
+        # single-revision `prj-http` fixture above.
+        registry.create_project("prj-http-multi", "Multi-Revision Product")
+        with unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            multi_ref1 = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-http-multi",
+            )
+        registry.create_revision("prj-http-multi", "prj-http-multi-r1", provenance_ref=multi_ref1)
+
     wiring = _PreviewBridgeWiring(
         artifact_session_scope=artifact_session_scope, artifact_blobs=blobs,
-        ledger=_accepted_ledger("golden-work-http"),
+        ledger=_accepted_ledger("golden-work-http", "golden-work-http-multi"),
     )
     return create_app(
         command_center_engine, pdp,
@@ -563,4 +657,125 @@ class TestProjectPreviewHttpRoute:
 
         second = http_client.post("/api/projects/prj-http/preview").json()
         assert second["job_id"] != first["job_id"]
+        assert second["lifecycle_state"] == "QUEUED"
+
+
+class TestProjectPreviewMultiRevisionHttpRoute:
+    """F-0074 (`PREVIEW_BRIDGE_MULTI_REVISION_GAP`): real, end-to-end proof
+    that the SAME `POST`/`GET /api/projects/{project_id}/preview` routes
+    correctly serve a Managed Product across a real current-revision
+    change, never confusing an old revision's own active/terminal job with
+    the new current revision's own."""
+
+    def test_archive_backed_current_revision_resolves_without_a_candidate(
+        self, http_client: TestClient, command_center_engine: Engine, artifact_engine: Engine,
+        blobs: ArtifactBlobStore,
+    ) -> None:
+        with unit_of_work(create_session_factory(command_center_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            ref2 = _register_revision_source_artifact(
+                artifact_session, blobs, context_hash="sha256:" + "d" * 64,
+            )
+            ProjectRegistry(session).create_revision(
+                "prj-http-multi", "prj-http-multi-r2", provenance_ref=ref2,
+            )
+
+        response = http_client.post("/api/projects/prj-http-multi/preview")
+        assert response.status_code == 202
+        body = response.json()
+        assert body["idempotency_key"] == "prj-http-multi-r2"
+        assert "prj-http-multi-r2" in body["job_id"]
+
+    def test_revision_advance_mints_a_new_job_never_reusing_the_old_revisions(
+        self, http_client: TestClient, command_center_engine: Engine, artifact_engine: Engine,
+        blobs: ArtifactBlobStore,
+    ) -> None:
+        """Part H: Revision 1's own preview stays active/untouched; a
+        request made once Revision 2 is current resolves Revision 2, on a
+        genuinely different job — never the old job mutated or reused."""
+        first = http_client.post("/api/projects/prj-http-multi/preview").json()
+        assert first["idempotency_key"] == "golden-work-http-multi"
+
+        with unit_of_work(create_session_factory(command_center_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            ref2 = _register_revision_source_artifact(
+                artifact_session, blobs, context_hash="sha256:" + "e" * 64,
+            )
+            ProjectRegistry(session).create_revision(
+                "prj-http-multi", "prj-http-multi-r2", provenance_ref=ref2,
+            )
+
+        second = http_client.post("/api/projects/prj-http-multi/preview").json()
+        assert second["job_id"] != first["job_id"]
+        assert second["idempotency_key"] == "prj-http-multi-r2"
+        assert second["lifecycle_state"] == "QUEUED"
+
+        # The old Revision 1 job is untouched -- still findable, still
+        # itself, never silently repurposed for Revision 2.
+        still_first = http_client.get("/api/candidates/golden-work-http-multi/preview").json()
+        assert still_first is not None
+        assert still_first["job_id"] == first["job_id"]
+
+    def test_double_open_on_the_same_archive_backed_revision_returns_one_job(
+        self, http_client: TestClient, command_center_engine: Engine, artifact_engine: Engine,
+        blobs: ArtifactBlobStore,
+    ) -> None:
+        with unit_of_work(create_session_factory(command_center_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            ref2 = _register_revision_source_artifact(
+                artifact_session, blobs, context_hash="sha256:" + "f" * 64,
+            )
+            ProjectRegistry(session).create_revision(
+                "prj-http-multi", "prj-http-multi-r2", provenance_ref=ref2,
+            )
+
+        first = http_client.post("/api/projects/prj-http-multi/preview").json()
+        second = http_client.post("/api/projects/prj-http-multi/preview").json()
+        assert first["job_id"] == second["job_id"]
+
+    def test_refresh_while_an_archive_backed_revision_is_active_rediscovers_it(
+        self, http_client: TestClient, command_center_engine: Engine, artifact_engine: Engine,
+        blobs: ArtifactBlobStore,
+    ) -> None:
+        """A real browser refresh (`GET`, never creating anything) during
+        an active Revision 2 preview must rediscover that SAME real
+        execution — no frontend-local authority, no duplicate job."""
+        with unit_of_work(create_session_factory(command_center_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            ref2 = _register_revision_source_artifact(
+                artifact_session, blobs, context_hash="sha256:" + "1" * 64,
+            )
+            ProjectRegistry(session).create_revision(
+                "prj-http-multi", "prj-http-multi-r2", provenance_ref=ref2,
+            )
+
+        opened = http_client.post("/api/projects/prj-http-multi/preview").json()
+        refreshed = http_client.get("/api/projects/prj-http-multi/preview").json()
+        assert refreshed is not None
+        assert refreshed["job_id"] == opened["job_id"]
+        assert refreshed["idempotency_key"] == "prj-http-multi-r2"
+
+    def test_reopen_after_terminal_on_an_archive_backed_revision_mints_a_new_job(
+        self, http_client: TestClient, command_center_engine: Engine, artifact_engine: Engine,
+        blobs: ArtifactBlobStore, pdp: PolicyDecisionPoint,
+    ) -> None:
+        with unit_of_work(create_session_factory(command_center_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            ref2 = _register_revision_source_artifact(
+                artifact_session, blobs, context_hash="sha256:" + "0" * 64,
+            )
+            ProjectRegistry(session).create_revision(
+                "prj-http-multi", "prj-http-multi-r2", provenance_ref=ref2,
+            )
+
+        first = http_client.post("/api/projects/prj-http-multi/preview").json()
+        pep = PolicyEnforcementPoint(pdp, "test.readback")
+        with unit_of_work(create_session_factory(command_center_engine)) as session:
+            store = JobStore(session, pep)
+            store.transition(first["job_id"], "RUNNING")
+            store.transition(first["job_id"], "CANCELLED")
+
+        second = http_client.post("/api/projects/prj-http-multi/preview").json()
+        assert second["job_id"] != first["job_id"]
+        assert second["idempotency_key"] == "prj-http-multi-r2#2"
         assert second["lifecycle_state"] == "QUEUED"
