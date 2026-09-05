@@ -43,6 +43,15 @@ unchanged call: candidate identity is derived from the real job id
 the manual verification track) and the durable job's own real lifecycle
 state and checkpoints are updated so the Command Center can show real
 progress without a second progress-state store.
+
+F-0078 (`PRODUCTION_FACTORY_ATTEMPT_OBSERVABILITY_GAP`). `model_factory`
+now wraps its real adapter in `_ObservedModel`, a copy (not an import) of
+`run_staged_generation.py`'s own private F-0070 wrapper, freezing every
+real attempt's own diagnostic facts through this script's own already-
+existing `_freeze()`; a terminal `STAGE_FAILED` payload also now carries
+`error.last_raw_output`, matching `run_staged_generation.py`'s own shape.
+Diagnostic provenance only — no retry, promotion, fingerprint, checker,
+or candidate-source decision is made or altered by this wiring.
 """
 
 from __future__ import annotations
@@ -145,6 +154,57 @@ def _freeze(
             )
     finally:
         engine.dispose()
+
+
+class _ObservedModel:
+    """F-0078. Byte-for-byte the same wrapper `run_staged_generation.py`'s
+    own `_ObservedModel` already is (F-0070) -- copied, not imported,
+    matching the pre-existing duplication this script's own `_freeze()`
+    already established between these two composition scripts (each
+    lives outside the measured architecture graph and owns its own
+    composition; neither imports production logic from the other).
+    Wraps a real `ModelSource`, delegating `infer` unchanged, and
+    additionally freezing each real attempt's own diagnostic facts as a
+    real, content-addressed artifact via THIS script's own already-
+    existing `_freeze()`/`ArtifactStore` mechanism -- never a second
+    authoritative store, and never a substitute for the candidate
+    ledger, the terminal stage evidence, or the durable job's own
+    checkpoints, none of which this touches. `record_attempt` is a real,
+    optional method `component_generation._notify_attempt` discovers
+    structurally (`getattr(model, "record_attempt", None)`); every
+    caller that does not define it is completely unaffected. A failure
+    inside `record_attempt` is caught by `_notify_attempt` itself, never
+    here -- this class stays a thin, honest wrapper, not a second place
+    that decides what "diagnostic-only, never fatal" means.
+    """
+
+    def __init__(self, inner: object, candidate_id: str, provider_model: str) -> None:
+        self._inner = inner
+        self._candidate_id = candidate_id
+        self._provider_model = provider_model
+
+    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0):  # noqa: ANN201
+        return self._inner.infer(model_id, prompt, timeout_seconds=timeout_seconds)  # type: ignore[attr-defined]
+
+    def record_attempt(
+        self, stage_name: str, attempt_number: int, repair_strategy: str,
+        prompt: str, raw_output: str, findings: tuple[tuple[str, str, str], ...],
+        fingerprint: str | None,
+    ) -> None:
+        payload = json.dumps({
+            "candidate_id": self._candidate_id, "stage": stage_name,
+            "attempt_number": attempt_number, "repair_strategy": repair_strategy,
+            "prompt": prompt, "raw_output": raw_output,
+            "findings": [{"code": c, "path": p, "detail": d} for c, p, d in findings],
+            "fingerprint": fingerprint,
+        }, sort_keys=True).encode()
+        _freeze(
+            payload, self._candidate_id,
+            f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
+            ("real staged-generation attempt evidence -- diagnostic provenance only "
+             "(F-0070, wired into the real production worker by F-0078)",),
+            self._provider_model,
+        )
 
 
 def _claim_one_job(store: JobStore) -> object | None:
@@ -250,7 +310,11 @@ def main(argv: list[str]) -> int:
 
     def model_factory(_stage_name: str):  # noqa: ANN202
         adapter = OllamaAdapter(json_mode=True, max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS)
-        return adapter, "qwen2.5-coder:14b"
+        # F-0078: every real attempt's own diagnostic facts are frozen as
+        # real, content-addressed evidence -- diagnostic provenance only,
+        # never changing what this run reports or how it is classified.
+        observed = _ObservedModel(adapter, candidate_id, provider_model)
+        return observed, "qwen2.5-coder:14b"
 
     try:
         result = generate_staged_model_product(
@@ -262,6 +326,7 @@ def main(argv: list[str]) -> int:
         payload = json.dumps({
             "candidate_id": candidate_id, "outcome": "STAGE_FAILED",
             "error": str(error), "elapsed_seconds": elapsed,
+            "last_raw_output": getattr(error, "last_raw_output", ""),
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",
