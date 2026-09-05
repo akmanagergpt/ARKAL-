@@ -74,6 +74,7 @@ from arkali.surfaces.command.jobs import build_jobs_router
 from arkali.surfaces.command.product_change_bridge import _ProductChangeWiring
 from arkali.surfaces.command.product_change_routes import _build_product_change_router
 from arkali.surfaces.command.product_preview_resolution import _PreviewBridgeWiring
+from arkali.surfaces.command.revision_preview_routes import _build_revision_preview_router
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
 from arkali.surfaces.command.workflow import (
@@ -392,7 +393,27 @@ def create_app(
     # extracted to its own function so this branch does not push
     # `create_app`'s own cyclomatic complexity over budget.
     _include_product_change_router(app, extensions, session_scope, guard, refuse, pep, clock)
+    # Explicit historical-revision preview (Revision History + Restore-
+    # as-New Convergence): additive and optional, the identical
+    # extracted-function shape as `_include_product_change_router` above,
+    # for the identical reason -- keeping this branch out of `create_app`
+    # itself so its own cyclomatic-complexity budget is not spent again.
+    _include_revision_preview_router(app, extensions, session_scope, guard, refuse, pep, clock)
     return app
+
+
+def _include_revision_preview_router(
+    app: FastAPI, extensions: _CommandExtensions | None, session_scope: Callable[[], Iterator[Session]],
+    guard: Callable[[str], None], refuse: Callable[[Exception], HTTPException],
+    pep: PolicyEnforcementPoint, clock: Callable[[], dt.datetime] | None,
+) -> None:
+    if extensions is None or extensions.preview_bridge is None:
+        return
+    app.include_router(
+        _build_revision_preview_router(
+            session_scope, guard, refuse, pep, extensions.preview_bridge, clock,
+        )
+    )
 
 
 def _include_product_change_router(

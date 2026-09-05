@@ -56,8 +56,17 @@ def _change_scope_key(project_id: str, attempt: int) -> str:
     return project_id if attempt == 1 else f"{project_id}#{attempt}"
 
 
-def _submit_or_recover_change(store: JobStore, project_id: str, request_text: str) -> DurableJobRecord:
-    """"Değişikliği Başlat" — identical reasoning to `jobs._submit_or_recover_preview`."""
+def _submit_or_recover_change(
+    store: JobStore, project_id: str, payload: dict[str, object],
+) -> DurableJobRecord:
+    """One project's real change-or-restore proposal slot — identical
+    reasoning to `jobs._submit_or_recover_preview`. `payload` carries
+    either `request_text` ("Değişikliği Başlat") or
+    `source_basis_revision_id` ("Bu sürüme geri dön") — opaque here
+    either way, since only the worker (`scripts/run_product_change_
+    worker.py`) branches on its shape; a project has exactly one active
+    change-or-restore proposal at a time, matching the single real
+    `managed_product.change` job type both share."""
     for attempt in itertools.count(1):
         key = _change_scope_key(project_id, attempt)
         existing = store.find_submitted(_CHANGE_JOB_TYPE, key)
@@ -65,8 +74,7 @@ def _submit_or_recover_change(store: JobStore, project_id: str, request_text: st
             return store.submit(
                 JobSubmission(
                     job_id=f"change-{key}", job_type=_CHANGE_JOB_TYPE,
-                    idempotency_key=key,
-                    payload={"project_id": project_id, "request_text": request_text},
+                    idempotency_key=key, payload=payload,
                 )
             )
         if existing.lifecycle_state not in _CHANGE_DONE_STATES:
@@ -112,7 +120,37 @@ def _build_product_change_router(
         durable-job route on this surface uses."""
         guard(WRITE)
         try:
-            record = _submit_or_recover_change(store(session), project_id, body.request_text)
+            record = _submit_or_recover_change(
+                store(session), project_id,
+                {"project_id": project_id, "request_text": body.request_text},
+            )
+        except Exception as error:
+            raise refuse(error) from error
+        return _reference(record)
+
+    @router.post(
+        "/projects/{project_id}/revisions/{revision_id}/restore",
+        response_model=JobReferenceResponse, status_code=202, tags=[BROWSER_SLICE],
+    )
+    def start_restore(
+        project_id: str, revision_id: str, session: Session = Depends(session_scope),
+    ) -> JobReferenceResponse:
+        """"Bu sürüme geri dön" — enqueue a real restore proposal over the
+        SAME `managed_product.change` job type and the SAME per-project
+        idempotency slot "Değişikliği Başlat" uses (a project has exactly
+        one active change-or-restore proposal at a time); the worker
+        distinguishes the payload shape and calls `engineering.product_
+        change.restore.prepare_restore` instead of `prepare_modification`
+        — no model is ever invoked for a pure restore. `revision_id` is
+        the SOURCE-BASIS revision being restored, never required to be
+        the project's current revision.
+        """
+        guard(WRITE)
+        try:
+            record = _submit_or_recover_change(
+                store(session), project_id,
+                {"project_id": project_id, "source_basis_revision_id": revision_id},
+            )
         except Exception as error:
             raise refuse(error) from error
         return _reference(record)

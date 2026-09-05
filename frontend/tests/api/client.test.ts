@@ -198,6 +198,9 @@ describe('ArkaliApiClient', () => {
       'POST /api/projects/{project_id}/changes',
       'GET /api/projects/{project_id}/changes',
       'POST /api/projects/{project_id}/changes/{job_id}/promote',
+      'POST /api/projects/{project_id}/revisions/{revision_id}/restore',
+      'POST /api/projects/{project_id}/revisions/{revision_id}/preview',
+      'GET /api/projects/{project_id}/revisions/{revision_id}/preview',
     ]);
   });
 });

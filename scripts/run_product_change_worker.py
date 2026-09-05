@@ -13,6 +13,16 @@ same subject-generic runtime primitive Turn G's own preview-bridge work
 extracted for exactly this reuse. No install/build/health logic is
 copied or reimplemented here.
 
+REVISION-HISTORY CONVERGENCE. The SAME job type also drives a real
+"Bu sürüme geri dön" restore proposal when the payload carries a
+`source_basis_revision_id` instead of a `request_text` — one lifecycle,
+one worker, one job type, branching only on which real preparation
+function the payload shape calls for
+(`engineering.product_change.restore.prepare_restore`, never a model,
+see `_NeverInferModel`). Everything downstream of "prepared" (live
+review preview, ready-for-review checkpoint shape, promote/reject) is
+byte-identical either way.
+
 WHY THIS SCRIPT, NOT `engineering.product_change`, COMPOSES THE MODEL
 ADAPTER AND THE PREVIEW PRIMITIVE. Both `engineering.localai.adapter.
 LocalRuntimeAdapter` and `engineering.candidate.preview._run_preview_
@@ -70,6 +80,7 @@ from arkali.engineering.product_change.modification import (  # noqa: E402
     ModificationWiring,
     prepare_modification,
 )
+from arkali.engineering.product_change.restore import prepare_restore  # noqa: E402
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.evidence.artifact.store import ArtifactStore  # noqa: E402
 from arkali.execution.durable.job_state_machine import (  # noqa: E402
@@ -96,6 +107,23 @@ MODEL_ID = "qwen2.5-coder:14b"
 #: cancel/promote ends this far sooner in the ordinary case.
 MAX_LIFETIME_SECONDS = 1800.0
 POLL_INTERVAL_SECONDS = 2.0
+
+
+class _NeverInferModel:
+    """A poison `_ModelAdapter` for a pure restore ("Bu sürüme geri dön"):
+    the restored content is already known in full from the source-basis
+    revision's own real bytes, so `prepare_restore` never references
+    `ModificationWiring.model`/`.model_id` at all -- proven, not merely
+    claimed, by wiring this in for every restore job. If `prepare_restore`
+    were ever changed to call a provider, this raises immediately and
+    loudly rather than silently reaching a real, unconfigured Ollama call."""
+
+    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0):  # noqa: ANN001, ANN201
+        raise AssertionError(
+            "a pure restore must never invoke a model -- the restored "
+            "content is already known from the source-basis revision's "
+            "own real, immutable bytes"
+        )
 
 
 class _CandidateSourceAdapter:
@@ -141,13 +169,17 @@ def main() -> int:
             job_id = job.job_id
             project_id = job.payload.get("project_id")
             request_text = job.payload.get("request_text")
+            source_basis_revision_id = job.payload.get("source_basis_revision_id")
             _store(session).transition(job_id, JOB_RUNNING)
     finally:
         engine.dispose()
 
-    if not isinstance(project_id, str) or not project_id or not isinstance(request_text, str) or not request_text:
+    is_restore = isinstance(source_basis_revision_id, str) and bool(source_basis_revision_id)
+    is_change = isinstance(request_text, str) and bool(request_text)
+    if not isinstance(project_id, str) or not project_id or not (is_restore or is_change):
         _finish(db_path, pdp, job_id, JOB_FAILED, {
-            "phase": "refused", "reason": "job payload carries no project_id/request_text",
+            "phase": "refused",
+            "reason": "job payload carries no project_id and no request_text/source_basis_revision_id",
         })
         print('{"outcome": "INVALID_PAYLOAD"}')
         return 1
@@ -191,18 +223,37 @@ def main() -> int:
             registry_engine = create_persistence_engine(sqlite_url(db_path))
             try:
                 with unit_of_work(create_session_factory(registry_engine)) as registry_session:
-                    wiring = ModificationWiring(
-                        artifacts=artifacts,
-                        candidate_source_resolver=_CandidateSourceAdapter(),
-                        workspace_allocator=WorkspaceAuthority(ROOT / "var" / "factory" / "changes"),
-                        model=OllamaAdapter(json_mode=False, max_output_tokens=4096),
-                        model_id=MODEL_ID,
-                    )
-                    prepared = prepare_modification(
-                        project_id, request_text,
-                        registry=ProjectRegistry(registry_session), wiring=wiring,
-                        on_phase=_checkpoint,
-                    )
+                    if is_restore:
+                        #: Pure restore ("Bu sürüme geri dön"): the desired
+                        #: content already exists as the source-basis
+                        #: revision's own real bytes -- a poison model
+                        #: proves, rather than merely claims, zero provider
+                        #: invocation (see `_NeverInferModel`'s own
+                        #: docstring).
+                        wiring = ModificationWiring(
+                            artifacts=artifacts,
+                            candidate_source_resolver=_CandidateSourceAdapter(),
+                            workspace_allocator=WorkspaceAuthority(ROOT / "var" / "factory" / "changes"),
+                            model=_NeverInferModel(), model_id=MODEL_ID,
+                        )
+                        prepared = prepare_restore(
+                            project_id, source_basis_revision_id,
+                            registry=ProjectRegistry(registry_session), wiring=wiring,
+                            on_phase=_checkpoint,
+                        )
+                    else:
+                        wiring = ModificationWiring(
+                            artifacts=artifacts,
+                            candidate_source_resolver=_CandidateSourceAdapter(),
+                            workspace_allocator=WorkspaceAuthority(ROOT / "var" / "factory" / "changes"),
+                            model=OllamaAdapter(json_mode=False, max_output_tokens=4096),
+                            model_id=MODEL_ID,
+                        )
+                        prepared = prepare_modification(
+                            project_id, request_text,
+                            registry=ProjectRegistry(registry_session), wiring=wiring,
+                            on_phase=_checkpoint,
+                        )
             finally:
                 registry_engine.dispose()
     except ProductChangeError as error:

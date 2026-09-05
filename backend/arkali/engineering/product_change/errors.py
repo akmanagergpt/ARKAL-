@@ -81,3 +81,11 @@ class NoActiveModificationError(ProductChangeError):
     and none exists for this project."""
 
     code = "ARK-ERR-0169"
+
+
+class UnknownSourceBasisRevisionError(ProductChangeError):
+    """A restore names a `source_basis_revision_id` that either does not
+    exist at all or belongs to a different project -- never guessed or
+    silently substituted with the current revision."""
+
+    code = "ARK-ERR-0174"

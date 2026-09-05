@@ -23,11 +23,13 @@ from arkali.surfaces.command.product_preview_resolution import (
     _ProvenanceNotManagedProductError,
     _ReferencedCandidateNotEligibleError,
     _RevisionHasNoProvenanceError,
+    _UnknownRevisionForProjectError,
 )
 
 #: Ordered most-specific first, matching the sibling tables' discipline.
 PREVIEW_BRIDGE_STATUS_BY_ERROR: Final[tuple[tuple[type[Exception], int], ...]] = (
     (_NoRevisionForProjectError, 409),
+    (_UnknownRevisionForProjectError, 404),
     (_RevisionHasNoProvenanceError, 409),
     (InvalidArtifactIdentity, 400),
     (UnknownArtifact, 404),

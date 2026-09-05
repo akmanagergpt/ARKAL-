@@ -6,6 +6,7 @@ import { Button, Callout, Field, Panel, Spinner, StateBadge } from '@/components
 import { PreviewActionButton, PreviewStatusPanel } from '@/features/factory/PreviewControls';
 import { usePreview } from '@/features/factory/usePreview';
 import { ProductChangePanel } from './ProductChangePanel';
+import { RevisionHistoryRow } from './RevisionHistoryRow';
 import { useProductChange } from './useProductChange';
 
 function formatTimestamp(value: string): string {
@@ -102,6 +103,14 @@ export function ProjectDetail({
     );
   }
 
+  // D-030's own ratified current-revision rule (sequence maximum), read
+  // client-side over the already-fetched `revisions` array — never a
+  // second "current" truth and never a backend flag added just for this
+  // label.
+  const currentSequence = project.revisions.reduce(
+    (max, revision) => Math.max(max, revision.sequence), 0,
+  );
+
   return (
     <Panel
       title="Uygulama Bilgileri"
@@ -155,30 +164,66 @@ export function ProjectDetail({
           {project.revisions.length === 0 ? (
             <p className="text-sm text-slate-500">Bu uygulama için henüz sürüm kaydedilmedi.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[28rem] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th scope="col" className="py-1 pr-4 font-medium">#</th>
-                    <th scope="col" className="py-1 pr-4 font-medium">Sürüm</th>
-                    <th scope="col" className="py-1 pr-4 font-medium">Kayıt tarihi</th>
-                    <th scope="col" className="py-1 font-medium">Kaynak</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {project.revisions.map((revision) => (
-                    <tr key={revision.revision_id}>
-                      <td className="py-2 pr-4 font-mono text-slate-500">{revision.sequence}</td>
-                      <td className={`py-2 pr-4 ${showTechnical ? 'font-mono text-slate-900' : 'text-slate-700'}`}>{showTechnical ? revision.revision_id : `Sürüm ${revision.sequence}`}</td>
-                      <td className="py-2 pr-4 text-slate-700">
-                        {formatTimestamp(revision.created_at)}
-                      </td>
-                      <td className="py-2 text-slate-700">{showTechnical ? (revision.provenance_ref ?? '—') : 'ARKALI tarafından kaydedildi'}</td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[28rem] text-left text-sm">
+                  <thead className="text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th scope="col" className="py-1 pr-4 font-medium">#</th>
+                      <th scope="col" className="py-1 pr-4 font-medium">Sürüm</th>
+                      <th scope="col" className="py-1 pr-4 font-medium">Kayıt tarihi</th>
+                      <th scope="col" className="py-1 font-medium">Kaynak</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {project.revisions.map((revision) => {
+                      // Current revision = D-030's own ratified rule, read
+                      // client-side over the same real `revisions` array
+                      // the backend already returns — never a second
+                      // "current" truth, never a backend flag added just
+                      // for this label.
+                      const isCurrent = revision.sequence === currentSequence;
+                      return (
+                        <tr key={revision.revision_id}>
+                          <td className="py-2 pr-4 font-mono text-slate-500">{revision.sequence}</td>
+                          <td className={`py-2 pr-4 ${showTechnical ? 'font-mono text-slate-900' : 'text-slate-700'}`}>
+                            {showTechnical ? revision.revision_id : `Sürüm ${revision.sequence}`}
+                            {isCurrent ? (
+                              <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                Mevcut
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-2 pr-4 text-slate-700">
+                            {formatTimestamp(revision.created_at)}
+                          </td>
+                          <td className="py-2 text-slate-700">{showTechnical ? (revision.provenance_ref ?? '—') : 'ARKALI tarafından kaydedildi'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {project.revisions.filter((revision) => revision.sequence !== currentSequence).length > 0 ? (
+                <div className="flex flex-col gap-2 pt-1">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Geçmiş sürümler
+                  </h4>
+                  {project.revisions
+                    .filter((revision) => revision.sequence !== currentSequence)
+                    .map((revision) => (
+                      <RevisionHistoryRow
+                        key={revision.revision_id}
+                        client={client}
+                        projectId={project.project_id}
+                        revision={revision}
+                        showTechnical={showTechnical}
+                        change={change}
+                      />
+                    ))}
+                </div>
+              ) : null}
+            </>
           )}
           {showTechnical ? (
             <form

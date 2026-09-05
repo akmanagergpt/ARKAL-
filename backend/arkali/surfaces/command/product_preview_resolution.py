@@ -114,6 +114,15 @@ class _ReferencedCandidateNotEligibleError(ContractViolation):
     code = "ARK-ERR-0153"
 
 
+class _UnknownRevisionForProjectError(ContractViolation):
+    """An explicit historical-preview/restore request names a
+    `revision_id` that either does not exist at all or belongs to a
+    different project -- never guessed or silently substituted with the
+    current revision (Revision History + Restore-as-New Convergence)."""
+
+    code = "ARK-ERR-0175"
+
+
 @runtime_checkable
 class _CandidateLedgerSource(Protocol):
     """Structural shape of `engineering.candidate.ledger.CandidateLedger`,
@@ -163,10 +172,10 @@ def _resolve_preview_subject_for_project(
     artifact_session: Session,
     wiring: _PreviewBridgeWiring,
 ) -> _PreviewSubject:
-    """The sole entry point: a Managed Product's `project_id` resolves to
-    its real current revision's own real preview subject, or raises a
-    typed refusal naming exactly which step in the chain failed.
-    `registry.require` already raises `UnknownProject`
+    """The sole entry point for "Uygulamayı Aç": a Managed Product's
+    `project_id` resolves to its real current revision's own real preview
+    subject, or raises a typed refusal naming exactly which step in the
+    chain failed. `registry.require` already raises `UnknownProject`
     (`control.registry.project.errors`) for an unknown project -- reused,
     not restated.
     """
@@ -183,7 +192,48 @@ def _resolve_preview_subject_for_project(
     # rather than imported (see the module docstring). Lexical
     # `revision_id` ordering never substitutes for the real sequence.
     revision = max(revisions, key=lambda r: r.sequence)
+    return _resolve_subject_for_revision(
+        revision, project_id=project_id, artifact_session=artifact_session, wiring=wiring,
+    )
 
+
+def _resolve_preview_subject_for_explicit_revision(
+    project_id: str,
+    revision_id: str,
+    *,
+    registry: ProjectRegistry,
+    artifact_session: Session,
+    wiring: _PreviewBridgeWiring,
+) -> _PreviewSubject:
+    """The sole entry point for an EXPLICIT historical preview ("Önizle"
+    on a non-current `Sürüm`, Revision History + Restore-as-New
+    Convergence): resolves to `revision_id`'s own real preview subject
+    regardless of whether it is the project's current revision -- never
+    silently substituted with `max(sequence)`. Shares every real check
+    `_resolve_preview_subject_for_project` performs beyond identity
+    resolution, through `_resolve_subject_for_revision`, so a historical
+    preview is refused for exactly the same real reasons a current one
+    would be (no provenance, wrong marker, not-ACCEPTED candidate) -- no
+    second, weaker eligibility rule for the historical case."""
+    registry.require(project_id)
+    revision = registry.revision(revision_id)
+    if revision is None or revision.project_id != project_id:
+        raise _UnknownRevisionForProjectError(
+            f"revision {revision_id!r} is not a real revision of project {project_id!r}"
+        )
+    return _resolve_subject_for_revision(
+        revision, project_id=project_id, artifact_session=artifact_session, wiring=wiring,
+    )
+
+
+def _resolve_subject_for_revision(
+    revision, *, project_id: str, artifact_session: Session, wiring: _PreviewBridgeWiring,  # noqa: ANN001
+) -> _PreviewSubject:
+    """The real chain shared by both entry points above, over one already-
+    identified `ProjectRevisionRecord`: `provenance_ref` -> `ArtifactStore`
+    -> the two real Managed Product provenance markers, exactly as before
+    F-0074's own convergence, just no longer requiring `revision` to be
+    the project's current one."""
     reference = revision.provenance_ref
     artifacts = ArtifactStore(artifact_session, wiring.artifact_blobs)
     if reference is None:

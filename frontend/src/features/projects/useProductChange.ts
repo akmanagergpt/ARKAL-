@@ -42,6 +42,9 @@ export interface ProductChangeState {
 
 export interface ProductChangeActions {
   start: (requestText: string) => Promise<void>;
+  /** "Bu sürüme geri dön" over the SAME job/idempotency slot `start`
+   * uses — `revisionId` is the SOURCE-BASIS revision being restored. */
+  startRestore: (revisionId: string) => Promise<void>;
   promote: () => Promise<void>;
   reject: () => Promise<void>;
 }
@@ -145,14 +148,14 @@ export function useProductChange(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per selected project
   }, [projectId]);
 
-  const start = useCallback(
-    async (requestText: string): Promise<void> => {
+  const startWith = useCallback(
+    async (submit: () => Promise<JobReferenceResponse>): Promise<void> => {
       stopPolling();
       setStarting(true);
       setFailure(null);
       setPromoted(null);
       try {
-        const reference = await client.startProjectChange(projectId, requestText);
+        const reference = await submit();
         setJob(reference);
         setCheckpoints(await client.listJobCheckpoints(reference.job_id).catch(() => []));
         if (!DONE_STATES.has(reference.lifecycle_state)) {
@@ -166,7 +169,17 @@ export function useProductChange(
         setStarting(false);
       }
     },
-    [client, projectId, pollOnce, stopPolling],
+    [client, pollOnce, stopPolling],
+  );
+
+  const start = useCallback(
+    (requestText: string): Promise<void> => startWith(() => client.startProjectChange(projectId, requestText)),
+    [client, projectId, startWith],
+  );
+
+  const startRestore = useCallback(
+    (revisionId: string): Promise<void> => startWith(() => client.startRestore(projectId, revisionId)),
+    [client, projectId, startWith],
   );
 
   const promote = useCallback(async (): Promise<void> => {
@@ -207,6 +220,6 @@ export function useProductChange(
 
   return {
     starting, promoting, rejecting, job, checkpoints, ready, promoted, failure,
-    start, promote, reject,
+    start, startRestore, promote, reject,
   };
 }

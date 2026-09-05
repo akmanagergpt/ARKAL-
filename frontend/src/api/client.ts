@@ -87,6 +87,15 @@ export const ENDPOINTS = {
   promoteProjectChange: {
     method: 'POST', path: '/api/projects/{project_id}/changes/{job_id}/promote',
   },
+  startRestore: {
+    method: 'POST', path: '/api/projects/{project_id}/revisions/{revision_id}/restore',
+  },
+  startRevisionPreview: {
+    method: 'POST', path: '/api/projects/{project_id}/revisions/{revision_id}/preview',
+  },
+  findRevisionPreview: {
+    method: 'GET', path: '/api/projects/{project_id}/revisions/{revision_id}/preview',
+  },
 } as const;
 
 /**
@@ -494,6 +503,42 @@ export class ArkaliApiClient {
   promoteProjectChange(projectId: string, jobId: string): Promise<_ChangePromotionResponse> {
     return this.request<_ChangePromotionResponse>(ENDPOINTS.promoteProjectChange, {
       params: { project_id: projectId, job_id: jobId },
+    });
+  }
+
+  /**
+   * "Bu sürüme geri dön" — a real restore proposal over the SAME
+   * `managed_product.change` job/idempotency slot `startProjectChange`
+   * uses. `revisionId` is the SOURCE-BASIS revision being restored, never
+   * required to be the project's current revision. Idempotent the same
+   * way `startProjectChange` is.
+   */
+  startRestore(projectId: string, revisionId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.startRestore, {
+      params: { project_id: projectId, revision_id: revisionId },
+    });
+  }
+
+  /**
+   * "Önizle" on an explicitly selected historical `Sürüm` — a real,
+   * ephemeral preview cycle over exactly that revision's own immutable
+   * source, never the project's current revision by default. Idempotent
+   * the same way `startProjectPreview` is.
+   */
+  startRevisionPreview(projectId: string, revisionId: string): Promise<JobReferenceResponse> {
+    return this.request<JobReferenceResponse>(ENDPOINTS.startRevisionPreview, {
+      params: { project_id: projectId, revision_id: revisionId },
+    });
+  }
+
+  /**
+   * Whether a real historical-preview job already exists for this
+   * revision, without creating one — the refresh-recovery counterpart to
+   * `startRevisionPreview`.
+   */
+  findRevisionPreview(projectId: string, revisionId: string): Promise<JobReferenceResponse | null> {
+    return this.request<JobReferenceResponse | null>(ENDPOINTS.findRevisionPreview, {
+      params: { project_id: projectId, revision_id: revisionId },
     });
   }
 }

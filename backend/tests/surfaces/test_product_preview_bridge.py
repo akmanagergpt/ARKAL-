@@ -52,6 +52,8 @@ from arkali.surfaces.command.product_preview_resolution import (
     _ProvenanceNotManagedProductError,
     _ReferencedCandidateNotEligibleError,
     _RevisionHasNoProvenanceError,
+    _UnknownRevisionForProjectError,
+    _resolve_preview_subject_for_explicit_revision,
     _resolve_preview_subject_for_project,
 )
 
@@ -543,6 +545,114 @@ class TestResolvePreviewSubjectForProject:
             assert subject.revision_id == "prj-archived-r2"
 
 
+class TestResolvePreviewSubjectForExplicitRevision:
+    """Managed Product Revision History + Restore-as-New Convergence:
+    "Önizle" on a non-current `Sürüm` must resolve exactly the named
+    revision, never `max(sequence)` -- every real refusal reason a
+    current-revision resolution would raise applies identically here."""
+
+    def test_unknown_revision_is_refused(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            registry = ProjectRegistry(session)
+            registry.create_project("prj-explicit", "Explicit Revision Product")
+            wiring = _PreviewBridgeWiring(
+                artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
+                ledger=_accepted_ledger("golden-work-explicit"),
+            )
+            with pytest.raises(_UnknownRevisionForProjectError):
+                _resolve_preview_subject_for_explicit_revision(
+                    "prj-explicit", "prj-explicit-r999", registry=registry,
+                    artifact_session=artifact_session, wiring=wiring,
+                )
+
+    def test_a_revision_of_a_different_project_is_refused(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            registry = ProjectRegistry(session)
+            registry.create_project("prj-a", "Product A")
+            registry.create_project("prj-b", "Product B")
+            ref = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-b",
+            )
+            registry.create_revision("prj-b", "prj-b-r1", provenance_ref=ref)
+            wiring = _PreviewBridgeWiring(
+                artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
+                ledger=_accepted_ledger("golden-work-b"),
+            )
+            with pytest.raises(_UnknownRevisionForProjectError):
+                _resolve_preview_subject_for_explicit_revision(
+                    "prj-a", "prj-b-r1", registry=registry,
+                    artifact_session=artifact_session, wiring=wiring,
+                )
+
+    def test_an_older_non_current_candidate_backed_revision_resolves(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        """The project's CURRENT revision is r2 (archive-backed); this
+        explicitly names r1 (candidate-backed) and must resolve to IT,
+        never silently substituted with current."""
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            registry = ProjectRegistry(session)
+            registry.create_project("prj-hist", "Historical Preview Product")
+            ref1 = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-hist",
+            )
+            registry.create_revision("prj-hist", "prj-hist-r1", provenance_ref=ref1)
+            ref2 = _register_revision_source_artifact(artifact_session, blobs)
+            registry.create_revision("prj-hist", "prj-hist-r2", provenance_ref=ref2)
+
+            wiring = _PreviewBridgeWiring(
+                artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
+                ledger=_accepted_ledger("golden-work-hist"),
+            )
+            # The current-revision path resolves r2 (archive) ...
+            current_subject = _resolve_preview_subject_for_project(
+                "prj-hist", registry=registry, artifact_session=artifact_session, wiring=wiring,
+            )
+            assert current_subject.revision_id == "prj-hist-r2"
+            assert current_subject.kind == "archive"
+
+            # ... but explicitly naming r1 resolves the historical,
+            # candidate-backed one, never the current one.
+            historical_subject = _resolve_preview_subject_for_explicit_revision(
+                "prj-hist", "prj-hist-r1", registry=registry,
+                artifact_session=artifact_session, wiring=wiring,
+            )
+            assert historical_subject.revision_id == "prj-hist-r1"
+            assert historical_subject.kind == "candidate"
+            assert historical_subject.subject_id == "golden-work-hist"
+
+    def test_an_ineligible_candidate_is_refused_even_when_historical(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+    ) -> None:
+        """A historical preview is not a weaker eligibility rule: a
+        candidate that is not currently ACCEPTED is refused exactly as it
+        would be for a current-revision preview."""
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            registry = ProjectRegistry(session)
+            registry.create_project("prj-ineligible", "Ineligible Historical Candidate")
+            ref = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-ineligible",
+            )
+            registry.create_revision("prj-ineligible", "prj-ineligible-r1", provenance_ref=ref)
+            wiring = _PreviewBridgeWiring(
+                artifact_session_scope=lambda: iter(()), artifact_blobs=blobs,
+                ledger=_FakeLedger({}),  # no recorded history at all
+            )
+            with pytest.raises(_ReferencedCandidateNotEligibleError):
+                _resolve_preview_subject_for_explicit_revision(
+                    "prj-ineligible", "prj-ineligible-r1", registry=registry,
+                    artifact_session=artifact_session, wiring=wiring,
+                )
+
+
 # ---------------------------------------------------------------------------
 # Part 3: end-to-end HTTP proof over a real FastAPI app
 # ---------------------------------------------------------------------------
@@ -594,9 +704,24 @@ def http_app(
             )
         registry.create_revision("prj-http-multi", "prj-http-multi-r1", provenance_ref=multi_ref1)
 
+        # Revision History + Restore-as-New Convergence: a third real
+        # product, seeded with BOTH revisions already present at fixture
+        # setup (r1 candidate-backed, r2 archive-backed/current) — never
+        # touching the two fixtures above — so historical-preview HTTP
+        # tests can name the non-current r1 deterministically.
+        registry.create_project("prj-http-hist", "Historical Preview Product")
+        with unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            hist_ref1 = _register_managed_product_artifact(
+                artifact_session, blobs, candidate_id="golden-work-http-hist",
+            )
+        registry.create_revision("prj-http-hist", "prj-http-hist-r1", provenance_ref=hist_ref1)
+        with unit_of_work(create_session_factory(artifact_engine)) as artifact_session:
+            hist_ref2 = _register_revision_source_artifact(artifact_session, blobs)
+        registry.create_revision("prj-http-hist", "prj-http-hist-r2", provenance_ref=hist_ref2)
+
     wiring = _PreviewBridgeWiring(
         artifact_session_scope=artifact_session_scope, artifact_blobs=blobs,
-        ledger=_accepted_ledger("golden-work-http", "golden-work-http-multi"),
+        ledger=_accepted_ledger("golden-work-http", "golden-work-http-multi", "golden-work-http-hist"),
     )
     return create_app(
         command_center_engine, pdp,
@@ -779,3 +904,70 @@ class TestProjectPreviewMultiRevisionHttpRoute:
         assert second["job_id"] != first["job_id"]
         assert second["idempotency_key"] == "prj-http-multi-r2#2"
         assert second["lifecycle_state"] == "QUEUED"
+
+
+class TestRevisionPreviewHttpRoute:
+    """Managed Product Revision History + Restore-as-New Convergence:
+    "Önizle" on an explicitly named historical `Sürüm`, over the real
+    `prj-http-hist` fixture (r1 candidate-backed, r2 archive-backed and
+    current)."""
+
+    def test_previewing_the_historical_r1_reaches_the_candidate_job_never_the_current_one(
+        self, http_client: TestClient,
+    ) -> None:
+        response = http_client.post("/api/projects/prj-http-hist/revisions/prj-http-hist-r1/preview")
+        assert response.status_code == 202
+        body = response.json()
+        assert body["job_type"] == _PREVIEW_JOB_TYPE
+        assert body["idempotency_key"] == "golden-work-http-hist"
+
+    def test_previewing_the_current_r2_by_explicit_id_reaches_its_own_revision_scoped_job(
+        self, http_client: TestClient,
+    ) -> None:
+        response = http_client.post("/api/projects/prj-http-hist/revisions/prj-http-hist-r2/preview")
+        assert response.status_code == 202
+        assert response.json()["idempotency_key"] == "prj-http-hist-r2"
+
+    def test_historical_preview_never_touches_the_normal_current_revision_job(
+        self, http_client: TestClient,
+    ) -> None:
+        """Opening a real historical (r1) preview and a real current
+        (via the normal `/preview` route) preview for the SAME project
+        mint two genuinely independent jobs, never one masquerading as
+        the other."""
+        historical = http_client.post(
+            "/api/projects/prj-http-hist/revisions/prj-http-hist-r1/preview",
+        ).json()
+        current = http_client.post("/api/projects/prj-http-hist/preview").json()
+        assert historical["job_id"] != current["job_id"]
+        assert historical["idempotency_key"] != current["idempotency_key"]
+        # And the current-revision route's own state is unaffected by the
+        # historical preview: reading it back still returns the SAME
+        # current job, not the historical one.
+        still_current = http_client.get("/api/projects/prj-http-hist/preview").json()
+        assert still_current["job_id"] == current["job_id"]
+
+    def test_get_before_any_open_is_null(self, http_client: TestClient) -> None:
+        response = http_client.get("/api/projects/prj-http-hist/revisions/prj-http-hist-r1/preview")
+        assert response.status_code == 200
+        assert response.json() is None
+
+    def test_get_after_open_rediscovers_the_active_historical_job(self, http_client: TestClient) -> None:
+        opened = http_client.post(
+            "/api/projects/prj-http-hist/revisions/prj-http-hist-r1/preview",
+        ).json()
+        found = http_client.get("/api/projects/prj-http-hist/revisions/prj-http-hist-r1/preview").json()
+        assert found is not None
+        assert found["job_id"] == opened["job_id"]
+
+    def test_unknown_revision_is_refused(self, http_client: TestClient) -> None:
+        response = http_client.post(
+            "/api/projects/prj-http-hist/revisions/no-such-revision/preview",
+        )
+        assert response.status_code >= 400
+
+    def test_a_revision_of_a_different_project_is_refused(self, http_client: TestClient) -> None:
+        response = http_client.post(
+            "/api/projects/prj-http-hist/revisions/prj-http-multi-r1/preview",
+        )
+        assert response.status_code >= 400

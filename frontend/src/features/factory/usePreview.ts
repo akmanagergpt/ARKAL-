@@ -71,24 +71,31 @@ function asFailure(error: unknown): Failure {
  * "Uygulamayı Aç", resolved backend-side through the canonical D-029 chain
  * (`ProjectRegistry` -> `provenance_ref` -> `ArtifactStore` ->
  * `CandidateLedger` eligibility) rather than this hook ever knowing a
- * candidate_id itself. Everything past the initial job reference — polling,
- * checkpoints, cancel — is byte-identical either way, since both routes
- * hand back the same real `JobReferenceResponse` for the same real
- * `candidate.preview` job type.
+ * candidate_id itself. `'revision'` is `POST`/`GET /api/projects/{project_id}
+ * /revisions/{revision_id}/preview` — "Önizle" on an explicitly selected
+ * historical `Sürüm` (Revision History + Restore-as-New Convergence);
+ * `resourceId` is that revision's own id and `projectId` (required only
+ * for this kind) names the owning project. Everything past the initial
+ * job reference — polling, checkpoints, cancel — is byte-identical for
+ * all three, since every route hands back the same real
+ * `JobReferenceResponse` for the same real `candidate.preview` job type.
  */
-export type PreviewResourceKind = 'candidate' | 'project';
+export type PreviewResourceKind = 'candidate' | 'project' | 'revision';
 
 export function usePreview(
   client: ArkaliApiClient, resourceId: string, kind: PreviewResourceKind = 'candidate',
+  projectId?: string,
 ): PreviewState & PreviewActions {
-  const startPreview = useMemo(
-    () => (kind === 'project' ? client.startProjectPreview.bind(client) : client.startPreview.bind(client)),
-    [client, kind],
-  );
-  const findPreview = useMemo(
-    () => (kind === 'project' ? client.findProjectPreview.bind(client) : client.findPreview.bind(client)),
-    [client, kind],
-  );
+  const startPreview = useMemo(() => {
+    if (kind === 'project') return client.startProjectPreview.bind(client);
+    if (kind === 'revision') return (revisionId: string) => client.startRevisionPreview(projectId ?? '', revisionId);
+    return client.startPreview.bind(client);
+  }, [client, kind, projectId]);
+  const findPreview = useMemo(() => {
+    if (kind === 'project') return client.findProjectPreview.bind(client);
+    if (kind === 'revision') return (revisionId: string) => client.findRevisionPreview(projectId ?? '', revisionId);
+    return client.findPreview.bind(client);
+  }, [client, kind, projectId]);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [stopRequested, setStopRequested] = useState(false);
