@@ -23,7 +23,15 @@ model produced unprompted for this exact rule (golden-work-045, frozen
 evidence sha256:aabfc2e5f44758724d4941869eaccff28f3bfba18d76a5f39c044c32b7962eb5) —
 codified here rather than fought, since a schema-first contract is not a
 worse design than inline decorator stubs, only a different one this
-pipeline had not yet declared explicitly.
+pipeline had not yet declared explicitly. Every such data-model document
+must also carry a real, non-empty "table_name" naming the real domain
+concept it represents — never left absent for a later stage to invent a
+name from this file's own filename instead (F-0079, real production
+evidence: a real `backend/models.json` with no `table_name` left
+`product_ux_spec`'s own required module `name` — "the model's own table
+name" per stage 6's rule below — with nothing to reuse but the generic
+word "models" itself, which no genuine product module can naturally be
+named).
 
 ### 2. backend_schema
 Inputs: backend_contract

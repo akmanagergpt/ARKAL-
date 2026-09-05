@@ -565,6 +565,107 @@ def test_backend_contract_findings_passes_on_real_route_and_model() -> None:
     assert findings == []
 
 
+# -- F-0079 (UPSTREAM_MODEL_NAME_FALLBACK_GAP) ------------------------------
+#
+# Real production evidence: goal-mtoun7ih-7odtyr's own real
+# backend/models.json carried a real "fields" map with no "table_name" at
+# all -- product_ux_spec's own reconciliation then fell back to the file's
+# own generic stem ("models"), a plain English word with no domain content,
+# which _resource_matching_name (F-0068's own fix) never normalizes (it
+# only strips a trailing SINGULAR "model", and "models" ends in "s", not
+# "model"). No later stage could ever satisfy that check without literally
+# reproducing "models" as a user-facing module name. Caught here, at
+# backend_contract itself -- the earliest point this is detectable, before
+# any downstream stage ever sees the fallback name.
+
+
+def test_backend_contract_findings_flags_a_model_with_no_table_name() -> None:
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/x", "method": "GET"}]),
+        "backend/models.json": json.dumps({"fields": {"id": "integer"}}),
+    })
+    codes = {f.code for f in findings}
+    assert codes == {"backend_contract_model_missing_table_name"}
+
+
+def test_backend_contract_findings_does_not_flag_an_empty_string_table_name() -> None:
+    """A present but empty/whitespace `table_name` is not a real name either."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/x", "method": "GET"}]),
+        "backend/models.json": json.dumps({"table_name": "   ", "fields": {"id": "integer"}}),
+    })
+    assert any(f.code == "backend_contract_model_missing_table_name" for f in findings)
+
+
+def test_backend_contract_findings_accepts_any_real_non_empty_table_name() -> None:
+    """No hardcoded name list -- any real, non-empty string is accepted,
+    including F-0068's own historical "task_model" shape (a real name, just
+    an awkward one -- a separate, already-solved problem this check does
+    not reopen or duplicate)."""
+    for real_name in ("task_model", "works", "book_id", "x", "Anything_At_All"):
+        findings = _backend_contract_findings({
+            "backend/routes.json": json.dumps([{"path": "/x", "method": "GET"}]),
+            "backend/models.json": json.dumps(
+                {"table_name": real_name, "fields": {"id": "integer"}}
+            ),
+        })
+        assert findings == [], real_name
+
+
+def test_backend_contract_findings_flags_only_the_model_missing_a_table_name() -> None:
+    """Multiple real models in the same real candidate -- only the one
+    genuinely missing a table_name is named, never the other, and the path
+    identifies exactly which file needs the fix."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/x", "method": "GET"}]),
+        "backend/students.json": json.dumps({"table_name": "students", "fields": {"id": "integer"}}),
+        "backend/models.json": json.dumps({"fields": {"id": "integer"}}),
+    })
+    assert [f.path for f in findings] == ["backend/models.json"]
+
+
+def test_a_real_missing_table_name_converges_on_retry_with_previous_attempt_output() -> None:
+    """Unseen-domain proof (never "models"/"book_id"/library), exercising
+    the real retry loop directly for just this one stage: backend_contract's
+    own retry -- reusing F-0077's generic previous_attempt_output feedback,
+    already wired for every stage -- converges on a real table_name once
+    the defect is disclosed, exactly like any other backend_contract
+    finding already does."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    missing_table_name = _output({
+        "backend/routes/widget_routes.json": json.dumps(
+            [{"path": "/widgets", "method": "GET", "model_fields": ["id"]}]
+        ),
+        "backend/widgets.json": json.dumps({"fields": {"id": {"type": "integer"}}}),
+    })
+    fixed_widgets = json.dumps(
+        {"table_name": "widgets", "fields": {"id": {"type": "integer"}}}
+    )
+    fixed = _output({
+        "backend/routes/widget_routes.json": json.dumps(
+            [{"path": "/widgets", "method": "GET", "model_fields": ["id"]}]
+        ),
+        "backend/widgets.json": fixed_widgets,
+    })
+    model = _QueueModel([(HonestState.PASS, missing_table_name), (HonestState.PASS, fixed)])
+    declaration = StageVocabulary.load(REPO).stage("backend_contract")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {},
+        timeout_seconds=30.0, max_attempts=4,
+    )
+    assert len(model.prompts) == 2
+    second_payload = json.loads(model.prompts[1])
+    assert "backend_contract_model_missing_table_name" in second_payload["prior_attempt_failure"]
+    assert second_payload["previous_attempt_output"] == {
+        "backend/routes/widget_routes.json": json.dumps(
+            [{"path": "/widgets", "method": "GET", "model_fields": ["id"]}]
+        ),
+        "backend/widgets.json": json.dumps({"fields": {"id": {"type": "integer"}}}),
+    }
+    assert stage_files["backend/widgets.json"] == fixed_widgets
+
+
 def test_frontend_ui_findings_flags_unused_export_and_missing_states() -> None:
     files = {
         "frontend/src/client.js": "export function fetchWorks() { return fetch('/works'); }\n",
