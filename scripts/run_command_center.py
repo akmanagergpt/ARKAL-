@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import subprocess
 import sys
 import threading
 import time
@@ -59,6 +60,7 @@ from arkali.engineering.localai.capability_query import (  # noqa: E402
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
+from arkali.execution.durable.job_state_machine import QUEUED as _JOB_QUEUED  # noqa: E402
 from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
 from arkali.execution.workflow.graph_model import (  # noqa: E402
@@ -119,7 +121,57 @@ class _DurableFactorySink:
         return record.job_id
 
 
-def _factory_submitter(pdp: PolicyDecisionPoint, repo_root: pathlib.Path) -> Callable[..., Any]:
+_FACTORY_WORKER_SCRIPT = pathlib.Path(__file__).resolve().with_name("run_factory_worker.py")
+_FACTORY_WORKER_DB = ROOT / "var" / "command_center.db"  # run_factory_worker.py's own fixed path
+
+
+def _spawn_factory_worker_once() -> None:
+    """DEF-009 composition wiring: run the existing, unmodified one-shot
+    `run_factory_worker.py` consumer as a detached background subprocess.
+
+    This makes no admission or priority decision among competing jobs - it
+    is a pure 1:1 dispatch triggered by the exact request that created the
+    work, never a perpetual poll. D-027 forbids a second *scheduler*; this
+    is the same "manual re-run" deployment pattern the worker's own module
+    docstring already names as in-scope, just automated. No worker logic is
+    copied here - only `python scripts/run_factory_worker.py` is invoked,
+    unchanged, exactly as an operator would from a terminal.
+    """
+    log_dir = ROOT / "var" / "factory" / "worker_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / f"worker-{time.time_ns()}.log"
+    with log_path.open("wb") as log_file:
+        subprocess.Popen(
+            [sys.executable, str(_FACTORY_WORKER_SCRIPT)],
+            cwd=str(ROOT),
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+        )
+
+
+def _should_auto_spawn_worker(
+    can_auto_spawn: bool, durable_job_id: str | None, fresh_lifecycle_state: str | None
+) -> bool:
+    """Pure decision extracted for direct unit-testing.
+
+    `submit_goal` always reports `QUEUED` for any call reaching the enqueue
+    branch, including an idempotent rediscovery of an already-RUNNING or
+    terminal job. Only a fresh read of the job's own real lifecycle state
+    (`fresh_lifecycle_state`) tells a genuinely new, still-unclaimed job
+    apart from that; spawning on the stale report would start a second,
+    redundant worker racing the first.
+    """
+    return (
+        can_auto_spawn
+        and durable_job_id is not None
+        and fresh_lifecycle_state == _JOB_QUEUED
+    )
+
+
+def _factory_submitter(
+    pdp: PolicyDecisionPoint, repo_root: pathlib.Path, database: pathlib.Path
+) -> Callable[..., Any]:
     """DEF-009 FLOW A CONVERGENCE AUTHORIZATION, item 3: `ProductionFactory`
     is composed with a real `capability_query` for the first time, derived
     once here (not per request) by probing the real local Ollama runtime -
@@ -148,6 +200,14 @@ def _factory_submitter(pdp: PolicyDecisionPoint, repo_root: pathlib.Path) -> Cal
     )
     authority = compose_real_capability_authority(repo_root, OllamaAdapter(), current_phase)
     factory = ProductionFactory(AuthorityMap.load(repo_root), authority.query)
+    # `run_factory_worker.py` opens its own fixed `var/command_center.db` by
+    # design (its own module docstring: no logic here may be copied into
+    # it). Auto-dispatch is only correct when this Command Center is
+    # actually serving that same database; a custom `--db` honestly falls
+    # back to the pre-existing manual-launch path rather than spawning a
+    # worker that would read/write a different database than the one that
+    # just queued the job.
+    can_auto_spawn = database.resolve() == _FACTORY_WORKER_DB.resolve()
 
     def submit(session: Session, body: Any) -> Any:
         pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
@@ -155,7 +215,14 @@ def _factory_submitter(pdp: PolicyDecisionPoint, repo_root: pathlib.Path) -> Cal
         if fields.get("capability_id") is None:
             fields["capability_id"] = authority.default_capability_id
         request = ProductionGoalRequest(**fields)
-        return factory.submit_goal(request, _DurableFactorySink(JobStore(session, pep)))
+        store = JobStore(session, pep)
+        result = factory.submit_goal(request, _DurableFactorySink(store))
+        durable_job_id = getattr(result, "durable_job_id", None)
+        record = store.get(durable_job_id) if durable_job_id is not None else None
+        fresh_state = record.lifecycle_state if record is not None else None
+        if _should_auto_spawn_worker(can_auto_spawn, durable_job_id, fresh_state):
+            _spawn_factory_worker_once()
+        return result
 
     return submit
 
@@ -439,7 +506,7 @@ def main(argv: list[str]) -> int:
         extensions=_CommandExtensions(
             operations_wiring=_operations_wiring(pdp, ROOT),
             operations_repo_root=ROOT,
-            factory_submitter=_factory_submitter(pdp, ROOT),
+            factory_submitter=_factory_submitter(pdp, ROOT, database),
             factory_candidate_history=_factory_candidate_history(ROOT),
             factory_campaign_history=_factory_campaign_history(ROOT),
             preview_bridge=_preview_bridge_wiring(ROOT),
