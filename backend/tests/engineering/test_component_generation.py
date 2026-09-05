@@ -813,3 +813,184 @@ def test_default_timeout_covers_default_output_budget_at_measured_floor() -> Non
     measured_floor_tokens_per_second = 7.0
     worst_case_generation_seconds = DEFAULT_MAX_OUTPUT_TOKENS / measured_floor_tokens_per_second
     assert DEFAULT_TIMEOUT_SECONDS >= worst_case_generation_seconds * 1.5
+
+
+# -- F-0080 (DOUBLE_SERIALIZATION_DEFECT) -----------------------------------
+#
+# Real production evidence: goal-mtow4gf9-84kplb's own real backend_cors_
+# boundary attempt (recovered via F-0078's own new observability) shows a
+# real qwen2.5-coder:14b double-escaping its own embedded newlines --
+# writing a real, literal "\n" (backslash + n) where a single JSON escape
+# was correct -- collapsing an entire real .py file onto one logical line
+# and failing ast.parse with the exact historical "unexpected character
+# after line continuation character" error goal-mtm6qrdr-apus8c also
+# produced. The fix reuses model_product_generation._normalise_python_
+# transport -- the one-shot path's own already-existing, already-correct
+# primitive for this exact defect class -- wired into the staged retry
+# loop for the first time, at the same point (materialization, right
+# after parsing, before any check) the one-shot path already applies it.
+
+
+def _double_escaped(real_content: str) -> str:
+    """The exact real defect shape: every real newline replaced with a
+    literal two-character backslash-n, mirroring goal-mtow4gf9-84kplb's
+    own real raw provider output byte-for-byte."""
+    return real_content.replace("\n", "\\n")
+
+
+def test_a_double_escaped_python_stage_output_normalizes_and_passes_immediately(
+    tmp_path: pathlib.Path,
+) -> None:
+    real_content = (
+        "from flask_cors import CORS\n"
+        "app = object()\n"
+        "CORS(app)\n"
+        "@app.get('/works')\n"
+        "def list_works():\n"
+        "    return []\n"
+    )
+    queues = _happy_path_queues()
+    queues["backend_cors_boundary"] = [
+        (HonestState.PASS, _output({"backend/main.py": _double_escaped(real_content)})),
+    ]
+    factory = _factory(queues)
+    workspace = _workspace(tmp_path)
+    result = generate_staged_model_product(
+        _blueprint(), factory, workspace, vocabulary=StageVocabulary.load(REPO),
+    )
+    # Exactly one real attempt -- normalization ran before the checker, so
+    # no retry was ever needed for a defect this generic already fixes.
+    assert len(factory.models["backend_cors_boundary"].prompts) == 1  # type: ignore[attr-defined]
+    assert workspace.root.joinpath("backend", "main.py").read_text(encoding="utf-8") == real_content
+    assert result.attempts_used == 11
+
+
+def test_a_legitimate_literal_backslash_n_in_otherwise_valid_python_is_preserved() -> None:
+    """Case 2 (mandatory adversarial proof): a genuinely intended two-
+    character backslash-n INSIDE a raw string, in a file that is otherwise
+    completely valid Python (real newlines everywhere else), must survive
+    byte-for-byte -- ast.parse already succeeds on the original, so
+    _normalise_python_transport's own first check (`continue` on success)
+    never touches it."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    real_content = (
+        "import re\n"
+        "from flask_cors import CORS\n"
+        "app = object()\n"
+        "CORS(app)\n"
+        "PATTERN = re.compile(r'\\n')\n"  # a genuine, intentional literal \n
+        "@app.get('/works')\n"
+        "def list_works():\n"
+        "    return []\n"
+    )
+    model = _QueueModel([(HonestState.PASS, _output({"backend/main.py": real_content}))])
+    declaration = StageVocabulary.load(REPO).stage("backend_cors_boundary")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["backend/main.py"] == real_content
+
+
+def test_a_still_broken_file_after_normalization_still_fails_the_real_checker(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Fails closed: a genuinely malformed file (a missing colon, unrelated
+    to escaping) that ALSO happens to arrive double-escaped must still be
+    rejected as real invalid syntax -- normalization must never silently
+    paper over an unrelated real defect."""
+    genuinely_broken = (
+        "from flask_cors import CORS\n"
+        "app = object()\n"
+        "CORS(app)\n"
+        "@app.get('/works')\n"
+        "def list_works()\n"  # missing colon -- a real, unrelated syntax error
+        "    return []\n"
+    )
+    queues = _happy_path_queues()
+    always_broken = _output({"backend/main.py": _double_escaped(genuinely_broken)})
+    queues["backend_cors_boundary"] = [(HonestState.PASS, always_broken)] * 4
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+    assert "python_syntax" in str(excinfo.value)
+
+
+def test_normalization_never_touches_a_non_python_file() -> None:
+    """`_normalise_python_transport`'s own `.py`-only guard, proven at the
+    staged-generation integration point: a JS file carrying the identical
+    literal backslash-n shape is left completely alone. Exercises the one
+    stage directly, avoiding unrelated downstream stages' own happy-path
+    fixtures overwriting the same file."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    js_with_literal_backslash_n = "export function fetchWorks() { return 'a\\nb'; }\n"
+    model = _QueueModel([(HonestState.PASS, _output({
+        "frontend/src/client.js": js_with_literal_backslash_n,
+    }))])
+    declaration = StageVocabulary.load(REPO).stage("frontend_client")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["frontend/src/client.js"] == js_with_literal_backslash_n
+
+
+def test_a_domain_independent_double_escape_reproduces_the_same_fix() -> None:
+    """Unseen-domain proof (never library/books, never the real Turkish
+    goal's own vocabulary): the identical defect shape, in an unrelated
+    inventory domain, converges via the identical, domain-agnostic fix.
+    Exercises the one stage directly, matching the real evidence's own
+    stage (backend_cors_boundary)."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    real_content = (
+        "from flask_cors import CORS\n"
+        "app = object()\n"
+        "CORS(app)\n"
+        "@app.get('/widgets')\n"
+        "def list_widgets():\n"
+        "    return []\n"
+        "class WidgetRecord(object):\n"
+        "    pass\n"
+    )
+    model = _QueueModel([(HonestState.PASS, _output({
+        "backend/main.py": _double_escaped(real_content),
+    }))])
+    declaration = StageVocabulary.load(REPO).stage("backend_cors_boundary")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {},
+        timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["backend/main.py"] == real_content
+
+
+def test_f0078_raw_evidence_stays_raw_while_the_written_file_is_normalized() -> None:
+    """F-0078's own observability must keep freezing the REAL, original,
+    un-normalized model text -- normalization is a materialization-layer
+    concern, never something that hides what the provider actually said."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+    from tests.engineering.test_stage_attempt_observability import _RecordingQueueModel
+
+    real_content = (
+        "from flask_cors import CORS\n"
+        "app = object()\n"
+        "CORS(app)\n"
+        "@app.get('/works')\n"
+        "def list_works():\n"
+        "    return []\n"
+    )
+    double_escaped_output = _output({"backend/main.py": _double_escaped(real_content)})
+    model = _RecordingQueueModel([(HonestState.PASS, double_escaped_output)])
+    declaration = StageVocabulary.load(REPO).stage("backend_cors_boundary")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    # The materialized, checked, workspace-bound content is normalized...
+    assert stage_files["backend/main.py"] == real_content
+    # ...but the frozen observability evidence still shows the REAL,
+    # original, un-normalized bytes the provider actually returned.
+    assert len(model.attempts) == 1
+    recorded_raw_output = model.attempts[0][4]
+    assert recorded_raw_output == double_escaped_output
+    assert real_content not in recorded_raw_output

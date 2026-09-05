@@ -104,6 +104,7 @@ from arkali.engineering.factory.model_product_generation import (
     ModelSource,
     WorkspaceTarget,
     _json_payload,
+    _normalise_python_transport,
 )
 from arkali.engineering.factory.product_preflight import (
     SemanticFinding, _manifest_findings, _manifests_stage_findings,
@@ -401,6 +402,26 @@ def _generate_one_stage(
                 last_findings = ()
             else:
                 stage_files = {item.path: item.content for item in envelope.files}
+                # F-0080. The one-shot path (`write_model_product_output`)
+                # already reuses this exact primitive at the identical point
+                # in its own pipeline (right after parsing, before any
+                # check) -- staged generation never called it. Real, live
+                # evidence (`goal-mtow4gf9-84kplb`, `backend_cors_boundary`):
+                # a real provider double-escapes an embedded newline as
+                # `\\n` in its own raw JSON reply, which the one legitimate
+                # `json.loads` above decodes to a literal two-character
+                # `\n` -- never an actual line break -- collapsing an
+                # entire real ".py" file onto one logical line and failing
+                # `ast.parse` with the exact historical
+                # "unexpected character after line continuation character"
+                # error. `_normalise_python_transport` only ever touches a
+                # ".py" file whose content does not already parse, and only
+                # ever keeps the transformed candidate if THAT parses --
+                # already-valid content (including a legitimate literal
+                # `\n` inside a string, in an otherwise valid file) is
+                # provably left untouched, never guessed into a different
+                # meaning.
+                stage_files = _normalise_python_transport(stage_files)
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
