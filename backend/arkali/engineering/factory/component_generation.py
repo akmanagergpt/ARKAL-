@@ -363,11 +363,31 @@ def _generate_one_stage(
     #: semantics exactly, never carrying a stale attempt's own facts
     #: forward past one that produced none.
     last_findings: tuple[tuple[str, str, str], ...] = ()
+    #: FACTORY RELIABILITY CONVERGENCE. `visible_files` is this stage's
+    #: declared INPUTS (strictly-earlier stages) and never changes across
+    #: attempts -- a retry's own prior REJECTED output was never shown back
+    #: to the model, anywhere, for any stage. `prior_attempt_failure` named
+    #: a code/path/location (e.g. "line 42: unterminated string literal")
+    #: that pointed at a file the model could no longer see, since it had
+    #: already been discarded; the model had to blindly regenerate the
+    #: whole stage from scratch, guided only by a location it could not
+    #: check against anything in front of it. Real, independently-
+    #: reproduced evidence: `goal-mtm6qrdr-apus8c` (`backend_cors_boundary`,
+    #: two consecutive real Python-syntax fingerprints) and
+    #: `goal-mtolm3cv-ivuo9g` (`product_ux_spec`, two consecutive real
+    #: `ux_spec_missing_module`/`ux_spec_invented_module` fingerprints) both
+    #: hit `ARK-ERR-0116` this way. This is SUBJECT-GENERIC (every stage
+    #: shares the same retry shape) and DOMAIN-INDEPENDENT (no stage/finding
+    #: name is special-cased): once a stage's own output parses as a real
+    #: `_StageEnvelope`, its per-file content is retained across attempts
+    #: and threaded back into the next prompt, unconditionally.
+    previous_attempt_files: dict[str, str] | None = None
     for attempt_number in range(1, max_attempts + 1):
         strategy = _repair_strategy_for_attempt(attempt_number)
         prompt = _stage_prompt(
             declaration, blueprint, visible_files, failure, target_runtime,
             repair_strategy=strategy, prior_findings=last_findings,
+            previous_attempt_files=previous_attempt_files,
         )
         outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
         last_raw_output = outcome.output
@@ -391,6 +411,10 @@ def _generate_one_stage(
                     return stage_files
                 last_findings = tuple((f.code, f.path, f.detail) for f in findings)
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
+                # A real, parseable (if rejected) attempt's own exact bytes
+                # become the NEXT attempt's own visible prior output -- see
+                # the retry-loop docstring above.
+                previous_attempt_files = stage_files
         _notify_attempt(
             model, declaration.name, attempt_number, strategy, prompt,
             outcome.output, last_findings, failure,

@@ -342,6 +342,167 @@ def test_a_failing_attempt_is_retried_with_the_real_finding_as_feedback(
     assert "backend_contract_no_routes" in prompts[1]
 
 
+# -- FACTORY RELIABILITY CONVERGENCE: previous-attempt-output feedback ------
+#
+# Real, repository evidence: `goal-mtm6qrdr-apus8c` (backend_cors_boundary,
+# a real repeated Python-syntax fingerprint) and `goal-mtolm3cv-ivuo9g`
+# (product_ux_spec, a real repeated module-parity fingerprint) both hit
+# ARK-ERR-0116 without the model ever seeing the exact bytes it wrote on
+# the attempt that was rejected -- only a flat failure string naming a
+# location/name in a file that had already been discarded. These tests
+# regression-guard the fix generically, never by candidate id or domain.
+
+
+def test_a_retried_stage_receives_its_own_previous_rejected_output(
+    tmp_path: pathlib.Path,
+) -> None:
+    queues = _happy_path_queues()
+    bad = _output({"backend/main.py": "app = object()\n"})
+    good = queues["backend_contract"][0]
+    queues["backend_contract"] = [(HonestState.PASS, bad), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
+    first_payload = json.loads(prompts[0])
+    second_payload = json.loads(prompts[1])
+    assert "previous_attempt_output" not in first_payload
+    assert second_payload["previous_attempt_output"] == {"backend/main.py": "app = object()\n"}
+
+
+def test_previous_attempt_output_reflects_the_immediately_prior_attempt_not_the_first(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Two DIFFERENT real defects in a row (never the same fingerprint, so
+    ARK-ERR-0116 correctly does not fire) -- the 3rd attempt's own prompt
+    must show the 2nd attempt's own bytes, never the 1st's."""
+    queues = _happy_path_queues()
+    no_routes_or_models = _output({"backend/main.py": "app = object()  # first\n"})
+    routes_but_no_models = _output({
+        "backend/routes/task_routes.json": json.dumps(
+            [{"path": "/works", "method": "GET", "model_fields": ["id"]}]
+        ),
+    })
+    good = queues["backend_contract"][0]
+    queues["backend_contract"] = [
+        (HonestState.PASS, no_routes_or_models),
+        (HonestState.PASS, routes_but_no_models),
+        good,
+    ]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 3
+    second_payload = json.loads(prompts[1])
+    third_payload = json.loads(prompts[2])
+    assert second_payload["previous_attempt_output"] == {
+        "backend/main.py": "app = object()  # first\n"
+    }
+    assert "backend_contract_no_models" in third_payload["prior_attempt_failure"]
+    assert "backend_contract_no_routes" not in third_payload["prior_attempt_failure"]
+    assert third_payload["previous_attempt_output"] == {
+        "backend/routes/task_routes.json": json.dumps(
+            [{"path": "/works", "method": "GET", "model_fields": ["id"]}]
+        ),
+    }
+
+
+def test_previous_attempt_output_is_absent_after_a_contract_violation(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A response that never even parses as a real `_StageEnvelope` leaves
+    nothing real to show back -- `previous_attempt_files` must stay `None`,
+    never the raw unparsed garbage passed off as real file content."""
+    queues = _happy_path_queues()
+    not_an_envelope = "not json at all"
+    good = queues["backend_contract"][0]
+    queues["backend_contract"] = [(HonestState.PASS, not_an_envelope), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
+    second_payload = json.loads(prompts[1])
+    assert "previous_attempt_output" not in second_payload
+    assert "violates the contract" in second_payload["prior_attempt_failure"]
+
+
+def test_the_anti_loop_still_fires_when_previous_attempt_output_is_present(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Showing the model its own previous output must never weaken
+    ARK-ERR-0116 -- two consecutive attempts producing the IDENTICAL real
+    rejected content are still the same failure fingerprint and must still
+    stop before the bounded budget is exhausted, exactly as before this fix."""
+    queues = _happy_path_queues()
+    always_same_bad = _output({"backend/main.py": "app = object()\n"})
+    queues["backend_contract"] = [(HonestState.PASS, always_same_bad)] * 4
+    factory = _factory(queues)
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+    assert "repeated the identical failure fingerprint" in str(excinfo.value)
+    # Stopped after attempt 2, never reaching a 3rd or 4th real call.
+    assert len(factory.models["backend_contract"].prompts) == 2  # type: ignore[attr-defined]
+
+
+def test_a_syntax_error_retry_can_see_the_previous_attempts_exact_broken_line(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Real shape of `goal-mtm6qrdr-apus8c` (backend_cors_boundary): a
+    location-anchored finding ("line N: ...") is useless on its own once
+    the file it points into has been discarded. The retry prompt must now
+    carry that exact file's own real bytes, so "line N" refers to
+    something the model can actually see and edit."""
+    queues = _happy_path_queues()
+    broken = _output({
+        "backend/main.py": (
+            "from flask_cors import CORS\napp = object()\nCORS(app)\n"
+            "x = ('CREATE TABLE works (\n  id INTEGER\n)')\n"
+        ),
+    })
+    good = queues["backend_cors_boundary"][0]
+    queues["backend_cors_boundary"] = [(HonestState.PASS, broken), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_cors_boundary"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 2
+    second_payload = json.loads(prompts[1])
+    assert "python_syntax" in second_payload["prior_attempt_failure"]
+    assert "CREATE TABLE works (" in second_payload["previous_attempt_output"]["backend/main.py"]
+
+
+def test_a_module_parity_retry_can_see_the_previous_attempts_exact_invented_module(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Real shape of `goal-mtolm3cv-ivuo9g` (product_ux_spec): a
+    name-anchored finding ("invented module ['book_id']") is now
+    accompanied by the exact previous JSON the model itself wrote, not just
+    the disclosed real/invented name pair inside a flat string."""
+    queues = _happy_path_queues()
+    good_spec = json.loads(HAPPY_PATH_FILES["product_ux_spec"]["product/ux_spec.json"])
+    bad_spec = dict(good_spec)
+    bad_spec["modules"] = [{**good_spec["modules"][0], "name": "book_id"}]
+    bad = _output({"product/ux_spec.json": json.dumps(bad_spec)})
+    good = queues["product_ux_spec"][0]
+    queues["product_ux_spec"] = [(HonestState.PASS, bad), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["product_ux_spec"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 2
+    second_payload = json.loads(prompts[1])
+    assert "ux_spec_invented_module" in second_payload["prior_attempt_failure"]
+    assert "book_id" in second_payload["previous_attempt_output"]["product/ux_spec.json"]
+
+
 def test_stage_budget_exhaustion_raises_and_writes_nothing_for_that_candidate(
     tmp_path: pathlib.Path,
 ) -> None:

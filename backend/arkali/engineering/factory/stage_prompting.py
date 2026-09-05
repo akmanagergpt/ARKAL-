@@ -193,6 +193,7 @@ def _stage_prompt(
     visible_files: Mapping[str, str], prior_failure: str | None,
     target_runtime: str | None = None, repair_strategy: str = _DEFAULT_REPAIR_STRATEGY,
     prior_findings: tuple[tuple[str, str, str], ...] = (),
+    previous_attempt_files: Mapping[str, str] | None = None,
 ) -> str:
     payload: dict[str, object] = {
         "role": "You are one bounded stage of a multi-stage software factory.",
@@ -215,6 +216,25 @@ def _stage_prompt(
             "while retaining everything else already correct."
         ),
     }
+    if previous_attempt_files:
+        # FACTORY RELIABILITY CONVERGENCE. The exact bytes this stage itself
+        # wrote on its immediately-prior parseable attempt -- never the
+        # declared-input files above, never a paraphrase. Without this, a
+        # location- or name-anchored `prior_attempt_failure` (e.g. "line 42:
+        # unterminated string literal", or "invented module ['book_id']")
+        # named a place in a file the model could no longer see, since its
+        # own prior output was discarded every retry.
+        payload["previous_attempt_output"] = dict(previous_attempt_files)
+        payload["convergence_rule"] = (
+            "previous_attempt_output is the exact content you wrote on your "
+            "immediately-prior attempt for THIS stage. prior_attempt_failure "
+            "names the exact defect a real, mechanical check found in it. "
+            "Start from previous_attempt_output, make the minimal edit that "
+            "resolves prior_attempt_failure at the exact location/name it "
+            "names, and retain everything else already correct -- do not "
+            "regenerate unrelated content from scratch, and do not repeat "
+            "the same wrong value again."
+        )
     if target_runtime is not None:
         # golden-work-047 (session evidence, frozen): the model was never
         # told what Python version its declared dependencies had to run
