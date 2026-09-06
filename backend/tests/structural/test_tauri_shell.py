@@ -26,6 +26,18 @@ def test_tauri_two_hosts_the_existing_frontend_build() -> None:
     assert not (TAURI / "ui").exists()
 
 
+def test_desktop_backend_bundles_authoritative_governance_inputs() -> None:
+    build = (REPO / "scripts" / "build_desktop_backend.py").read_text(
+        encoding="utf-8"
+    )
+    for relative in (
+        "'build' / 'BUILD_STATE.md'",
+        "'build' / 'OPEN_BLOCKERS.md'",
+        "'acceptance' / 'HUMAN_GATE_RECORDS.md'",
+    ):
+        assert relative in build
+
+
 def test_native_bridge_is_empty_and_fail_closed() -> None:
     source = (TAURI / "src" / "main.rs").read_text(encoding="utf-8")
     lifecycle = (TAURI / "src" / "backend_runtime.rs").read_text(encoding="utf-8")

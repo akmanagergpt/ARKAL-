@@ -43,6 +43,12 @@ def main() -> int:
         "--add-data",
         f"{ROOT / 'docs' / 'canonical'};docs/canonical",
         "--add-data",
+        f"{ROOT / 'docs' / 'build' / 'BUILD_STATE.md'};docs/build",
+        "--add-data",
+        f"{ROOT / 'docs' / 'build' / 'OPEN_BLOCKERS.md'};docs/build",
+        "--add-data",
+        f"{ROOT / 'docs' / 'acceptance' / 'HUMAN_GATE_RECORDS.md'};docs/acceptance",
+        "--add-data",
         f"{ROOT / 'docs' / 'ARKALI_GENESIS_V2_VERIFICATION_AND_DELIVERY_CONTRACT.md'};docs",
         str(ROOT / "scripts" / "run_command_center.py"),
     ]

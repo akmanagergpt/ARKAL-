@@ -104,10 +104,10 @@ try {
   await expect(first.page.getByRole('button', { name: 'Profesyonel' })).toHaveAttribute('aria-pressed', 'true');
   await openExpertProjects(first.page);
   if (!EXISTING_PROJECT_ID) {
-    await first.page.getByLabel(/project identifier/i).fill(PROJECT_ID);
-    await first.page.getByLabel(/project name/i).fill(PROJECT_NAME);
-    await first.page.getByRole('button', { name: /register project/i }).click();
-    await expect(first.page.getByText(/registered in DRAFT/i)).toBeVisible();
+    await first.page.getByLabel(/proje tanımlayıcısı/i).fill(PROJECT_ID);
+    await first.page.getByLabel(/proje adı/i).fill(PROJECT_NAME);
+    await first.page.getByRole('button', { name: /projeyi kaydet/i }).click();
+    await expect(first.page.getByText(/kaydedildi \(DRAFT\)/i)).toBeVisible();
   }
 
   const duplicate = spawn(EXE, [], { cwd: REPO, stdio: 'ignore' });

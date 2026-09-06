@@ -198,6 +198,13 @@ artifacts/phase29-recovery/
 data/*.db
 data/*.sqlite3
 var/
+# Obsidian'da gösterilen yerel, yeniden üretilebilir hafıza panoları. Bunlar
+# kaynak ya da karar kaydı değildir; scripts/arkali_memory.py tarafından
+# üretildikleri için depoya yazılmazlar.
+docs/hafiza/.generated/
+# Obsidian'ın kişisel çalışma alanı durumu (açık sekmeler, pano düzeni, yerel
+# grafik önbelleği) -- kaynak değil, katkı sağlayana özgü yerel tercihtir.
+.obsidian/
 instance/
 
 # --- Fixtures and seed databases intended for version control ---
