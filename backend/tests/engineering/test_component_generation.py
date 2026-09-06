@@ -1132,3 +1132,35 @@ def test_the_real_historical_frontend_client_attempts_now_reconstruct_correctly(
 
 def _output_flat(files: dict[str, str]) -> str:
     return json.dumps(files)
+
+
+# -- F-0082 (OBJECT_LITERAL_AT_STATEMENT_POSITION_GAP) ----------------------
+
+
+def test_the_enriched_semantic_finding_reaches_the_real_retry_context() -> None:
+    """End-to-end proof that the sharper diagnosis
+    (javascript_syntax_preflight._is_object_literal_at_statement_position)
+    actually reaches attempt 2's own real prompt through the existing,
+    unmodified F-0077 mechanism -- zero new wiring needed anywhere in the
+    retry loop itself."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    bad = _output({
+        "frontend/src/apiClient.js": '{\n  "getOverdueBooks": "GET /api/books/overdue"\n}',
+    })
+    good = _output({
+        "frontend/src/apiClient.js": (
+            "export async function getOverdueBooks() {\n"
+            "  const response = await fetch('/api/books/overdue');\n"
+            "  return response.json();\n}\n"
+        ),
+    })
+    model = _QueueModel([(HonestState.PASS, bad), (HonestState.PASS, good)])
+    declaration = StageVocabulary.load(REPO).stage("frontend_client")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert len(model.prompts) == 2
+    second_payload = json.loads(model.prompts[1])
+    assert "object literal" in second_payload["prior_attempt_failure"]
+    assert "frontend/src/apiClient.js" in stage_files

@@ -63,6 +63,54 @@ def _node_syntax_error(source: str) -> str | None:
     return prefix + message.group(0).strip()
 
 
+#: F-0082 (`OBJECT_LITERAL_AT_STATEMENT_POSITION_GAP`). Real, live,
+#: independently-reproduced evidence (`goal-mtoxjx1x-cwtlad` and
+#: `goal-mtpjpadj-k9auqu`, `frontend_client`) that this exact class recurs
+#: even with `STAGED_GENERATION_STAGES.md#7`'s own explicit prose warning
+#: present on every attempt (the golden-work-054 citation already embedded
+#: in that stage's own canonical rule text) and, since F-0077, the model's
+#: own exact prior rejected bytes shown back to it too: a real
+#: `qwen2.5-coder:14b` twice wrote a real object literal directly at the
+#: top level of a `.js` file -- a route-to-string descriptor on one real
+#: attempt, the same descriptor with a function-valued property on the
+#: next real attempt -- real, `node`-verified `SyntaxError`s both times,
+#: since a bare `{` at statement position parses as a BLOCK, never the
+#: object literal it looks like (JavaScript's own grammar draws this
+#: distinction only for `{`; a bare `[` is always a real, valid array-
+#: literal expression statement either way, so it never needs or gets
+#: this check). `_node_syntax_error` already, correctly, catches this as
+#: invalid JS -- but its own detail text is a bare parser message
+#: ("Unexpected token ':'"), giving the model a location and a mechanism,
+#: never the SEMANTIC reason: prose describing a requirement, however
+#: explicit, is not the same signal as a checker naming the actual
+#: violated invariant (the identical lesson F-0069 already proved for
+#: `frontend_forms`'s own structural findings).
+#:
+#: The extra check below is mechanically unambiguous, never a guess, and
+#: strictly more general than a JSON-validity check (it also catches the
+#: real function-valued variant above, which is not valid JSON at all):
+#: it reuses `_node_syntax_error` itself, unchanged, against the SAME
+#: source merely wrapped in parentheses. Wrapping in `(...)` is the exact,
+#: real distinction JavaScript's own grammar already draws between "a `{`
+#: opening a block/statement" (invalid here, since it is not a real
+#: statement) and "a `{` opening a parenthesized EXPRESSION" (valid
+#: whenever the content genuinely is a real object literal). If node
+#: rejects the bare content but ACCEPTS the parenthesized form, the
+#: content is, mechanically and unambiguously, a real object literal
+#: sitting where a real statement (a function declaration, an assignment,
+#: an export) was required -- never a guess about what the content "looks
+#: like". Genuine, unrelated JS syntax mistakes (a missing semicolon, an
+#: unclosed string, mismatched brackets) stay rejected in BOTH forms and
+#: are never touched. Generic across every JS-producing stage that already
+#: calls this shared checker (`frontend_client` today); no route, domain,
+#: candidate or provider vocabulary appears anywhere.
+def _is_object_literal_at_statement_position(source: str) -> bool:
+    stripped = source.strip()
+    if not stripped.startswith("{"):
+        return False
+    return _node_syntax_error(f"({source})") is None
+
+
 def _javascript_syntax_findings(
     files: Mapping[str, str], *, path_prefix: str,
 ) -> list[SemanticFinding]:
@@ -72,6 +120,17 @@ def _javascript_syntax_findings(
         if not (path.startswith(path_prefix) and path.endswith((".js", ".jsx"))):
             continue
         error = _node_syntax_error(source)
-        if error is not None:
-            findings.append(SemanticFinding(code="javascript_syntax", path=path, detail=error))
+        if error is None:
+            continue
+        if _is_object_literal_at_statement_position(source):
+            error += (
+                " -- this file's own content is a real object literal written "
+                "where a real statement was required (e.g. a function "
+                "declaration, an assignment, or an export), never actually "
+                "invoked or exported; write real JS/TS source that DOES "
+                "something (a real function making a real HTTP call, "
+                "assigned or exported), never a descriptor of what the code "
+                "should do"
+            )
+        findings.append(SemanticFinding(code="javascript_syntax", path=path, detail=error))
     return findings
