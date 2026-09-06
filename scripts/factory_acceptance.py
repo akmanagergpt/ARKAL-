@@ -1,0 +1,546 @@
+"""The one real, generic candidate-acceptance engine (ARK-REQ-0074:
+"Golden domain logic must not enter ARKALI core" -- this module itself
+names no resource, field, or route of its own).
+
+This is the SAME acceptance orchestration `scripts/run_golden_acceptance.py`
+has always run, extracted so a second real caller -- `scripts/
+run_factory_worker.py`'s own real production composition -- can invoke it
+directly, in-process, immediately after a real Factory candidate reaches its
+own real `STAGED_GENERATION_PASS`, with zero second acceptance engine, zero
+second ledger, zero second evidence store, and zero candidate-identity
+translation.
+
+`_accept()` takes an already-resolved `source_candidate: pathlib.Path`
+rather than a `candidate_id` string it re-resolves itself -- identity-shape
+validation (`golden-work-*` vs `factory-<job_id>`) is an ENTRY-POINT concern,
+owned by each caller (`run_golden_acceptance.py`'s own `_candidate()` for the
+CLI; `run_factory_worker.py` already holds a real, trusted workspace root it
+never needs to re-validate). This function itself has never depended on,
+and does not now depend on, which caller resolved that path or what shape
+the caller's own id string had.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import time
+import urllib.request
+from dataclasses import dataclass, field
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
+
+from alembic import command as _alembic_command  # noqa: E402
+from alembic.config import Config as _AlembicConfig  # noqa: E402
+from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
+from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
+from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
+from arkali.engineering.candidate.ledger import (  # noqa: E402
+    ACCEPTANCE_FAILED,
+    ACCEPTED,
+    CandidateAcceptanceInProgressError,
+    CandidateIntegrityError,
+    CandidateLedger,
+    INTERRUPTED,
+)
+from arkali.engineering.candidate.runtime_process import (  # noqa: E402
+    port_accepts_connections as _port_accepts_connections,
+    port_is_free as _port_is_free,
+    stop_process as _stop,
+    wait_http as _wait_http,
+)
+from arkali.engineering.factory.acceptance_plan_compiler import (  # noqa: E402
+    _AcceptancePlanIncomplete,
+    _compile_acceptance_plan,
+)
+from arkali.engineering.factory.acceptance_plan_reconciliation import _reconcile_scenario  # noqa: E402
+from arkali.engineering.factory.acceptance_scenario import _AcceptanceScenario  # noqa: E402
+from arkali.engineering.factory.errors import CandidateNotAcceptedError  # noqa: E402
+from arkali.engineering.factory.product_registration import (  # noqa: E402
+    register_accepted_candidate_as_managed_product,
+)
+from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
+from arkali.evidence.artifact.store import ArtifactStore  # noqa: E402
+from arkali.kernel.persistence.engine import (  # noqa: E402
+    create_persistence_engine,
+    sqlite_url,
+)
+from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
+from arkali.kernel.persistence.session import (  # noqa: E402
+    create_session_factory,
+    unit_of_work,
+)
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+#: The one real candidates root both `run_golden_acceptance.py` (`golden-
+#: work-*`) and `run_factory_worker.py` (`factory-<job_id>`) already write
+#: into and track through the same `CandidateLedger` -- never a second root.
+CANDIDATES = ROOT / "var" / "factory" / "candidates"
+RUNTIMES = ROOT / "var" / "factory" / "runtime"
+BACKEND_PORT = 5000
+FRONTEND_PORT = 3000
+
+
+def _load_scenario(path: pathlib.Path) -> _AcceptanceScenario:
+    return _AcceptanceScenario.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _candidate_contract_files(candidate_dir: pathlib.Path) -> dict[str, str]:
+    """Every real `product/*.json` and `backend/*.json` file the candidate
+    itself wrote, keyed `"<root>/<name>.json"` -- the same `files:
+    Mapping[str, str]` shape every other stage-input reader in
+    `engineering.factory` already consumes (`_parse_ux_spec`,
+    `_backend_json_documents`), read fresh from the frozen candidate
+    directory rather than re-derived from anything in memory."""
+    files: dict[str, str] = {}
+    for sub in ("product", "backend"):
+        directory = candidate_dir / sub
+        if not directory.is_dir():
+            continue
+        for path in directory.glob("*.json"):
+            files[f"{sub}/{path.name}"] = path.read_text(encoding="utf-8")
+    return files
+
+
+def _write_compiled_scenario(candidate_id: str, scenario: _AcceptanceScenario) -> pathlib.Path:
+    """Persists a compiled scenario to a real file -- `run_golden_browser_
+    journey.mjs` only ever reads a scenario from a real path argument, the
+    same as it does for an explicit `--scenario` override."""
+    directory = RUNTIMES / candidate_id
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"compiled-scenario-{int(time.time())}.json"
+    path.write_text(scenario.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+def _relationship_payload(
+    related: object, related_create_payload: dict[str, object], created_ids: dict[str, int],
+) -> dict[str, object]:
+    """`related_create_payload` plus every relationship field this
+    resource declares, resolved against ids real earlier resources in
+    this same journey actually got back from the backend -- never a
+    literal id this runner invented itself."""
+    payload = dict(related_create_payload)
+    for field_name, resource_name in related.relationship_fields.items():  # type: ignore[attr-defined]
+        if resource_name in created_ids:
+            payload[field_name] = created_ids[resource_name]
+    return payload
+
+
+class AcceptanceCheckFailed(RuntimeError):
+    """One specific, named acceptance check (`Journey.record`) failed --
+    a classified, evidenced GOLDEN_ACCEPTANCE_FAILED outcome, distinct
+    from an unclassified crash or a Ctrl+C (ACCEPTANCE_INTERRUPTED):
+    every check that ran before this one, and the one that failed, are
+    all in `Journey.checks` either way."""
+
+
+@dataclass
+class Journey:
+    candidate_id: str
+    checks: list[dict[str, object]] = field(default_factory=list)
+
+    def record(self, name: str, passed: bool, detail: str) -> None:
+        self.checks.append({"name": name, "passed": passed, "detail": detail})
+        if not passed:
+            raise AcceptanceCheckFailed(f"{name}: {detail}")
+
+
+def _copy_candidate(source: pathlib.Path, destination: pathlib.Path) -> None:
+    shutil.copytree(
+        source, destination,
+        ignore=shutil.ignore_patterns(
+            "node_modules", "build", ".pytest_cache", "__pycache__",
+            "*.pyc", "backend.db",
+        ),
+    )
+
+
+def _run(
+    command: list[str], *, cwd: pathlib.Path, env: dict[str, str] | None = None,
+    timeout_seconds: float = 300.0,
+) -> str:
+    process = subprocess.Popen(
+        command, cwd=cwd, env=env, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    try:
+        output, _ = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as error:
+        _stop(process)
+        partial = error.output or ""
+        if isinstance(partial, bytes):
+            partial = partial.decode(errors="replace")
+        raise RuntimeError(
+            f"command timed out after {timeout_seconds:g}s: {' '.join(command)}\n{partial}"
+        ) from error
+    if process.returncode:
+        raise RuntimeError(f"command failed ({process.returncode}): {' '.join(command)}\n{output}")
+    return output
+
+
+def _json_request(
+    method: str, url: str, payload: dict[str, object] | None = None,
+) -> tuple[int, object]:
+    body = json.dumps(payload).encode() if payload is not None else None
+    request = urllib.request.Request(
+        url, data=body, method=method,
+        headers={"Content-Type": "application/json"} if body else {},
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return response.status, json.loads(response.read().decode())
+
+
+def _backend_process(python: pathlib.Path, candidate: pathlib.Path, log) -> subprocess.Popen[str]:  # noqa: ANN001
+    # Import and run the generated app ourselves: no debug reloader, one PID,
+    # and therefore no stale inherited listening socket on Windows.
+    code = (
+        "from backend.app import app; "
+        f"app.run(host='127.0.0.1', port={BACKEND_PORT}, debug=False, use_reloader=False)"
+    )
+    return subprocess.Popen(
+        [str(python), "-c", code], cwd=candidate, stdout=log, stderr=subprocess.STDOUT,
+        text=True, env={**os.environ, "FLASK_DEBUG": "0"},
+    )
+
+
+def _upgraded_engine(db_path: pathlib.Path):  # noqa: ANN202
+    """Real, already-existing per-store persistence bootstrap -- the same
+    shape `run_factory_worker.py`'s own `_freeze` already uses for the
+    evidence store, applied here to both real stores this composition
+    touches. Never a new database; `command_center.db` and `repair-
+    evidence.db` are the same real, already-production files
+    `surfaces.command`'s own app and `run_factory_worker.py` already use."""
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = _AlembicConfig(str(ROOT / "backend" / ALEMBIC_INI))
+    cfg.set_main_option("script_location", str(ROOT / "backend" / "alembic"))
+    cfg.set_main_option("sqlalchemy.url", sqlite_url(db_path))
+    _alembic_command.upgrade(cfg, "head")
+    return create_persistence_engine(sqlite_url(db_path))
+
+
+def _register_managed_product(candidate_id: str, ledger: CandidateLedger) -> dict[str, object]:
+    """The automatic Managed Product registration trigger: called only
+    after `ledger.record_state(candidate_id, ACCEPTED, ...)` has already
+    durably succeeded (see `_accept`'s `finally` block below), never
+    before and never independently. Failure here is reported, never
+    raised past this function -- a real acceptance that already succeeded
+    and was already recorded must not be turned into a crashed process by
+    a registration-side problem; `scripts/register_managed_product.py`
+    re-invokes the same idempotent composition standalone for recovery.
+    """
+    pdp = PolicyDecisionPoint.load(ROOT)
+    command_center_engine = _upgraded_engine(ROOT / "var" / "command_center.db")
+    evidence_engine = _upgraded_engine(ROOT / "var" / "factory" / "evidence" / "repair-evidence.db")
+    blobs = ArtifactBlobStore(
+        ROOT / "var" / "factory" / "evidence" / "blobs",
+        PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store"),
+    )
+    try:
+        with unit_of_work(create_session_factory(command_center_engine)) as project_session, \
+             unit_of_work(create_session_factory(evidence_engine)) as evidence_session:
+            outcome = register_accepted_candidate_as_managed_product(
+                candidate_id,
+                ledger=ledger,
+                registry=ProjectRegistry(project_session),
+                artifacts=ArtifactStore(evidence_session, blobs),
+            )
+            return {
+                "outcome": "REGISTERED",
+                "project_id": outcome.project.project_id,
+                "revision_id": outcome.revision.revision_id,
+                "provenance_ref": outcome.provenance_ref,
+                "created": outcome.created,
+            }
+    except CandidateNotAcceptedError as error:
+        return {"outcome": "CANDIDATE_NOT_ACCEPTED", "error": str(error)}
+    except Exception as error:  # noqa: BLE001 -- reported, never raised; see docstring
+        return {"outcome": "REGISTRATION_FAILED", "error": str(error)}
+    finally:
+        command_center_engine.dispose()
+        evidence_engine.dispose()
+
+
+def _accept(
+    candidate_id: str, source_candidate: pathlib.Path,
+    scenario: _AcceptanceScenario, scenario_path: pathlib.Path,
+    *, skip_browser: bool = False,
+) -> dict[str, object]:
+    """The one real, generic acceptance journey. `source_candidate` is
+    already resolved and already trusted by the caller (`run_golden_
+    acceptance.py`'s own `_candidate()` for the manual/CLI track;
+    `run_factory_worker.py`'s own real `workspace.root` for a live
+    production candidate) -- this function itself performs no identity
+    resolution and holds no opinion on `candidate_id`'s own shape."""
+    ledger = CandidateLedger(CANDIDATES / "_ledger")
+    journey = Journey(candidate_id)
+    runtime = RUNTIMES / candidate_id / f"acceptance-{int(time.time())}"
+    runtime.mkdir(parents=True, exist_ok=False)
+    evidence = runtime / "evidence"
+    evidence.mkdir()
+    started = time.monotonic()
+
+    # begin_acceptance is the strict, atomic, single gate: eligibility
+    # (latest recorded state must be exactly STAGED_GENERATION_PASS -- a
+    # STAGE_FAILED, ACCEPTANCE_FAILED, already-ACCEPTED, or LEGACY_
+    # UNVERIFIED candidate is refused here just as surely as a tampered
+    # one), integrity (live content must match the manifest recorded at
+    # that state), and the ACCEPTANCE_RUNNING transition itself, all
+    # behind one cross-platform file lock so a second concurrent
+    # acceptance attempt for the same candidate_id is refused outright.
+    # Nothing about the source candidate is touched before this passes.
+    try:
+        ledger.begin_acceptance(candidate_id, source_candidate)
+    except CandidateIntegrityError as error:
+        result = {
+            "outcome": "CANDIDATE_INTEGRITY_FAILED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": [], "evidence_dir": str(evidence),
+        }
+        (evidence / "result.json").write_text(
+            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        return result
+    except CandidateAcceptanceInProgressError as error:
+        result = {
+            "outcome": "ACCEPTANCE_ALREADY_IN_PROGRESS", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": [], "evidence_dir": str(evidence),
+        }
+        (evidence / "result.json").write_text(
+            json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+        return result
+
+    candidate = runtime / "candidate"
+    _copy_candidate(source_candidate, candidate)
+    backend: subprocess.Popen[str] | None = None
+    frontend: subprocess.Popen[str] | None = None
+    # A real placeholder, not left unbound: a KeyboardInterrupt or crash
+    # before any check even runs must still leave `finally` something
+    # real to persist -- the candidate must never end up in a recorded-
+    # nowhere, truly ambiguous state.
+    result: dict[str, object] = {
+        "outcome": "ACCEPTANCE_INTERRUPTED", "candidate_id": candidate_id,
+        "error": "acceptance ended before any check completed",
+        "elapsed_seconds": round(time.monotonic() - started, 1),
+        "checks": journey.checks, "evidence_dir": str(evidence),
+    }
+
+    try:
+        journey.record("ports_free", all(_port_is_free(p) for p in (BACKEND_PORT, FRONTEND_PORT)),
+                       "ports 3000 and 5000 must be free before acceptance")
+        venv = runtime / ".venv"
+        _run([sys.executable, "-m", "venv", str(venv)], cwd=ROOT)
+        python = venv / "Scripts" / "python.exe" if os.name == "nt" else venv / "bin" / "python"
+        pip_output = _run(
+            [str(python), "-m", "pip", "install", "-r", "backend/requirements.txt"],
+            cwd=candidate,
+        )
+        journey.record("backend_clean_install", True, pip_output.splitlines()[-1])
+        test_output = _run([str(python), "-m", "pytest", "tests", "-q"], cwd=candidate)
+        journey.record("generated_backend_tests", True, test_output.strip().splitlines()[-1])
+
+        primary = scenario.resource(scenario.primary_resource)
+        backend_log = (evidence / "backend-first.log").open("w", encoding="utf-8")
+        backend = _backend_process(python, candidate, backend_log)
+        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
+        status, primary_obj = _json_request(
+            "POST", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+            scenario.create_payload,
+        )
+        primary_id = int(primary_obj["id"])  # type: ignore[index]
+        created_ids = {scenario.primary_resource: primary_id}
+        journey.record(
+            f"{scenario.primary_resource}_create", status == 201,
+            f"POST {primary.collection_route} -> {status}, id={primary_id}",
+        )
+        status, _ = _json_request(
+            "PUT", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}/{primary_id}",
+            scenario.update_payload,
+        )
+        journey.record(
+            f"{scenario.primary_resource}_edit", status == 200,
+            f"PUT {primary.collection_route}/{primary_id} -> {status}",
+        )
+        related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
+        if related is not None and scenario.related_create_payload is not None:
+            related_payload = _relationship_payload(
+                related, scenario.related_create_payload, created_ids,
+            )
+            status, related_obj = _json_request(
+                "POST", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}", related_payload,
+            )
+            journey.record(
+                f"{scenario.related_resource}_create", status == 201,
+                f"POST {related.collection_route} -> {status}, body={related_obj}",
+            )
+        _stop(backend)
+        backend = None
+        journey.record(
+            "backend_stopped", not _port_accepts_connections(BACKEND_PORT),
+            "owned backend no longer accepts connections on port 5000",
+        )
+
+        backend_log.close()
+        restart_log = (evidence / "backend-restart.log").open("w", encoding="utf-8")
+        backend = _backend_process(python, candidate, restart_log)
+        _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
+        _, primary_rows = _json_request(
+            "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+        )
+        primary_persisted = any(row.get("id") == primary_id for row in primary_rows)  # type: ignore[union-attr]
+        related_persisted = True
+        if related is not None:
+            _, related_rows = _json_request(
+                "GET", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}",
+            )
+            related_persisted = bool(related_rows)
+        journey.record(
+            "sqlite_restart_persistence", primary_persisted and related_persisted,
+            f"{scenario.primary_resource} and {scenario.related_resource} survived a real restart",
+        )
+
+        frontend_dir = candidate / "frontend"
+        npm = "npm.cmd" if os.name == "nt" else "npm"
+        install_output = _run([npm, "install"], cwd=frontend_dir, timeout_seconds=600)
+        journey.record("frontend_clean_install", True, install_output.strip().splitlines()[-1])
+        build_env = {**os.environ, "NODE_OPTIONS": "--openssl-legacy-provider"}
+        build_output = _run(
+            [npm, "run", "build"], cwd=frontend_dir, env=build_env,
+            timeout_seconds=300,
+        )
+        journey.record("frontend_production_build", (frontend_dir / "build" / "index.html").is_file(),
+                       build_output.strip().splitlines()[-1])
+
+        frontend_log = (evidence / "frontend.log").open("w", encoding="utf-8")
+        frontend = subprocess.Popen(
+            [str(python), str(ROOT / "scripts" / "serve_spa.py"),
+             "--directory", str(frontend_dir / "build"), "--port", str(FRONTEND_PORT)],
+            cwd=ROOT, stdout=frontend_log, stderr=subprocess.STDOUT, text=True,
+        )
+        _wait_http(f"http://127.0.0.1:{FRONTEND_PORT}", frontend)
+        if not skip_browser:
+            browser_output = _run(
+                ["node", str(ROOT / "scripts" / "run_golden_browser_journey.mjs"),
+                 "--candidate", candidate_id, "--scenario", str(scenario_path),
+                 "--primary-id", str(primary_id)], cwd=ROOT,
+                timeout_seconds=120,
+            )
+            (evidence / "browser.json").write_text(browser_output, encoding="utf-8")
+            journey.record("real_browser_journey", True, browser_output.strip().splitlines()[-1])
+
+        result = {
+            "outcome": "GOLDEN_ACCEPTANCE_PASS", "candidate_id": candidate_id,
+            "elapsed_seconds": round(time.monotonic() - started, 1), "checks": journey.checks,
+            "evidence_dir": str(evidence),
+        }
+    except AcceptanceCheckFailed as error:  # a classified, evidenced failure
+        result = {
+            "outcome": "GOLDEN_ACCEPTANCE_FAILED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": journey.checks, "evidence_dir": str(evidence),
+        }
+    except (KeyboardInterrupt, Exception) as error:
+        # Anything NOT a classified named-check failure -- Ctrl+C, a
+        # crashed subprocess, a bug -- is genuinely ambiguous, not a
+        # verdict any check reached; record it as such rather than
+        # silently reusing GOLDEN_ACCEPTANCE_FAILED for it. A real
+        # KeyboardInterrupt is re-raised once the ledger/evidence below
+        # are written (`finally` always runs first) -- Ctrl+C must still
+        # actually stop the process.
+        result = {
+            "outcome": "ACCEPTANCE_INTERRUPTED", "candidate_id": candidate_id,
+            "error": str(error), "elapsed_seconds": round(time.monotonic() - started, 1),
+            "checks": journey.checks, "evidence_dir": str(evidence),
+        }
+        if isinstance(error, KeyboardInterrupt):
+            raise
+    finally:
+        _stop(frontend)
+        _stop(backend)
+        result_path = evidence / "result.json"
+        result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        result_sha256 = hashlib.sha256(result_path.read_bytes()).hexdigest()
+        # Recorded against the original candidate directory, not the
+        # isolated runtime copy -- acceptance observes the source, it
+        # never mutates it. The ACCEPTANCE_RUNNING -> {..} transition
+        # itself is what `record_state` enforces; an outcome this
+        # function did not expect would be refused here, not silently
+        # accepted.
+        state = {
+            "GOLDEN_ACCEPTANCE_PASS": ACCEPTED,
+            "GOLDEN_ACCEPTANCE_FAILED": ACCEPTANCE_FAILED,
+            "ACCEPTANCE_INTERRUPTED": INTERRUPTED,
+        }[result["outcome"]]
+        ledger.record_state(
+            candidate_id, state, source_candidate,
+            detail={
+                "outcome": result["outcome"], "elapsed_seconds": result["elapsed_seconds"],
+                "runtime_dir": str(runtime), "evidence_dir": str(evidence),
+                "result_sha256": result_sha256,
+            },
+        )
+        # DECISION 2 (automatic trigger): only after the real ACCEPTED
+        # transition above has already durably succeeded -- never before,
+        # never for any other outcome. Reported on `result`, never allowed
+        # to change `result["outcome"]` or the already-written, already-
+        # hashed `result.json` evidence above.
+        if state == ACCEPTED:
+            result["managed_product_registration"] = _register_managed_product(
+                candidate_id, ledger,
+            )
+    return result
+
+
+def _resolve_scenario(
+    candidate_id: str, contract_files: dict[str, str], override_path: pathlib.Path | None,
+) -> tuple[_AcceptanceScenario, pathlib.Path] | dict[str, object]:
+    """The real scenario to run, plus the real file path the browser
+    journey subprocess reads it from -- or a terminal, unaccepted result
+    dict when neither a compiled nor an override scenario is trustworthy.
+    No override (the default): COMPILE one from `contract_files` and
+    persist it so the browser journey has a real path to read. An
+    override: load it, then RECONCILE it against `contract_files` and
+    refuse rather than run a scenario that no longer matches this real
+    candidate."""
+    if override_path is None:
+        try:
+            scenario = _compile_acceptance_plan(contract_files)
+        except _AcceptancePlanIncomplete as error:
+            return {
+                "outcome": "ACCEPTANCE_PLAN_INCOMPLETE", "candidate_id": candidate_id,
+                "error": str(error), "reasons": error.reasons, "checks": [],
+            }
+        return scenario, _write_compiled_scenario(candidate_id, scenario)
+
+    scenario = _load_scenario(override_path)
+    reasons = _reconcile_scenario(scenario, contract_files)
+    if reasons:
+        return {
+            "outcome": "ACCEPTANCE_SCENARIO_INCOMPATIBLE", "candidate_id": candidate_id,
+            "error": f"--scenario {override_path} does not match candidate {candidate_id!r}'s "
+                     "own real contracts", "reasons": reasons, "checks": [],
+        }
+    return scenario, override_path
+
+
+__all__ = [
+    "AcceptanceCheckFailed",
+    "BACKEND_PORT",
+    "CANDIDATES",
+    "FRONTEND_PORT",
+    "Journey",
+    "RUNTIMES",
+    "_accept",
+    "_candidate_contract_files",
+    "_compile_acceptance_plan",
+    "_load_scenario",
+    "_resolve_scenario",
+    "_run",
+]

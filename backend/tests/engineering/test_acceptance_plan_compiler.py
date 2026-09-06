@@ -138,6 +138,59 @@ class TestTwoResourcesWithASchemaDrivenRelationship:
         assert "external_id" in resource.editable_form_fields
 
 
+class TestNestedRoutePrefixMatching:
+    """A real backend is free to nest a resource under a real, semantic
+    path prefix (`/api/books/overdue`, real evidence: `factory-goal-
+    mtpnp9af-yeldck`) rather than the flat `/resource` convention every
+    prior golden fixture happened to use -- no canonical stage rule ever
+    required the FIRST path segment to name the resource, and this is
+    the real, previously-undiscovered gap that blocked this candidate's
+    own real production acceptance attempt."""
+
+    def test_a_module_nested_under_an_unrelated_prefix_still_resolves(self) -> None:
+        files = {
+            "product/ux_spec.json": _ux_spec(
+                [_module("widgets", "Widgets", ["create", "edit", "delete"], ["id", "name", "price"])],
+                ["Widgets"],
+            ),
+            "backend/routes.json": _routes(
+                ("/api/catalog/widgets", "GET"), ("/api/catalog/widgets", "POST"),
+                ("/api/catalog/widgets/{id}", "PUT"), ("/api/catalog/widgets/{id}", "DELETE"),
+            ),
+            "backend/data_model.json": _models({"widgets": {"id": "integer", "name": "string", "price": "float"}}),
+        }
+        scenario = _compile_acceptance_plan(files)
+        resource = scenario.resource("widgets")
+        assert resource.collection_route == "/api/catalog/widgets"
+
+    def test_a_route_matching_no_segment_at_all_still_refuses(self) -> None:
+        """The widened matching never becomes "any route will do" -- a
+        genuinely unrelated nested path still resolves nothing, exactly
+        as the pre-existing flat-path case already required."""
+        files = {
+            "product/ux_spec.json": _ux_spec(
+                [_module("ghosts", "Ghosts", ["create"], ["id", "name"])], ["Ghosts"],
+            ),
+            "backend/routes.json": _routes(("/api/catalog/other", "GET")),
+            "backend/data_model.json": _models({"ghosts": {"id": "integer", "name": "string"}}),
+        }
+        with pytest.raises(_AcceptancePlanIncomplete):
+            _compile_acceptance_plan(files)
+
+    def test_a_route_param_segment_is_never_matched_as_a_resource_name(self) -> None:
+        """`{id}` (or any `{param}`) is a placeholder, never a real
+        segment this module's own name could coincidentally match."""
+        files = {
+            "product/ux_spec.json": _ux_spec(
+                [_module("id", "Ids", ["create"], ["id", "name"])], ["Ids"],
+            ),
+            "backend/routes.json": _routes(("/api/widgets/{id}", "GET")),
+            "backend/data_model.json": _models({"id": {"id": "integer", "name": "string"}}),
+        }
+        with pytest.raises(_AcceptancePlanIncomplete):
+            _compile_acceptance_plan(files)
+
+
 class TestRefusesRatherThanGuesses:
     def test_no_product_ux_spec_refuses(self) -> None:
         with pytest.raises(_AcceptancePlanIncomplete):

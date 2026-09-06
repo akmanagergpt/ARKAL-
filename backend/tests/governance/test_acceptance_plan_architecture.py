@@ -96,8 +96,12 @@ class TestFixtureFilesNeverEnterTheProductionImportGraph:
 class TestAManualScenarioIsNeverAuthoritativeOnItsOwn:
     """`_reconcile_scenario` exists precisely so a `--scenario` override is
     never trusted on its own -- this is a real, enforced call site, not
-    just a function that exists somewhere unused."""
+    just a function that exists somewhere unused. The real call site is
+    `_resolve_scenario`, in the one real generic acceptance engine
+    (`scripts/factory_acceptance.py`) both `run_golden_acceptance.py`'s
+    CLI and `run_factory_worker.py`'s own production composition call
+    unchanged -- never a second, duplicated resolution path per caller."""
 
-    def test_run_golden_acceptance_calls_reconcile_before_trusting_an_override(self) -> None:
-        source = (REPO / "scripts" / "run_golden_acceptance.py").read_text(encoding="utf-8")
+    def test_resolve_scenario_calls_reconcile_before_trusting_an_override(self) -> None:
+        source = (REPO / "scripts" / "factory_acceptance.py").read_text(encoding="utf-8")
         assert "_reconcile_scenario(scenario, contract_files)" in source

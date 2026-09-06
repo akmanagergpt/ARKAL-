@@ -63,6 +63,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
@@ -115,6 +116,11 @@ from arkali.kernel.persistence.migrations import ALEMBIC_INI  # noqa: E402
 from arkali.kernel.persistence.session import (  # noqa: E402
     create_session_factory,
     unit_of_work,
+)
+from factory_acceptance import (  # noqa: E402
+    _accept as _run_acceptance,
+    _candidate_contract_files,
+    _resolve_scenario,
 )
 
 JOB_TYPE = "software_factory.production"
@@ -223,6 +229,30 @@ def _claim_one_job(store: JobStore) -> object | None:
         return None
     candidates.sort(key=lambda job: job.created_at)
     return candidates[0]
+
+
+def _run_production_acceptance(candidate_id: str, workspace_root: pathlib.Path) -> dict[str, object]:
+    """Production Factory -> canonical acceptance bridge. Calls the exact
+    same generic acceptance engine `scripts/run_golden_acceptance.py`'s own
+    CLI already uses (`factory_acceptance._accept`), automatically, once
+    this worker's own real generation reaches its own real terminal
+    `STAGED_GENERATION_PASS` -- never a second acceptance engine, never a
+    job-level state change (`JobStore`'s own `SUCCEEDED` below still means
+    exactly "generation completed"; `CandidateLedger` alone owns what
+    happens to the candidate next). `workspace_root` is this worker's own
+    already-real, already-trusted workspace directory -- no `_candidate()`-
+    style identity-string resolution is needed or performed here, since
+    this caller never received an untrusted id to resolve in the first
+    place. A real, terminal, unaccepted outcome (`ACCEPTANCE_PLAN_
+    INCOMPLETE`, `GOLDEN_ACCEPTANCE_FAILED`, ...) is returned exactly as
+    `_resolve_scenario`/`_accept` themselves classify it -- this function
+    invents no new outcome vocabulary and repairs nothing."""
+    contract_files = _candidate_contract_files(workspace_root)
+    resolved = _resolve_scenario(candidate_id, contract_files, None)
+    if isinstance(resolved, dict):
+        return resolved
+    scenario, scenario_path = resolved
+    return _run_acceptance(candidate_id, workspace_root, scenario, scenario_path)
 
 
 def main(argv: list[str]) -> int:
@@ -395,13 +425,29 @@ def main(argv: list[str]) -> int:
         provider_model,
     )
     ledger.record_state(candidate_id, STAGED_GENERATION_PASS, workspace.root)
+
+    # Production Factory -> canonical acceptance bridge: the real candidate
+    # this job just produced is handed, automatically and in-process, to
+    # the SAME generic acceptance engine the manual `run_golden_
+    # acceptance.py` CLI already uses. A normal Command Center user never
+    # runs a second command for this. Failure here is real, evidenced
+    # engineering fact -- reported on the job, never allowed to change
+    # JOB_SUCCEEDED below (generation already genuinely succeeded) or to
+    # crash this worker.
+    try:
+        acceptance = _run_production_acceptance(candidate_id, workspace.root)
+    except Exception as error:  # noqa: BLE001 -- reported, never allowed to mask a real STAGED_GENERATION_PASS
+        acceptance = {"outcome": "ACCEPTANCE_BRIDGE_ERROR", "error": str(error)}
+
     _finish_job(JOB_SUCCEEDED, {
         "phase": "staged_generation_pass", "candidate_id": candidate_id,
         "evidence_ref": ref, "files": sorted(assembled), "elapsed_seconds": elapsed,
+        "acceptance": acceptance,
     })
     print(json.dumps({
         "outcome": "STAGED_GENERATION_PASS", "candidate_id": candidate_id,
         "evidence_ref": ref, "files": sorted(assembled), "elapsed_seconds": elapsed,
+        "acceptance": acceptance,
     }, ensure_ascii=False))
     return 0
 

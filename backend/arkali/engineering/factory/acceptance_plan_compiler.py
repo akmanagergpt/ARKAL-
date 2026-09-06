@@ -138,11 +138,29 @@ def _normalize_field_types(fields: object) -> dict[str, str]:
     return normalized
 
 
+def _path_segment_matches(segment: str, target: str) -> bool:
+    key = re.sub(r"[^a-z0-9]", "", segment.lower())
+    matching_key = _resource_matching_name(key)
+    return target in matching_key or matching_key in target
+
+
 def _module_routes(files: Mapping[str, str], module_name: str) -> tuple[str | None, str | None, str | None]:
     """(collection_route, item_route_template, route_param) for the real
     backend routes matching `module_name` -- reuses `product_ux_spec.py`'s
     own resource-matching normalization so a route is matched to a module
-    exactly the way `_module_action_findings` already reconciles them."""
+    exactly the way `_module_action_findings` already reconciles them.
+
+    Checks EVERY real path segment, not only the first: a real, valid
+    backend is free to nest a resource under a prefix (`/api/books/
+    overdue`, real evidence, `factory-goal-mtpnp9af-yeldck`) rather than
+    the flat `/resource` convention every prior golden fixture happened to
+    use -- no canonical stage rule ever required the first segment to BE
+    the resource name, and `_module_parity_findings`'s own real model<->
+    module reconciliation (the one that actually gates staged generation)
+    never assumed it either. The real matched path is returned verbatim
+    (never reconstructed from `segments[0]` alone) so a matched nested
+    route round-trips as the exact real path the candidate's own backend
+    and frontend already agree on."""
     target = _resource_matching_name(module_name)
     collection: str | None = None
     item: str | None = None
@@ -154,16 +172,17 @@ def _module_routes(files: Mapping[str, str], module_name: str) -> tuple[str | No
         segments = [s for s in path.split("/") if s]
         if not segments:
             continue
-        key = re.sub(r"[^a-z0-9]", "", segments[0].lower())
-        matching_key = _resource_matching_name(key)
-        if target not in matching_key and matching_key not in target:
+        if not any(
+            _path_segment_matches(segment, target)
+            for segment in segments if not segment.startswith("{")
+        ):
             continue
         match = _ROUTE_PARAM.search(path)
         if match:
-            item = f"/{segments[0]}/{{{match.group(1)}}}"
+            item = path
             param = match.group(1)
         elif collection is None:
-            collection = f"/{segments[0]}"
+            collection = path
     return collection, item, param
 
 
