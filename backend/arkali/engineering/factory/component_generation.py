@@ -265,13 +265,49 @@ def _apply_deterministic_repairs(
     return stage_files
 
 
+#: F-0081 (`STAGE_ENVELOPE_FLAT_MAP_GAP`). Real, live evidence
+#: (`goal-mtoxjx1x-cwtlad`, `frontend_client`, attempts 2-4): once shown a
+#: real parse failure on attempt 1, the real model abandoned the correct
+#: `{"files": [{"path": ..., "content": ...}]}` envelope entirely and wrote
+#: `{"<path>": "<content>"}` directly at the JSON top level -- the exact
+#: shape `_StageEnvelope._normalise_path_map` already accepts, unchanged,
+#: whenever it is explicitly passed as the "files" field's own value; only
+#: the outer "files" key itself was ever missing. This is `product_ux_spec`
+#: 's own historical flat-envelope defect (golden-work-093/094,
+#: `_repair_flat_ux_spec_envelope` below) recurring at a different stage --
+#: but this repair is stage-agnostic by construction, since EVERY stage
+#: shares the identical `_StageEnvelope` file-map contract, unlike that
+#: one, which must validate against `_ProductUxSpec`'s own particular
+#: schema. Structurally unambiguous, never a guess: applies only when the
+#: parsed JSON is a real object, carries no "files" key of its own (so it
+#: can never shadow or collide with the schema's own existing dict-shaped
+#: "files" support), and is composed ENTIRELY of real string keys mapped
+#: to real string values -- the same, and only the same, shape
+#: `_normalise_path_map` already treats as a real file map. Every
+#: repaired candidate is re-validated by the unchanged `_StageEnvelope`
+#: schema afterward (path safety, null-byte/size bounds, uniqueness, the
+#: 1-32 file count) -- nothing about content or path validation is
+#: bypassed, only the outer wrapper is supplied.
+def _repair_flat_file_envelope(raw_json: str) -> str | None:
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict) or not parsed or "files" in parsed:
+        return None
+    if not all(isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()):
+        return None
+    return json.dumps({"files": parsed})
+
+
 def _parse_stage_envelope(
     stage_name: str, raw_output: str,
 ) -> tuple[_StageEnvelope | None, str | None]:
     """Real stage output validated against `_StageEnvelope`, falling back
     to `product_ux_spec`'s own deterministic flat-envelope repair
     (golden-work-093/094, session evidence, frozen, byte-identical
-    failure reproduced on two independent candidates) before treating a
+    failure reproduced on two independent candidates), then to the
+    generic flat-file-map repair above (F-0081), before treating a
     contract violation as final -- once the exact, unambiguous fix for a
     real, verified defect is known, applying it and re-validating is more
     honest than another blind model retry (golden-work-050/051's own
@@ -281,7 +317,10 @@ def _parse_stage_envelope(
     try:
         return _StageEnvelope.model_validate_json(payload), None
     except (ValueError, json.JSONDecodeError) as error:
-        repaired = _repair_flat_ux_spec_envelope(stage_name, payload)
+        repaired = (
+            _repair_flat_ux_spec_envelope(stage_name, payload)
+            or _repair_flat_file_envelope(payload)
+        )
         if repaired is None:
             return None, f"stage response violates the contract: {error}"
     try:

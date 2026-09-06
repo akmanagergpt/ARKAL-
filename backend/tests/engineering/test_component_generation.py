@@ -994,3 +994,141 @@ def test_f0078_raw_evidence_stays_raw_while_the_written_file_is_normalized() -> 
     recorded_raw_output = model.attempts[0][4]
     assert recorded_raw_output == double_escaped_output
     assert real_content not in recorded_raw_output
+
+
+# -- F-0081 (STAGE_ENVELOPE_FLAT_MAP_GAP) -----------------------------------
+#
+# Real production evidence: goal-mtoxjx1x-cwtlad's own real frontend_client
+# attempts 2-4 (recovered via F-0078's own observability) show the real
+# model abandoning the correct {"files": [{"path", "content"}]} envelope
+# after a real rejection and writing {"<path>": "<content>"} directly at
+# the JSON top level -- the exact shape _StageEnvelope._normalise_path_map
+# already accepts, unchanged, when explicitly passed as the "files" value;
+# only the outer "files" key itself was ever missing. product_ux_spec's own
+# historical flat-envelope defect (golden-work-093/094) recurring at a
+# different, unrelated stage -- generalized here since every stage shares
+# the identical file-map contract.
+
+
+def test_a_flat_top_level_file_map_is_repaired_into_the_real_envelope() -> None:
+    from arkali.engineering.factory.component_generation import _parse_stage_envelope
+
+    raw = json.dumps({"frontend/src/widgetClient.js": "export function noop() {}\n"})
+    envelope, failure = _parse_stage_envelope("frontend_client", raw)
+    assert failure is None
+    assert envelope is not None
+    assert {f.path: f.content for f in envelope.files} == {
+        "frontend/src/widgetClient.js": "export function noop() {}\n",
+    }
+
+
+def test_an_already_correct_envelope_is_never_touched_by_the_new_repair() -> None:
+    from arkali.engineering.factory.component_generation import _parse_stage_envelope
+
+    raw = json.dumps({"files": [{"path": "frontend/src/x.js", "content": "export {};\n"}]})
+    envelope, failure = _parse_stage_envelope("frontend_client", raw)
+    assert failure is None
+    assert {f.path: f.content for f in envelope.files} == {"frontend/src/x.js": "export {};\n"}
+
+
+def test_a_dict_shaped_files_value_is_still_handled_by_the_existing_validator() -> None:
+    """The pre-existing `_normalise_path_map` path (`{"files": {path: content}}`)
+    must keep working unchanged -- the new repair only ever applies when
+    the "files" key is absent entirely, never as a second, competing path."""
+    from arkali.engineering.factory.component_generation import _parse_stage_envelope
+
+    raw = json.dumps({"files": {"frontend/src/y.js": "export {};\n"}})
+    envelope, failure = _parse_stage_envelope("frontend_client", raw)
+    assert failure is None
+    assert {f.path: f.content for f in envelope.files} == {"frontend/src/y.js": "export {};\n"}
+
+
+def test_a_non_string_value_fails_closed_never_guessed() -> None:
+    """Ambiguous shape (Section 7): a value that is not itself a real file-
+    content string must never be silently coerced -- fail closed."""
+    from arkali.engineering.factory.component_generation import _repair_flat_file_envelope
+
+    raw = json.dumps({"frontend/src/x.js": {"nested": "object"}})
+    assert _repair_flat_file_envelope(raw) is None
+
+
+def test_an_empty_object_fails_closed() -> None:
+    from arkali.engineering.factory.component_generation import _repair_flat_file_envelope
+
+    assert _repair_flat_file_envelope(json.dumps({})) is None
+
+
+def test_malformed_json_fails_closed() -> None:
+    from arkali.engineering.factory.component_generation import _repair_flat_file_envelope
+
+    assert _repair_flat_file_envelope("{not json") is None
+
+
+def test_a_top_level_list_is_not_treated_as_a_flat_file_map() -> None:
+    from arkali.engineering.factory.component_generation import _repair_flat_file_envelope
+
+    assert _repair_flat_file_envelope(json.dumps(["frontend/src/x.js"])) is None
+
+
+def test_f0078_raw_evidence_stays_raw_across_the_new_flat_map_repair() -> None:
+    """The frozen observability evidence must still show the real, original,
+    un-repaired flat JSON the provider actually returned -- repair is a
+    parsing-layer concern, not something that rewrites what was observed."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+    from tests.engineering.test_stage_attempt_observability import _RecordingQueueModel
+
+    flat_output = _output_flat({"frontend/src/apiClient.js": "export function noop() {}\n"})
+    model = _RecordingQueueModel([(HonestState.PASS, flat_output)])
+    declaration = StageVocabulary.load(REPO).stage("frontend_client")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["frontend/src/apiClient.js"] == "export function noop() {}\n"
+    assert len(model.attempts) == 1
+    assert model.attempts[0][4] == flat_output  # raw_output, byte-for-byte as returned
+
+
+def test_the_real_historical_frontend_client_attempts_now_reconstruct_correctly() -> None:
+    """Direct replay of goal-mtoxjx1x-cwtlad's own real, frozen attempt
+    bytes (F-0078 evidence) through the fixed parser: attempt 1's already-
+    correct envelope is unaffected; attempts 2-4's real flat envelopes,
+    previously rejected purely on shape, now parse and reach the real
+    checker, which correctly still rejects the still-invalid JS in
+    attempts 1-2 and correctly accepts the real, valid axios-based JS in
+    attempt 3 -- proving the fix changes envelope recognition only, never
+    checker strictness."""
+    from arkali.engineering.factory.component_generation import _parse_stage_envelope
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    attempt_1_raw = json.dumps({"files": [{
+        "path": "frontend/src/apiClient.js",
+        "content": '{\n  "getOverdueBooks": "GET /api/books/overdue"\n}',
+    }]})
+    attempt_2_raw = json.dumps({
+        "frontend/src/apiClient.js": (
+            "{\n  \"getOverdueBooks\": function() {\n    return fetch('/api/books/overdue', {\n"
+            "      method: 'GET'\n    }).then(response => response.json());\n  }\n}"
+        ),
+    })
+    attempt_3_raw = json.dumps({
+        "frontend/src/apiClient.js": (
+            "const axios = require('axios');\n\nasync function getOverdueBooks() {\n"
+            "  const response = await axios.get('/api/books/overdue');\n  return response.data;\n"
+            "}\n\nmodule.exports = {\n  getOverdueBooks\n};"
+        ),
+    })
+
+    for label, raw, expect_pass in (
+        ("attempt 1", attempt_1_raw, False),
+        ("attempt 2", attempt_2_raw, False),
+        ("attempt 3", attempt_3_raw, True),
+    ):
+        envelope, failure = _parse_stage_envelope("frontend_client", raw)
+        assert failure is None, f"{label}: envelope should now parse, got {failure!r}"
+        files = {f.path: f.content for f in envelope.files}
+        findings = frontend_contract_findings(files)
+        assert (not findings) == expect_pass, f"{label}: findings={findings}"
+
+
+def _output_flat(files: dict[str, str]) -> str:
+    return json.dumps(files)
