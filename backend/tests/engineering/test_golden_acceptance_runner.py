@@ -59,6 +59,36 @@ def test_candidate_path_rejects_a_missing_candidate() -> None:
         runner._candidate("golden-work-999999")
 
 
+def test_candidate_path_accepts_a_real_production_factory_id(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """`scripts/run_factory_worker.py`'s own real candidate identity shape
+    (`candidate_id = f"factory-{job_id}"`) resolves through the exact same
+    `_candidate()` identity gate as `golden-work-*` -- both are real
+    directories under the exact same `CANDIDATES` root."""
+    runner = _module()
+    candidates = tmp_path / "candidates"
+    candidate_id = "factory-goal-mtpnp9af-yeldck"
+    (candidates / candidate_id).mkdir(parents=True)
+    monkeypatch.setattr(runner, "CANDIDATES", candidates)
+
+    resolved = runner._candidate(candidate_id)
+
+    assert resolved == (candidates / candidate_id).resolve()
+
+
+def test_candidate_path_rejects_a_missing_factory_candidate() -> None:
+    runner = _module()
+    with pytest.raises(ValueError, match="does not exist"):
+        runner._candidate("factory-goal-doesnotexist")
+
+
+def test_candidate_path_still_rejects_a_shape_that_is_neither_prefix() -> None:
+    runner = _module()
+    with pytest.raises(ValueError, match="golden-work-\\* or factory-\\*"):
+        runner._candidate("unrelated-work-001")
+
+
 def test_stop_owns_only_the_passed_process(monkeypatch) -> None:  # noqa: ANN001
     runner = _module()
     commands: list[list[str]] = []
@@ -237,6 +267,28 @@ def test_1_staged_generation_pass_through_acceptance_running_to_accepted(
     result = _accept(runner, candidate_id)
 
     assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+    states = [entry["state"] for entry in ledger.history(candidate_id)]
+    assert states == [
+        "ALLOCATED", "GENERATING", "STAGED_GENERATION_PASS", "ACCEPTANCE_RUNNING", "ACCEPTED",
+    ]
+    assert ledger.classify(candidate_id) == ACCEPTED
+
+
+def test_1b_a_real_production_factory_candidate_reaches_accepted_the_same_way(
+    monkeypatch, tmp_path: pathlib.Path,  # noqa: ANN001
+) -> None:
+    """The exact same `_accept()` orchestration -- ledger transitions,
+    scenario-driven checks, evidence -- for a `factory-<job_id>` candidate
+    identity, never a second acceptance path or a renamed/aliased id."""
+    runner = _module()
+    candidate_id = "factory-goal-mtpnp9af-yeldck"
+    source, ledger = _seed_verified_candidate(runner, monkeypatch, tmp_path, candidate_id)
+    _stub_a_full_successful_journey(runner, monkeypatch)
+
+    result = _accept(runner, candidate_id)
+
+    assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+    assert result["candidate_id"] == candidate_id
     states = [entry["state"] for entry in ledger.history(candidate_id)]
     assert states == [
         "ALLOCATED", "GENERATING", "STAGED_GENERATION_PASS", "ACCEPTANCE_RUNNING", "ACCEPTED",

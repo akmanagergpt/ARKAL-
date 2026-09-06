@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""One isolated, real acceptance journey for a generated Golden candidate.
+"""One isolated, real acceptance journey for a generated candidate --
+either the manual verification track (`golden-work-*`) or a real production
+Factory candidate (`factory-<job_id>`, `scripts/run_factory_worker.py`).
+Both live under the same `CANDIDATES` root and the same `CandidateLedger`;
+this runner has never depended on which one it was given except through its
+own `_candidate()` identity-shape check.
 
 This runner owns every process it starts, disables Flask's debug reloader,
 refuses occupied ports, and records one machine-readable result.  It never
@@ -145,9 +150,24 @@ class Journey:
             raise AcceptanceCheckFailed(f"{name}: {detail}")
 
 
+#: The two real, canonical candidate-identity shapes `CANDIDATES` already
+#: contains: `golden-work-*` (the manual verification track, `scripts/
+#: run_golden_repair.py`) and `factory-<job_id>` (real production goals,
+#: `scripts/run_factory_worker.py`'s own `candidate_id = f"factory-{job_id}"`).
+#: Both are written to, and tracked by, the exact same `CandidateLedger` at
+#: the exact same `CANDIDATES` root -- this tuple is the runner's only
+#: identity-shape opinion, never a second candidate root or lifecycle.
+_CANDIDATE_ID_PREFIXES = ("golden-work-", "factory-")
+
+
 def _candidate(candidate_id: str) -> pathlib.Path:
-    if not candidate_id.startswith("golden-work-") or not candidate_id.replace("-", "").isalnum():
-        raise ValueError("candidate id must be a golden-work-* identifier")
+    if (
+        not candidate_id.startswith(_CANDIDATE_ID_PREFIXES)
+        or not candidate_id.replace("-", "").isalnum()
+    ):
+        raise ValueError(
+            "candidate id must be a golden-work-* or factory-* identifier"
+        )
     path = (CANDIDATES / candidate_id).resolve()
     if path.parent != CANDIDATES.resolve() or not path.is_dir():
         raise ValueError(f"candidate does not exist: {candidate_id}")
