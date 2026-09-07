@@ -41,12 +41,28 @@ def _require_runnable_manifests(paths: tuple[str, ...]) -> None:
 
 
 def _normalise_requirements(files: dict[str, str]) -> dict[str, str]:
-    """Remove only impossible stdlib package declarations; code is untouched."""
+    """Undo a literal escaped-newline transport defect (the same real class
+    `_normalise_python_transport` already fixes for `.py` files, F-0080;
+    real evidence: `factory-goal-mtqt1uk9-qfs6bw` -- a real `requirements.
+    txt` with three real declared packages collapsed onto ONE line by
+    literal `\\n` sequences, so pip could never parse `flask_cors`/
+    `pytest` as separate requirements at all, reported downstream as
+    `undeclared_test_dependency`/`missing_local_module` even though both
+    were genuinely declared, just unparseable) before removing only
+    impossible stdlib package declarations; code is untouched. A real
+    `requirements.txt` line never legitimately contains a literal
+    backslash-escape sequence (unlike Python source, which can hold one
+    inside a real string literal), so unescaping here needs none of
+    `_normalise_python_transport`'s own parse-before/parse-after safety
+    dance -- it is unconditionally safe."""
     path = "backend/requirements.txt"
     if path not in files:
         return files
+    content = files[path]
+    if "\\n" in content:
+        content = content.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\t", "\t")
     retained: list[str] = []
-    for line in files[path].splitlines():
+    for line in content.splitlines():
         declared = line.split("#", 1)[0].strip()
         name = declared.split("[", 1)[0]
         for marker in ("==", ">=", "<=", "~=", "!=", ">", "<"):

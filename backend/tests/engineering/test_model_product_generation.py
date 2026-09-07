@@ -256,6 +256,38 @@ def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
     )
 
 
+def test_requirements_escaped_newlines_are_unescaped_before_stdlib_stripping(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Real evidence: `factory-goal-mtqt1uk9-qfs6bw`. A real model wrote
+    `flask==2.3.2\\nflask_cors>=3.0\\npytest==7.4.0\\nWerkzeug<3` -- three
+    real, genuinely declared packages collapsed onto one line by literal
+    backslash-n sequences, the same real transport defect F-0080 already
+    fixed for `.py` files (`_normalise_python_transport`) but which never
+    covered `requirements.txt`. pip can never parse a `\\n`-joined blob as
+    three separate requirements, so `flask_cors`/`pytest` were reported
+    downstream as genuinely undeclared even though the model's own intent
+    was correct."""
+    from arkali.engineering.factory.model_product_generation import _normalise_requirements
+
+    files = {
+        "backend/requirements.txt": "flask==2.3.2\\nflask_cors>=3.0\\npytest==7.4.0\nWerkzeug<3",
+    }
+    normalized = _normalise_requirements(files)
+    assert normalized["backend/requirements.txt"] == (
+        "flask==2.3.2\nflask_cors>=3.0\npytest==7.4.0\nWerkzeug<3\n"
+    )
+
+
+def test_requirements_without_escaped_newlines_are_left_alone() -> None:
+    from arkali.engineering.factory.model_product_generation import _normalise_requirements
+
+    files = {"backend/requirements.txt": "flask==2.3.2\npytest==7.4.0\n"}
+    assert _normalise_requirements(files) == {
+        "backend/requirements.txt": "flask==2.3.2\npytest==7.4.0\n",
+    }
+
+
 def test_double_escaped_python_transport_is_normalized_only_when_parseable(
     tmp_path: pathlib.Path,
 ) -> None:

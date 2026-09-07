@@ -919,6 +919,41 @@ def test_a_still_broken_file_after_normalization_still_fails_the_real_checker(
     assert "python_syntax" in str(excinfo.value)
 
 
+# -- F-0087 (REQUIREMENTS_TXT_ESCAPED_NEWLINE_NOT_WIRED_GAP) ---------------
+
+
+def test_a_double_escaped_requirements_txt_normalizes_and_passes_immediately(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Real evidence: `factory-goal-mtqt1uk9-qfs6bw`. `_normalise_
+    requirements` already existed (stdlib-package stripping) but was never
+    wired into the staged-generation retry path at all -- only the one-shot
+    `write_model_product_output`. A real `requirements.txt` with three
+    genuinely declared packages collapsed onto one line by literal
+    backslash-n sequences must now normalize and pass on the first real
+    attempt, exactly as `_normalise_python_transport` already does for
+    `.py` files."""
+    real_content = "flask==2.3.2\nflask_cors>=3.0\npytest==7.4.0\nWerkzeug<3\n"
+    escaped_content = "flask==2.3.2\\nflask_cors>=3.0\\npytest==7.4.0\nWerkzeug<3"
+    queues = _happy_path_queues()
+    queues["manifests"] = [
+        (HonestState.PASS, _output({
+            "backend/requirements.txt": escaped_content,
+            "config/README.md": "run instructions\n",
+        })),
+    ]
+    factory = _factory(queues)
+    workspace = _workspace(tmp_path)
+    result = generate_staged_model_product(
+        _blueprint(), factory, workspace, vocabulary=StageVocabulary.load(REPO),
+    )
+    assert len(factory.models["manifests"].prompts) == 1  # type: ignore[attr-defined]
+    assert workspace.root.joinpath("backend", "requirements.txt").read_text(
+        encoding="utf-8",
+    ) == real_content
+    assert result.attempts_used == 11
+
+
 def test_normalization_never_touches_a_non_python_file() -> None:
     """`_normalise_python_transport`'s own `.py`-only guard, proven at the
     staged-generation integration point: a JS file carrying the identical
