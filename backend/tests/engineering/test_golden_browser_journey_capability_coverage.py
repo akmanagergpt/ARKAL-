@@ -241,6 +241,7 @@ def _make_frontend_handler(
     related_create_control: bool,
     edit_prefill_correct: bool,
     store: _Store,
+    render_no_nav: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args: object) -> None:  # noqa: ANN401
@@ -257,6 +258,17 @@ def _make_frontend_handler(
         def do_GET(self) -> None:  # noqa: N802
             path = self.path.split("?")[0]
             parts = [p for p in path.split("/") if p]
+
+            if path == "/" and render_no_nav:
+                # Real evidence, factory-goal-mtr3en0w-a3xa19: a genuinely
+                # single-destination product's real, minimal implementation
+                # renders its one real view directly at the root URL, with
+                # NO nav element and NO separate route to click to reach it.
+                items = "".join(
+                    f"<li>{row.get(primary_display, '')}</li>" for row in store.list(primary)
+                )
+                self._html(f"<html><body><h1>{primary}</h1><ul>{items}</ul></body></html>")
+                return
 
             if path == "/":
                 self._html(f"<html><body>{_nav(primary, related)}<h2>Dashboard</h2></body></html>")
@@ -338,6 +350,7 @@ def _scenario_json(
     related: str | None, related_singular: str, related_fields: tuple[str, ...],
     related_relationship_field: str, related_actions: tuple[str, ...],
     primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
+    single_destination: bool = False,
 ) -> pathlib.Path:
     scenario = {
         "scenario_id": "capability-coverage-fixture",
@@ -361,7 +374,10 @@ def _scenario_json(
         "update_payload": {f: "y" for f in primary_fields},
         "related_resource": related,
         "related_create_payload": {f: "x" for f in related_fields} if related else None,
-        "navigation_destinations": ["Primary", "Related", "Dashboard"] if related else ["Primary", "Dashboard"],
+        "navigation_destinations": (
+            ["Primary"] if single_destination
+            else ["Primary", "Related", "Dashboard"] if related else ["Primary", "Dashboard"]
+        ),
         "browser_create_values": {f: f"browser-create-{f}" for f in primary_fields},
         "browser_update_values": {primary_fields[0]: f"browser-update-{primary_fields[0]}"},
         "browser_related_values": {f: f"browser-related-{f}" for f in related_fields} if related else None,
@@ -377,9 +393,17 @@ def _run_journey(
     related_relationship_field: str = "", related_actions: tuple[str, ...] = (),
     related_create_control: bool = True, edit_prefill_correct: bool = True,
     primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
+    single_destination: bool = False,
+    render_no_nav: bool | None = None,
 ) -> subprocess.CompletedProcess:
     if not _free(BACKEND_PORT) or not _free(FRONTEND_PORT):
         pytest.skip(f"ports {BACKEND_PORT}/{FRONTEND_PORT} are not free on this host")
+    # By default the frontend fixture's own nav rendering matches the
+    # scenario's declared destination count; `render_no_nav` overrides this
+    # independently, so a test can prove the real negative control (a
+    # scenario declaring MULTIPLE destinations whose frontend nonetheless
+    # renders no real nav landmark must still genuinely fail).
+    effective_no_nav = single_destination if render_no_nav is None else render_no_nav
 
     store = _Store()
     primary_seed = store.create(primary, {f: f"seed-{f}" for f in primary_fields})
@@ -393,7 +417,7 @@ def _run_journey(
         related=related, related_singular=related_singular, related_fields=related_fields,
         related_relationship_field=related_relationship_field,
         related_create_control=related_create_control, edit_prefill_correct=edit_prefill_correct,
-        store=store,
+        store=store, render_no_nav=effective_no_nav,
     ))
     backend_thread = threading.Thread(target=backend.serve_forever, daemon=True)
     frontend_thread = threading.Thread(target=frontend.serve_forever, daemon=True)
@@ -407,7 +431,7 @@ def _run_journey(
             tmp_path, primary=primary, primary_singular=primary_singular, primary_fields=primary_fields,
             related=related, related_singular=related_singular, related_fields=related_fields,
             related_relationship_field=related_relationship_field, related_actions=related_actions,
-            primary_actions=primary_actions,
+            primary_actions=primary_actions, single_destination=single_destination,
         )
         args = [
             "node", str(JOURNEY), "--candidate", "capability-coverage-fixture",
@@ -540,6 +564,43 @@ class TestReadOnlyPrimaryCapabilityCoverage:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert "BROWSER_JOURNEY_PASS" in result.stdout
+
+
+class TestSingleDestinationCapabilityCoverage:
+    """Real evidence, `factory-goal-mtr3en0w-a3xa19`: a scenario declaring
+    exactly ONE real navigation destination has nothing to navigate
+    BETWEEN, and its own real, valid, minimal frontend renders that one
+    view directly at the root URL with no nav landmark and no nav control
+    at all. This file's own unconditional `getByRole('navigation')`
+    visibility assertion made the identical class of mistake gap 6 already
+    fixed for page headings -- proven here against a real frontend fixture
+    that genuinely has no `<nav>` anywhere, on this file's own real,
+    unmodified journey."""
+
+    def test_j_a_single_destination_read_only_product_passes_with_no_nav_landmark(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        result = _run_journey(
+            tmp_path, primary="overdue_books", primary_singular="Overdue Book",
+            primary_fields=("title",), primary_actions=("view",), single_destination=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "BROWSER_JOURNEY_PASS" in result.stdout
+
+    def test_k_a_multi_destination_scenario_still_requires_the_real_nav_landmark(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """Negative control for gap 9: a scenario declaring MORE than one
+        real destination must still genuinely FAIL when the frontend
+        renders no real nav landmark at all -- the single-destination skip
+        path is only ever taken when the scenario itself genuinely
+        declares exactly one destination, never as a blanket excuse."""
+        result = _run_journey(
+            tmp_path, primary="reports", primary_singular="Report", primary_fields=("title",),
+            primary_actions=("view",), single_destination=False, render_no_nav=True,
+        )
+        assert result.returncode != 0, result.stdout + result.stderr
+        assert "navigation" in (result.stdout + result.stderr).lower()
 
 
 class TestExistingValidJourneyStillPasses:

@@ -149,6 +149,37 @@
  * console/page/network error -- reusing this file's own existing
  * `navigateTo`/`navigateAndVerifyReachable` primitives, never a second
  * journey engine.
+ *
+ * (9) A NAVIGATION LANDMARK IS NOT A CANONICAL REQUIREMENT OF A GENUINELY
+ * SINGLE-VIEW PRODUCT. Real evidence, `factory-goal-mtr3en0w-a3xa19` (the
+ * first real candidate this session's own capability-aware read-only
+ * acceptance actually reached the real browser journey against, F-0090's
+ * own fix having just unblocked the frontend build step that used to fail
+ * first): its own real `product_ux_spec.json` declares exactly ONE
+ * navigation destination ("Overdue Books"), and its own real, valid,
+ * minimal frontend (`ReactDOM.render(<OverdueBooks />, ...)`, no router,
+ * no nav bar) renders that content directly at the app's own root URL --
+ * the only real, observable page this product was ever asked to have.
+ * This journey's own unconditional `getByRole('navigation')` visibility
+ * assertion, gap 6's own real evidence already having established that a
+ * heading is not a canonical requirement, made the identical mistake one
+ * landmark over: neither `ARK-REQ-0072`/`0311`/`0312` nor
+ * `STAGED_GENERATION_STAGES.md#8` names a `<nav>` element or an ARIA
+ * `navigation` role for a product with nothing to navigate BETWEEN, and a
+ * real, live `ExpectError: locator.toBeVisible() ... getByRole('navigation')`
+ * timeout reproduced this exactly, on a candidate whose own real backend
+ * install, tests, read-only journey (`overdue_books_read`, `read_only_
+ * restart_recovery`) and frontend production build had all already,
+ * genuinely PASSED. `scenario.navigation_destinations.length === 1` is the
+ * same real, declared-intent signal already used everywhere else in this
+ * file (never a route name, never a candidate-specific string): when
+ * true, `dashboardLabel` degenerates to `primary.navigation_label` itself
+ * -- there is no second destination to click FROM the first -- so the
+ * initial nav-landmark check, the initial `navigateTo(primary)` (already
+ * on it, by definition, the instant `BASE` loads) and the final
+ * `navigateTo(dashboardLabel)` are all real no-ops for this shape, and are
+ * skipped rather than demanding UI this pipeline's own real, valid intent
+ * never asked the candidate to build.
  */
 
 import { createRequire } from 'node:module';
@@ -180,6 +211,12 @@ const resourceByName = Object.fromEntries(scenario.resources.map((r) => [r.name,
 const primary = resourceByName[scenario.primary_resource];
 const related = scenario.related_resource ? resourceByName[scenario.related_resource] : null;
 const dashboardLabel = scenario.navigation_destinations[scenario.navigation_destinations.length - 1];
+// (9, module docstring): a scenario declaring exactly ONE real navigation
+// destination has nothing to navigate BETWEEN -- its own real, minimal,
+// single-view implementation is valid with no nav landmark and no nav
+// control at all, `dashboardLabel` degenerating to `primary.navigation_
+// label` itself.
+const singleDestination = scenario.navigation_destinations.length === 1;
 // (8, module docstring): the primary's own real, reconciled `actions` --
 // never a route name, never a candidate-specific string -- decide which
 // real journey below actually runs.
@@ -270,8 +307,14 @@ page.on('response', (response) => {
 
 try {
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await expect(page.getByRole('navigation')).toBeVisible();
-  await navigateTo(page, navPattern(primary.navigation_label));
+  if (!singleDestination) {
+    // (9, module docstring): a real nav landmark is only a real
+    // observable when there is a second real destination to have
+    // navigated FROM -- a single-destination product renders its one
+    // real view directly at `BASE`, already reached above.
+    await expect(page.getByRole('navigation')).toBeVisible();
+    await navigateTo(page, navPattern(primary.navigation_label));
+  }
 
   if (primaryIsMutationCapable) {
     const createValues = scenario.browser_create_values || {};
@@ -395,7 +438,13 @@ try {
   // is real navigation -- already proven above by `navigateTo(primary)` --
   // with no console/page/network error; nothing further is asked of it.
 
-  await navigateTo(page, navPattern(dashboardLabel));
+  if (!singleDestination) {
+    // (9, module docstring): for a single-destination scenario,
+    // `dashboardLabel` degenerates to `primary.navigation_label` itself --
+    // the page never left it, so a second navigateTo has no real control
+    // to click and nothing further to prove.
+    await navigateTo(page, navPattern(dashboardLabel));
+  }
   if (consoleErrors.length || pageErrors.length || failedRequests.length) {
     throw new Error(JSON.stringify({ consoleErrors, pageErrors, failedRequests }));
   }

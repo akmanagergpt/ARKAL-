@@ -261,6 +261,36 @@ class TestViewOnlyModuleNeverGetsAGuessedMutation:
         assert resource.actions == ()
         assert scenario.create_payload == {}
 
+    def test_the_real_factory_goal_mtr3en0w_a3xa19_compiles_a_single_navigation_destination(
+        self,
+    ) -> None:
+        """Historical replay, F-0090's own next generic gap (real evidence
+        `factory-goal-mtr3en0w-a3xa19`, the F-0090 fix's own live-generation
+        proof run): direct replay of this real candidate's own real, frozen
+        `product/ux_spec.json` bytes -- no new generation, no live process
+        -- confirms the real, declared shape that made `run_golden_browser_
+        journey.mjs`'s own unconditional nav-landmark assertion a real
+        false positive: exactly one real navigation destination, nothing to
+        navigate between."""
+        import pathlib
+
+        candidate_dir = (
+            pathlib.Path(__file__).resolve().parents[3] / "var" / "factory" / "candidates"
+            / "factory-goal-mtr3en0w-a3xa19"
+        )
+        if not candidate_dir.is_dir():
+            pytest.skip("real candidate directory not present in this checkout")
+        files: dict[str, str] = {}
+        for sub in ("product", "backend"):
+            directory = candidate_dir / sub
+            if not directory.is_dir():
+                continue
+            for path in directory.glob("*.json"):
+                files[f"{sub}/{path.name}"] = path.read_text(encoding="utf-8")
+        scenario = _compile_acceptance_plan(files)
+        assert scenario.navigation_destinations == ("Overdue Books",)
+        assert len(scenario.navigation_destinations) == 1
+
     def test_a_declared_mutation_the_real_backend_never_backs_still_refuses(self) -> None:
         """The capability-aware relaxation never becomes "any empty
         create_payload is fine" -- a module that DECLARES create/edit but
