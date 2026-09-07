@@ -45,6 +45,12 @@ from arkali.engineering.product_change.modification import (
     _validate_changeset,
     prepare_modification,
 )
+from arkali.engineering.product_change.inspection import (
+    _MAX_GROUNDED_SOURCE_BYTES,
+    _MAX_GROUNDED_SOURCE_FILES,
+    _select_authoritative_source,
+    inspect_source,
+)
 from arkali.engineering.product_change.promotion import (
     PROMOTION_GATE_ID,
     PROMOTION_OPERATION_CLASS,
@@ -85,6 +91,16 @@ class FixedModel:
             detail="product-change test double", output=self.output,
             output_excerpt=self.output[:200],
         )
+
+
+class RecordingModel(FixedModel):
+    def __init__(self, output: str) -> None:
+        super().__init__(output)
+        self.prompts: list[str] = []
+
+    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0) -> InferenceResult:
+        self.prompts.append(prompt)
+        return super().infer(model_id, prompt, timeout_seconds=timeout_seconds)
 
 
 class _StubCandidateSource:
@@ -391,6 +407,93 @@ class TestValidateAndApplyChangeset:
 
 
 class TestPrepareModification:
+    def test_historical_cross_file_contract_is_grounded_and_preserved(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        candidate = tmp_path / "candidate-x"
+        (candidate / "frontend" / "src").mkdir(parents=True)
+        provider = "export const resolveNebulaToken = () => 'stable';\n"
+        consumer = (
+            "import { resolveNebulaToken } from './signalBridge';\n"
+            "export default function AuroraPanel() {\n"
+            "  return <h1>{resolveNebulaToken()}</h1>;\n}\n"
+        )
+        (candidate / "frontend/src/signalBridge.js").write_text(provider, encoding="utf-8")
+        (candidate / "frontend/src/AuroraPanel.js").write_text(consumer, encoding="utf-8")
+        (candidate / "frontend/src/unrelated.js").write_text("export const noise = 1;\n", encoding="utf-8")
+        _seed_initial_revision("p1", registry_engine, artifact_engine, blobs, candidate)
+        replacement = consumer.replace("<h1>", "<h1 className=\"modern\">")
+        model = RecordingModel(json.dumps({
+            "schema_version": "1.0.0", "request_text": "modernize AuroraPanel heading",
+            "target_summary": "bounded visible change", "operations": [{
+                "operation": "update", "path": "frontend/src/AuroraPanel.js",
+                "content": replacement, "rationale": "requested presentation change",
+            }],
+        }))
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as art_session:
+            prepared = prepare_modification(
+                "p1", "modernize AuroraPanel heading", registry=ProjectRegistry(session),
+                wiring=ModificationWiring(
+                    artifacts=ArtifactStore(art_session, blobs),
+                    candidate_source_resolver=_StubCandidateSource(candidate),
+                    workspace_allocator=WorkspaceAuthority(tmp_path / "change-ws"),
+                    model=model, model_id="test-model",
+                ),
+            )
+        prompt = model.prompts[0]
+        assert consumer in prompt
+        assert provider in prompt
+        assert "./signalBridge" in prompt
+        assert "resolveNebulaToken" in prompt
+        assert "export const noise = 1" not in prompt
+        assert prepared.verification.passed is True
+        assert resolve_current_revision  # stale-revision owner remains the existing one
+
+    def test_default_export_and_relative_path_are_grounded(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src/theme.js").write_text("export default function lunarTheme() {}\n", encoding="utf-8")
+        current = "import lunarTheme from './theme';\nexport default function ZenithView() { return lunarTheme(); }\n"
+        (tmp_path / "src/ZenithView.js").write_text(current, encoding="utf-8")
+        report = inspect_source(tmp_path)
+        selected = _select_authoritative_source(tmp_path, report, "adjust ZenithView")
+        rendered = selected.render()
+        assert current in rendered
+        assert "export default function lunarTheme" in rendered
+        assert "./theme" in rendered
+
+    def test_selection_is_deterministic_bounded_and_excludes_sensitive_paths(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "src").mkdir()
+        for name in reversed(["AlphaView.js", "BetaView.js", "GammaView.js"]):
+            (tmp_path / "src" / name).write_text(f"export default function {name[:-3]}() {{}}\n", encoding="utf-8")
+        (tmp_path / ".env").write_text("DO_NOT_EXPOSE=value\n", encoding="utf-8")
+        (tmp_path / ".hidden.js").write_text("const hidden = 'DO_NOT_EXPOSE';\n", encoding="utf-8")
+        (tmp_path / "credentials.js").write_text("const credential = 'DO_NOT_EXPOSE';\n", encoding="utf-8")
+        report = inspect_source(tmp_path)
+        first = _select_authoritative_source(tmp_path, report, "AlphaView", max_files=2)
+        second = _select_authoritative_source(tmp_path, report, "AlphaView", max_files=2)
+        assert first.paths == second.paths
+        assert len(first.paths) <= 2
+        assert "DO_NOT_EXPOSE" not in first.render()
+
+    def test_required_source_over_byte_budget_fails_safely(self, tmp_path: pathlib.Path) -> None:
+        (tmp_path / "EnormousPanel.js").write_text("x" * 100, encoding="utf-8")
+        report = inspect_source(tmp_path)
+        with pytest.raises(ChangesetValidationError, match="source context budget"):
+            _select_authoritative_source(tmp_path, report, "change EnormousPanel", max_total_bytes=32)
+
+    def test_summary_only_update_is_refused(self) -> None:
+        with pytest.raises(ChangesetValidationError, match="authoritative current source"):
+            _validate_changeset((ChangeOperation(
+                operation="update", path="src/UnseenPanel.js", content="export default 1;",
+                rationale="requested",
+            ),), grounded_paths=frozenset())
+
+    def test_default_limits_are_explicit_positive_bounds(self) -> None:
+        assert 0 < _MAX_GROUNDED_SOURCE_FILES < 40
+        assert 0 < _MAX_GROUNDED_SOURCE_BYTES < 1_000_000
+
     def test_valid_plan_is_applied_and_passes_verification(
         self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
         tmp_path: pathlib.Path,

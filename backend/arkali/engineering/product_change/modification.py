@@ -30,7 +30,11 @@ from arkali.engineering.product_change.errors import (
     ChangesetValidationError,
     ModelPlanInvalidError,
 )
-from arkali.engineering.product_change.inspection import inspect_source, render_for_prompt
+from arkali.engineering.product_change.inspection import (
+    _select_authoritative_source,
+    inspect_source,
+    render_for_prompt,
+)
 from arkali.engineering.product_change.revision_resolution import (
     _CandidateSourceResolver,
     materialized_source,
@@ -61,8 +65,15 @@ your plan creates.
 User request:
 {request_text}
 
-Real source inventory:
+Structural summary (discovery only; NOT implementation truth):
 {inventory}
+
+Authoritative current source (exact, bounded, current revision bytes):
+{authoritative_source}
+
+Preserve existing contracts unless the user explicitly requests changing them. Never invent import,
+export, route, API, component, function, or relative-path identifiers. An existing file may be
+updated only when its full authoritative current source appears above.
 """
 
 
@@ -155,7 +166,9 @@ def _extract_json_object(text: str) -> str:
     return text[start : end + 1]
 
 
-def _validate_changeset(operations: tuple[ChangeOperation, ...]) -> None:
+def _validate_changeset(
+    operations: tuple[ChangeOperation, ...], *, grounded_paths: frozenset[str] | None = None,
+) -> None:
     """Refuses before any write: a collision (two operations naming the
     same target path), an unsafe path shape, or a structurally incomplete
     operation. `CandidateWorkspace.path_for`'s own containment check is
@@ -173,6 +186,10 @@ def _validate_changeset(operations: tuple[ChangeOperation, ...]) -> None:
         seen_targets.add(target)
         if op.operation in ("create", "update") and not op.content:
             raise ChangesetValidationError(f"{op.operation} of {op.path!r} carries no content")
+        if op.operation == "update" and grounded_paths is not None and op.path not in grounded_paths:
+            raise ChangesetValidationError(
+                f"update of {op.path!r} has no authoritative current source in planning context"
+            )
 
 
 #: Every real path `ChangeOperation` names is relative to the PRODUCT root
@@ -264,8 +281,10 @@ def prepare_modification(
         "python_files": len(report.python_files), "js_files": len(report.js_files),
     })
 
+    grounded = _select_authoritative_source(product_root, report, request_text)
     prompt = _PROMPT_TEMPLATE.format(
         request_text=request_text, inventory=render_for_prompt(report),
+        authoritative_source=grounded.render(),
     )
     result = wiring.model.infer(wiring.model_id, prompt, timeout_seconds=180.0)
     if result.state.value != "PASS":
@@ -278,7 +297,7 @@ def prepare_modification(
         raise ModelPlanInvalidError(f"provider response is not a valid ChangePlan: {error}") from error
     _report(on_phase, "plan_ready", {"operations": len(plan.operations)})
 
-    _validate_changeset(plan.operations)
+    _validate_changeset(plan.operations, grounded_paths=frozenset(grounded.paths))
     _apply_changeset(workspace, plan.operations)
     _report(on_phase, "changes_applied", {"operations": len(plan.operations)})
 
