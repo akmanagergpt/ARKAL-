@@ -200,7 +200,18 @@ class TestViewOnlyModuleNeverGetsAGuessedMutation:
     against its real, GET-only route then failed with a real, live
     "HTTP Error 405: METHOD NOT ALLOWED" -- never a candidate defect, an
     acceptance-compiler one: it silently GUESSED a mutation capability
-    the module's own real, reconciled actions never claimed."""
+    the module's own real, reconciled actions never claimed.
+
+    CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record, post-dating F-0088's own original fix): a genuinely,
+    declared-intent read-only module is now a LEGITIMATE compiled
+    scenario -- `_compile_acceptance_plan` no longer refuses it -- since
+    `factory_acceptance._accept()` and the browser journey both branch on
+    a resource's own `actions` to run a real read/render/restart journey
+    instead of a synthesized mutation one. Only a module that DECLARES a
+    mutation its own real backend never backs is still refused -- that
+    remains a genuine defect, never reclassified as "read-only by
+    design"."""
 
     def _files(self) -> dict[str, str]:
         view_only_module = {
@@ -218,16 +229,21 @@ class TestViewOnlyModuleNeverGetsAGuessedMutation:
             }),
         }
 
-    def test_a_view_only_module_refuses_rather_than_guesses_a_create_payload(self) -> None:
-        with pytest.raises(_AcceptancePlanIncomplete) as excinfo:
-            _compile_acceptance_plan(self._files())
-        assert any("no real editable field to create with" in reason for reason in excinfo.value.reasons)
+    def test_a_view_only_module_compiles_as_a_legitimate_read_only_primary(self) -> None:
+        scenario = _compile_acceptance_plan(self._files())
+        assert scenario.primary_resource == "overdue_books"
+        resource = scenario.resource("overdue_books")
+        assert resource.actions == ()
+        assert scenario.create_payload == {}
+        assert resource.relationship_fields == {}
 
-    def test_the_real_factory_goal_mtquvzmc_dt3go3_contracts_now_refuse_cleanly(self) -> None:
+    def test_the_real_factory_goal_mtquvzmc_dt3go3_contracts_now_compile_cleanly(self) -> None:
         """Direct historical replay of this real candidate's own real,
         frozen `product/ux_spec.json` + `backend/*.json` bytes -- no new
         generation, no live process, the exact same real contracts that
-        real acceptance attempt actually used."""
+        real acceptance attempt actually used. Under capability-aware
+        acceptance this now compiles into a real read-only scenario
+        instead of refusing."""
         import pathlib
 
         candidate_dir = pathlib.Path(__file__).resolve().parents[3] / "var" / "factory" / "candidates" / "factory-goal-mtquvzmc-dt3go3"
@@ -240,9 +256,30 @@ class TestViewOnlyModuleNeverGetsAGuessedMutation:
                 continue
             for path in directory.glob("*.json"):
                 files[f"{sub}/{path.name}"] = path.read_text(encoding="utf-8")
+        scenario = _compile_acceptance_plan(files)
+        resource = scenario.resource(scenario.primary_resource)
+        assert resource.actions == ()
+        assert scenario.create_payload == {}
+
+    def test_a_declared_mutation_the_real_backend_never_backs_still_refuses(self) -> None:
+        """The capability-aware relaxation never becomes "any empty
+        create_payload is fine" -- a module that DECLARES create/edit but
+        whose real backend route only ever exposes GET is a genuine
+        defect (a promise the candidate's own real code never kept),
+        still refused exactly as before."""
+        files = {
+            "product/ux_spec.json": _ux_spec(
+                [_module("widgets", "Widgets", ["create", "edit"], ["id", "name"])], ["Widgets"],
+            ),
+            "backend/routes.json": _routes(("/widgets", "GET")),
+            "backend/data_model.json": _models({"widgets": {"id": "integer", "name": "string"}}),
+        }
         with pytest.raises(_AcceptancePlanIncomplete) as excinfo:
             _compile_acceptance_plan(files)
-        assert any("no real editable field to create with" in reason for reason in excinfo.value.reasons)
+        assert any(
+            "declares" in reason and "no matching backend route/method" in reason
+            for reason in excinfo.value.reasons
+        )
 
     def test_a_module_declaring_edit_but_not_create_still_gets_a_payload(self) -> None:
         """The gate is "create OR edit", not "create only" -- a real,
@@ -259,6 +296,67 @@ class TestViewOnlyModuleNeverGetsAGuessedMutation:
         }
         scenario = _compile_acceptance_plan(files)
         assert scenario.update_payload
+
+
+class TestMixedReadOnlyAndMutableProduct:
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a real product with BOTH a mutation-capable module and a
+    genuinely read-only module must verify each per its own declared
+    capability set -- the mutable module keeps its normal create/edit/
+    delete/related-create journey untouched, and the read-only module is
+    never forced into that journey (as a fabricated primary or a
+    fabricated related-create target) merely because it happens to hold a
+    schema-detectable foreign key toward the mutable one."""
+
+    def _files(self) -> dict[str, str]:
+        return {
+            "product/ux_spec.json": _ux_spec(
+                [
+                    _module("crates", "Crates", ["create", "edit", "delete"], ["id", "label"]),
+                    # A real, genuine read-only module ("view" only) that
+                    # STILL carries a schema-detectable foreign key toward
+                    # the mutable primary -- the exact shape that would
+                    # wrongly get selected as `related_resource` and handed
+                    # a synthesized create_payload under the old, capability-
+                    # blind relationship detection.
+                    _module("crate_reports", "Crate Reports", ["view"], ["id", "crate_id", "summary"]),
+                ],
+                ["Crates", "Crate Reports"],
+            ),
+            "backend/routes.json": _routes(
+                ("/crates", "GET"), ("/crates", "POST"), ("/crates/{id}", "PUT"), ("/crates/{id}", "DELETE"),
+                ("/crate-reports", "GET"),
+            ),
+            "backend/data_model.json": _models({
+                "crates": {"id": "integer", "label": "string"},
+                "crate_reports": {"id": "integer", "crate_id": "integer", "summary": "string"},
+            }),
+        }
+
+    def test_the_mutable_module_is_selected_as_primary_with_its_normal_journey_intact(self) -> None:
+        scenario = _compile_acceptance_plan(self._files())
+        assert scenario.primary_resource == "crates"
+        assert scenario.create_payload
+        primary = scenario.resource("crates")
+        assert {"create", "edit", "delete"} <= set(primary.actions)
+
+    def test_the_read_only_module_is_never_synthesized_into_a_related_mutation(self) -> None:
+        scenario = _compile_acceptance_plan(self._files())
+        # Either genuinely excluded from `related_resource`, or -- if ever
+        # selected -- must never carry a synthesized create observable:
+        # both outcomes are legitimate; a real create_payload for it is not.
+        if scenario.related_resource == "crate_reports":
+            assert not scenario.related_create_payload
+        else:
+            assert scenario.related_resource is None
+        report = scenario.resource("crate_reports")
+        assert report.actions == ()
+        assert report.relationship_fields == {}
+
+    def test_both_modules_still_reconcile_cleanly_against_their_own_source(self) -> None:
+        files = self._files()
+        scenario = _compile_acceptance_plan(files)
+        assert _reconcile_scenario(scenario, files) == []
 
 
 class TestRefusesRatherThanGuesses:

@@ -59,7 +59,10 @@ from arkali.engineering.factory.acceptance_plan_compiler import (  # noqa: E402
     _compile_acceptance_plan,
 )
 from arkali.engineering.factory.acceptance_plan_reconciliation import _reconcile_scenario  # noqa: E402
-from arkali.engineering.factory.acceptance_scenario import _AcceptanceScenario  # noqa: E402
+from arkali.engineering.factory.acceptance_scenario import (  # noqa: E402
+    _AcceptanceScenario,
+    _ResourceScenario,
+)
 from arkali.engineering.factory.errors import CandidateNotAcceptedError  # noqa: E402
 from arkali.engineering.factory.product_registration import (  # noqa: E402
     register_accepted_candidate_as_managed_product,
@@ -266,6 +269,110 @@ def _register_managed_product(candidate_id: str, ledger: CandidateLedger) -> dic
         evidence_engine.dispose()
 
 
+def _run_mutation_journey(
+    scenario: _AcceptanceScenario, primary: _ResourceScenario, journey: Journey, evidence: pathlib.Path,
+) -> int:
+    """The pre-existing create -> edit -> related-create journey, unchanged
+    byte-for-byte in behavior -- extracted only so `_accept()` can branch
+    on a resource's own real, reconciled `actions` (capability-aware
+    acceptance, human governance decision, session record) without
+    growing past its own architecture-budget complexity ceiling."""
+    status, primary_obj = _json_request(
+        "POST", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+        scenario.create_payload,
+    )
+    primary_id = int(primary_obj["id"])  # type: ignore[index]
+    created_ids = {scenario.primary_resource: primary_id}
+    journey.record(
+        f"{scenario.primary_resource}_create", status == 201,
+        f"POST {primary.collection_route} -> {status}, id={primary_id}",
+    )
+    status, _ = _json_request(
+        "PUT", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}/{primary_id}",
+        scenario.update_payload,
+    )
+    journey.record(
+        f"{scenario.primary_resource}_edit", status == 200,
+        f"PUT {primary.collection_route}/{primary_id} -> {status}",
+    )
+    related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
+    if related is not None and scenario.related_create_payload is not None:
+        related_payload = _relationship_payload(
+            related, scenario.related_create_payload, created_ids,
+        )
+        status, related_obj = _json_request(
+            "POST", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}", related_payload,
+        )
+        journey.record(
+            f"{scenario.related_resource}_create", status == 201,
+            f"POST {related.collection_route} -> {status}, body={related_obj}",
+        )
+    return primary_id
+
+
+def _run_read_only_journey(scenario: _AcceptanceScenario, primary: _ResourceScenario, journey: Journey) -> None:
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a resource whose own real, declared `product_ux_spec.json`
+    never claims "create"/"edit" is a legitimate real product shape --
+    real evidence, `factory-goal-mtquvzmc-dt3go3`, a real library-overdue-
+    books reporting view. Proving it real never invents a mutation it was
+    never asked to support: a real GET against its own real, declared
+    collection route, structurally valid (a real JSON array or object,
+    never raising), is the entire real observable this resource's own
+    declared capability promises. `restart` survival is checked
+    separately, by `_verify_read_only_survives_restart`, the same
+    real-backend-restart primitive the mutation journey already uses."""
+    status, primary_body = _json_request(
+        "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+    )
+    journey.record(
+        f"{scenario.primary_resource}_read", status == 200 and isinstance(primary_body, (list, dict)),
+        f"GET {primary.collection_route} -> {status}, structurally valid "
+        f"body type={type(primary_body).__name__}",
+    )
+
+
+def _verify_mutation_survives_restart(
+    scenario: _AcceptanceScenario, primary: _ResourceScenario, primary_id: int, journey: Journey,
+) -> None:
+    related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
+    _, primary_rows = _json_request(
+        "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+    )
+    primary_persisted = any(row.get("id") == primary_id for row in primary_rows)  # type: ignore[union-attr]
+    related_persisted = True
+    if related is not None:
+        _, related_rows = _json_request(
+            "GET", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}",
+        )
+        related_persisted = bool(related_rows)
+    journey.record(
+        "sqlite_restart_persistence", primary_persisted and related_persisted,
+        f"{scenario.primary_resource} and {scenario.related_resource} survived a real restart",
+    )
+
+
+def _verify_read_only_survives_restart(
+    scenario: _AcceptanceScenario, primary: _ResourceScenario, journey: Journey,
+) -> None:
+    """Real evidence, factory-goal-mtquvzmc-dt3go3-class products: "restart
+    persistence" for a resource with no declared mutation never means
+    manufacturing create/edit/delete behavior solely to prove it (human
+    governance decision, session record) -- it means the same real read
+    behavior the first real GET already proved keeps working after a real
+    process restart, whatever the product's own real, declared data
+    source (a database, a static/computed source, or genuinely empty
+    real data) actually is."""
+    status, primary_body = _json_request(
+        "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
+    )
+    journey.record(
+        "read_only_restart_recovery",
+        status == 200 and isinstance(primary_body, (list, dict)),
+        f"{scenario.primary_resource} remained readable after a real restart",
+    )
+
+
 def _accept(
     candidate_id: str, source_candidate: pathlib.Path,
     scenario: _AcceptanceScenario, scenario_path: pathlib.Path,
@@ -350,61 +457,37 @@ def _accept(
         backend_log = (evidence / "backend-first.log").open("w", encoding="utf-8")
         backend = _backend_process(python, candidate, backend_log)
         _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
-        status, primary_obj = _json_request(
-            "POST", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
-            scenario.create_payload,
-        )
-        primary_id = int(primary_obj["id"])  # type: ignore[index]
-        created_ids = {scenario.primary_resource: primary_id}
-        journey.record(
-            f"{scenario.primary_resource}_create", status == 201,
-            f"POST {primary.collection_route} -> {status}, id={primary_id}",
-        )
-        status, _ = _json_request(
-            "PUT", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}/{primary_id}",
-            scenario.update_payload,
-        )
-        journey.record(
-            f"{scenario.primary_resource}_edit", status == 200,
-            f"PUT {primary.collection_route}/{primary_id} -> {status}",
-        )
-        related = scenario.resource(scenario.related_resource) if scenario.related_resource else None
-        if related is not None and scenario.related_create_payload is not None:
-            related_payload = _relationship_payload(
-                related, scenario.related_create_payload, created_ids,
+
+        # CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+        # record): the primary's own real, reconciled `actions` -- never a
+        # route name, never a candidate-specific string -- decide which
+        # real journey below actually runs. A resource that never declares
+        # "create"/"edit" is a legitimate, real READ-ONLY design (real
+        # evidence: `factory-goal-mtquvzmc-dt3go3`) and is verified by
+        # proving its own real read behavior survives a real restart,
+        # never by inventing a mutation it was never asked to support.
+        if {"create", "edit"} & set(primary.actions):
+            primary_id = _run_mutation_journey(
+                scenario, primary, journey, evidence,
             )
-            status, related_obj = _json_request(
-                "POST", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}", related_payload,
-            )
-            journey.record(
-                f"{scenario.related_resource}_create", status == 201,
-                f"POST {related.collection_route} -> {status}, body={related_obj}",
-            )
+        else:
+            primary_id = _run_read_only_journey(scenario, primary, journey)
+
         _stop(backend)
         backend = None
         journey.record(
             "backend_stopped", not _port_accepts_connections(BACKEND_PORT),
             "owned backend no longer accepts connections on port 5000",
         )
-
         backend_log.close()
+
         restart_log = (evidence / "backend-restart.log").open("w", encoding="utf-8")
         backend = _backend_process(python, candidate, restart_log)
         _wait_http(f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}", backend)
-        _, primary_rows = _json_request(
-            "GET", f"http://127.0.0.1:{BACKEND_PORT}{primary.collection_route}",
-        )
-        primary_persisted = any(row.get("id") == primary_id for row in primary_rows)  # type: ignore[union-attr]
-        related_persisted = True
-        if related is not None:
-            _, related_rows = _json_request(
-                "GET", f"http://127.0.0.1:{BACKEND_PORT}{related.collection_route}",
-            )
-            related_persisted = bool(related_rows)
-        journey.record(
-            "sqlite_restart_persistence", primary_persisted and related_persisted,
-            f"{scenario.primary_resource} and {scenario.related_resource} survived a real restart",
-        )
+        if primary_id is not None:
+            _verify_mutation_survives_restart(scenario, primary, primary_id, journey)
+        else:
+            _verify_read_only_survives_restart(scenario, primary, journey)
 
         frontend_dir = candidate / "frontend"
         npm = "npm.cmd" if os.name == "nt" else "npm"
@@ -426,12 +509,17 @@ def _accept(
         )
         _wait_http(f"http://127.0.0.1:{FRONTEND_PORT}", frontend)
         if not skip_browser:
-            browser_output = _run(
-                ["node", str(ROOT / "scripts" / "run_golden_browser_journey.mjs"),
-                 "--candidate", candidate_id, "--scenario", str(scenario_path),
-                 "--primary-id", str(primary_id)], cwd=ROOT,
-                timeout_seconds=120,
-            )
+            browser_args = [
+                "node", str(ROOT / "scripts" / "run_golden_browser_journey.mjs"),
+                "--candidate", candidate_id, "--scenario", str(scenario_path),
+            ]
+            # CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+            # record): a read-only primary never created a real backend row,
+            # so there is no real id to pass -- `--primary-id` is only ever
+            # supplied when the mutation journey actually produced one.
+            if primary_id is not None:
+                browser_args += ["--primary-id", str(primary_id)]
+            browser_output = _run(browser_args, cwd=ROOT, timeout_seconds=120)
             (evidence / "browser.json").write_text(browser_output, encoding="utf-8")
             journey.record("real_browser_journey", True, browser_output.strip().splitlines()[-1])
 

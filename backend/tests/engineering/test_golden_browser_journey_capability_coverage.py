@@ -337,6 +337,7 @@ def _scenario_json(
     tmp_path: pathlib.Path, *, primary: str, primary_singular: str, primary_fields: tuple[str, ...],
     related: str | None, related_singular: str, related_fields: tuple[str, ...],
     related_relationship_field: str, related_actions: tuple[str, ...],
+    primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
 ) -> pathlib.Path:
     scenario = {
         "scenario_id": "capability-coverage-fixture",
@@ -344,7 +345,7 @@ def _scenario_json(
             {
                 "name": primary, "collection_route": f"/{primary}", "navigation_label": "Primary",
                 "singular_label": primary_singular, "editable_form_fields": list(primary_fields),
-                "destructive_confirmation_required": True, "actions": ["create", "edit", "delete", "view"],
+                "destructive_confirmation_required": True, "actions": list(primary_actions),
             },
         ] + (
             [{
@@ -375,6 +376,7 @@ def _run_journey(
     related: str | None = None, related_singular: str = "", related_fields: tuple[str, ...] = (),
     related_relationship_field: str = "", related_actions: tuple[str, ...] = (),
     related_create_control: bool = True, edit_prefill_correct: bool = True,
+    primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
 ) -> subprocess.CompletedProcess:
     if not _free(BACKEND_PORT) or not _free(FRONTEND_PORT):
         pytest.skip(f"ports {BACKEND_PORT}/{FRONTEND_PORT} are not free on this host")
@@ -405,13 +407,19 @@ def _run_journey(
             tmp_path, primary=primary, primary_singular=primary_singular, primary_fields=primary_fields,
             related=related, related_singular=related_singular, related_fields=related_fields,
             related_relationship_field=related_relationship_field, related_actions=related_actions,
+            primary_actions=primary_actions,
         )
+        args = [
+            "node", str(JOURNEY), "--candidate", "capability-coverage-fixture",
+            "--scenario", str(scenario_path),
+        ]
+        # Mirrors `factory_acceptance.py`'s own real call site: `--primary-id`
+        # is only ever supplied for a mutation-capable primary, proving the
+        # journey's own read-only branch never needs it either.
+        if {"create", "edit"} & set(primary_actions):
+            args += ["--primary-id", str(primary_seed["id"])]
         return subprocess.run(
-            [
-                "node", str(JOURNEY), "--candidate", "capability-coverage-fixture",
-                "--scenario", str(scenario_path), "--primary-id", str(primary_seed["id"]),
-            ],
-            cwd=REPO, capture_output=True, text=True, timeout=60,
+            args, cwd=REPO, capture_output=True, text=True, timeout=60,
         )
     finally:
         backend.shutdown()
@@ -496,6 +504,42 @@ class TestSecondDomainProvesNoHardcoding:
 
         bad_prefill = domain_b(edit_prefill_correct=False)
         assert bad_prefill.returncode != 0, bad_prefill.stdout + bad_prefill.stderr
+
+
+class TestReadOnlyPrimaryCapabilityCoverage:
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a primary whose own real, declared `actions` never claim
+    "create"/"edit" must reach `BROWSER_JOURNEY_PASS` through real
+    navigation alone -- no `--primary-id` supplied, no create/edit/delete
+    control ever looked for, on this file's own real, unmodified
+    `run_golden_browser_journey.mjs`, driving a real Chromium instance
+    against a real backend and frontend fixture."""
+
+    def test_h_a_genuinely_read_only_primary_passes_via_navigation_alone(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        result = _run_journey(
+            tmp_path, primary="reports", primary_singular="Report", primary_fields=("title",),
+            primary_actions=("view",),
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "BROWSER_JOURNEY_PASS" in result.stdout
+        assert "read-only" in result.stdout
+
+    def test_i_a_read_only_primary_with_no_create_or_delete_control_still_passes(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """A read-only primary's frontend fixture still renders the same
+        real create/delete controls this module's other fixtures render for
+        a mutation-capable primary (the fixture is not customized per test)
+        -- proving the journey itself never clicks them, rather than merely
+        proving they happen to be absent."""
+        result = _run_journey(
+            tmp_path, primary="dashboards", primary_singular="Dashboard", primary_fields=("name",),
+            primary_actions=("view",),
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "BROWSER_JOURNEY_PASS" in result.stdout
 
 
 class TestExistingValidJourneyStillPasses:

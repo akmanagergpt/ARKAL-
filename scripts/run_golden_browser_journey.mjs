@@ -133,6 +133,22 @@
  * exercised -- SKIP is legitimate only for a capability neither the
  * candidate's own `product_ux_spec.json` nor its own real backend routes
  * ever declared.
+ *
+ * (8) CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+ * record): a primary resource whose own real, reconciled `actions` (the
+ * same `_ResourceScenario.actions` this journey already reads for gap 7)
+ * never declares "create"/"edit" at all is a legitimate, real READ-ONLY
+ * product shape (real evidence: `factory-goal-mtquvzmc-dt3go3`, a real
+ * library-overdue-books reporting view) -- never a defect, and never a
+ * reason to synthesize a create/edit/delete flow this journey was never
+ * asked to prove. Such a primary never produces a real backend id, so
+ * `--primary-id` is no longer unconditionally required; it stays required
+ * only for a mutation-capable primary. The read-only journey below proves
+ * the one real, observable fact its own declared capability actually
+ * promises: real navigation to its own destination succeeds, with no
+ * console/page/network error -- reusing this file's own existing
+ * `navigateTo`/`navigateAndVerifyReachable` primitives, never a second
+ * journey engine.
  */
 
 import { createRequire } from 'node:module';
@@ -154,9 +170,6 @@ const candidateIndex = process.argv.indexOf('--candidate');
 const candidate = candidateIndex >= 0 ? process.argv[candidateIndex + 1] : 'unknown';
 const primaryIdIndex = process.argv.indexOf('--primary-id');
 const primaryBackendId = primaryIdIndex >= 0 ? process.argv[primaryIdIndex + 1] : null;
-if (!primaryBackendId || !/^\d+$/.test(primaryBackendId)) {
-  throw new Error('--primary-id must identify the real backend-persisted primary record');
-}
 const scenarioIndex = process.argv.indexOf('--scenario');
 const scenarioPath = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : null;
 if (!scenarioPath) {
@@ -167,6 +180,13 @@ const resourceByName = Object.fromEntries(scenario.resources.map((r) => [r.name,
 const primary = resourceByName[scenario.primary_resource];
 const related = scenario.related_resource ? resourceByName[scenario.related_resource] : null;
 const dashboardLabel = scenario.navigation_destinations[scenario.navigation_destinations.length - 1];
+// (8, module docstring): the primary's own real, reconciled `actions` --
+// never a route name, never a candidate-specific string -- decide which
+// real journey below actually runs.
+const primaryIsMutationCapable = (primary.actions || []).some((a) => a === 'create' || a === 'edit');
+if (primaryIsMutationCapable && (!primaryBackendId || !/^\d+$/.test(primaryBackendId))) {
+  throw new Error('--primary-id must identify the real backend-persisted primary record');
+}
 
 /** A loose, case-insensitive label pattern for a real declared field name
  * -- "due_date" -> /due.*date/i, "amount" -> /amount/i -- the same shape
@@ -253,122 +273,127 @@ try {
   await expect(page.getByRole('navigation')).toBeVisible();
   await navigateTo(page, navPattern(primary.navigation_label));
 
-  const createValues = scenario.browser_create_values || {};
-  await clickNamed(page, createButtonPattern(primary.singular_label));
-  for (const fieldName of primary.editable_form_fields) {
-    await expect(page.getByLabel(fieldPattern(fieldName))).toBeVisible();
-  }
-  const mutationCountBeforeValidation = mutations.length;
-  await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
-  if (mutations.length !== mutationCountBeforeValidation) {
-    throw new Error('invalid empty form emitted a network mutation');
-  }
-  await fillFields(page, primary.editable_form_fields, createValues);
-  await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
-  await waitForMutation(
-    mutations,
-    (m) => m.method === 'POST' && m.url.includes(primary.collection_route),
-    `${primary.name} form did not emit a real POST ${primary.collection_route} request`,
-  );
-
-  const createdText = Object.values(createValues)[0];
-  await clickNamed(page, navPattern(primary.navigation_label));
-  await expect(page.getByText(createdText, { exact: false })).toBeVisible();
-  // Read the real created id back from the list's own rendered edit link
-  // (its href always embeds the record's real id) rather than the create
-  // POST's response body: that read raced against a real candidate's own
-  // window.location.href navigation and intermittently came back empty,
-  // reproduced live against the Student/Fee Golden - the DOM here is
-  // post-navigation and stable.
-  const createdRow = page.getByRole('listitem').filter({ hasText: createdText });
-  const editHref = await createdRow.getByRole('link', { name: /edit/i }).first().getAttribute('href');
-  const createdIdMatch = editHref?.match(/(\d+)\/?$/);
-  if (!createdIdMatch) {
-    throw new Error(`the new ${primary.name} row has no numeric id in its edit link href: ${editHref}`);
-  }
-  const createdId = createdIdMatch[1];
-  await clickInRow(page, createdText, /edit/i);
-  const collectionSegment = primary.collection_route.replace(/^\//, '');
-  await expect(page).toHaveURL(new RegExp(`/${collectionSegment}/edit/${createdId}(?:[/?]|$)`));
-
-  // Gap 7(b), module docstring: prove the edit form genuinely shows this
-  // real record's own real data BEFORE any new value is typed over it --
-  // never inferred from the post-submit result alone, which a form that
-  // was blank all along would satisfy identically.
-  for (const fieldName of primary.editable_form_fields) {
-    if (!Object.prototype.hasOwnProperty.call(createValues, fieldName)) continue;
-    const input = await firstVisible([
-      page.getByLabel(fieldPattern(fieldName)), page.getByPlaceholder(fieldPattern(fieldName)),
-    ]);
-    const currentValue = (await input.inputValue()).trim();
-    const expectedValue = String(createValues[fieldName]).trim();
-    if (currentValue !== expectedValue) {
-      throw new Error(
-        `edit form field "${fieldName}" does not show this record's own real value before mutation `
-        + `(expected "${expectedValue}", found "${currentValue}") -- the edit form is not genuinely `
-        + 'pre-populated'
-      );
+  if (primaryIsMutationCapable) {
+    const createValues = scenario.browser_create_values || {};
+    await clickNamed(page, createButtonPattern(primary.singular_label));
+    for (const fieldName of primary.editable_form_fields) {
+      await expect(page.getByLabel(fieldPattern(fieldName))).toBeVisible();
     }
-  }
-
-  const updateValues = scenario.browser_update_values || {};
-  await fillFields(page, primary.editable_form_fields, updateValues);
-  await clickNamed(page, /update|save|submit/i);
-  await waitForMutation(
-    mutations,
-    (m) => m.method === 'PUT' && m.url.includes(`${primary.collection_route}/${createdId}`),
-    `edit form did not emit a real PUT ${primary.collection_route}/${createdId} request`,
-  );
-
-  const updatedText = Object.values(updateValues)[0] || createdText;
-  await clickNamed(page, navPattern(primary.navigation_label));
-  await expect(page.getByText(updatedText, { exact: false })).toBeVisible();
-  await clickInRow(page, updatedText, /delete/i);
-  const confirm = await firstVisible([
-    page.getByRole('button', { name: /confirm|yes|delete/i }),
-    page.getByRole('link', { name: /confirm|yes|delete/i }),
-  ]);
-  await confirm.click();
-  await waitForMutation(
-    mutations,
-    (m) => m.method === 'DELETE' && m.url.includes(`${primary.collection_route}/${createdId}`),
-    `delete flow did not emit a real DELETE ${primary.collection_route}/${createdId} request`,
-  );
-
-  if (related) {
-    await navigateTo(page, navPattern(related.navigation_label));
-    // Gap 7(a), module docstring: "create" declared in `related.actions`
-    // is a real, spec+backend-reconciled promise (`acceptance_plan_
-    // compiler.py`'s own `_resolved_actions`) -- a missing control for a
-    // declared-mandatory capability is a real FAIL, never a silent skip.
-    // SKIP stays legitimate only when neither the candidate's own
-    // product_ux_spec.json nor its own real backend routes ever declared
-    // "create" for this resource in the first place.
-    const relatedMustCreate = (related.actions || []).includes('create');
-    const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
-    const relatedCreateCount = await relatedCreate.count();
-    if (relatedMustCreate && relatedCreateCount === 0) {
-      throw new Error(
-        `${related.name} declares a mandatory "create" capability (both product_ux_spec.json and the `
-        + 'real backend agree it exists) but no reachable create control was found anywhere on the '
-        + `${related.navigation_label} page`
-      );
+    const mutationCountBeforeValidation = mutations.length;
+    await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
+    if (mutations.length !== mutationCountBeforeValidation) {
+      throw new Error('invalid empty form emitted a network mutation');
     }
-    if (relatedCreateCount) {
-      await relatedCreate.first().click();
-      const relationshipField = Object.keys(related.relationship_fields || {})[0];
-      if (relationshipField) {
-        await fillByLabel(page, fieldPattern(relationshipField), primaryBackendId);
+    await fillFields(page, primary.editable_form_fields, createValues);
+    await clickNamed(page, new RegExp(`create.*${primary.singular_label.toLowerCase()}|save|submit`, 'i'));
+    await waitForMutation(
+      mutations,
+      (m) => m.method === 'POST' && m.url.includes(primary.collection_route),
+      `${primary.name} form did not emit a real POST ${primary.collection_route} request`,
+    );
+
+    const createdText = Object.values(createValues)[0];
+    await clickNamed(page, navPattern(primary.navigation_label));
+    await expect(page.getByText(createdText, { exact: false })).toBeVisible();
+    // Read the real created id back from the list's own rendered edit link
+    // (its href always embeds the record's real id) rather than the create
+    // POST's response body: that read raced against a real candidate's own
+    // window.location.href navigation and intermittently came back empty,
+    // reproduced live against the Student/Fee Golden - the DOM here is
+    // post-navigation and stable.
+    const createdRow = page.getByRole('listitem').filter({ hasText: createdText });
+    const editHref = await createdRow.getByRole('link', { name: /edit/i }).first().getAttribute('href');
+    const createdIdMatch = editHref?.match(/(\d+)\/?$/);
+    if (!createdIdMatch) {
+      throw new Error(`the new ${primary.name} row has no numeric id in its edit link href: ${editHref}`);
+    }
+    const createdId = createdIdMatch[1];
+    await clickInRow(page, createdText, /edit/i);
+    const collectionSegment = primary.collection_route.replace(/^\//, '');
+    await expect(page).toHaveURL(new RegExp(`/${collectionSegment}/edit/${createdId}(?:[/?]|$)`));
+
+    // Gap 7(b), module docstring: prove the edit form genuinely shows this
+    // real record's own real data BEFORE any new value is typed over it --
+    // never inferred from the post-submit result alone, which a form that
+    // was blank all along would satisfy identically.
+    for (const fieldName of primary.editable_form_fields) {
+      if (!Object.prototype.hasOwnProperty.call(createValues, fieldName)) continue;
+      const input = await firstVisible([
+        page.getByLabel(fieldPattern(fieldName)), page.getByPlaceholder(fieldPattern(fieldName)),
+      ]);
+      const currentValue = (await input.inputValue()).trim();
+      const expectedValue = String(createValues[fieldName]).trim();
+      if (currentValue !== expectedValue) {
+        throw new Error(
+          `edit form field "${fieldName}" does not show this record's own real value before mutation `
+          + `(expected "${expectedValue}", found "${currentValue}") -- the edit form is not genuinely `
+          + 'pre-populated'
+        );
       }
-      await fillFields(page, related.editable_form_fields, scenario.browser_related_values || {});
-      await clickNamed(page, new RegExp(`create.*${related.singular_label.toLowerCase()}|save|submit`, 'i'));
-      await waitForMutation(
-        mutations,
-        (m) => m.method === 'POST' && m.url.includes(related.collection_route),
-        `${related.name} form did not emit a real POST ${related.collection_route} request`,
-      );
+    }
+
+    const updateValues = scenario.browser_update_values || {};
+    await fillFields(page, primary.editable_form_fields, updateValues);
+    await clickNamed(page, /update|save|submit/i);
+    await waitForMutation(
+      mutations,
+      (m) => m.method === 'PUT' && m.url.includes(`${primary.collection_route}/${createdId}`),
+      `edit form did not emit a real PUT ${primary.collection_route}/${createdId} request`,
+    );
+
+    const updatedText = Object.values(updateValues)[0] || createdText;
+    await clickNamed(page, navPattern(primary.navigation_label));
+    await expect(page.getByText(updatedText, { exact: false })).toBeVisible();
+    await clickInRow(page, updatedText, /delete/i);
+    const confirm = await firstVisible([
+      page.getByRole('button', { name: /confirm|yes|delete/i }),
+      page.getByRole('link', { name: /confirm|yes|delete/i }),
+    ]);
+    await confirm.click();
+    await waitForMutation(
+      mutations,
+      (m) => m.method === 'DELETE' && m.url.includes(`${primary.collection_route}/${createdId}`),
+      `delete flow did not emit a real DELETE ${primary.collection_route}/${createdId} request`,
+    );
+
+    if (related) {
+      await navigateTo(page, navPattern(related.navigation_label));
+      // Gap 7(a), module docstring: "create" declared in `related.actions`
+      // is a real, spec+backend-reconciled promise (`acceptance_plan_
+      // compiler.py`'s own `_resolved_actions`) -- a missing control for a
+      // declared-mandatory capability is a real FAIL, never a silent skip.
+      // SKIP stays legitimate only when neither the candidate's own
+      // product_ux_spec.json nor its own real backend routes ever declared
+      // "create" for this resource in the first place.
+      const relatedMustCreate = (related.actions || []).includes('create');
+      const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
+      const relatedCreateCount = await relatedCreate.count();
+      if (relatedMustCreate && relatedCreateCount === 0) {
+        throw new Error(
+          `${related.name} declares a mandatory "create" capability (both product_ux_spec.json and the `
+          + 'real backend agree it exists) but no reachable create control was found anywhere on the '
+          + `${related.navigation_label} page`
+        );
+      }
+      if (relatedCreateCount) {
+        await relatedCreate.first().click();
+        const relationshipField = Object.keys(related.relationship_fields || {})[0];
+        if (relationshipField) {
+          await fillByLabel(page, fieldPattern(relationshipField), primaryBackendId);
+        }
+        await fillFields(page, related.editable_form_fields, scenario.browser_related_values || {});
+        await clickNamed(page, new RegExp(`create.*${related.singular_label.toLowerCase()}|save|submit`, 'i'));
+        await waitForMutation(
+          mutations,
+          (m) => m.method === 'POST' && m.url.includes(related.collection_route),
+          `${related.name} form did not emit a real POST ${related.collection_route} request`,
+        );
+      }
     }
   }
+  // (8, module docstring): a read-only primary's entire observable promise
+  // is real navigation -- already proven above by `navigateTo(primary)` --
+  // with no console/page/network error; nothing further is asked of it.
 
   await navigateTo(page, navPattern(dashboardLabel));
   if (consoleErrors.length || pageErrors.length || failedRequests.length) {
@@ -376,7 +401,9 @@ try {
   }
   console.log(JSON.stringify({
     outcome: 'BROWSER_JOURNEY_PASS', candidate, mutations,
-    validation: 'empty required form emitted no mutation',
+    validation: primaryIsMutationCapable
+      ? 'empty required form emitted no mutation'
+      : 'read-only primary: real navigation only, no mutation attempted',
     consoleErrors: 0, pageErrors: 0, failedRequests: 0,
   }));
 } finally {

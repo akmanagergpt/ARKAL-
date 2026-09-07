@@ -65,13 +65,26 @@ def _reconciled_fields(files: Mapping[str, str], resource: _ResourceScenario) ->
                 fields = candidate_fields
                 break
     reasons = []
-    for field_name in resource.editable_form_fields:
-        if field_name in fields or field_name in resource.relationship_fields:
-            continue
-        reasons.append(
-            f"resource {resource.name!r} editable field {field_name!r} is not a real "
-            "declared backend model field",
-        )
+    # CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    # record): a resource whose real backend never actually backs a
+    # create/edit for it makes no real editable-field promise at all --
+    # `_build_resource`'s own `editable_form_fields` fallback
+    # (`route_param or "value"`) exists purely to satisfy `_ResourceScenario`'s
+    # non-empty-tuple constraint for a genuinely read-only resource, never a
+    # real field claim to reconcile against the backend schema. Recomputed
+    # fresh from `files` here (never trusted from `resource.actions`
+    # itself) for the same reason every other check in this module already
+    # re-derives from `files`: a hand-authored override could otherwise
+    # under-report its own `actions` to silently skip real field checking.
+    real_actions = _resolved_actions(files, resource.name, ("create", "edit"))
+    if real_actions:
+        for field_name in resource.editable_form_fields:
+            if field_name in fields or field_name in resource.relationship_fields:
+                continue
+            reasons.append(
+                f"resource {resource.name!r} editable field {field_name!r} is not a real "
+                "declared backend model field",
+            )
     for field_name, target in resource.relationship_fields.items():
         if target not in model_fields:
             reasons.append(
@@ -120,12 +133,17 @@ def _reconciled_primary_actions(files: Mapping[str, str], scenario: _AcceptanceS
         return []
     primary_actions = _resolved_actions(files, scenario.primary_resource, ("create", "edit"))
     reasons = []
-    if "create" not in primary_actions:
+    # CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    # record): a genuinely read-only primary's `create_payload`/
+    # `update_payload` are real, empty dicts (`_build_resource`'s own
+    # capability-gated output), never a claim this check should reconcile
+    # against a POST/PUT route that was never promised in the first place.
+    if scenario.create_payload and "create" not in primary_actions:
         reasons.append(
             f"primary resource {scenario.primary_resource!r} has a create_payload but the "
             "real backend exposes no POST route for it",
         )
-    if "edit" not in primary_actions:
+    if scenario.update_payload and "edit" not in primary_actions:
         reasons.append(
             f"primary resource {scenario.primary_resource!r} has an update_payload but the "
             "real backend exposes no PUT/PATCH route for it",

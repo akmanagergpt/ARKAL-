@@ -591,6 +591,214 @@ def _widget_contract_files(work: pathlib.Path) -> None:
     ), encoding="utf-8")
 
 
+def _read_only_scenario_path(tmp_path: pathlib.Path) -> pathlib.Path:
+    """A real, minimal single-resource `_AcceptanceScenario` whose only
+    resource declares no "create"/"edit" action -- the exact real shape
+    `acceptance_plan_compiler._build_resource` now produces for a genuine
+    read-only module (human governance decision, session record: real
+    evidence `factory-goal-mtquvzmc-dt3go3`). `editable_form_fields` still
+    carries the same one-element fallback the real compiler falls back to
+    (`(route_param or "value",)`) purely to satisfy `_ResourceScenario`'s
+    own `min_length=1` constraint -- the read-only journey never reads it."""
+    path = tmp_path / "read_only_scenario.json"
+    path.write_text(json.dumps({
+        "scenario_id": "read-only-reports",
+        "resources": [{
+            "name": "reports", "collection_route": "/reports", "navigation_label": "Reports",
+            "singular_label": "Report", "editable_form_fields": ["id"],
+            "destructive_confirmation_required": False, "actions": ["view"],
+        }],
+        "primary_resource": "reports",
+        "create_payload": {}, "update_payload": {},
+        "navigation_destinations": ["Reports", "Dashboard"],
+    }), encoding="utf-8")
+    return path
+
+
+def _stub_a_read_only_journey(module, monkeypatch, get_reports=None) -> None:  # noqa: ANN001
+    """The read-only counterpart to `_stub_a_full_successful_journey`: the
+    fake backend only ever answers a real GET against `/reports` -- any
+    POST/PUT/DELETE would mean the engine synthesized a mutation this
+    genuinely read-only scenario never declared, and fails the test hard
+    via `AssertionError` rather than silently succeeding.
+
+    `get_reports`, when given, is called with the 1-indexed call number
+    (1 = the pre-restart read, 2 = the post-restart read) and must return
+    the `(status, body)` pair to answer that call with -- lets a test
+    simulate a real read that fails, returns invalid structure, or only
+    breaks after a real restart, without duplicating this fixture."""
+    calls = {"get_reports": 0}
+
+    def fake_run(command, *, cwd, env=None, timeout_seconds=300.0):  # noqa: ANN001, ARG001
+        if "run" in command and "build" in command:
+            (cwd / "build").mkdir(parents=True, exist_ok=True)
+            (cwd / "build" / "index.html").write_text("<html></html>", encoding="utf-8")
+        return "ok\nok"
+
+    def fake_json_request(method, url, payload=None):  # noqa: ANN001, ARG001
+        if method == "GET" and url.endswith("/reports"):
+            calls["get_reports"] += 1
+            if get_reports is not None:
+                return get_reports(calls["get_reports"])
+            return 200, [{"id": 1, "title": "Overdue"}]
+        raise AssertionError(f"unexpected request {method} {url} -- a read-only scenario never mutates")
+
+    monkeypatch.setattr(module, "_run", fake_run)
+    monkeypatch.setattr(module, "_json_request", fake_json_request)
+    monkeypatch.setattr(module, "_wait_http", lambda *a, **k: None)
+    monkeypatch.setattr(module, "_port_is_free", lambda port: True)
+    monkeypatch.setattr(module, "_port_accepts_connections", lambda port: False)
+    monkeypatch.setattr(module, "_backend_process", lambda *a, **k: _FakeProcess())
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **k: _FakeProcess())
+    monkeypatch.setattr(module, "_stop", lambda process: None)
+
+
+class TestCapabilityAwareReadOnlyAcceptance:
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a primary resource whose own real, reconciled `actions` never
+    claim "create"/"edit" reaches `ACCEPTED` through a real read/restart
+    journey, never a synthesized mutation -- and a declared-but-unbacked
+    mutation still refuses exactly as before (`acceptance_plan_compiler`'s
+    own test coverage already proves that half; this class covers the
+    `_accept()` orchestration half)."""
+
+    def test_a_genuinely_read_only_primary_reaches_accepted(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        module = _module()
+        candidate_id = "factory-goal-readonly-1"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+        _stub_a_read_only_journey(module, monkeypatch)
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        result = _accept(module, candidate_id, source, scenario_path=scenario_path)
+
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS", result
+        assert ledger.classify(candidate_id) == ACCEPTED
+        check_names = {c["name"] for c in result["checks"]}
+        assert "reports_read" in check_names
+        assert "read_only_restart_recovery" in check_names
+        assert "reports_create" not in check_names
+        assert "reports_edit" not in check_names
+        assert "sqlite_restart_persistence" not in check_names
+
+    def test_b_a_read_only_journey_never_requests_a_mutation(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """If `_accept()` ever regresses into synthesizing a create/edit
+        for a read-only primary, `_stub_a_read_only_journey`'s own fake
+        backend raises `AssertionError` on the first POST/PUT/DELETE it
+        sees (surfacing as `ACCEPTANCE_INTERRUPTED`, not a false PASS).
+        This test additionally proves every real check the engine recorded
+        describes a GET, never a POST/PUT/DELETE, for the extra certainty
+        that PASS was reached by the read-only path, not a lucky no-op."""
+        module = _module()
+        candidate_id = "factory-goal-readonly-2"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+        _stub_a_read_only_journey(module, monkeypatch)
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        result = _accept(module, candidate_id, source, scenario_path=scenario_path)
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS", result
+        for check in result["checks"]:
+            detail = check.get("detail", "")
+            assert "POST " not in detail and "PUT " not in detail and "DELETE " not in detail, check
+
+    def test_c_the_browser_journey_invocation_omits_primary_id_for_read_only(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """`skip_browser=False` still must not invoke the real node/
+        Chromium journey with a nonsensical `--primary-id None` -- the
+        recorded `_run` call args for the browser step must never contain
+        `--primary-id` when the primary never produced a real backend id."""
+        module = _module()
+        candidate_id = "factory-goal-readonly-3"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+        _stub_a_read_only_journey(module, monkeypatch)
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        recorded_commands: list[list[str]] = []
+        real_fake_run = module._run
+
+        def recording_run(command, *, cwd, env=None, timeout_seconds=300.0):  # noqa: ANN001, ARG001
+            if isinstance(command, list) and any("run_golden_browser_journey.mjs" in str(part) for part in command):
+                recorded_commands.append(command)
+                return json.dumps({"outcome": "BROWSER_JOURNEY_PASS"})
+            return real_fake_run(command, cwd=cwd, env=env, timeout_seconds=timeout_seconds)
+
+        monkeypatch.setattr(module, "_run", recording_run)
+
+        path = scenario_path or DEFAULT_SCENARIO_PATH
+        scenario = module._load_scenario(path)
+        result = module._accept(candidate_id, source, scenario, path, skip_browser=False)
+
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS", result
+        assert len(recorded_commands) == 1
+        assert "--primary-id" not in recorded_commands[0]
+
+    def test_d_a_read_route_that_fails_at_runtime_is_caught(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """A real GET returning a non-200 status must fail acceptance, not
+        be treated as an empty-but-valid read -- the same real observable
+        a mutation-capable journey already requires for its own POST/PUT."""
+        module = _module()
+        candidate_id = "factory-goal-readonly-4"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+        _stub_a_read_only_journey(module, monkeypatch, get_reports=lambda n: (500, {"error": "boom"}))
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        result = _accept(module, candidate_id, source, scenario_path=scenario_path)
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED", result
+        assert "reports_read" in result["error"]
+        assert ledger.classify(candidate_id) == ACCEPTANCE_FAILED
+
+    def test_e_a_read_route_returning_structurally_invalid_data_is_caught(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """A real 200 whose body is neither a JSON array nor object (here,
+        a bare string) is not "structurally valid data" -- the read-only
+        journey's own structural check must catch it, never wave it through
+        just because the HTTP layer alone looked fine."""
+        module = _module()
+        candidate_id = "factory-goal-readonly-5"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+        _stub_a_read_only_journey(module, monkeypatch, get_reports=lambda n: (200, "not-a-list-or-dict"))
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        result = _accept(module, candidate_id, source, scenario_path=scenario_path)
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED", result
+        assert "reports_read" in result["error"]
+        assert ledger.classify(candidate_id) == ACCEPTANCE_FAILED
+
+    def test_f_read_behavior_breaking_only_after_a_real_restart_is_caught(
+        self, monkeypatch, tmp_path: pathlib.Path,
+    ) -> None:
+        """The first real GET (pre-restart) succeeds -- proving the read-
+        only journey itself is not what is broken -- but the SECOND real
+        GET (post-restart) fails, proving `_verify_read_only_survives_
+        restart` is a genuinely separate, real check, not a no-op repeat of
+        the first."""
+        module = _module()
+        candidate_id = "factory-goal-readonly-6"
+        source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, candidate_id)
+
+        def get_reports(call_number: int):  # noqa: ANN202
+            if call_number == 1:
+                return 200, [{"id": 1, "title": "Overdue"}]
+            return 500, {"error": "backend did not come back up cleanly"}
+
+        _stub_a_read_only_journey(module, monkeypatch, get_reports=get_reports)
+        scenario_path = _read_only_scenario_path(tmp_path)
+
+        result = _accept(module, candidate_id, source, scenario_path=scenario_path)
+        assert result["outcome"] == "GOLDEN_ACCEPTANCE_FAILED", result
+        assert "read_only_restart_recovery" in result["error"]
+        check_names = {c["name"] for c in result["checks"]}
+        assert "reports_read" in check_names  # the pre-restart read genuinely passed
+        assert ledger.classify(candidate_id) == ACCEPTANCE_FAILED
+
+
 class TestScenarioResolution:
     """`_resolve_scenario` compiles a real scenario by default (ARK-REQ-0074
     Part A: ARKALI cannot ask an operator to hand-author one per generated

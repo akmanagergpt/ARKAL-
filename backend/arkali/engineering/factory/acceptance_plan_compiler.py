@@ -257,6 +257,34 @@ def _resource_payloads(
     return create_payload, update_payload, browser_create, browser_update, relationship_fields
 
 
+def _declared_mutation_never_backed(module, actions: tuple[str, ...]) -> str | None:  # noqa: ANN001
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a module the candidate's own real `product_ux_spec.json`
+    never declares "create"/"edit" for at all is a genuine, legitimate
+    READ-ONLY design -- real evidence, `factory-goal-mtquvzmc-dt3go3` --
+    and must be accepted via a real read/render/restart journey, never
+    forced through a synthesized mutation (the acceptance-overreach class
+    F-0088 already closed for THIS shape: a real, live "HTTP Error 405:
+    METHOD NOT ALLOWED" once `_build_resource` stopped guessing a
+    create_payload for it). But a module that DOES declare "create"/"edit"
+    whose real, RECONCILED actions (backend route+method backed) never
+    actually satisfy that declaration is a real, genuine DEFECT (a
+    declared mutation the real backend never backs) -- never silently
+    reclassified as "read-only by design" just because its own
+    `create_payload` would otherwise end up empty. The distinction is the
+    module's own DECLARED intent (`module.actions`, from the real
+    `product_ux_spec.json`), never inferred from a route name or any
+    candidate-specific string. Returns the refusal reason, or `None` when
+    this module's declared intent is either backed or genuinely absent."""
+    declared_mutating = {a for a in module.actions if a in ("create", "edit")}
+    if declared_mutating and not ({"create", "edit"} & set(actions)):
+        return (
+            f"module {module.name!r} declares {sorted(declared_mutating)} but no matching "
+            "backend route/method actually backs any of them"
+        )
+    return None
+
+
 def _build_resource(
     files: Mapping[str, str], module, model_fields: dict[str, dict[str, str]],  # noqa: ANN001
     reasons: list[str],
@@ -266,25 +294,12 @@ def _build_resource(
         reasons.append(f"module {module.name!r} has no matching backend collection route")
         return None
     actions = _resolved_actions(files, module.name, module.actions)
+    unbacked_reason = _declared_mutation_never_backed(module, actions)
+    if unbacked_reason is not None:
+        reasons.append(unbacked_reason)
+        return None
     fields = _resource_fields(model_fields, module.name)
-    # A module real acceptance never attempts to mutate (no real,
-    # reconciled "create" or "edit" action) must never be handed a
-    # synthesized create/update payload -- real evidence, factory-goal-
-    # mtquvzmc-dt3go3: a real, valid, view-only module (declared actions
-    # ["view"] only, a real backend exposing GET alone) previously still
-    # got a real create_payload built from its own model fields, was
-    # still selected as primary (the only resolved module), and the real
-    # browser journey's own POST against its real, GET-only route then
-    # failed with a real, live "HTTP Error 405: METHOD NOT ALLOWED" --
-    # never a candidate defect, an acceptance-compiler one: it silently
-    # GUESSED a mutation capability the module's own real, reconciled
-    # actions never claimed, the opposite of this module's own documented
-    # "refuses rather than guesses" posture. `_compile_acceptance_plan`'s
-    # own existing "no real editable field to create with" refusal
-    # already exists precisely for this case -- it never fired only
-    # because `create_payload` was always non-empty regardless of
-    # `actions`.
-    mutable = "create" in actions or "edit" in actions
+    mutable = bool({"create", "edit"} & set(actions))
     editable = (
         tuple(f for f in fields if f != route_param and f not in _PRIMARY_KEY_FIELD_NAMES)
         if mutable else ()
@@ -381,9 +396,16 @@ def _compile_acceptance_plan(files: Mapping[str, str]) -> _AcceptanceScenario:
         raise _AcceptancePlanIncomplete(reasons or ["no module resolved a real backend resource"])
 
     primary_name = _select_primary(spec, built)
-    primary_resource, create_payload = built[primary_name][0], built[primary_name][1]
-    if not create_payload and not primary_resource.relationship_fields:
-        reasons.append(f"primary resource {primary_name!r} has no real editable field to create with")
+    # CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    # record): a primary resource with no real create_payload and no
+    # relationship_fields is no longer refused here -- `_build_resource`
+    # already proved, above, that this is a genuine, declared-intent
+    # READ-ONLY resource (never a declared-but-unbacked mutation, which
+    # `_build_resource` itself already excludes from `built` with its own
+    # real reason). A real, view-only primary is a legitimate acceptance
+    # target: `_accept()` (factory_acceptance.py) and the browser journey
+    # both branch on this exact resource's own `actions` to run a real
+    # read/render/restart journey instead of a synthesized mutation one.
     if reasons:
         raise _AcceptancePlanIncomplete(reasons)
 

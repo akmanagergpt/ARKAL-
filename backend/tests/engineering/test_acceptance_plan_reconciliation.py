@@ -151,3 +151,53 @@ class TestReconciliationRejectsAnIncompatibleOverride:
         )
         reasons = _reconcile_scenario(scenario, _widget_files())
         assert any("gadgets" in r for r in reasons)
+
+    def test_a_genuinely_mutation_capable_resource_still_gets_its_fields_checked(self) -> None:
+        """The capability-aware relaxation below (`_reconciled_fields`) must
+        never widen into "any editable field is fine" for a resource the
+        real backend actually backs a create/edit for -- `resource.actions`
+        itself is never trusted for this (a hand-authored override could
+        under-report it to dodge the check); the real, files-derived
+        `_resolved_actions` result is what gates it, and this fixture's
+        widgets resource genuinely has POST+PUT routes."""
+        scenario = _widget_scenario(actions=(), editable_form_fields=("name", "color"))
+        reasons = _reconcile_scenario(scenario, _widget_files())
+        assert any("color" in r and "not a real" in r for r in reasons)
+
+
+class TestReadOnlyResourceFieldReconciliation:
+    """CAPABILITY-AWARE ACCEPTANCE (human governance decision, session
+    record): a resource the real backend never backs any create/edit for
+    makes no real editable-field promise -- `_build_resource`'s own
+    fallback placeholder (`route_param or "value"`), which exists only to
+    satisfy `_ResourceScenario`'s non-empty-tuple constraint, must never be
+    flagged as an unknown schema field."""
+
+    def _read_only_files(self) -> dict[str, str]:
+        view_only_module = {
+            "name": "reports", "navigation_label": "Reports", "presentation": "table",
+            "actions": ["view"], "forms": [],
+        }
+        return {
+            "product/ux_spec.json": _ux_spec([view_only_module], ["Reports"]),
+            "backend/routes.json": _routes(("/reports", "GET")),
+            "backend/data_model.json": _models({"reports": {"id": "integer", "title": "string"}}),
+        }
+
+    def test_the_compiler_own_read_only_output_reconciles_cleanly(self) -> None:
+        files = self._read_only_files()
+        scenario = _compile_acceptance_plan(files)
+        assert scenario.resource("reports").actions == ()
+        assert _reconcile_scenario(scenario, files) == []
+
+    def test_a_hand_authored_read_only_override_with_the_fallback_field_reconciles_cleanly(self) -> None:
+        scenario = _AcceptanceScenario(
+            scenario_id="hand-authored-read-only",
+            resources=(_ResourceScenario(
+                name="reports", collection_route="/reports", navigation_label="Reports",
+                singular_label="Report", editable_form_fields=("value",), actions=(),
+            ),),
+            primary_resource="reports", create_payload={}, update_payload={},
+            navigation_destinations=("Reports",),
+        )
+        assert _reconcile_scenario(scenario, self._read_only_files()) == []
