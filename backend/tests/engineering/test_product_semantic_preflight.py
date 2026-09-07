@@ -82,6 +82,51 @@ def test_react_scripts_requires_real_html_entry() -> None:
     assert "missing_frontend_entry" in {item.code for item in report.findings}
 
 
+def test_a_double_escaped_package_json_is_flagged_as_invalid_json() -> None:
+    """F-0090, real evidence `factory-goal-mtqz9w2b-cuqqqe`: detection,
+    the second half of the fix -- `_normalise_json_transport` (prevention)
+    is not authority to skip this check; a malformed artifact that
+    somehow still reaches this point must still be caught, not silently
+    waved through to a real `npm error code EJSONPARSE` at acceptance."""
+    files = {
+        **_complete(),
+        "frontend/package.json": '{\\n  "scripts": {\\n    "build": "echo ok"\\n  }\\n}\\n',
+    }
+    report = inspect_product_files(files)
+    codes = {item.code for item in report.findings}
+    assert "invalid_json_artifact" in codes
+
+
+def test_a_genuinely_invalid_json_artifact_of_any_kind_is_flagged() -> None:
+    """GENERIC, not `frontend/package.json`-specific: any `.json` file this
+    pipeline writes is exposed to the identical real transport defect."""
+    files = {
+        **_complete(),
+        "backend/routes.json": "{not json at all",
+    }
+    report = inspect_product_files(files)
+    codes = {item.code for item in report.findings}
+    assert "invalid_json_artifact" in codes
+
+
+def test_valid_json_with_a_legitimate_escaped_newline_is_never_flagged() -> None:
+    """The required invariant: a real, already-valid JSON file containing
+    a correctly-escaped `\\n` inside a real string value must never be
+    mistaken for the transport defect. Asserted narrowly against
+    `invalid_json_artifact` specifically (not the whole report) so this
+    stays independent of `_complete()`'s own unrelated, pre-existing
+    `missing_backend_entrypoint` gap (already a known, tracked failure
+    elsewhere in this suite, nothing to do with JSON validity)."""
+    files = {
+        **_complete(),
+        "frontend/package.json": (
+            '{"description": "line1\\nline2", "scripts": {"build": "echo ok"}}'
+        ),
+    }
+    report = inspect_product_files(files)
+    assert "invalid_json_artifact" not in {item.code for item in report.findings}
+
+
 def test_manifest_names_cannot_stand_in_for_persistence_or_api_code() -> None:
     files = {
         **_complete(),

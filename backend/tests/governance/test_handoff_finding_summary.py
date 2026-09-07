@@ -64,6 +64,26 @@ def truth(findings_module: types.ModuleType) -> dict:
     return findings_module.finding_truth(REPO)
 
 
+def _blocker_high_counts(truth: dict) -> tuple[int, int]:
+    """The real, independently-counted BLOCKER and HIGH totals within the
+    live stopping set -- never assumed equal. `finding_truth`'s own
+    `"stopping"` field is a flat, severity-blind list of identifiers, so
+    this re-derives severity per identifier from the same canonical
+    `OPEN_BLOCKERS.md` parse (F-0090 session record: a prior version of
+    this helper's own callers hard-coded `"{n} / {n}"`, an assumption that
+    only ever happened to hold while this project's real stopping set was
+    always either empty or, by coincidence, evenly split between the two
+    severities -- broken the instant a real, HIGH-only stopping finding,
+    F-0090 itself, was ever recorded)."""
+    from arkali.acceptance.findings import parse_findings
+
+    text = FINDINGS.read_text(encoding="utf-8")
+    by_id = {f.identifier: f for f in parse_findings(text)}
+    blocker = sum(1 for i in truth["stopping"] if by_id[i].severity.upper() == "BLOCKER")
+    high = sum(1 for i in truth["stopping"] if by_id[i].severity.upper() == "HIGH")
+    return blocker, high
+
+
 def current_state_section(text: str) -> str:
     """The live current-state section, fetched through the validator's own helper."""
     markdown = load_module(REPO / "scripts" / "handoff_markdown.py")
@@ -155,11 +175,11 @@ class TestFindingSummaryIsReconciled:
     def test_a_wrong_blocker_high_pair_is_detected(
         self, validator: types.ModuleType, handoff_text: str, truth: dict
     ) -> None:
-        stopping = len(truth["stopping"])
+        blocker, high = _blocker_high_counts(truth)
         mutated = replace_once(
             handoff_text,
-            f"| BLOCKER / HIGH | **{stopping} / {stopping}**",
-            f"| BLOCKER / HIGH | **{stopping} / {stopping + 3}**",
+            f"| BLOCKER / HIGH | **{blocker} / {high}**",
+            f"| BLOCKER / HIGH | **{blocker} / {high + 3}**",
         )
         assert "stated BLOCKER + HIGH total" in drift_names(validator, mutated)
 
@@ -167,10 +187,10 @@ class TestFindingSummaryIsReconciled:
         self, validator: types.ModuleType, handoff_text: str, truth: dict
     ) -> None:
         """ANTI-VACUITY over the stopping-finding half."""
-        stopping = len(truth["stopping"])
+        blocker, high = _blocker_high_counts(truth)
         mutated = replace_once(
             handoff_text,
-            f"| BLOCKER / HIGH | **{stopping} / {stopping}**",
+            f"| BLOCKER / HIGH | **{blocker} / {high}**",
             "| BLOCKER / HIGH | none worth stating",
         )
         assert "the live summary still states the BLOCKER/HIGH pair" in \

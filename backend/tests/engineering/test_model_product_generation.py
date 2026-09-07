@@ -288,6 +288,121 @@ def test_requirements_without_escaped_newlines_are_left_alone() -> None:
     }
 
 
+def test_double_escaped_package_json_is_unescaped_into_valid_json() -> None:
+    """F-0090, real evidence `factory-goal-mtqz9w2b-cuqqqe`: the identical
+    real transport defect F-0080 fixed for `.py` and F-0087 fixed for
+    `requirements.txt`, now closed for JSON artifacts generally --
+    `_normalise_json_transport` shares `_normalise_python_transport`'s
+    own parse-before/parse-after primitive (`_normalise_escaped_
+    transport`), never a blind unconditional replace."""
+    from arkali.engineering.factory.model_product_generation import _normalise_json_transport
+
+    escaped = (
+        '{\\n  "name": "frontend",\\n  "scripts": {\\n    "build": '
+        '"react-scripts build"\\n  }\\n}'
+    )
+    files = {"frontend/package.json": escaped}
+    normalized = _normalise_json_transport(files)
+    parsed = json.loads(normalized["frontend/package.json"])
+    assert parsed == {"name": "frontend", "scripts": {"build": "react-scripts build"}}
+
+
+def test_valid_json_with_a_legitimate_escaped_newline_is_left_untouched() -> None:
+    """The required invariant (human governance decision, F-0090 session
+    record): a real, ALREADY-VALID JSON file that happens to contain a
+    correctly-escaped `\\n` inside a real string value must never be
+    corrupted -- it already parses on the very first attempt, so the
+    parse-before check returns before any replacement ever runs."""
+    from arkali.engineering.factory.model_product_generation import _normalise_json_transport
+
+    valid = json.dumps({"description": "line1\nline2"})
+    assert "\\n" in valid  # sanity: this file genuinely contains a literal 2-char escape
+    files = {"product/ux_spec.json": valid}
+    assert _normalise_json_transport(files) == files
+
+
+def test_genuinely_invalid_json_is_left_unchanged_not_guessed() -> None:
+    """Content that fails to parse even after unescaping is left exactly
+    as it was -- never silently guessed or repaired further, so a real,
+    still-invalid artifact keeps failing loudly downstream instead of
+    being coerced into something the model never actually intended."""
+    from arkali.engineering.factory.model_product_generation import _normalise_json_transport
+
+    broken = "{not json at all\\n"
+    files = {"backend/routes.json": broken}
+    assert _normalise_json_transport(files) == files
+
+
+def test_non_json_files_are_never_touched_by_json_transport_normalization() -> None:
+    from arkali.engineering.factory.model_product_generation import _normalise_json_transport
+
+    files = {"frontend/src/App.js": "const x = 'a\\\\nb';"}
+    assert _normalise_json_transport(files) == files
+
+
+def test_the_real_factory_goal_mtqz9w2b_cuqqqe_package_json_is_repaired_by_replay() -> None:
+    """Historical replay (F-0090, real evidence): the frozen, real
+    `frontend/package.json` bytes from `factory-goal-mtqz9w2b-cuqqqe` --
+    every real newline written as a literal `\\n` escape sequence, the
+    exact real defect that failed `npm install` with `EJSONPARSE` one
+    step after this session's own new read-only acceptance journey had
+    already genuinely passed -- are read directly from the frozen
+    candidate directory (never mutated: this test only reads) and proven
+    to (a) fail `json.loads` as originally written, and (b) parse into
+    the real, intended, semantically-equivalent JSON once
+    `_normalise_json_transport` runs, with no live process and no new
+    generation."""
+    from arkali.engineering.factory.model_product_generation import _normalise_json_transport
+
+    candidate_dir = (
+        pathlib.Path(__file__).resolve().parents[3] / "var" / "factory" / "candidates"
+        / "factory-goal-mtqz9w2b-cuqqqe"
+    )
+    package_json = candidate_dir / "frontend" / "package.json"
+    if not package_json.is_file():
+        pytest.skip("real candidate directory not present in this checkout")
+    raw = package_json.read_text(encoding="utf-8")
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(raw)
+    fixed = _normalise_json_transport({"frontend/package.json": raw})["frontend/package.json"]
+    parsed = json.loads(fixed)
+    assert parsed["name"] == "frontend"
+    assert parsed["scripts"] == {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject",
+    }
+    assert parsed["dependencies"] == {
+        "axios": "^0.21.1",
+        "react": "^17.0.2",
+        "react-dom": "^17.0.2",
+        "react-scripts": "4.0.3",
+    }
+    # The frozen candidate itself is untouched -- this test only ever reads it.
+    assert package_json.read_text(encoding="utf-8") == raw
+
+
+def test_a_double_escaped_package_json_survives_the_full_one_shot_pipeline(
+    tmp_path: pathlib.Path,
+) -> None:
+    """End-to-end proof through `generate_model_product` itself (the
+    one-shot path), mirroring `test_double_escaped_python_transport_is_
+    normalized_only_when_parseable`'s own shape exactly for JSON."""
+    payload = json.loads(_valid_output())
+    package = next(item for item in payload["files"] if item["path"] == "frontend/package.json")
+    package["content"] = '{\\n  "scripts": {\\n    "build": "echo ok"\\n  }\\n}'
+    workspace = _workspace(tmp_path)
+    generate_model_product(
+        derive_blueprint(GOAL, AuthorityMap.load(REPO)),
+        FixedModel(json.dumps(payload)),
+        "model-1",
+        workspace,
+    )
+    written = (workspace.root / "frontend/package.json").read_text()
+    assert json.loads(written) == {"scripts": {"build": "echo ok"}}
+
+
 def test_double_escaped_python_transport_is_normalized_only_when_parseable(
     tmp_path: pathlib.Path,
 ) -> None:

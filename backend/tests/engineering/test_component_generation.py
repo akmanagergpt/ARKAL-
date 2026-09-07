@@ -973,6 +973,107 @@ def test_normalization_never_touches_a_non_python_file() -> None:
     assert stage_files["frontend/src/client.js"] == js_with_literal_backslash_n
 
 
+
+# -- F-0090 (PACKAGE_JSON_ESCAPED_NEWLINE_NOT_NORMALIZED_GAP) --------------
+
+
+def test_a_double_escaped_package_json_normalizes_and_passes_immediately(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Real evidence: `factory-goal-mtqz9w2b-cuqqqe`. A real, otherwise-
+    correct `frontend/package.json` had every one of its own real
+    newlines written as a literal `\\n` escape sequence -- invalid JSON
+    that `npm install` failed outright on with `EJSONPARSE`, one step
+    after this turn's own new read-only acceptance journey had already
+    genuinely passed. `_normalise_json_transport` (mirroring `_normalise_
+    python_transport`'s own parse-before/parse-after primitive exactly)
+    must now normalize this on the first real attempt, no retry needed."""
+    real_content = '{\n  "name": "app",\n  "scripts": {\n    "build": "vite build"\n  }\n}\n'
+    escaped_content = (
+        '{\\n  "name": "app",\\n  "scripts": {\\n    "build": '
+        '"vite build"\\n  }\\n}\\n'
+    )
+    queues = _happy_path_queues()
+    queues["frontend_tests_config"] = [
+        (HonestState.PASS, _output({
+            "frontend/package.json": escaped_content,
+            "frontend/tests/App.test.js": "test('x', () => {});\n",
+        })),
+    ]
+    factory = _factory(queues)
+    workspace = _workspace(tmp_path)
+    result = generate_staged_model_product(
+        _blueprint(), factory, workspace, vocabulary=StageVocabulary.load(REPO),
+    )
+    assert len(factory.models["frontend_tests_config"].prompts) == 1  # type: ignore[attr-defined]
+    written = workspace.root.joinpath("frontend", "package.json").read_text(encoding="utf-8")
+    assert json.loads(written) == json.loads(real_content)
+    assert result.attempts_used == 11
+
+
+def test_json_normalization_never_touches_a_non_json_file() -> None:
+    """`_normalise_json_transport`'s own `.json`-only guard, proven at the
+    staged-generation integration point: a JS file carrying the identical
+    literal backslash-n shape is left completely alone -- the exact
+    counterpart to `test_normalization_never_touches_a_non_python_file`
+    for the JSON side of this same fix."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    js_with_literal_backslash_n = "export function fetchWorks() { return 'a\\nb'; }\n"
+    model = _QueueModel([(HonestState.PASS, _output({
+        "frontend/src/client.js": js_with_literal_backslash_n,
+    }))])
+    declaration = StageVocabulary.load(REPO).stage("frontend_client")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["frontend/src/client.js"] == js_with_literal_backslash_n
+
+
+def test_a_legitimate_escaped_newline_inside_valid_json_is_preserved() -> None:
+    """Case 2 (mandatory adversarial proof) for JSON: a real, valid
+    `package.json` whose `description` field legitimately contains an
+    escaped `\\n` must survive byte-for-byte -- `json.loads` already
+    succeeds on the original, so `_normalise_json_transport`'s own first
+    check (`continue` on success) never touches it."""
+    from arkali.engineering.factory.component_generation import _generate_one_stage
+
+    real_content = json.dumps({"description": "line1\nline2", "scripts": {}})
+    assert "\\n" in real_content  # sanity: a genuine, correctly-escaped newline
+    model = _QueueModel([(HonestState.PASS, _output({
+        "frontend/package.json": real_content,
+        "frontend/tests/App.test.js": "test('x', () => {});\n",
+    }))])
+    declaration = StageVocabulary.load(REPO).stage("frontend_tests_config")
+    stage_files = _generate_one_stage(
+        declaration, _blueprint(), model, "test-model", {}, timeout_seconds=30.0, max_attempts=4,
+    )
+    assert stage_files["frontend/package.json"] == real_content
+
+
+def test_a_still_invalid_package_json_after_normalization_still_fails_the_real_checker(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Fails closed, the JSON counterpart to `test_a_still_broken_file_
+    after_normalization_still_fails_the_real_checker`: genuinely invalid
+    JSON (unrelated to escaping -- a trailing comma) that also happens to
+    arrive double-escaped must still be rejected by the new
+    `invalid_json_artifact` detection check, never silently waved
+    through just because normalization ran."""
+    genuinely_broken = '{\n  "name": "app",\n  "scripts": {},\n}\n'  # trailing comma
+    queues = _happy_path_queues()
+    always_broken = _output({
+        "frontend/package.json": _double_escaped(genuinely_broken),
+        "frontend/tests/App.test.js": "test('x', () => {});\n",
+    })
+    queues["frontend_tests_config"] = [(HonestState.PASS, always_broken)] * 4
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+    assert "invalid_json_artifact" in str(excinfo.value)
+
+
 def test_a_domain_independent_double_escape_reproduces_the_same_fix() -> None:
     """Unseen-domain proof (never library/books, never the real Turkish
     goal's own vocabulary): the identical defect shape, in an unrelated

@@ -77,6 +77,44 @@ _V5_SWITCH_IMPORT = re.compile(r"import\s*\{[^}]*\bSwitch\b[^}]*\}\s*from\s*['\"
 _REACT_ROUTER_V5_PIN = "^5.3.4"
 
 
+def _invalid_json_artifact_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """F-0090, real evidence `factory-goal-mtqz9w2b-cuqqqe`: a real,
+    otherwise-correct `frontend/package.json` reached `STAGED_GENERATION_
+    PASS` with every one of its own real newlines written as a literal
+    `\\n` escape sequence -- invalid JSON that no staged check ever
+    parsed. `_missing_frontend_scripts_findings` below already
+    anticipated this exact gap (its own comment: "a real JSON-syntax
+    finding belongs to a different check") but that check never existed.
+    GENERIC, not package.json-specific: every `.json` artifact this
+    pipeline ever writes (`backend/routes.json`, `backend/data_model.
+    json`, `product/ux_spec.json`, `frontend/package.json`) is exposed to
+    the identical real provider transport defect, so this checks every
+    one of them, never one candidate-specific filename -- lives here
+    (this module's own existing home for real, parsed-JSON package.json
+    checks) rather than a new module, both to reuse `product_preflight.
+    _manifest_findings`'s existing import edge into this file and to
+    keep the architecture-budget headroom `product_preflight.py` no
+    longer had for one more function (measured, not assumed). This is
+    DETECTION, the second, independent half of F-0090's fix --
+    `_normalise_json_transport` (`model_product_generation.py`) is
+    PREVENTION, repairing the one real, deterministic double-escaping
+    shape before it ever reaches a file; this check is what still fires
+    if malformed JSON reaches this point some other way (prevention is
+    not authority to skip detection)."""
+    findings: list[SemanticFinding] = []
+    for path, content in files.items():
+        if not path.endswith(".json") or not content.strip():
+            continue
+        try:
+            json.loads(content)
+        except json.JSONDecodeError as error:
+            findings.append(SemanticFinding(
+                code="invalid_json_artifact", path=path,
+                detail=f"{path} does not parse as valid JSON: {error}",
+            ))
+    return findings
+
+
 def _declared_npm_packages(parsed: dict) -> set[str]:
     declared: set[str] = set()
     for key in ("dependencies", "devDependencies"):

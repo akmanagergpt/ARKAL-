@@ -13,7 +13,7 @@ import json
 import pathlib
 import platform
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -75,23 +75,70 @@ def _normalise_requirements(files: dict[str, str]) -> dict[str, str]:
     return normalized
 
 
-def _normalise_python_transport(files: dict[str, str]) -> dict[str, str]:
+def _normalise_escaped_transport(
+    files: dict[str, str], *, suffix: str,
+    parse: Callable[[str], object], parse_error: type[Exception],
+) -> dict[str, str]:
+    """A real provider can double-escape an embedded newline as a literal
+    `\\n` in its own raw JSON reply (F-0080, real evidence: a `.py` file
+    collapsed onto one logical line this way, failing `ast.parse`).
+    UNCONDITIONALLY SAFE for any file type with a real, mechanical parser:
+    already-valid content is never touched (`parse(content)` succeeding
+    is the only way this returns without change), and a repair candidate
+    is only ever kept when it genuinely parses where the original did
+    not -- a legitimate literal `\\n` inside an already-valid file (a
+    real newline correctly escaped within a string literal) can never be
+    corrupted, since that file already parses on the first attempt.
+    Shared by `_normalise_python_transport` (`.py`/`ast.parse`) and
+    `_normalise_json_transport` (`.json`/`json.loads`, F-0090) rather than
+    duplicating the same parse-before/parse-after dance twice."""
     normalized = dict(files)
     for path, content in files.items():
-        if not path.endswith(".py") or "\\n" not in content:
+        if not path.endswith(suffix) or "\\n" not in content:
             continue
         try:
-            ast.parse(content)
+            parse(content)
             continue
-        except SyntaxError:
+        except parse_error:
             candidate = content.replace("\\r\\n", "\n").replace("\\n", "\n")
             candidate = candidate.replace("\\t", "\t")
         try:
-            ast.parse(candidate)
-        except SyntaxError:
+            parse(candidate)
+        except parse_error:
             continue
         normalized[path] = candidate
     return normalized
+
+
+def _normalise_python_transport(files: dict[str, str]) -> dict[str, str]:
+    return _normalise_escaped_transport(files, suffix=".py", parse=ast.parse, parse_error=SyntaxError)
+
+
+def _normalise_json_transport(files: dict[str, str]) -> dict[str, str]:
+    """F-0090, real evidence `factory-goal-mtqz9w2b-cuqqqe`: the identical
+    real transport-corruption class F-0080 already fixed for `.py` files
+    and F-0087 already fixed for `backend/requirements.txt`, never yet
+    extended to JSON artifacts -- a real, otherwise-correct
+    `frontend/package.json` was written with every one of its own real
+    newlines as a literal `\\n` escape sequence, so `npm install` failed
+    outright with `npm error code EJSONPARSE`. Every `.json` file this
+    pipeline ever writes gets the same treatment, not only
+    `frontend/package.json` specifically -- `backend/routes.json`,
+    `backend/data_model.json` and `product/ux_spec.json` are exactly as
+    exposed to the same real provider transport defect, and a fix scoped
+    to one candidate-specific filename would be exactly the kind of
+    domain leakage this pipeline's own architecture forbids. Unlike
+    `.py` source, JSON has no legitimate reason to contain a literal
+    backslash-n OUTSIDE a string value, but a string value MAY
+    legitimately contain one (e.g. a real multi-line description) --
+    which is exactly why this reuses the parse-before/parse-after
+    primitive rather than `_normalise_requirements`'s unconditional
+    replace: a JSON file whose only "escape" is a real, valid one inside
+    an already-parseable string already parses on the first attempt and
+    is therefore never touched."""
+    return _normalise_escaped_transport(
+        files, suffix=".json", parse=json.loads, parse_error=json.JSONDecodeError,
+    )
 
 
 def _normalise_frontend_entry(files: dict[str, str]) -> dict[str, str]:
@@ -304,8 +351,10 @@ def write_model_product_output(
             f"model response violates the multi-file contract: {error}"
         ) from error
     file_map = _normalise_frontend_entry(
-        _normalise_python_transport(
-            _normalise_requirements({item.path: item.content for item in envelope.files})
+        _normalise_json_transport(
+            _normalise_python_transport(
+                _normalise_requirements({item.path: item.content for item in envelope.files})
+            )
         )
     )
     try:

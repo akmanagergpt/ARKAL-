@@ -274,6 +274,8 @@ def _target_runtime_findings(requirements: str) -> list[SemanticFinding]:
 
 def _manifest_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
+    from arkali.engineering.factory import frontend_manifest_preflight
+    findings.extend(frontend_manifest_preflight._invalid_json_artifact_findings(files))
     stdlib = sorted(_declared_dependencies(files) & sys.stdlib_module_names)
     if stdlib:
         findings.append(

@@ -104,6 +104,7 @@ from arkali.engineering.factory.model_product_generation import (
     ModelSource,
     WorkspaceTarget,
     _json_payload,
+    _normalise_json_transport,
     _normalise_python_transport,
     _normalise_requirements,
 )
@@ -462,6 +463,12 @@ def _generate_one_stage(
                 # provably left untouched, never guessed into a different
                 # meaning.
                 stage_files = _normalise_python_transport(stage_files)
+                # F-0090: the identical real transport-corruption class,
+                # never wired into the staged retry path for JSON
+                # artifacts (frontend/package.json, real evidence
+                # factory-goal-mtqz9w2b-cuqqqe) -- mirrors F-0087's own
+                # requirements.txt fix exactly.
+                stage_files = _normalise_json_transport(stage_files)
                 stage_files = _normalise_requirements(stage_files)
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
