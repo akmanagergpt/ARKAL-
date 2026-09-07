@@ -183,7 +183,7 @@ descriptor or a route-to-string mapping object is not a call and does
 not satisfy this rule (golden-work-054, session evidence, frozen: a real
 qwen2.5-coder:14b wrote `{"createTask": "POST /tasks"}` — one JSON
 property per route, never an actual invocation — identically on two
-consecutive attempts).
+consecutive attempts). Every file this stage writes must be placed under the top-level frontend/src/ path — never a bare src/... path (factory-goal-mtqrbyqj-5m1bf8, real production evidence: a real model wrote real, correct, working client code at src/apiClient.js instead of frontend/src/apiClient.js; every check this stage's own checker performs filters by the frontend/src/ prefix, so the real, correct content was never actually inspected at all, and the wrong convention then propagated into frontend_ui's own visible prior context, which reported every one of its own checks as missing for the wrong reason).
 
 ### 8. frontend_ui
 Inputs: frontend_client, backend_contract, product_ux_spec

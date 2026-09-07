@@ -1132,6 +1132,51 @@ def test_the_real_historical_frontend_client_attempts_now_reconstruct_correctly(
         assert (not findings) == expect_pass, f"{label}: findings={findings}"
 
 
+# -- F-0086 (FRONTEND_CLIENT_PATH_PREFIX_VACUITY_GAP) -----------------------
+
+
+def test_frontend_client_rejects_real_files_missing_the_frontend_src_prefix() -> None:
+    """Real evidence: `factory-goal-mtqrbyqj-5m1bf8`. The model's own real
+    output for this stage used bare `src/...` paths (the exact convention
+    its own immediately preceding stage had already, silently, gotten away
+    with) instead of `frontend/src/...`. Every check in `frontend_contract_
+    findings` filters by that exact prefix, so a real attempt using ANY
+    other path silently produced an EMPTY frontend blob -- no syntax
+    findings (nothing to parse), no CORS finding (an empty string never
+    contains "http://localhost:"), and no contract-drift finding either
+    for this real, GET-only backend (that loop's own `_exposes` check
+    never runs for a method the backend never exposes) -- passing
+    vacuously on content that was never actually inspected at all,
+    exactly the class of gap `_backend_tests_stage_findings`'s own
+    `backend_tests_missing_top_level_path` (golden-work-048) already
+    closed for `tests/`."""
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "src/apiClient.js": (
+            "import axios from 'axios';\nconst apiClient = { "
+            "getOverdueBooks: async () => (await axios.get('/api/books/overdue')).data };\n"
+            "export default apiClient;"
+        ),
+        "src/App.js": "export default function App() { return null; }\n",
+    }
+    findings = frontend_contract_findings(files)
+    assert [f.code for f in findings] == ["frontend_client_missing_top_level_path"]
+
+
+def test_frontend_client_is_silent_once_files_carry_the_real_prefix() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "import axios from 'axios';\nconst apiClient = { "
+            "getOverdueBooks: async () => (await axios.get('/api/books/overdue')).data };\n"
+            "export default apiClient;"
+        ),
+    }
+    assert frontend_contract_findings(files) == []
+
+
 def _output_flat(files: dict[str, str]) -> str:
     return json.dumps(files)
 

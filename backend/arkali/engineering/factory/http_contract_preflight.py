@@ -10,6 +10,9 @@ from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 
 def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    vacuity_findings = _frontend_src_missing_findings(files)
+    if vacuity_findings:
+        return vacuity_findings
     syntax_findings = _javascript_syntax_findings(files, path_prefix="frontend/src/")
     if syntax_findings:
         return syntax_findings
@@ -23,7 +26,39 @@ def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding
         for path, source in files.items()
         if path.startswith("frontend/src/")
     )
-    findings: list[SemanticFinding] = [*_cors_findings(backend, frontend)]
+    return _cors_findings(backend, frontend) + _contract_drift_findings(backend, frontend)
+
+
+def _frontend_src_missing_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """ANTI-VACUITY (the same class `_backend_tests_stage_findings`'s own
+    `backend_tests_missing_top_level_path` already closed for `tests/`,
+    golden-work-048, session evidence): every check in `frontend_contract_
+    findings` only ever iterates files already prefixed `frontend/src/` --
+    a real attempt that instead wrote its own real frontend source under a
+    different path (bare `src/...`, real evidence: `factory-goal-mtqrbyqj-
+    5m1bf8` -- the model's own immediately preceding stage had shown it
+    that exact bare-path convention, in its own visible prior context, and
+    it naturally continued it) would otherwise pass that function on a
+    silently EMPTY frontend blob: no syntax findings (nothing to parse),
+    no CORS finding (`"http://localhost:" not in ""`), and -- for any
+    backend exposing no POST/PUT/DELETE route, as this real one did not --
+    no contract-drift finding either, since that loop's own `_exposes`
+    check never even runs. The real defect then propagated silently into
+    `frontend_ui`'s own visible prior context, which correctly, but for
+    the wrong stage, reported every downstream check as missing."""
+    if any(path.startswith("frontend/src/") for path in files):
+        return []
+    return [SemanticFinding(
+        code="frontend_client_missing_top_level_path", path="frontend/src/",
+        detail=(
+            "no file exists under the top-level frontend/src/ path -- every real "
+            "frontend file this stage writes must be placed there"
+        ),
+    )]
+
+
+def _contract_drift_findings(backend: str, frontend: str) -> list[SemanticFinding]:
+    findings: list[SemanticFinding] = []
     for method in ("post", "put", "delete"):
         if not _exposes(backend, method):
             continue
