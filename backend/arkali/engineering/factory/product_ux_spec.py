@@ -236,22 +236,39 @@ def _route_items(files: Mapping[str, str]) -> list[dict]:
     return items
 
 
-def _resource_key(item: dict) -> str | None:
+def _resource_keys(item: dict) -> list[str]:
+    """Every real, non-parameter path segment, normalized -- not only the
+    first. A real backend is free to nest a resource under a real,
+    semantic prefix (`/api/books/overdue`, real evidence: `factory-goal-
+    mtpnp9af-yeldck`) rather than the flat `/resource` convention every
+    prior golden fixture happened to use; `acceptance_plan_compiler.
+    _module_routes` was already widened this same way (F-0084) for its
+    own, separate route-matching concern, but this sibling function --
+    reconciling a module's own DECLARED actions against the real HTTP
+    methods a route backs, `_module_parity_findings`'s own real
+    mechanism and `acceptance_plan_compiler._resolved_actions`'s only
+    source of truth -- still only ever checked `segments[0]`, silently
+    reconciling NO real methods at all for any nested route (real
+    evidence: `factory-goal-mtquvzmc-dt3go3`'s own real, mutation-capable
+    `/api/catalog/widgets`-shaped test fixture would have wrongly refused
+    a genuinely correct create/edit/delete module once `acceptance_plan_
+    compiler` started gating a synthesized create/update payload on this
+    exact reconciliation)."""
     if "path" not in item or "method" not in item:
-        return None
-    segments = [s for s in str(item["path"]).split("/") if s]
-    return _normalize(segments[0]) if segments else None
+        return []
+    segments = [s for s in str(item["path"]).split("/") if s and not s.startswith("{")]
+    return [_normalize(s) for s in segments]
 
 
 def _backend_methods_by_resource(files: Mapping[str, str]) -> dict[str, set[str]]:
-    """First path segment (normalized) -> the real HTTP methods declared for
-    it. Deliberately coarse (path-segment matching, not full route
-    resolution) — the same tolerance `http_contract_preflight._exposes`
-    already accepts for this exact class of check."""
+    """Every real, non-parameter path segment (normalized) -> the real
+    HTTP methods declared for it. Deliberately coarse (path-segment
+    matching, not full route resolution) — the same tolerance
+    `http_contract_preflight._exposes` already accepts for this exact
+    class of check."""
     methods: dict[str, set[str]] = {}
     for item in _route_items(files):
-        key = _resource_key(item)
-        if key is not None:
+        for key in _resource_keys(item):
             methods.setdefault(key, set()).add(str(item["method"]).upper())
     return methods
 

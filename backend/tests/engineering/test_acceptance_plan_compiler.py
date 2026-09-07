@@ -191,6 +191,76 @@ class TestNestedRoutePrefixMatching:
             _compile_acceptance_plan(files)
 
 
+class TestViewOnlyModuleNeverGetsAGuessedMutation:
+    """Real evidence: `factory-goal-mtquvzmc-dt3go3`. A real, valid,
+    view-only module (declared actions `["view"]` only, a real backend
+    exposing GET alone) previously still got a real `create_payload`
+    synthesized from its own model fields, was still selected as primary
+    (the only resolved module), and the real browser journey's own POST
+    against its real, GET-only route then failed with a real, live
+    "HTTP Error 405: METHOD NOT ALLOWED" -- never a candidate defect, an
+    acceptance-compiler one: it silently GUESSED a mutation capability
+    the module's own real, reconciled actions never claimed."""
+
+    def _files(self) -> dict[str, str]:
+        view_only_module = {
+            "name": "overdue_books", "navigation_label": "Overdue Books", "presentation": "table",
+            "actions": ["view"], "forms": [],
+        }
+        return {
+            "product/ux_spec.json": _ux_spec([view_only_module], ["Overdue Books"]),
+            "backend/routes.json": _routes(("/api/books/overdue", "GET")),
+            "backend/data_model.json": _models({
+                "overdue_books": {
+                    "book_id": "integer", "title": "string",
+                    "borrow_date": "date", "due_date": "date",
+                },
+            }),
+        }
+
+    def test_a_view_only_module_refuses_rather_than_guesses_a_create_payload(self) -> None:
+        with pytest.raises(_AcceptancePlanIncomplete) as excinfo:
+            _compile_acceptance_plan(self._files())
+        assert any("no real editable field to create with" in reason for reason in excinfo.value.reasons)
+
+    def test_the_real_factory_goal_mtquvzmc_dt3go3_contracts_now_refuse_cleanly(self) -> None:
+        """Direct historical replay of this real candidate's own real,
+        frozen `product/ux_spec.json` + `backend/*.json` bytes -- no new
+        generation, no live process, the exact same real contracts that
+        real acceptance attempt actually used."""
+        import pathlib
+
+        candidate_dir = pathlib.Path(__file__).resolve().parents[3] / "var" / "factory" / "candidates" / "factory-goal-mtquvzmc-dt3go3"
+        if not candidate_dir.is_dir():
+            pytest.skip("real candidate directory not present in this checkout")
+        files: dict[str, str] = {}
+        for sub in ("product", "backend"):
+            directory = candidate_dir / sub
+            if not directory.is_dir():
+                continue
+            for path in directory.glob("*.json"):
+                files[f"{sub}/{path.name}"] = path.read_text(encoding="utf-8")
+        with pytest.raises(_AcceptancePlanIncomplete) as excinfo:
+            _compile_acceptance_plan(files)
+        assert any("no real editable field to create with" in reason for reason in excinfo.value.reasons)
+
+    def test_a_module_declaring_edit_but_not_create_still_gets_a_payload(self) -> None:
+        """The gate is "create OR edit", not "create only" -- a real,
+        valid update-only module must still be usable as an acceptance
+        primary via its own real edit flow."""
+        files = {
+            "product/ux_spec.json": _ux_spec(
+                [_module("settings", "Settings", ["edit"], ["id", "value"])], ["Settings"],
+            ),
+            "backend/routes.json": _routes(
+                ("/settings", "GET"), ("/settings/{id}", "PUT"),
+            ),
+            "backend/data_model.json": _models({"settings": {"id": "integer", "value": "string"}}),
+        }
+        scenario = _compile_acceptance_plan(files)
+        assert scenario.update_payload
+
+
 class TestRefusesRatherThanGuesses:
     def test_no_product_ux_spec_refuses(self) -> None:
         with pytest.raises(_AcceptancePlanIncomplete):

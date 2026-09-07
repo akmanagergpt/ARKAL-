@@ -267,7 +267,28 @@ def _build_resource(
         return None
     actions = _resolved_actions(files, module.name, module.actions)
     fields = _resource_fields(model_fields, module.name)
-    editable = tuple(f for f in fields if f != route_param and f not in _PRIMARY_KEY_FIELD_NAMES)
+    # A module real acceptance never attempts to mutate (no real,
+    # reconciled "create" or "edit" action) must never be handed a
+    # synthesized create/update payload -- real evidence, factory-goal-
+    # mtquvzmc-dt3go3: a real, valid, view-only module (declared actions
+    # ["view"] only, a real backend exposing GET alone) previously still
+    # got a real create_payload built from its own model fields, was
+    # still selected as primary (the only resolved module), and the real
+    # browser journey's own POST against its real, GET-only route then
+    # failed with a real, live "HTTP Error 405: METHOD NOT ALLOWED" --
+    # never a candidate defect, an acceptance-compiler one: it silently
+    # GUESSED a mutation capability the module's own real, reconciled
+    # actions never claimed, the opposite of this module's own documented
+    # "refuses rather than guesses" posture. `_compile_acceptance_plan`'s
+    # own existing "no real editable field to create with" refusal
+    # already exists precisely for this case -- it never fired only
+    # because `create_payload` was always non-empty regardless of
+    # `actions`.
+    mutable = "create" in actions or "edit" in actions
+    editable = (
+        tuple(f for f in fields if f != route_param and f not in _PRIMARY_KEY_FIELD_NAMES)
+        if mutable else ()
+    )
     create_payload, update_payload, browser_create, browser_update, relationship_fields = _resource_payloads(
         fields, editable, model_fields, reasons,
     )
