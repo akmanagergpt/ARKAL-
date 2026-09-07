@@ -108,6 +108,7 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     },
     "backend_implementation": {
         "backend/main.py": (
+            "from backend.schema import bootstrap\nbootstrap()\n"
             "app = object()\n@app.get('/works')\ndef list_works():\n    return []\n"
             "class WorkRecord(object):\n    pass\n"
         ),
@@ -115,6 +116,7 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     "backend_cors_boundary": {
         "backend/main.py": (
             "from flask_cors import CORS\n"
+            "from backend.schema import bootstrap\nbootstrap()\n"
             "app = object()\nCORS(app)\n@app.get('/works')\ndef list_works():\n    return []\n"
             "class WorkRecord(object):\n    pass\n"
         ),

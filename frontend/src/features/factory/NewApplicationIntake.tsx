@@ -67,6 +67,36 @@ const CHECKPOINT_PHASE_TR: Readonly<Record<string, string>> = {
   interrupted: 'İşlem durduruldu',
   refused: 'Bu istek zaten daha önce üretilmiş bir uygulamayla eşleşiyor',
 };
+//: The real, automatic acceptance attempt `scripts/run_factory_worker.py`
+//: now runs immediately after `staged_generation_pass` (F-0084) carries its
+//: own real outcome string in the same checkpoint payload
+//: (`payload.acceptance.outcome`) — read here, never re-derived or guessed.
+//: Anything this map does not name (including a checkpoint recorded before
+//: this wiring existed, which carries no `acceptance` key at all) falls
+//: back to the honest "not yet verified" sentence already below, never a
+//: false "hazır" claim.
+const ACCEPTANCE_OUTCOME_TR: Readonly<Record<string, string>> = {
+  GOLDEN_ACCEPTANCE_PASS: 'Otomatik kabul (acceptance) de başarıyla tamamlandı — uygulamanız hazır.',
+  GOLDEN_ACCEPTANCE_FAILED: 'Otomatik kabul denemesi gerçek bir sorun buldu; uygulama henüz kabul edilmedi.',
+  ACCEPTANCE_PLAN_INCOMPLETE:
+    'Otomatik kabul, üretilen içerikten gerçek bir doğrulama planı çıkaramadı; uygulama henüz kabul edilmedi.',
+  ACCEPTANCE_SCENARIO_INCOMPATIBLE:
+    'Otomatik kabul, mevcut içerikle uyumlu bir senaryo bulamadı; uygulama henüz kabul edilmedi.',
+  CANDIDATE_INTEGRITY_FAILED: 'Aday içeriği kayıtlı durumla eşleşmiyor; uygulama henüz kabul edilmedi.',
+  ACCEPTANCE_ALREADY_IN_PROGRESS: 'Bu aday için zaten ayrı bir kabul denemesi sürüyor.',
+  ACCEPTANCE_INTERRUPTED: 'Otomatik kabul denemesi tamamlanamadan kesintiye uğradı; uygulama henüz kabul edilmedi.',
+  ACCEPTANCE_BRIDGE_ERROR:
+    'Otomatik kabul denemesi başlatılırken beklenmeyen bir hata oluştu; uygulama henüz kabul edilmedi.',
+};
+
+function acceptanceOutcome(latest: _JobCheckpointResponse | null | undefined): string | null {
+  const acceptance = latest?.payload.acceptance;
+  if (acceptance === null || typeof acceptance !== 'object') {
+    return null;
+  }
+  const outcome = (acceptance as Record<string, unknown>).outcome;
+  return typeof outcome === 'string' ? outcome : null;
+}
 
 function unresolvedReason(kind: string, showTechnical: boolean): string {
   const friendly = UNRESOLVED_REASON_TR[kind];
@@ -130,9 +160,13 @@ function ProgressCallout({
         <p>Uygulamanız gerçek zamanlı olarak üretiliyor. Bu işlem birkaç dakika sürebilir.</p>
       ) : job.lifecycle_state === 'SUCCEEDED' ? (
         <p>
-          İlk üretim aşaması ve son bütünlük kontrolü başarıyla tamamlandı.
-          Bu, uygulamanın tamamen doğrulandığı (kabul/acceptance) anlamına
-          henüz gelmiyor — o adım bu ortamda ayrıca çalıştırılmalıdır.
+          İlk üretim aşaması ve son bütünlük kontrolü başarıyla tamamlandı.{' '}
+          {acceptanceOutcome(latest) === 'GOLDEN_ACCEPTANCE_PASS'
+            ? ACCEPTANCE_OUTCOME_TR.GOLDEN_ACCEPTANCE_PASS
+            : (acceptanceOutcome(latest) !== null
+              ? (ACCEPTANCE_OUTCOME_TR[acceptanceOutcome(latest) as string]
+                ?? 'Otomatik kabul denemesi tamamlandı ancak uygulama henüz kabul edilmedi.')
+              : 'Bu, uygulamanın tamamen doğrulandığı (kabul/acceptance) anlamına henüz gelmiyor.')}
         </p>
       ) : (
         <p>

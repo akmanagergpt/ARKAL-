@@ -1,9 +1,10 @@
-"""Real, general checks for two route response-shape gaps.
+"""Real, general checks for three route/schema response-shape gaps.
 
-Owner: `engineering.factory`. Both were first found through real
-execution — real generated tests running against a real assembled
-candidate — never through static analysis alone, since both require
-knowing what a route handler's real runtime behavior produces.
+Owner: `engineering.factory`. All three were first found through real
+execution — real generated tests, or a real acceptance run, against a
+real assembled candidate — never through static analysis alone, since
+each requires knowing what a real route handler or a real application
+startup actually does, not merely what its source text contains.
 
 MISSING GENERATED ID. golden-work-052 and golden-work-053 (session
 evidence, frozen, byte-identical across two separate real
@@ -26,16 +27,31 @@ on a plain tuple itself raises a real `TypeError`, and every route
 handling one returned HTTP 500. `dict(...)` alone does not prove
 correctness; only `row_factory` does.
 
-GENERAL, NOT GOLDEN-SPECIFIC. Both check for the pattern — what a
-function's body contains and how its variables flow into `jsonify` —
-never any specific route path, table or field name. Any Flask+`sqlite3`
-backend this pipeline's own stack always produces can trip or satisfy
-either check identically.
+SCHEMA-CREATION CODE UNREACHABLE FROM THE REAL ROUTES FILE.
+`factory-goal-mtpnp9af-yeldck` (real repository evidence, the first real
+production Factory candidate to ever reach a real acceptance attempt):
+its own real `backend/db.py` correctly created its own real
+`overdue_books` table on import, but its own real `backend/app.py` never
+imported it — reimplementing its own bare `sqlite3.connect()` instead —
+so that schema creation could never actually run when the real
+application started. The real, first `pytest` run, in a genuinely fresh
+environment, failed outright: `sqlite3.OperationalError: no such table:
+overdue_books`. Every prior stage-time check is static/textual and
+proves schema creation exists SOMEWHERE under `backend/`, never that
+anything real actually reaches it.
+
+GENERAL, NOT GOLDEN-SPECIFIC. All three check for a real pattern — what a
+function's body contains, how its variables flow into `jsonify`, or which
+real files a real import line actually names — never any specific route
+path, table or field name. Any Flask+`sqlite3` backend this pipeline's
+own stack produces can trip or satisfy each check identically.
 """
 
 from __future__ import annotations
 
 import ast
+import pathlib
+import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.semantic_finding import SemanticFinding
@@ -159,3 +175,73 @@ def _raw_row_jsonify_findings(files: Mapping[str, str]) -> list[SemanticFinding]
             ),
         ))
     return findings
+
+
+_IMPORT_LINE = re.compile(r"^\s*(?:import|from)\s")
+_SCHEMA_MARKERS = ("create table", "create_all(")
+_ROUTE_MARKERS = (
+    "@app.route", "@app.get", "@app.post", "@app.put", "@app.delete",
+    "@router.", "add_url_rule",
+)
+
+
+def _schema_creating_paths(lowered: Mapping[str, str]) -> set[str]:
+    return {path for path, source in lowered.items() if any(m in source for m in _SCHEMA_MARKERS)}
+
+
+def _route_declaring_paths(lowered: Mapping[str, str]) -> set[str]:
+    return {path for path, source in lowered.items() if any(m in source for m in _ROUTE_MARKERS)}
+
+
+def _module_referenced_on_an_import_line(
+    module_stem: str, source_by_path: Mapping[str, str], *, skip_path: str,
+) -> bool:
+    """Whether any real backend `.py` file OTHER than `skip_path` has a real
+    `import`/`from ... import ...` line naming `module_stem` -- covers every
+    real Python import shape a candidate's own generated code might use
+    (`import backend.db`, `from backend.db import init_db`, `from backend
+    import db`, `from . import db`) without needing full import-graph
+    resolution: on a real import line, the bare module name always appears
+    somewhere in the statement. Deliberately coarse, the same tolerance
+    `_matching_methods`/`_module_routes` (`acceptance_plan_compiler.py`)
+    already accept for this exact class of check, not full static
+    resolution."""
+    token = re.compile(rf"\b{re.escape(module_stem)}\b")
+    for path, source in source_by_path.items():
+        if path == skip_path:
+            continue
+        for line in source.splitlines():
+            if _IMPORT_LINE.match(line) and token.search(line):
+                return True
+    return False
+
+
+def _schema_bootstrap_reachability_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Generic, framework-neutral: a file that itself declares real HTTP
+    routes is trivially exempt (its own schema creation always runs when
+    it does); otherwise the schema file's own module name must appear on a
+    real import line in at least one other real backend file."""
+    backend_files = {
+        path: source for path, source in files.items()
+        if path.startswith("backend/") and path.endswith(".py")
+    }
+    lowered = {path: source.lower() for path, source in backend_files.items()}
+    schema_paths = _schema_creating_paths(lowered)
+    route_paths = _route_declaring_paths(lowered)
+    if not schema_paths or not route_paths:
+        return []  # this module's own sibling checks already own "no schema"/"no routes"
+
+    return [
+        SemanticFinding(
+            code="schema_bootstrap_unreachable", path=schema_path,
+            detail=(
+                f"{schema_path!r} creates real schema (CREATE TABLE / create_all) but no "
+                "other real backend file ever imports it -- this schema-creation code can "
+                "never actually run when the real application starts"
+            ),
+        )
+        for schema_path in sorted(schema_paths - route_paths)
+        if not _module_referenced_on_an_import_line(
+            pathlib.Path(schema_path).stem, backend_files, skip_path=schema_path,
+        )
+    ]

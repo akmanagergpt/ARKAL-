@@ -187,6 +187,85 @@ describe('New Application intake', () => {
     expect(screen.getByText(/factory-goal-3/)).toBeInTheDocument();
   });
 
+  it('reports the real automatic acceptance outcome once STAGED_GENERATION_PASS carries one (F-0084)', async () => {
+    const user = userEvent.setup();
+    const JOB = `GET ${BASE}/api/jobs/goal-3`;
+    const CHECKPOINTS = `GET ${BASE}/api/jobs/goal-3/checkpoints`;
+    mount({
+      [GOALS]: { status: 202, body: QUEUED },
+      [JOB]: {
+        status: 200,
+        body: {
+          job_id: 'goal-3', job_type: 'software_factory.production',
+          idempotency_key: 'goal-3', lifecycle_state: 'SUCCEEDED',
+          created_at: '2026-09-04T00:00:00Z',
+        },
+      },
+      [CHECKPOINTS]: {
+        status: 200,
+        body: [
+          {
+            sequence: 1,
+            payload: {
+              phase: 'staged_generation_pass', candidate_id: 'factory-goal-3',
+              acceptance: { outcome: 'GOLDEN_ACCEPTANCE_PASS', candidate_id: 'factory-goal-3' },
+            },
+            recorded_at: '2026-09-04T00:05:00Z',
+          },
+        ],
+      },
+    });
+
+    await typeAndSubmit(
+      user,
+      'The system must respond within at least 500 ms. The system must support at least 10 users.',
+    );
+
+    expect(
+      await screen.findByText(/Otomatik kabul \(acceptance\) de başarıyla tamamlandı/),
+    ).toBeInTheDocument();
+  });
+
+  it('honestly reports a real automatic acceptance failure, never a false "hazır" claim', async () => {
+    const user = userEvent.setup();
+    const JOB = `GET ${BASE}/api/jobs/goal-3`;
+    const CHECKPOINTS = `GET ${BASE}/api/jobs/goal-3/checkpoints`;
+    mount({
+      [GOALS]: { status: 202, body: QUEUED },
+      [JOB]: {
+        status: 200,
+        body: {
+          job_id: 'goal-3', job_type: 'software_factory.production',
+          idempotency_key: 'goal-3', lifecycle_state: 'SUCCEEDED',
+          created_at: '2026-09-04T00:00:00Z',
+        },
+      },
+      [CHECKPOINTS]: {
+        status: 200,
+        body: [
+          {
+            sequence: 1,
+            payload: {
+              phase: 'staged_generation_pass', candidate_id: 'factory-goal-3',
+              acceptance: { outcome: 'ACCEPTANCE_PLAN_INCOMPLETE', candidate_id: 'factory-goal-3' },
+            },
+            recorded_at: '2026-09-04T00:05:00Z',
+          },
+        ],
+      },
+    });
+
+    await typeAndSubmit(
+      user,
+      'The system must respond within at least 500 ms. The system must support at least 10 users.',
+    );
+
+    expect(
+      await screen.findByText(/gerçek bir doğrulama planı çıkaramadı; uygulama henüz kabul edilmedi/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Otomatik kabul \(acceptance\) de başarıyla tamamlandı/)).not.toBeInTheDocument();
+  });
+
   it('reports a transport failure rather than a fabricated result', async () => {
     const user = userEvent.setup();
     mount({ [GOALS]: { status: 503, body: null } });

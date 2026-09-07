@@ -3,6 +3,7 @@ from __future__ import annotations
 from arkali.engineering.factory.route_response_preflight import (
     _missing_generated_id_findings,
     _raw_row_jsonify_findings,
+    _schema_bootstrap_reachability_findings,
 )
 
 
@@ -168,3 +169,45 @@ def test_raw_row_check_catches_the_real_golden_work_056_evidence() -> None:
     )
     findings = _raw_row_jsonify_findings({"backend/app.py": source})
     assert [f.code for f in findings] == ["raw_sqlite_row_passed_to_jsonify"]
+
+
+def test_schema_reachability_catches_the_real_factory_goal_mtpnp9af_yeldck_evidence() -> None:
+    """Real, frozen evidence: `backend/db.py` correctly creates its own
+    real schema on import, but `backend/app.py` never imports it."""
+    files = {
+        "backend/db.py": (
+            "import sqlite3\n"
+            "def init_db():\n"
+            "    conn = sqlite3.connect('library.db')\n"
+            "    conn.execute('CREATE TABLE overdue_books (id INTEGER)')\n"
+            "init_db()\n"
+        ),
+        "backend/app.py": (
+            "import sqlite3\napp = object()\n"
+            "@app.route('/overdue')\ndef list_overdue(): return sqlite3.connect('library.db')\n"
+        ),
+    }
+    findings = _schema_bootstrap_reachability_findings(files)
+    assert [(f.code, f.path) for f in findings] == [("schema_bootstrap_unreachable", "backend/db.py")]
+
+
+def test_schema_reachability_is_silent_once_the_routes_file_imports_it() -> None:
+    files = {
+        "backend/db.py": (
+            "import sqlite3\ndef init_db():\n"
+            "    sqlite3.connect('library.db').execute('CREATE TABLE overdue_books (id INTEGER)')\n"
+            "init_db()\n"
+        ),
+        "backend/app.py": (
+            "import sqlite3\nfrom backend.db import init_db\napp = object()\n"
+            "@app.route('/overdue')\ndef list_overdue(): return sqlite3.connect('library.db')\n"
+        ),
+    }
+    assert _schema_bootstrap_reachability_findings(files) == []
+
+
+def test_schema_reachability_is_silent_with_no_routes_or_no_schema() -> None:
+    assert _schema_bootstrap_reachability_findings({"backend/db.py": "import sqlite3\n"}) == []
+    assert _schema_bootstrap_reachability_findings(
+        {"backend/app.py": "app = object()\n@app.route('/x')\ndef x(): return 1\n"}
+    ) == []

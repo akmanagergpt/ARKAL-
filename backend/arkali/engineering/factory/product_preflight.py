@@ -22,6 +22,9 @@ from arkali.engineering.factory.dependency_resolution import (
     _resolve_backend_dependency_contract,
 )
 from arkali.engineering.factory.errors import ProductSemanticPreflightError
+from arkali.engineering.factory.route_response_preflight import (
+    _schema_bootstrap_reachability_findings,
+)
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 
@@ -388,6 +391,7 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
             )
         )
     findings.extend(_schema_context_findings(backend_text))
+    findings.extend(_schema_bootstrap_reachability_findings(files))
     route_markers = (
         "@app.route",
         "@app.get",

@@ -76,7 +76,10 @@ def _valid_output() -> str:
             "files": [
                 {
                     "path": "backend/app.py",
-                    "content": "app = object()\n@app.route('/status')\ndef status(): return 'ok'\n",
+                    "content": (
+                        "from backend.database import bootstrap\nbootstrap()\n"
+                        "app = object()\n@app.route('/status')\ndef status(): return 'ok'\n"
+                    ),
                 },
                 {
                     "path": "backend/database.py",
@@ -248,6 +251,7 @@ def test_stdlib_dependency_is_mechanically_normalized_without_touching_code(
     )
     assert (workspace.root / "backend/requirements.txt").read_text() == "Flask==3.1.0\n"
     assert (workspace.root / "backend/app.py").read_text() == (
+        "from backend.database import bootstrap\nbootstrap()\n"
         "app = object()\n@app.route('/status')\ndef status(): return 'ok'\n"
     )
 
@@ -432,6 +436,7 @@ def test_fastapi_decorators_are_real_routes_and_mutation_contracts(
     payload = json.loads(_valid_output())
     app = next(item for item in payload["files"] if item["path"] == "backend/app.py")
     app["content"] = (
+        "from backend.database import bootstrap\nbootstrap()\n"
         "app = object()\n"
         "@app.get('/items')\ndef items(): return []\n"
         "@app.put('/items/{item_id}')\ndef update(item_id): return item_id\n"

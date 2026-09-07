@@ -214,3 +214,83 @@ def test_a_bare_import_of_a_real_local_submodule_is_silent() -> None:
     }
     report = inspect_product_files(files)
     assert "undeclared_test_dependency" not in {item.code for item in report.findings}
+
+
+def test_schema_bootstrap_in_a_file_nothing_ever_imports_is_detected() -> None:
+    """Real evidence: `factory-goal-mtpnp9af-yeldck`, the first real
+    production Factory candidate to ever reach a real acceptance attempt.
+    `backend/db.py` correctly creates its own real schema on import, but
+    the real `backend/app.py` never imports `backend/db.py` at all --
+    reimplementing its own bare `sqlite3.connect()` instead -- so this
+    schema-creation code can never actually run when the real application
+    starts. Nothing before this check could see it: `ast.parse` alone is
+    blind to reachability, and the flattened whole-backend-text checks
+    only ever proved schema creation exists SOMEWHERE, never that
+    anything reaches it. The real, first `pytest` run of this real
+    candidate, in a genuinely fresh environment, failed with
+    `sqlite3.OperationalError: no such table: overdue_books`."""
+    files = {
+        "backend/db.py": (
+            "import sqlite3\n"
+            "def init_db():\n"
+            "    conn = sqlite3.connect('library.db')\n"
+            "    conn.execute('CREATE TABLE overdue_books (id INTEGER)')\n"
+            "    conn.commit()\n"
+            "init_db()\n"
+        ),
+        "backend/app.py": (
+            "import sqlite3\n"
+            "app = object()\n"
+            "@app.route('/overdue')\n"
+            "def list_overdue(): return sqlite3.connect('library.db')\n"
+        ),
+    }
+    report = inspect_product_files(files)
+    paths_with_finding = {
+        item.path for item in report.findings if item.code == "schema_bootstrap_unreachable"
+    }
+    assert paths_with_finding == {"backend/db.py"}
+
+
+def test_schema_bootstrap_in_a_correctly_imported_separate_file_is_silent() -> None:
+    """The exact same split-file shape as the test above, this time
+    correctly wired -- `backend/app.py` really does import `backend/db.py`
+    -- must never be flagged."""
+    files = {
+        "backend/db.py": (
+            "import sqlite3\n"
+            "def init_db():\n"
+            "    conn = sqlite3.connect('library.db')\n"
+            "    conn.execute('CREATE TABLE overdue_books (id INTEGER)')\n"
+            "    conn.commit()\n"
+            "init_db()\n"
+        ),
+        "backend/app.py": (
+            "import sqlite3\n"
+            "from backend.db import init_db\n"
+            "app = object()\n"
+            "@app.route('/overdue')\n"
+            "def list_overdue(): return sqlite3.connect('library.db')\n"
+        ),
+    }
+    report = inspect_product_files(files)
+    assert "schema_bootstrap_unreachable" not in {item.code for item in report.findings}
+
+
+def test_schema_bootstrap_in_the_same_file_as_its_own_routes_is_silent() -> None:
+    """A single-file backend that creates its own schema inline, in the
+    exact same file that declares its own real routes, trivially wires
+    itself -- the common, simple, otherwise-correct shape most of this
+    file's own fixtures already use."""
+    files = {
+        "backend/app.py": (
+            "import sqlite3\n"
+            "app = object()\n"
+            "conn = sqlite3.connect('library.db')\n"
+            "conn.execute('CREATE TABLE overdue_books (id INTEGER)')\n"
+            "@app.route('/overdue')\n"
+            "def list_overdue(): return conn\n"
+        ),
+    }
+    report = inspect_product_files(files)
+    assert "schema_bootstrap_unreachable" not in {item.code for item in report.findings}

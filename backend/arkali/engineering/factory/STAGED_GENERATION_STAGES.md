@@ -75,7 +75,15 @@ a real TypeError). dict(row) alone does not fix this: without
 conn.row_factory = sqlite3.Row set on the connection first, dict() on a
 plain tuple raises its own TypeError (golden-work-057, session evidence,
 frozen: a real model wrapped every raw row in dict(row) but never set
-row_factory, and every affected route returned HTTP 500). Cross-origin
+row_factory, and every affected route returned HTTP 500). If schema
+creation (CREATE TABLE / create_all) lives in a file separate from the
+one declaring the real HTTP routes, the routes file must actually import
+that file — schema-creation code nothing ever imports never runs when
+the real application starts (factory-goal-mtpnp9af-yeldck, real
+production evidence: `backend/db.py` correctly created its own real
+table on import, but `backend/app.py` never imported it, and the real,
+first `pytest` run in a genuinely fresh environment failed outright with
+`sqlite3.OperationalError: no such table: overdue_books`). Cross-origin
 access is not this stage's concern — that is backend_cors_boundary's
 job, immediately after this one.
 
