@@ -133,6 +133,9 @@ class ModificationWiring:
     workspace_allocator: _WorkspaceAllocator
     model: _ModelAdapter
     model_id: str
+    #: Finite, task-appropriate provider bound chosen by the composition
+    #: root.  This remains invocation policy, never lifecycle truth.
+    planning_timeout_seconds: float = 180.0
 
 
 @dataclass(frozen=True)
@@ -286,7 +289,12 @@ def prepare_modification(
         request_text=request_text, inventory=render_for_prompt(report),
         authoritative_source=grounded.render(),
     )
-    result = wiring.model.infer(wiring.model_id, prompt, timeout_seconds=180.0)
+    if not 0 < wiring.planning_timeout_seconds < float("inf"):
+        shutil.rmtree(workspace.root, ignore_errors=True)
+        raise ModelPlanInvalidError("provider planning timeout must be finite and positive")
+    result = wiring.model.infer(
+        wiring.model_id, prompt, timeout_seconds=wiring.planning_timeout_seconds,
+    )
     if result.state.value != "PASS":
         shutil.rmtree(workspace.root, ignore_errors=True)
         raise ModelPlanInvalidError(f"provider call did not succeed: {result.detail}")

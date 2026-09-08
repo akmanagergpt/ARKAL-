@@ -94,12 +94,14 @@ class FixedModel:
 
 
 class RecordingModel(FixedModel):
-    def __init__(self, output: str) -> None:
-        super().__init__(output)
+    def __init__(self, output: str, state: HonestState = HonestState.PASS) -> None:
+        super().__init__(output, state)
         self.prompts: list[str] = []
+        self.timeouts: list[float] = []
 
     def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0) -> InferenceResult:
         self.prompts.append(prompt)
+        self.timeouts.append(timeout_seconds)
         return super().infer(model_id, prompt, timeout_seconds=timeout_seconds)
 
 
@@ -407,6 +409,68 @@ class TestValidateAndApplyChangeset:
 
 
 class TestPrepareModification:
+    def test_configured_bounded_planning_timeout_reaches_provider(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        candidate_dir = tmp_path / "candidate-x"
+        candidate_dir.mkdir()
+        (candidate_dir / "app.py").write_text("print('old')\n", encoding="utf-8")
+        _seed_initial_revision("p1", registry_engine, artifact_engine, blobs, candidate_dir)
+        model = RecordingModel(json.dumps({
+            "schema_version": "1.0.0", "request_text": "adjust greeting",
+            "target_summary": "bounded change", "operations": [{
+                "operation": "update", "path": "app.py", "content": "print('new')\n",
+                "rationale": "requested",
+            }],
+        }))
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as art_session:
+            prepare_modification(
+                "p1", "adjust greeting", registry=ProjectRegistry(session),
+                wiring=ModificationWiring(
+                    artifacts=ArtifactStore(art_session, blobs),
+                    candidate_source_resolver=_StubCandidateSource(candidate_dir),
+                    workspace_allocator=WorkspaceAuthority(tmp_path / "change-ws"),
+                    model=model, model_id="test-model", planning_timeout_seconds=877.5,
+                ),
+            )
+        assert model.timeouts == [877.5]
+
+    def test_worker_reuses_factory_code_generation_timeout_policy(self) -> None:
+        worker_source = (REPO / "scripts/run_product_change_worker.py").read_text(encoding="utf-8")
+        assert "from arkali.engineering.factory.component_generation import (" in worker_source
+        assert "DEFAULT_TIMEOUT_SECONDS" in worker_source
+        assert "planning_timeout_seconds=DEFAULT_TIMEOUT_SECONDS" in worker_source
+
+    def test_provider_timeout_fails_once_without_mutation_or_revision(
+        self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
+        tmp_path: pathlib.Path,
+    ) -> None:
+        candidate_dir = tmp_path / "candidate-x"
+        candidate_dir.mkdir()
+        original = "print('unchanged')\n"
+        (candidate_dir / "app.py").write_text(original, encoding="utf-8")
+        _seed_initial_revision("p1", registry_engine, artifact_engine, blobs, candidate_dir)
+        model = RecordingModel("", state=HonestState.NOT_CONFIGURED)
+        workspace_root = tmp_path / "change-ws"
+        with unit_of_work(create_session_factory(registry_engine)) as session, \
+             unit_of_work(create_session_factory(artifact_engine)) as art_session:
+            with pytest.raises(ModelPlanInvalidError, match="provider call did not succeed"):
+                prepare_modification(
+                    "p1", "adjust greeting", registry=ProjectRegistry(session),
+                    wiring=ModificationWiring(
+                        artifacts=ArtifactStore(art_session, blobs),
+                        candidate_source_resolver=_StubCandidateSource(candidate_dir),
+                        workspace_allocator=WorkspaceAuthority(workspace_root),
+                        model=model, model_id="test-model", planning_timeout_seconds=42.0,
+                    ),
+                )
+            assert len(ProjectRegistry(session).revisions_of("p1")) == 1
+        assert model.timeouts == [42.0]
+        assert (candidate_dir / "app.py").read_text(encoding="utf-8") == original
+        assert not any(workspace_root.iterdir())
+
     def test_historical_cross_file_contract_is_grounded_and_preserved(
         self, registry_engine: Engine, artifact_engine: Engine, blobs: ArtifactBlobStore,
         tmp_path: pathlib.Path,

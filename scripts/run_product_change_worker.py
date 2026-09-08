@@ -73,6 +73,9 @@ from arkali.engineering.candidate.preview import (  # noqa: E402
     _run_preview_over_source,
 )
 from arkali.engineering.candidate.workspace import WorkspaceAuthority  # noqa: E402
+from arkali.engineering.factory.component_generation import (  # noqa: E402
+    DEFAULT_TIMEOUT_SECONDS,
+)
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.engineering.product_change.errors import ProductChangeError  # noqa: E402
 from arkali.engineering.product_change.modification import (  # noqa: E402
@@ -248,6 +251,7 @@ def main() -> int:
                             workspace_allocator=WorkspaceAuthority(ROOT / "var" / "factory" / "changes"),
                             model=OllamaAdapter(json_mode=False, max_output_tokens=4096),
                             model_id=MODEL_ID,
+                            planning_timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
                         )
                         prepared = prepare_modification(
                             project_id, request_text,
