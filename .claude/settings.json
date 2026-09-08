@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import json,pathlib; d=pathlib.Path('docs/hafiza/.generated/DEVAM_ET.md'); s=pathlib.Path('var/memory/status.json'); devam=d.read_text(encoding='utf-8') if d.is_file() else ''; st=json.loads(s.read_text(encoding='utf-8')) if s.is_file() else {}; summ=('Hafiza: '+str(st.get('source_count','?'))+' dosya, yenileme '+str(st.get('refreshed_at','?'))) if st else 'Hafiza henuz uretilmemis.'; ctx=(devam+chr(10)+chr(10)+summ) if devam else summ; print(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionStart','additionalContext':ctx}}))\"",
+            "timeout": 10,
+            "statusMessage": "ARKALI hafizasi okunuyor..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python scripts/arkali_memory.py refresh > /dev/null 2>&1 || true",
+            "timeout": 30,
+            "statusMessage": "ARKALI hafizasi yenileniyor..."
+          }
+        ]
+      }
+    ]
+  }
+}
