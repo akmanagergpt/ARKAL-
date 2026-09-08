@@ -27,7 +27,12 @@ import subprocess
 
 from arkali.engineering.product_change.change_plan import ChangeOperation
 from arkali.engineering.product_change.errors import VerificationFailedError
-from arkali.engineering.product_change.inspection import _INSPECT_JS_SCRIPT, _JS_SUFFIXES
+from arkali.engineering.product_change.inspection import (
+    _INSPECT_JS_SCRIPT,
+    _JS_SUFFIXES,
+    _SKIP_DIR_NAMES,
+    _resolve_relative_import,
+)
 
 
 class VerificationResult:
@@ -93,8 +98,32 @@ def _verify_js_targets(workspace_root: pathlib.Path, targets: list[pathlib.Path]
     except json.JSONDecodeError as error:
         raise VerificationFailedError(f"JS/TS verification produced malformed JSON: {error}") from error
     checked_relatives = {t.relative_to(workspace_root).as_posix() for t in targets}
-    return [
+    failures = [
         f"{entry['path']}: {entry['message']}"
         for entry in payload.get("errors", [])
         if entry["path"] in checked_relatives
     ]
+    failures.extend(_unresolved_local_dependencies(workspace_root, payload, checked_relatives))
+    return failures
+
+
+def _unresolved_local_dependencies(
+    workspace_root: pathlib.Path, payload: dict[str, object], checked_relatives: set[str],
+) -> list[str]:
+    available = {
+        path.relative_to(workspace_root).as_posix()
+        for path in workspace_root.rglob("*")
+        if path.is_file()
+        and not any(part in _SKIP_DIR_NAMES for part in path.relative_to(workspace_root).parts[:-1])
+    }
+    failures: list[str] = []
+    for entry in payload.get("files", []):
+        source_path = entry["path"]
+        if source_path not in checked_relatives:
+            continue
+        for imported in entry.get("imports", []):
+            if imported.startswith(".") and _resolve_relative_import(source_path, imported, available) is None:
+                failures.append(
+                    f"{source_path}: unresolved local dependency {imported!r} in proposed workspace"
+                )
+    return failures

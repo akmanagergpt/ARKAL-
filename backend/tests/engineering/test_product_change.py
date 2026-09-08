@@ -64,6 +64,7 @@ from arkali.engineering.product_change.revision_resolution import (
     materialized_source,
     resolve_current_revision,
 )
+from arkali.engineering.product_change.verification import verify_changeset
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
@@ -644,6 +645,119 @@ class TestPrepareModification:
             )
         assert result.verification.passed is False
         assert result.verification.failures
+
+
+class TestLocalDependencyCompleteness:
+    @staticmethod
+    def _verify(tmp_path: pathlib.Path, source: str, *, extra: dict[str, str] | None = None):
+        root = tmp_path / "product"
+        target = root / "frontend" / "src" / "Panel.tsx"
+        target.parent.mkdir(parents=True)
+        target.write_text(source, encoding="utf-8")
+        for relative, content in (extra or {}).items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        operation = ChangeOperation(
+            operation="update", path="frontend/src/Panel.tsx", content=source, rationale="visible change",
+        )
+        return verify_changeset(root, (operation,))
+
+    @pytest.mark.parametrize("specifier,relative", [
+        ("./format", "frontend/src/format.js"),
+        ("./Widget", "frontend/src/Widget.tsx"),
+        ("../theme/base", "frontend/theme/base.ts"),
+        ("./parts", "frontend/src/parts/index.ts"),
+        ("./Panel.css", "frontend/src/Panel.css"),
+        ("./mark.svg", "frontend/src/mark.svg"),
+    ])
+    def test_supported_local_dependency_resolves(
+        self, tmp_path: pathlib.Path, specifier: str, relative: str,
+    ) -> None:
+        result = self._verify(
+            tmp_path, f'import value from "{specifier}";\nexport default value;\n',
+            extra={relative: "export default function value() {}\n"},
+        )
+        assert result.passed is True
+
+    @pytest.mark.parametrize("specifier", ["./missing", "./Panel.css"])
+    def test_missing_local_dependency_fails(self, tmp_path: pathlib.Path, specifier: str) -> None:
+        result = self._verify(
+            tmp_path, f'import value from "{specifier}";\nexport default value;\n',
+        )
+        assert result.passed is False
+        assert specifier in "\n".join(result.failures)
+
+    def test_external_package_does_not_false_positive(self, tmp_path: pathlib.Path) -> None:
+        result = self._verify(
+            tmp_path, 'import React from "react";\nexport default React.Fragment;\n',
+        )
+        assert result.passed is True
+
+    def test_dependency_created_by_same_plan_passes(self, tmp_path: pathlib.Path) -> None:
+        root = tmp_path / "product"
+        source = 'import token from "./token";\nexport default token;\n'
+        target = root / "frontend" / "src" / "Panel.tsx"
+        target.parent.mkdir(parents=True)
+        target.write_text(source, encoding="utf-8")
+        (target.parent / "token.ts").write_text("export default 1;\n", encoding="utf-8")
+        operations = (
+            ChangeOperation(operation="update", path="frontend/src/Panel.tsx", content=source, rationale="use token"),
+            ChangeOperation(operation="create", path="frontend/src/token.ts", content="export default 1;\n", rationale="provide token"),
+        )
+        assert verify_changeset(root, operations).passed is True
+
+    def test_css_created_by_same_plan_passes(self, tmp_path: pathlib.Path) -> None:
+        root = tmp_path / "product"
+        source = 'import "./Panel.css";\nexport default 1;\n'
+        target = root / "frontend" / "src" / "Panel.tsx"
+        target.parent.mkdir(parents=True)
+        target.write_text(source, encoding="utf-8")
+        (target.parent / "Panel.css").write_text("main { display: grid; }\n", encoding="utf-8")
+        operations = (
+            ChangeOperation(operation="update", path="frontend/src/Panel.tsx", content=source, rationale="style"),
+            ChangeOperation(operation="create", path="frontend/src/Panel.css", content="main {}\n", rationale="style file"),
+        )
+        assert verify_changeset(root, operations).passed is True
+
+    def test_rename_into_required_path_passes(self, tmp_path: pathlib.Path) -> None:
+        root = tmp_path / "product"
+        source = 'import token from "./token";\nexport default token;\n'
+        target = root / "frontend" / "src" / "Panel.tsx"
+        target.parent.mkdir(parents=True)
+        target.write_text(source, encoding="utf-8")
+        (target.parent / "token.ts").write_text("export default 1;\n", encoding="utf-8")
+        operations = (
+            ChangeOperation(operation="update", path="frontend/src/Panel.tsx", content=source, rationale="use token"),
+            ChangeOperation(
+                operation="rename", path="frontend/src/value.ts", new_path="frontend/src/token.ts",
+                content=None, rationale="provide expected path",
+            ),
+        )
+        assert verify_changeset(root, operations).passed is True
+
+    def test_delete_leaving_changed_file_broken_fails(self, tmp_path: pathlib.Path) -> None:
+        root = tmp_path / "product"
+        source = 'import token from "./token";\nexport default token;\n'
+        target = root / "frontend" / "src" / "Panel.tsx"
+        target.parent.mkdir(parents=True)
+        target.write_text(source, encoding="utf-8")
+        operations = (
+            ChangeOperation(operation="update", path="frontend/src/Panel.tsx", content=source, rationale="change"),
+            ChangeOperation(operation="delete", path="frontend/src/token.ts", content=None, rationale="remove"),
+        )
+        assert verify_changeset(root, operations).passed is False
+
+    def test_unrelated_untouched_broken_file_is_not_scanned(self, tmp_path: pathlib.Path) -> None:
+        root = tmp_path / "product"
+        src = root / "frontend" / "src"
+        src.mkdir(parents=True)
+        (src / "Panel.tsx").write_text("export default 1;\n", encoding="utf-8")
+        (src / "Historical.js").write_text('import x from "./absent";\n', encoding="utf-8")
+        operation = ChangeOperation(
+            operation="update", path="frontend/src/Panel.tsx", content="export default 1;\n", rationale="change",
+        )
+        assert verify_changeset(root, (operation,)).passed is True
 
 
 class TestPromoteAndReject:

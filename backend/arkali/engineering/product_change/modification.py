@@ -61,6 +61,8 @@ Rules:
 - Only touch files that already exist in the inventory below, or genuinely new files \
 your plan creates.
 - Prefer the smallest real change that honestly satisfies the request.
+- Do not introduce a new local file dependency unless this same ChangePlan makes that
+dependency available in the resulting workspace.
 
 User request:
 {request_text}

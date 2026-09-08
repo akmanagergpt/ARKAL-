@@ -26,6 +26,7 @@ from __future__ import annotations
 import ast
 import json
 import pathlib
+import posixpath
 import re
 import subprocess
 
@@ -33,12 +34,14 @@ from arkali.engineering.product_change.errors import ChangesetValidationError, I
 
 _PYTHON_SUFFIXES = frozenset({".py"})
 _JS_SUFFIXES = frozenset({".js", ".jsx", ".ts", ".tsx"})
+_LOCAL_RESOURCE_SUFFIXES = frozenset({".css", ".scss", ".sass", ".less", ".json", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp"})
 _SKIP_DIR_NAMES = frozenset({"node_modules", "build", "dist", ".git", "__pycache__", ".venv", "venv"})
 _INSPECT_JS_SCRIPT = pathlib.Path(__file__).resolve().parents[4] / "scripts" / "inspect_js_source.mjs"
 _MAX_GROUNDED_SOURCE_FILES = 12
 _MAX_GROUNDED_SOURCE_BYTES = 96 * 1024
 _SENSITIVE_NAMES = frozenset({"credentials", "credential", "secrets", "secret", "private_key"})
 _SOURCE_SUFFIXES = _PYTHON_SUFFIXES | _JS_SUFFIXES
+_LOCAL_RESOLUTION_SUFFIXES = _SOURCE_SUFFIXES | _LOCAL_RESOURCE_SUFFIXES
 
 
 class PythonFileSummary:
@@ -111,9 +114,8 @@ def _request_terms(request_text: str) -> frozenset[str]:
 def _resolve_relative_import(source_path: str, imported: str, available: set[str]) -> str | None:
     if not imported.startswith("."):
         return None
-    base = pathlib.PurePosixPath(source_path).parent
-    candidate = base.joinpath(imported).as_posix()
-    choices = [candidate, *(candidate + suffix for suffix in sorted(_SOURCE_SUFFIXES))]
+    candidate = posixpath.normpath(posixpath.join(posixpath.dirname(source_path), imported))
+    choices = [candidate, *(candidate + suffix for suffix in sorted(_LOCAL_RESOLUTION_SUFFIXES))]
     choices.extend(f"{candidate}/index{suffix}" for suffix in sorted(_SOURCE_SUFFIXES))
     return next((choice for choice in choices if choice in available), None)
 
