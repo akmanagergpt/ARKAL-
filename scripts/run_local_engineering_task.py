@@ -29,6 +29,8 @@ from arkali.engineering.agent.harness_task import HarnessTask
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import DEFAULT_TIMEOUT_SECONDS
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter
+from arkali.engineering.localai.host_probe import probe_host
+from arkali.engineering.localai.suitability import LocalSelection, LocalSelectionRequest, select_local_model
 from arkali.engineering.product_change.change_plan import ChangePlan
 from arkali.engineering.product_change.inspection import _is_sensitive_path
 from arkali.engineering.product_change.modification import _apply_changeset, _extract_json_object, _validate_changeset
@@ -40,7 +42,6 @@ from arkali.execution.durable.job_state_machine import RUNNING, FAILED, SUCCEEDE
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 
-MODEL = "qwen2.5-coder:14b"
 MAX_CONTEXT_BYTES = 16 * 1024
 MAX_SOURCE_FILES = 5
 MAX_EDITABLE_FILES = 2
@@ -68,7 +69,7 @@ def _source(root: Path, relative: str) -> bytes:
     return data
 
 
-def compile_task(root, task_id, request, paths, acceptance, workspace):
+def compile_task(root, task_id, request, paths, acceptance, workspace, *, selection: LocalSelection | None = None):
     paths = tuple(sorted(set(paths)))
     if not 1 <= len(paths) <= MAX_SOURCE_FILES:
         raise ValueError("source file-count budget exceeded")
@@ -83,8 +84,9 @@ def compile_task(root, task_id, request, paths, acceptance, workspace):
                           origin="human bounded task and acceptance target"),)
     package = ContextPackage.compiled(ContextKindAuthority.load(root), package_id=task_id + "-context",
                                       task_id=task_id, items=items)
+    environment = f"{selection.provider}:{selection.model_id}" if selection else "local"
     task = HarnessTask(task_specification=spec, context_package=package.context_hash, tools=(),
-                       permissions=(), workspace=str(workspace), environment=f"ollama:{MODEL}",
+                       permissions=(), workspace=str(workspace), environment=environment,
                        acceptance_target=acceptance, repair_budget=0)
     prompt = ('Return only ChangePlan JSON: {"schema_version":"1.0.0","request_text":"...",'
               '"target_summary":"...","operations":[{"operation":"update","path":"...",'
@@ -101,13 +103,16 @@ def compile_task(root, task_id, request, paths, acceptance, workspace):
     return task, package, prompt, source
 
 
-def execute_once(task, package, prompt, source, workspace, model, acceptance_check):
+def execute_once(task, package, prompt, source, workspace, model, acceptance_check, selection: LocalSelection | None = None):
     """No loop. The caller persists the result through existing truth owners."""
     if task.repair_budget != 0 or task.tools or task.permissions or model.runtime != "ollama":
         raise ValueError("Phase 1 permits only tool-free, zero-repair local execution")
     if task.context_package != package.context_hash or task.workspace != str(workspace.root):
         raise ValueError("task/package/workspace binding mismatch")
-    result = model.infer(MODEL, prompt, timeout_seconds=DEFAULT_TIMEOUT_SECONDS)
+    selected_model = selection.model_id if selection else getattr(model, "model_id", "")
+    if not selected_model:
+        raise ValueError("no canonical local model selection supplied")
+    result = model.infer(selected_model, prompt, timeout_seconds=DEFAULT_TIMEOUT_SECONDS)
     if result.state.value != "PASS":
         raise ValueError("local inference failed: " + redact_raw_secrets(result.detail))
     assert_no_raw_secret(result.output, sink="local engineering output")
@@ -138,6 +143,8 @@ def main():
     parser.add_argument("--request", required=True)
     parser.add_argument("--source", action="append", required=True)
     parser.add_argument("--acceptance-test", required=True, help="trusted tracked pytest file::node")
+    parser.add_argument("--complexity", choices=("low", "medium", "high"), default="low")
+    parser.add_argument("--warm-model", default=None)
     args = parser.parse_args()
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT).strip():
         raise ValueError("main must be clean before the local attempt")
@@ -146,8 +153,12 @@ def main():
     if not sep or not node.isidentifier() or test_path in args.source:
         raise ValueError("a trusted acceptance node outside editable scope is required")
     model = OllamaAdapter(json_mode=True, max_output_tokens=4096)
-    if not any(m.model_id == MODEL for m in model.list_models()):
-        raise ValueError("requested local model unavailable; no fallback")
+    selection = select_local_model(
+        model.list_models(),
+        LocalSelectionRequest(complexity=args.complexity, required_capabilities=("coding",),
+                              warm_model_id=args.warm_model),
+        host=probe_host(),
+    )
     pdp = PolicyDecisionPoint.load(ROOT)
     engine = create_persistence_engine(sqlite_url(ROOT / "var/command_center.db"))
     evidence_engine = create_persistence_engine(sqlite_url(ROOT / "var/factory/evidence/repair-evidence.db"))
@@ -169,7 +180,7 @@ def main():
                 workspace_id=args.task_id, task_id=args.task_id, agent_id="local-engineering",
                 stable_snapshot=Path(empty_seed))
         task, package, prompt, source = compile_task(ROOT, args.task_id, args.request, args.source,
-                                                    args.acceptance_test, workspace.root)
+                                                    args.acceptance_test, workspace.root, selection=selection)
         for path, data in source.items():
             workspace.write("snapshot/" + path, data)
             workspace.write("baseline/" + path, data)
@@ -177,7 +188,7 @@ def main():
         with unit_of_work(create_session_factory(evidence_engine)) as session:
             artifacts = ArtifactStore(session, ArtifactBlobStore(ROOT / "var/factory/evidence/blobs",
                 PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store")))
-            provenance = ProvenanceInput(producer_agent="local-engineering", provider_model=f"ollama:{MODEL}",
+            provenance = ProvenanceInput(producer_agent="local-engineering", provider_model=f"{selection.provider}:{selection.model_id}",
                 task_id=args.task_id, specification_version="local-engineering-phase1/1",
                 context_hash=package.context_hash)
             context_ref = artifacts.register(json.dumps({"harness_task": task.model_dump(),
@@ -194,10 +205,13 @@ def main():
             return {"passed": check.returncode == 0,
                     "detail": redact_raw_secrets((check.stdout + check.stderr)[-4000:])}
 
-        report = execute_once(task, package, prompt, source, workspace, model, acceptance_check)
+        report = execute_once(task, package, prompt, source, workspace, model, acceptance_check, selection)
         report.update(task_id=args.task_id, context_hash=package.context_hash, context_ref=context_ref,
                       context_items=len(package.items), context_bytes=len(prompt.encode()),
-                      source_files=list(source), workspace=str(workspace.root), provider_model=f"ollama:{MODEL}")
+                      source_files=list(source), workspace=str(workspace.root), provider_model=f"{selection.provider}:{selection.model_id}",
+                      selection_reason=selection.reason, switch_required=selection.switch_required,
+                      warm_model_id=selection.warm_model_id, candidates_considered=selection.candidates_considered,
+                      task_complexity=selection.complexity)
         if any((ROOT / p).read_bytes() != data for p, data in source.items()):
             raise ValueError("main source changed during execution")
         with unit_of_work(create_session_factory(evidence_engine)) as session:

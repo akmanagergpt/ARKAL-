@@ -20,7 +20,7 @@ total" - this is a suitability *decision*, not a bare capacity comparison.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from arkali.engineering.localai.adapter import HonestState, LocalModelDescriptor
 from arkali.engineering.localai.host_probe import HostFacts
@@ -46,6 +46,96 @@ class SuitabilityVerdict(BaseModel):
     state: HonestState
     reason: str
     estimated_memory_bytes: int | None = None
+
+
+class LocalSelectionRequest(BaseModel):
+    """The caller's generic need; it names no concrete provider or model."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    complexity: str = Field(pattern=r"^(low|medium|high)$")
+    required_capabilities: tuple[str, ...] = ()
+    prefer_warm_model: bool = True
+    warm_model_id: str | None = None
+
+
+class LocalSelection(BaseModel):
+    """One selected descriptor plus an inspectable, deterministic reason."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    provider: str
+    model_id: str
+    complexity: str
+    reason: str
+    warm_model_id: str | None = None
+    switch_required: bool
+    candidates_considered: tuple[str, ...]
+
+
+def _strength(descriptor: LocalModelDescriptor) -> float:
+    """Relative strength from discovered parameter size, never a model-name list."""
+    return _parameter_count(descriptor.parameter_size) or 0.0
+
+
+def _eligible_models(
+    descriptors: tuple[LocalModelDescriptor, ...],
+    required_capabilities: tuple[str, ...],
+    host: HostFacts | None,
+) -> list[LocalModelDescriptor]:
+    required = frozenset(required_capabilities)
+    candidates = [
+        descriptor for descriptor in descriptors
+        if descriptor.runtime
+        and descriptor.model_id
+        and required.issubset(frozenset(descriptor.capabilities))
+    ]
+    if host is not None:
+        candidates = [
+            descriptor for descriptor in candidates
+            if evaluate_suitability(descriptor, host).state is HonestState.PASS
+        ]
+    return sorted(candidates, key=lambda descriptor: (_strength(descriptor), descriptor.model_id))
+
+
+def _selection_reason(complexity: str) -> str:
+    if complexity == "high":
+        return "strongest discovered sufficient local model selected for high complexity"
+    return "smallest discovered sufficient local model selected for low complexity"
+
+
+def select_local_model(
+    descriptors: tuple[LocalModelDescriptor, ...],
+    request: LocalSelectionRequest,
+    *,
+    host: HostFacts | None = None,
+) -> LocalSelection:
+    """Choose the smallest sufficient local model with warm-model preference.
+
+    Availability comes from the provider's live discovery. Suitability is
+    optional because selection tests may use descriptors without host facts;
+    when supplied, a non-PASS verdict excludes that candidate.
+    """
+    candidates = _eligible_models(descriptors, request.required_capabilities, host)
+    if not candidates:
+        raise ValueError("no suitable local model is available")
+    considered = tuple(d.model_id for d in candidates)
+    warm = next((d for d in candidates if d.model_id == request.warm_model_id), None)
+    if warm is not None and request.prefer_warm_model and request.complexity == "medium":
+        return LocalSelection(
+            provider=warm.runtime, model_id=warm.model_id, complexity=request.complexity,
+            reason="warm sufficient local model retained for medium complexity; switch cost avoided",
+            warm_model_id=request.warm_model_id, switch_required=False,
+            candidates_considered=considered,
+        )
+    chosen = candidates[-1] if request.complexity == "high" else candidates[0]
+    return LocalSelection(
+        provider=chosen.runtime, model_id=chosen.model_id, complexity=request.complexity,
+        reason=_selection_reason(request.complexity),
+        warm_model_id=request.warm_model_id,
+        switch_required=request.warm_model_id is not None and chosen.model_id != request.warm_model_id,
+        candidates_considered=considered,
+    )
 
 
 def _parameter_count(parameter_size: str) -> float | None:
@@ -114,4 +204,7 @@ def evaluate_suitability(
     )
 
 
-__all__ = ["SuitabilityVerdict", "estimate_memory_bytes", "evaluate_suitability"]
+__all__ = [
+    "LocalSelection", "LocalSelectionRequest", "SuitabilityVerdict",
+    "estimate_memory_bytes", "evaluate_suitability", "select_local_model",
+]

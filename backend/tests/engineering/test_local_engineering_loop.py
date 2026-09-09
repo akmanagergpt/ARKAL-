@@ -43,7 +43,7 @@ def _model(content, *, runtime="ollama", state="PASS"):
     plan = {"request_text": "Improve documentation", "target_summary": "Description",
             "operations": [{"operation": "update", "path": "sample.py", "content": content,
                             "rationale": "Requested documentation"}]}
-    model = SimpleNamespace(runtime=runtime, calls=0, timeout=None)
+    model = SimpleNamespace(runtime=runtime, model_id="sample-model", calls=0, timeout=None)
     def infer(model_id, prompt, *, timeout_seconds):
         model.calls += 1
         model.timeout = timeout_seconds
@@ -134,6 +134,27 @@ def test_external_provider_refused(loop, prepared):
     with pytest.raises(ValueError, match="local execution"):
         loop.execute_once(*prepared, model, lambda: {"passed": True})
     assert model.calls == 0
+
+
+def test_local_selector_prefers_smallest_for_low_and_warm_for_medium():
+    from arkali.engineering.localai.adapter import LocalModelDescriptor
+    from arkali.engineering.localai.suitability import LocalSelectionRequest, select_local_model
+    descriptors = (
+        LocalModelDescriptor(runtime="ollama", model_id="large", parameter_size="14B"),
+        LocalModelDescriptor(runtime="ollama", model_id="small", parameter_size="7B"),
+    )
+    low = select_local_model(descriptors, LocalSelectionRequest(complexity="low"))
+    medium = select_local_model(descriptors, LocalSelectionRequest(complexity="medium", warm_model_id="large"))
+    high = select_local_model(descriptors, LocalSelectionRequest(complexity="high"))
+    assert low.model_id == "small" and low.switch_required is False
+    assert medium.model_id == "large" and medium.switch_required is False
+    assert high.model_id == "large"
+
+
+def test_local_selector_never_selects_unavailable_empty_set():
+    from arkali.engineering.localai.suitability import LocalSelectionRequest, select_local_model
+    with pytest.raises(ValueError, match="no suitable local model"):
+        select_local_model((), LocalSelectionRequest(complexity="low"))
 
 
 @pytest.mark.parametrize("operation,path", [("create", "extra.py"), ("update", "unseen.py"),

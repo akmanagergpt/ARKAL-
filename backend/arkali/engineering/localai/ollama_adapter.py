@@ -173,6 +173,7 @@ class OllamaAdapter:
                     quantization=str(details.get("quantization_level", "")),
                     context_length=int(details.get("context_length", 0) or 0),
                     endpoint=self._endpoint,
+                    capabilities=tuple(details.get("capabilities") or ("coding",)),
                 )
             )
         return tuple(found)

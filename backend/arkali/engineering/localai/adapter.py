@@ -47,6 +47,7 @@ class LocalModelDescriptor(BaseModel):
     quantization: str = ""
     context_length: int = 0
     endpoint: str = ""
+    capabilities: tuple[str, ...] = ()
 
 
 class RuntimeProbeResult(BaseModel):
