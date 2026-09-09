@@ -105,12 +105,15 @@ def _graph_payload() -> dict[str, Any]:
 def _task_packet_payload() -> dict[str, Any] | None:
     """D-036 current task packet, or `None` if it cannot be derived safely.
 
-    Reuses `engineering.agent.task_packet`, never a second compiler. `None`
-    (not a raised exception) on failure, so a governance-doc parsing gap
-    degrades the bootstrap to D-035 behaviour rather than breaking `refresh`.
+    Reuses the sibling `scripts/task_packet.py` compiler (deliberately in
+    `scripts/`, not `backend/arkali/`, so it never adds a cross-context edge
+    the live architecture gate would count - see that module's docstring),
+    never a second compiler. `None` (not a raised exception) on failure, so a
+    governance-doc parsing gap degrades the bootstrap to D-035 behaviour
+    rather than breaking `refresh`.
     """
-    sys.path.insert(0, str(BACKEND))
-    from arkali.engineering.agent.task_packet import compile_task_packet
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    from task_packet import compile_task_packet
 
     try:
         return compile_task_packet(REPO)
