@@ -30,6 +30,7 @@ STORE = REPO / "var" / "memory"
 STATUS = STORE / "status.json"
 MANIFEST = STORE / "source_manifest.json"
 GRAPHS = STORE / "python_graphs.json"
+TASK_PACKET = STORE / "task_packet.json"
 OBSIDIAN_STATUS = REPO / "docs" / "hafiza" / ".generated" / "DURUM.md"
 OBSIDIAN_CONTINUE = REPO / "docs" / "hafiza" / ".generated" / "DEVAM_ET.md"
 # Bu araç içerik dışa aktarmasa da hassas konumları hiç taramamak tercih edilir.
@@ -101,6 +102,22 @@ def _graph_payload() -> dict[str, Any]:
     }
 
 
+def _task_packet_payload() -> dict[str, Any] | None:
+    """D-036 current task packet, or `None` if it cannot be derived safely.
+
+    Reuses `engineering.agent.task_packet`, never a second compiler. `None`
+    (not a raised exception) on failure, so a governance-doc parsing gap
+    degrades the bootstrap to D-035 behaviour rather than breaking `refresh`.
+    """
+    sys.path.insert(0, str(BACKEND))
+    from arkali.engineering.agent.task_packet import compile_task_packet
+
+    try:
+        return compile_task_packet(REPO)
+    except Exception:
+        return None
+
+
 def _write_json(path: pathlib.Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     rendered = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -135,7 +152,47 @@ def _write_obsidian_status(status: dict[str, Any]) -> None:
     OBSIDIAN_STATUS.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def continue_markdown(status: dict[str, Any]) -> str:
+def _task_packet_lines(packet: dict[str, Any] | None) -> list[str]:
+    """D-036: compact current-task section, rendered before navigation.
+
+    Absent or unparseable packet renders nothing here rather than stale or
+    guessed content - `docs/build/OPEN_BLOCKERS.md`/`ARKALI_HANDOFF.md`
+    remain the source of truth either way.
+    """
+    if packet is None:
+        return []
+    finding = packet["open_stopping_finding"]
+    if finding:
+        finding_line = (
+            f"- Açık {finding['severity']}/BLOCKER bulgu: **{finding['id']}** "
+            f"({finding['status']}) — {finding['detail']}"
+        )
+    else:
+        finding_line = "- Açık HIGH/BLOCKER bulgu yok."
+    files = "\n".join(
+        f"  - `{item['path']}` — {item['origin']}" for item in packet["next_files"]
+    )
+    action = packet["next_exact_action"] or "Kayıtlı bir sonraki eylem türetilemedi."
+    return [
+        "## Güncel görev paketi (D-036, türetilmiş, otorite değil)",
+        "",
+        f"- Dal/HEAD: `{packet['branch']}` @ `{packet['head'][:12]}` "
+        f"({'temiz' if packet['working_tree_clean'] else 'değişiklik var'})",
+        f"- Aşama: {packet['current_phase'] or 'belirlenemedi'}",
+        finding_line,
+        f"- SONRAKİ KESİN EYLEM: {action}",
+        "- En fazla 5 sonraki dosya:",
+        files,
+        "",
+        "Bu paket çelişirse `docs/build/OPEN_BLOCKERS.md`, `ARKALI_HANDOFF.md` ve "
+        "`docs/build/BUILD_STATE.md` kazanır.",
+        "",
+    ]
+
+
+def continue_markdown(
+    status: dict[str, Any], packet: dict[str, Any] | None = None,
+) -> str:
     """Aylar sonraki dönüş için kısa, otoriteye bağlantılı başlangıç ekranı."""
     changes = status["changes"]
     changed_paths = changes["added"] + changes["changed"] + changes["removed"]
@@ -155,6 +212,7 @@ def continue_markdown(status: dict[str, Any]) -> str:
             "",
             f"Son yenileme: `{status['refreshed_at']}`",
             "",
+            *_task_packet_lines(packet),
             "## Güvenli başlangıç",
             "",
             "1. [[ARKALI_HANDOFF|Devir kaydını]] oku.",
@@ -193,9 +251,9 @@ def continue_markdown(status: dict[str, Any]) -> str:
     )
 
 
-def _write_continue_page(status: dict[str, Any]) -> None:
+def _write_continue_page(status: dict[str, Any], packet: dict[str, Any] | None) -> None:
     OBSIDIAN_CONTINUE.parent.mkdir(parents=True, exist_ok=True)
-    OBSIDIAN_CONTINUE.write_text(continue_markdown(status), encoding="utf-8")
+    OBSIDIAN_CONTINUE.write_text(continue_markdown(status, packet), encoding="utf-8")
 
 
 def refresh() -> dict[str, Any]:
@@ -213,11 +271,14 @@ def refresh() -> dict[str, Any]:
         "not_built": payload["not_built"],
         "changes": changed,
     }
+    packet = _task_packet_payload()
     _write_json(MANIFEST, {"sources": current})
     _write_json(GRAPHS, payload)
     _write_json(STATUS, status)
+    if packet is not None:
+        _write_json(TASK_PACKET, packet)
     _write_obsidian_status(status)
-    _write_continue_page(status)
+    _write_continue_page(status, packet)
     return status
 
 
