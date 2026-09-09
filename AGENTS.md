@@ -28,3 +28,16 @@ Kurallar:
 - Bir değişiklikten önce güncel handoff, açık bulgular ve geçit durumunu kontrol
   et. Yetki veya kabul geçidi gerektiren işlemleri atlama.
 - İş bittiğinde `scripts/arkali_memory.py refresh` ile yerel hafızayı yenile.
+
+Düşük kotalı varsayılan (D-035):
+
+1. Önce hafıza gezinmesini oku.
+2. Tek görev / tek bulgu / tek sahiplik kapsamı.
+3. Açıkça yetkilendirilmedikçe arka plan ajanı/alt ajan kullanma.
+4. Geniş depo taraması istisnadır, varsayılan değildir.
+5. Önce hedefli testler.
+6. Tam regresyon yalnızca kapanışta ve gerektiğinde.
+7. Kısa ara yanıtlar.
+8. Değişmeyen mimariyi yeniden türetme.
+9. Bağlam aşırı büyümeden önce dur ve yeni oturum öner.
+10. Depo gerçeği hafızayı geçersiz kılar.
