@@ -88,3 +88,108 @@ def test_packet_does_not_regress_the_live_architecture_gate() -> None:
     truth = architecture.architecture_truth(REPO)
     assert truth["violations"] == 0
     assert truth["depth"] <= truth["depth_allowed"]
+
+
+# -- live-state correction (task-packet live-state fix) ----------------------
+
+
+def test_packet_carries_live_operational_state_and_hint() -> None:
+    """Every packet now reports the live JobStore snapshot it read, never
+    only a static doc claim about operational work."""
+    packet = _module().compile_task_packet(REPO)
+    live = packet["live_operational_state"]
+    assert "available" in live and "hint" in live
+    assert live["hint"] in {
+        "resolve_open_finding", "live_state_unavailable",
+        "review_pending_product_change", "pending_operational_job",
+        "no_pending_operational_work",
+    }
+    assert isinstance(packet["next_exact_action_potentially_stale"], bool)
+
+
+def test_open_finding_always_outranks_live_operational_state() -> None:
+    """Repository/governance truth stays canonical (rule 3): an open
+    HIGH/BLOCKER wins the hint regardless of what JobStore shows."""
+    tp = _module()
+    hint = tp._live_next_action_hint(
+        1, {"available": True, "active_job_count": 3, "ready_for_review": [{"job_id": "x"}]},
+    )
+    assert hint == "resolve_open_finding"
+
+
+def test_ready_for_review_is_recognised_live() -> None:
+    """Scenario: an active READY_FOR_REVIEW product-change proposal exists."""
+    tp = _module()
+    hint = tp._live_next_action_hint(
+        0, {"available": True, "active_job_count": 1, "ready_for_review": [{"job_id": "x"}]},
+    )
+    assert hint == "review_pending_product_change"
+
+
+def test_pending_job_without_review_is_distinguished_from_idle() -> None:
+    tp = _module()
+    hint = tp._live_next_action_hint(
+        0, {"available": True, "active_job_count": 1, "ready_for_review": []},
+    )
+    assert hint == "pending_operational_job"
+
+
+def test_no_open_finding_and_no_pending_work_yields_truthful_idle_hint() -> None:
+    """Scenario: a completed/live-proven cycle must not suggest replay."""
+    tp = _module()
+    hint = tp._live_next_action_hint(
+        0, {"available": True, "active_job_count": 0, "ready_for_review": []},
+    )
+    assert hint == "no_pending_operational_work"
+
+
+def test_unavailable_live_state_is_reported_not_assumed_idle() -> None:
+    tp = _module()
+    hint = tp._live_next_action_hint(0, {"available": False})
+    assert hint == "live_state_unavailable"
+
+
+def test_stale_static_next_action_flagged_only_against_its_own_marker() -> None:
+    """The exact real conflict this fix targets: static text still claiming
+    a pending product-change accept/reject/restore review while live
+    JobStore shows nothing pending - flagged, never silently corrected."""
+    tp = _module()
+    stale_text = (
+        "proceed with the governed P4 accept/reject/restore proof on the "
+        "existing product; no new Factory generation."
+    )
+    assert tp._next_action_potentially_stale(
+        stale_text, "no_pending_operational_work",
+    ) is True
+    # Same idle hint, unrelated text: never flagged - the check is scoped to
+    # its own narrow marker vocabulary, not a general staleness guess.
+    assert tp._next_action_potentially_stale(
+        "run the full backend regression suite.", "no_pending_operational_work",
+    ) is False
+    # Matching text, but live state shows real pending work: not stale.
+    assert tp._next_action_potentially_stale(
+        stale_text, "review_pending_product_change",
+    ) is False
+    assert tp._next_action_potentially_stale(None, "no_pending_operational_work") is False
+
+
+def test_operational_snapshot_degrades_safely_without_a_live_database(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A fresh checkout with no `var/command_center.db` yet must degrade to
+    `available: False`, never raise and never claim work is pending."""
+    tp = _module()
+    snapshot = tp._operational_snapshot(tmp_path)
+    assert snapshot == {"available": False}
+
+
+def test_operational_snapshot_reflects_the_real_repository_database() -> None:
+    """Live-proven against this repository's own real `var/command_center.db`
+    (not a fixture): the snapshot must be internally consistent, whatever the
+    live state currently is."""
+    tp = _module()
+    snapshot = tp._operational_snapshot(REPO)
+    if snapshot["available"]:
+        assert snapshot["active_job_count"] >= len(snapshot["ready_for_review"])
+        for entry in snapshot["ready_for_review"]:
+            assert entry["job_id"]

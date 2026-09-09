@@ -52,15 +52,61 @@ from arkali.acceptance.governance_state import (  # noqa: E402
     OPEN_BLOCKERS,
     GovernanceState,
 )
+from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
+from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.engineering.agent.context_kinds import ContextKindAuthority  # noqa: E402
 from arkali.engineering.agent.context_package import (  # noqa: E402
     ContextItem,
     ContextPackage,
 )
+from arkali.execution.durable.job_state_machine import (  # noqa: E402
+    CHECKPOINTED,
+    PAUSED,
+    QUEUED,
+    RECOVERABLE,
+    RESUMING,
+    RUNNING,
+)
+from arkali.execution.durable.job_store import JobStore  # noqa: E402
+from arkali.kernel.persistence.engine import (  # noqa: E402
+    create_persistence_engine,
+    sqlite_url,
+)
+from arkali.kernel.persistence.session import (  # noqa: E402
+    create_session_factory,
+    unit_of_work,
+)
 
 PACKET_SCHEMA = "arkali.task_packet/1"
 HANDOFF = "ARKALI_HANDOFF.md"
 BUILD_STATE = "docs/build/BUILD_STATE.md"
+COMMAND_CENTER_DB = "var/command_center.db"
+
+#: Every non-terminal `Job` machine state (`STATE_MACHINES.md` §3) - a job in
+#: any of these is real, live, unfinished operational work.
+_ACTIVE_JOB_STATES: tuple[str, ...] = (
+    QUEUED, RUNNING, CHECKPOINTED, PAUSED, RESUMING, RECOVERABLE,
+)
+
+#: The one job type this task packet checks live, since it is the one D-036's
+#: own `next_exact_action` text has already been observed pointing at
+#: (`scripts/run_product_change_worker.py`'s "ready_for_review" checkpoint
+#: phase). Not a general-purpose registry: a second domain needing the same
+#: live check gets its own named constant here, never a guess over all types.
+_PRODUCT_CHANGE_JOB_TYPE = "managed_product.change"
+_READY_FOR_REVIEW_PHASE = "ready_for_review"
+
+#: A narrow, explicit vocabulary for recognising when the free-text
+#: `next_exact_action` (sourced from `ARKALI_HANDOFF.md`, unchanged, still the
+#: sole authority) is making a claim about THIS ONE checked operational
+#: domain - a pending product-change review. This is not a staleness oracle
+#: over arbitrary prose; it flags exactly one thing: "this text talks about a
+#: product-change proposal, and live JobStore currently shows none pending",
+#: so a reading session sees the conflict instead of re-deriving it by hand.
+_PRODUCT_CHANGE_TEXT_MARKERS: tuple[str, ...] = (
+    "accept/reject", "ready_for_review", "ready for review",
+    "restore-as-new", "restore proof",
+)
 
 #: A commit-ledger row this document itself marks as matching current HEAD.
 #: Reused rather than "the last numbered row": `check_handoff.py` already
@@ -130,6 +176,96 @@ def _next_files(repo_root: pathlib.Path) -> tuple[ContextItem, ...]:
     return tuple(items[:5])
 
 
+def _operational_snapshot(repo_root: pathlib.Path) -> dict[str, Any]:
+    """The minimum live ProjectRegistry/JobStore read needed to keep
+    `next_exact_action` from silently going stale once the one operational
+    proposal it names resolves - `var/command_center.db`'s own live
+    `durable_job`/`job_checkpoint` rows, read through the existing
+    `JobStore`, never a raw query.
+
+    NOT A SECOND TRUTH STORE (per this task's own rule 3): this never edits
+    or replaces `next_exact_action`'s text, which stays sourced from
+    `ARKALI_HANDOFF.md` alone. It only reports what is live-true right now,
+    so `next_exact_action_potentially_stale` below can say "these two
+    disagree" without this compiler ever deciding which one is right -
+    identical in spirit to `CANONICAL_AMBIGUITY`: disclose, never guess.
+
+    Best-effort and read-only: an absent database (a fresh checkout that has
+    never run Command Center) or any read failure degrades to
+    `{"available": False}` rather than raising, matching
+    `arkali_memory.py::_task_packet_payload`'s own None-on-failure contract
+    for this same packet.
+    """
+    db_path = repo_root / COMMAND_CENTER_DB
+    if not db_path.is_file():
+        return {"available": False}
+
+    try:
+        engine = create_persistence_engine(sqlite_url(db_path))
+        factory = create_session_factory(engine)
+        pdp = PolicyDecisionPoint.load(repo_root)
+        with unit_of_work(factory) as session:
+            pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
+            store = JobStore(session, pep)
+            active = store.list_by_state(_ACTIVE_JOB_STATES)
+
+            ready_for_review: list[dict[str, str]] = []
+            for job in active:
+                if job.job_type != _PRODUCT_CHANGE_JOB_TYPE:
+                    continue
+                checkpoints = store.checkpoints(job.job_id)
+                phase = checkpoints[-1].payload.get("phase") if checkpoints else None
+                if phase == _READY_FOR_REVIEW_PHASE:
+                    ready_for_review.append({
+                        "job_id": job.job_id,
+                        "project_id": str(job.payload.get("project_id", "")),
+                    })
+
+            return {
+                "available": True,
+                "active_job_count": len(active),
+                "ready_for_review": ready_for_review,
+            }
+    except Exception:
+        return {"available": False}
+
+
+def _live_next_action_hint(
+    stopping_count: int, snapshot: dict[str, Any],
+) -> str:
+    """One of the states rule 4 asks this packet to distinguish.
+
+    Order matters and matches priority, not chronology: an open
+    HIGH/BLOCKER always outranks live operational state (repository
+    governance truth stays canonical per rule 3), live review-ready work
+    outranks a merely-running job, and "unavailable" is honestly reported
+    rather than defaulting to "nothing pending".
+    """
+    if stopping_count > 0:
+        return "resolve_open_finding"
+    if not snapshot["available"]:
+        return "live_state_unavailable"
+    if snapshot["ready_for_review"]:
+        return "review_pending_product_change"
+    if snapshot["active_job_count"] > 0:
+        return "pending_operational_job"
+    return "no_pending_operational_work"
+
+
+def _next_action_potentially_stale(next_action: str | None, hint: str) -> bool:
+    """Narrow conflict check, scoped only to `_PRODUCT_CHANGE_TEXT_MARKERS`.
+
+    True only when the static text itself claims a pending product-change
+    review AND live JobStore currently shows none. Never fires for any other
+    kind of `next_exact_action` text - a second domain needs its own marker
+    list and its own reasoning here, not a broadened guess.
+    """
+    if next_action is None or hint != "no_pending_operational_work":
+        return False
+    lowered = next_action.lower()
+    return any(marker in lowered for marker in _PRODUCT_CHANGE_TEXT_MARKERS)
+
+
 def compile_task_packet(repo_root: pathlib.Path) -> dict[str, Any]:
     """Derive the current task packet. Read-only: writes nothing itself."""
     branch = _git(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
@@ -156,6 +292,9 @@ def compile_task_packet(repo_root: pathlib.Path) -> dict[str, Any]:
     head_row = _latest_head_row(_read(repo_root, HANDOFF))
     next_action = _next_exact_action(head_row[1]) if head_row else None
 
+    live = _operational_snapshot(repo_root)
+    live_hint = _live_next_action_hint(len(stopping), live)
+
     authority = ContextKindAuthority.load(repo_root)
     files = _next_files(repo_root)
     package = ContextPackage.compiled(
@@ -176,6 +315,10 @@ def compile_task_packet(repo_root: pathlib.Path) -> dict[str, Any]:
         "open_stopping_finding_count": len(stopping),
         "open_stopping_finding": top_finding,
         "next_exact_action": next_action,
+        "next_exact_action_potentially_stale": _next_action_potentially_stale(
+            next_action, live_hint,
+        ),
+        "live_operational_state": {**live, "hint": live_hint},
         "next_files": [
             {"path": item.identifier, "origin": item.origin} for item in package.items
         ],
