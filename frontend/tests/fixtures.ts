@@ -10,6 +10,7 @@
 
 import type {
   _CodeIntelligenceSnapshotResponse,
+  _DiagnosticsSnapshotResponse,
   FactoryHistorySnapshot,
   LifecycleMachineResponse,
   OperationsSnapshot,
@@ -307,6 +308,30 @@ export const CODE_INTELLIGENCE_SNAPSHOT_WITH_VIOLATIONS: _CodeIntelligenceSnapsh
     gates_passed: 7, gates_total: 8,
     violations: ['architecture_budget_violation: context surfaces.command: public surface 41 > 40'],
   },
+};
+
+export const DIAGNOSTICS_SNAPSHOT_HEALTHY: _DiagnosticsSnapshotResponse = {
+  overall_status: 'HEALTHY',
+  open_stopping_count: 0,
+  top_findings: [],
+  architecture: { gates_passed: 8, gates_total: 8, violations: [] },
+  operational_hint: 'no_pending_operational_work',
+  generated_at: '2026-09-09T19:33:32.857176+00:00',
+};
+
+export const DIAGNOSTICS_SNAPSHOT_ATTENTION: _DiagnosticsSnapshotResponse = {
+  overall_status: 'ATTENTION_NEEDED',
+  open_stopping_count: 2,
+  top_findings: [
+    { identifier: 'F-0099', severity: 'HIGH', status: 'OPEN', detail: 'A real open finding detail.' },
+    { identifier: 'F-0098', severity: 'HIGH', status: 'OPEN', detail: '' },
+  ],
+  architecture: {
+    gates_passed: 7, gates_total: 8,
+    violations: ['architecture_budget_violation: context surfaces.command: public surface 41 > 40'],
+  },
+  operational_hint: 'resolve_open_finding',
+  generated_at: '2026-09-09T19:33:32.857176+00:00',
 };
 
 export const FACTORY_HISTORY_SNAPSHOT: FactoryHistorySnapshot = {

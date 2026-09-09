@@ -22,6 +22,7 @@ an evidence harness, not a deployment path.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import pathlib
 import subprocess
 import sys
@@ -38,7 +39,8 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from arkali.acceptance.governance_state import GovernanceState  # noqa: E402
+from arkali.acceptance.findings import Finding, parse_findings  # noqa: E402
+from arkali.acceptance.governance_state import OPEN_BLOCKERS, GovernanceState  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.policy.workflow_approval import WorkflowApprovalGate  # noqa: E402
@@ -61,6 +63,9 @@ from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E40
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.durable.job_state_machine import QUEUED as _JOB_QUEUED  # noqa: E402
+from arkali.execution.durable.job_state_machine import (  # noqa: E402
+    CHECKPOINTED, PAUSED, RECOVERABLE, RESUMING, RUNNING,
+)
 from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
 from arkali.execution.workflow.executor import WorkflowExecutor  # noqa: E402
 from arkali.execution.workflow.graph_model import (  # noqa: E402
@@ -104,6 +109,13 @@ from arkali.surfaces.command.code_intelligence import (  # noqa: E402
     _build_code_intelligence_router,
     _observe_code_intelligence,
 )
+from arkali.surfaces.command.diagnostics import (  # noqa: E402
+    DiagnosticsSnapshotSource,
+    _build_diagnostics_router,
+    _DiagnosticsFinding,
+    _DiagnosticsSnapshotResponse,
+)
+from arkali.surfaces.operations.ai_review_bundle import observe_architecture  # noqa: E402
 from arkali.surfaces.operations.contracts import DimensionReading  # noqa: E402
 from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
 from arkali.engineering.product_change.change_plan import ChangePlan  # noqa: E402
@@ -261,6 +273,95 @@ def _code_intelligence_wiring(repo_root: pathlib.Path) -> CodeIntelligenceSnapsh
 
     def snapshot():  # noqa: ANN202
         return _observe_code_intelligence(backend_arkali_root, repo_root)
+
+    return snapshot
+
+
+#: The same job-type/checkpoint-phase names `_providers_wiring` above and
+#: `scripts/task_packet.py::_operational_snapshot` both already use.
+_PRODUCT_CHANGE_JOB_TYPE = "managed_product.change"
+_READY_FOR_REVIEW_PHASE = "ready_for_review"
+_DIAGNOSTICS_ACTIVE_JOB_STATES = (
+    _JOB_QUEUED, RUNNING, CHECKPOINTED, PAUSED, RESUMING, RECOVERABLE,
+)
+_DIAGNOSTICS_SEVERITY_RANK = {"BLOCKER": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+_DIAGNOSTICS_MAX_TOP_FINDINGS = 5
+_DIAGNOSTICS_MAX_DETAIL_CHARS = 200
+
+
+def _diagnostics_operational_hint(
+    stopping_count: int, session: Session, pep: PolicyEnforcementPoint,
+) -> str:
+    """The identical five-value vocabulary and priority order `scripts/
+    task_packet.py::_live_next_action_hint` already established, derived
+    fresh here from the real `JobStore` rather than shared code across the
+    `scripts/`<->`backend/arkali` boundary (`diagnostics.py`'s own module
+    docstring names exactly why that boundary is one-directional)."""
+    if stopping_count > 0:
+        return "resolve_open_finding"
+    try:
+        store = JobStore(session, pep)
+        active = store.list_by_state(_DIAGNOSTICS_ACTIVE_JOB_STATES)
+    except Exception:
+        return "live_state_unavailable"
+    for job in active:
+        if job.job_type != _PRODUCT_CHANGE_JOB_TYPE:
+            continue
+        checkpoints = store.checkpoints(job.job_id)
+        phase = checkpoints[-1].payload.get("phase") if checkpoints else None
+        if phase == _READY_FOR_REVIEW_PHASE:
+            return "review_pending_product_change"
+    return "pending_operational_job" if active else "no_pending_operational_work"
+
+
+def _diagnostics_finding_rank(finding: Finding) -> tuple[int, str]:
+    return (
+        _DIAGNOSTICS_SEVERITY_RANK.get(finding.severity.upper(), len(_DIAGNOSTICS_SEVERITY_RANK)),
+        finding.identifier,
+    )
+
+
+def _diagnostics_top_findings(all_findings: tuple[Finding, ...]) -> tuple[_DiagnosticsFinding, ...]:
+    open_findings = sorted(
+        (f for f in all_findings if f.is_open), key=_diagnostics_finding_rank,
+    )
+    return tuple(
+        _DiagnosticsFinding(
+            identifier=f.identifier, severity=f.severity, status=f.status.value,
+            detail=" ".join(f.detail.split())[:_DIAGNOSTICS_MAX_DETAIL_CHARS],
+        )
+        for f in open_findings[:_DIAGNOSTICS_MAX_TOP_FINDINGS]
+    )
+
+
+def _diagnostics_wiring(
+    pdp: PolicyDecisionPoint, repo_root: pathlib.Path,
+) -> DiagnosticsSnapshotSource:
+    """Tanılama composition-root wiring - the identical reason `operations.
+    py`'s own module docstring already documents for `PolicyEnforcementPoint`
+    / `host_probe`: this script sits outside the measured architecture
+    graph, so composing real `GovernanceState`/`findings.parse_findings`
+    (already at `acceptance.engine`'s own orchestration-depth ceiling) and
+    a real `JobStore`-backed `PolicyEnforcementPoint` (already at `control.
+    policy.pep`'s own fan-in ceiling) here adds no edge the architecture
+    budget would ever see.
+    """
+    def snapshot(session: Session) -> _DiagnosticsSnapshotResponse:
+        governance = GovernanceState.load(repo_root)
+        stopping = governance.open_stopping_findings
+        all_findings = parse_findings((repo_root / OPEN_BLOCKERS).read_text(encoding="utf-8"))
+        architecture = observe_architecture(repo_root)
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
+        hint = _diagnostics_operational_hint(len(stopping), session, pep)
+        healthy = len(stopping) == 0 and not architecture.violations
+        return _DiagnosticsSnapshotResponse(
+            overall_status="HEALTHY" if healthy else "ATTENTION_NEEDED",
+            open_stopping_count=len(stopping),
+            top_findings=_diagnostics_top_findings(all_findings),
+            architecture=architecture,
+            operational_hint=hint,
+            generated_at=dt.datetime.now(dt.UTC),
+        )
 
     return snapshot
 
@@ -597,6 +698,7 @@ def main(argv: list[str]) -> int:
             product_change=_product_change_wiring(ROOT, database),
             providers_wiring=_providers_wiring(ROOT),
             code_intelligence_wiring=_code_intelligence_wiring(ROOT),
+            diagnostics_wiring=_diagnostics_wiring(pdp, ROOT),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")

@@ -19,6 +19,7 @@ import type {
   _CodeIntelligenceSnapshotResponse,
   CreateProjectRequest,
   CreateRevisionRequest,
+  _DiagnosticsSnapshotResponse,
   _FactoryGoalRequest,
   FactoryHistorySnapshot,
   _FactoryIntakeResponse,
@@ -77,6 +78,7 @@ export const ENDPOINTS = {
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
   providersSnapshot: { method: 'GET', path: '/api/providers/snapshot' },
   codeIntelligenceSnapshot: { method: 'GET', path: '/api/code-intelligence/snapshot' },
+  diagnosticsSnapshot: { method: 'GET', path: '/api/diagnostics/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
   startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
@@ -383,6 +385,18 @@ export class ArkaliApiClient {
   codeIntelligenceSnapshot(signal?: AbortSignal): Promise<_CodeIntelligenceSnapshotResponse> {
     return this.request<_CodeIntelligenceSnapshotResponse>(
       ENDPOINTS.codeIntelligenceSnapshot,
+      signal === undefined ? {} : { signal },
+    );
+  }
+
+  /**
+   * Tanılama: a representation-only diagnostics summary composed fresh, on
+   * every call, from real governance findings, the real architecture gate
+   * and a live JobStore read - never cached here, never a second truth.
+   */
+  diagnosticsSnapshot(signal?: AbortSignal): Promise<_DiagnosticsSnapshotResponse> {
+    return this.request<_DiagnosticsSnapshotResponse>(
+      ENDPOINTS.diagnosticsSnapshot,
       signal === undefined ? {} : { signal },
     );
   }

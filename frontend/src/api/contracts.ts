@@ -254,6 +254,31 @@ export interface _CodeIntelligenceSnapshotResponse {
   architecture: ArchitectureSummary;
 }
 
+/** One open finding, bounded and truncated by the backend composition root -
+ * never the full ledger row. */
+export interface _DiagnosticsFinding {
+  identifier: string;
+  severity: string;
+  status: string;
+  detail: string;
+}
+
+/**
+ * Tanılama (Command Center Wave 2C, Surface C): a representation-only
+ * summary composed fresh, on every call, from `GovernanceState`/findings,
+ * the real architecture gate (`ArchitectureSummary`, reused verbatim) and a
+ * live `JobStore` read. `operational_hint` is a structured value, never
+ * free text, so it cannot go stale the way cached prose can.
+ */
+export interface _DiagnosticsSnapshotResponse {
+  overall_status: string;
+  open_stopping_count: number;
+  top_findings: _DiagnosticsFinding[];
+  architecture: ArchitectureSummary;
+  operational_hint: string;
+  generated_at: string;
+}
+
 /**
  * Read-only Phase 30 production-history shapes.
  *

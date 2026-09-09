@@ -21,5 +21,5 @@ export const COMMAND_AREAS: readonly CommandArea[] = [
   { id: 'extensions', label: 'Uzantılar', description: 'Eklentiler ve entegrasyonlar', available: false },
   { id: 'security', label: 'Güvenlik', description: 'Politikalar ve güvenlik bulguları', available: false },
   { id: 'release', label: 'Sürüm ve Dağıtım', description: 'Sürüm hazırlığı ve teslimat', available: false },
-  { id: 'diagnostics', label: 'Tanılama', description: 'Teknik inceleme araçları', available: false },
+  { id: 'diagnostics', label: 'Tanılama', description: 'Teknik inceleme araçları', available: true },
 ] as const;

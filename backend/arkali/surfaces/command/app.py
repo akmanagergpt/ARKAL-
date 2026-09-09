@@ -79,6 +79,10 @@ from arkali.surfaces.command.code_intelligence import (
     _build_code_intelligence_router,
     CodeIntelligenceSnapshotSource,
 )
+from arkali.surfaces.command.diagnostics import (
+    _build_diagnostics_router,
+    DiagnosticsSnapshotSource,
+)
 from arkali.surfaces.command.revision_preview_routes import _build_revision_preview_router
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
@@ -125,6 +129,11 @@ class _CommandExtensions:
     #: omits the route entirely, the identical additive-and-optional shape
     #: every extension above already uses.
     code_intelligence_wiring: CodeIntelligenceSnapshotSource | None = None
+    #: Tanılama (Command Center Wave 2C, Surface C) -- see
+    #: `diagnostics.py`'s own module docstring. `None` (the default) omits
+    #: the route entirely, the identical additive-and-optional shape every
+    #: extension above already uses.
+    diagnostics_wiring: DiagnosticsSnapshotSource | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -420,6 +429,7 @@ def create_app(
     # against a budget of 12 (found by running the gate, not assumed).
     _include_providers_router(app, extensions, guard)
     _include_code_intelligence_router(app, extensions, guard)
+    _include_diagnostics_router(app, extensions, session_scope, guard)
     return app
 
 
@@ -438,6 +448,17 @@ def _include_code_intelligence_router(
         return
     app.include_router(
         _build_code_intelligence_router(guard, extensions.code_intelligence_wiring)
+    )
+
+
+def _include_diagnostics_router(
+    app: FastAPI, extensions: _CommandExtensions | None,
+    session_scope: Callable[[], Iterator[Session]], guard: Callable[[str], None],
+) -> None:
+    if extensions is None or extensions.diagnostics_wiring is None:
+        return
+    app.include_router(
+        _build_diagnostics_router(guard, session_scope, extensions.diagnostics_wiring)
     )
 
 

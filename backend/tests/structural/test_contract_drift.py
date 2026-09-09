@@ -35,7 +35,8 @@ from arkali.engineering.localai import host_probe
 from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.surfaces.command import (
-    code_intelligence, contracts, factory, factory_history, providers, workflow_contracts,
+    code_intelligence, contracts, diagnostics, factory, factory_history, providers,
+    workflow_contracts,
 )
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
@@ -169,6 +170,61 @@ def _code_intelligence_wiring(repo_root: pathlib.Path):
 
     def snapshot():
         return _observe_code_intelligence(backend_arkali_root, repo_root)
+
+    return snapshot
+
+
+def _diagnostics_wiring(pdp: PolicyDecisionPoint, repo_root: pathlib.Path):
+    """Mirrors `scripts/run_command_center.py`'s own `_diagnostics_wiring`
+    exactly, so `/api/diagnostics/snapshot` is drift-tested against the
+    same real composition a live caller reaches."""
+    from arkali.acceptance.findings import Finding, parse_findings
+    from arkali.acceptance.governance_state import OPEN_BLOCKERS, GovernanceState
+    from arkali.control.policy.pep import PolicyEnforcementPoint
+    from arkali.execution.durable.job_state_machine import (
+        CHECKPOINTED, PAUSED, QUEUED, RECOVERABLE, RESUMING, RUNNING,
+    )
+    from arkali.execution.durable.job_store import JobStore
+    from arkali.surfaces.command.diagnostics import _DiagnosticsFinding, _DiagnosticsSnapshotResponse
+    from arkali.surfaces.operations.ai_review_bundle import observe_architecture
+
+    active_states = (QUEUED, RUNNING, CHECKPOINTED, PAUSED, RESUMING, RECOVERABLE)
+    rank = {"BLOCKER": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+
+    def top_findings(all_findings: tuple[Finding, ...]):
+        open_findings = sorted(
+            (f for f in all_findings if f.is_open),
+            key=lambda f: (rank.get(f.severity.upper(), len(rank)), f.identifier),
+        )
+        return tuple(
+            _DiagnosticsFinding(
+                identifier=f.identifier, severity=f.severity, status=f.status.value,
+                detail=" ".join(f.detail.split())[:200],
+            )
+            for f in open_findings[:5]
+        )
+
+    def snapshot(session):
+        governance = GovernanceState.load(repo_root)
+        stopping = governance.open_stopping_findings
+        all_findings = parse_findings((repo_root / OPEN_BLOCKERS).read_text(encoding="utf-8"))
+        architecture = observe_architecture(repo_root)
+        pep = PolicyEnforcementPoint(pdp, "execution.durable.job_store")
+        store = JobStore(session, pep)
+        active = store.list_by_state(active_states)
+        hint = "resolve_open_finding" if stopping else (
+            "pending_operational_job" if active else "no_pending_operational_work"
+        )
+        healthy = len(stopping) == 0 and not architecture.violations
+        import datetime as _dt
+        return _DiagnosticsSnapshotResponse(
+            overall_status="HEALTHY" if healthy else "ATTENTION_NEEDED",
+            open_stopping_count=len(stopping),
+            top_findings=top_findings(all_findings),
+            architecture=architecture,
+            operational_hint=hint,
+            generated_at=_dt.datetime.now(_dt.UTC),
+        )
 
     return snapshot
 
@@ -331,6 +387,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             product_change=_product_change_wiring(),
             providers_wiring=_providers_wiring(REPO),
             code_intelligence_wiring=_code_intelligence_wiring(REPO),
+            diagnostics_wiring=_diagnostics_wiring(pdp, REPO),
         ),
     )
 
@@ -423,7 +480,7 @@ def surface_contract_names() -> frozenset[str]:
     """
     modules = (
         contracts, workflow_contracts, operations_contracts, factory_history, factory,
-        providers, code_intelligence, ai_review_bundle,
+        providers, code_intelligence, ai_review_bundle, diagnostics,
     )
     return frozenset(
         name
