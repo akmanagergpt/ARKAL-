@@ -94,6 +94,12 @@ from arkali.surfaces.command.product_change_bridge import (  # noqa: E402
 from arkali.surfaces.command.product_preview_resolution import (  # noqa: E402
     _PreviewBridgeWiring,
 )
+from arkali.surfaces.command.providers import (  # noqa: E402
+    ProvidersSnapshotSource,
+    _build_providers_router,
+    _ProvidersSnapshotResponse,
+)
+from arkali.surfaces.operations.contracts import DimensionReading  # noqa: E402
 from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
 from arkali.engineering.product_change.change_plan import ChangePlan  # noqa: E402
 from arkali.engineering.product_change.errors import (  # noqa: E402
@@ -169,6 +175,76 @@ def _should_auto_spawn_worker(
     )
 
 
+#: `ARK-REQ-0048`'s own owning phase (register-verified in tests) - the
+#: Capability Graph's activation gate every real caller must answer the
+#: identical way.
+_CAPABILITY_ACTIVATION_PHASE = "9B"
+
+
+def _current_capability_phase(repo_root: pathlib.Path) -> str:
+    """`GovernanceState` (`acceptance.engine`) is asked here, not inside
+    `capability_query.py`: that module lives in `engineering.localai`, a
+    lower architecture layer, and importing `acceptance.engine` from it
+    extended the repository's longest dependency chain past
+    `max_orchestration_depth` (proven by trying it, not assumed). This
+    script is outside the measured architecture graph, exactly like every
+    `host_probe`/`compose_real_capability_authority` composition below.
+    Shared by every real caller of `compose_real_capability_authority` in
+    this script, so "has phase 9B been reached" is answered once, the same
+    way, rather than re-derived per composition.
+    """
+    governance = GovernanceState.load(repo_root)
+    return (
+        _CAPABILITY_ACTIVATION_PHASE
+        if governance.phase(_CAPABILITY_ACTIVATION_PHASE).is_accepted
+        else str(governance.current_work_phase())
+    )
+
+
+def _providers_wiring(repo_root: pathlib.Path) -> ProvidersSnapshotSource:
+    """Sağlayıcılar ve Modeller composition-root wiring - the identical
+    probe-once-not-per-request shape `_factory_submitter` below already
+    establishes for Factory routing, composed independently here so this
+    route's own lifecycle never depends on Factory's. Host facts
+    (accelerator presence) are probed fresh on every call instead, the
+    identical choice `_operations_wiring` already makes for
+    `host_probe.probe_host`.
+    """
+    authority = compose_real_capability_authority(
+        repo_root, OllamaAdapter(), _current_capability_phase(repo_root),
+    )
+
+    def snapshot() -> _ProvidersSnapshotResponse:
+        model_id = authority.default_capability_id
+        if model_id is None:
+            local_runtime = DimensionReading.not_configured(
+                "local_runtime", "yerel bir AI modeli şu anda kullanılamıyor",
+            )
+            configured_model = DimensionReading.not_configured(
+                "configured_model", "hiçbir model yapılandırılmamış",
+            )
+        else:
+            local_runtime = DimensionReading.real(
+                "local_runtime", 1.0, f"yerel model kullanılabilir: {model_id}",
+            )
+            configured_model = DimensionReading.real(
+                "configured_model", 1.0, f"yapılandırılmış model: {model_id}",
+            )
+        host = host_probe.probe_host()
+        accelerator = (
+            DimensionReading.real("accelerator", 1.0, host.accelerator_detail)
+            if host.accelerator_present
+            else DimensionReading.not_configured("accelerator", host.accelerator_detail)
+        )
+        return _ProvidersSnapshotResponse(
+            local_runtime=local_runtime,
+            configured_model=configured_model,
+            accelerator=accelerator,
+        )
+
+    return snapshot
+
+
 def _factory_submitter(
     pdp: PolicyDecisionPoint, repo_root: pathlib.Path, database: pathlib.Path
 ) -> Callable[..., Any]:
@@ -184,21 +260,9 @@ def _factory_submitter(
     and only to a capability this same probe found genuinely configured -
     if none is, the default stays `None` and routing honestly escalates.
     """
-    # `GovernanceState` (`acceptance.engine`) is asked here, not inside
-    # `capability_query.py`: that module lives in `engineering.localai`, a
-    # lower architecture layer, and importing `acceptance.engine` from it
-    # extended the repository's longest dependency chain past
-    # `max_orchestration_depth` (proven by trying it, not assumed). This
-    # script is outside the measured architecture graph, exactly like its
-    # own `host_probe`/`ProductionFactory` composition just below.
-    activation_phase = "9B"  # ARK-REQ-0048's own owning phase (register-verified in tests)
-    governance = GovernanceState.load(repo_root)
-    current_phase = (
-        activation_phase
-        if governance.phase(activation_phase).is_accepted
-        else str(governance.current_work_phase())
+    authority = compose_real_capability_authority(
+        repo_root, OllamaAdapter(), _current_capability_phase(repo_root),
     )
-    authority = compose_real_capability_authority(repo_root, OllamaAdapter(), current_phase)
     factory = ProductionFactory(AuthorityMap.load(repo_root), authority.query)
     # `run_factory_worker.py` opens its own fixed `var/command_center.db` by
     # design (its own module docstring: no logic here may be copied into
@@ -511,6 +575,7 @@ def main(argv: list[str]) -> int:
             factory_campaign_history=_factory_campaign_history(ROOT),
             preview_bridge=_preview_bridge_wiring(ROOT),
             product_change=_product_change_wiring(ROOT, database),
+            providers_wiring=_providers_wiring(ROOT),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")

@@ -14,6 +14,7 @@ import type {
   OperationsSnapshot,
   ProjectDetailResponse,
   ProjectListResponse,
+  _ProvidersSnapshotResponse,
   WorkflowExecutionDetailResponse,
   WorkflowRevisionDetailResponse,
 } from '@/api/contracts';
@@ -253,6 +254,36 @@ export const OPERATIONS_SNAPSHOT_NOT_CONFIGURED: OperationsSnapshot = {
     database_size_bytes: {
       dimension: 'database_size_bytes', detail: 'no storage configured', ...NOT_CONFIGURED_READING,
     },
+  },
+};
+
+export const PROVIDERS_SNAPSHOT: _ProvidersSnapshotResponse = {
+  local_runtime: {
+    dimension: 'local_runtime', state: 'PASS',
+    detail: 'yerel model kullanılabilir: localai.ollama.qwen2_5_coder_14b', value: 1,
+  },
+  configured_model: {
+    dimension: 'configured_model', state: 'PASS',
+    detail: 'yapılandırılmış model: localai.ollama.qwen2_5_coder_14b', value: 1,
+  },
+  accelerator: {
+    dimension: 'accelerator', state: 'PASS',
+    detail: '1 accelerator(s): NVIDIA GeForce RTX 5050 Laptop GPU', value: 1,
+  },
+};
+
+export const PROVIDERS_SNAPSHOT_NOT_CONFIGURED: _ProvidersSnapshotResponse = {
+  local_runtime: {
+    dimension: 'local_runtime', detail: 'yerel bir AI modeli şu anda kullanılamıyor',
+    ...NOT_CONFIGURED_READING,
+  },
+  configured_model: {
+    dimension: 'configured_model', detail: 'hiçbir model yapılandırılmamış',
+    ...NOT_CONFIGURED_READING,
+  },
+  accelerator: {
+    dimension: 'accelerator', detail: 'nvidia-smi not found on PATH; no accelerator detected',
+    ...NOT_CONFIGURED_READING,
   },
 };
 

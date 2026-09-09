@@ -28,6 +28,7 @@ import type {
   OperationsSnapshot,
   ProjectDetailResponse,
   ProjectListResponse,
+  _ProvidersSnapshotResponse,
   PublishWorkflowRevisionRequest,
   StartExecutionRequest,
   _StartChangeRequest,
@@ -73,6 +74,7 @@ export const ENDPOINTS = {
     path: '/api/workflows/{workflow_id}/executions/{execution_id}/approve',
   },
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
+  providersSnapshot: { method: 'GET', path: '/api/providers/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
   startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
@@ -354,6 +356,18 @@ export class ArkaliApiClient {
   operationsSnapshot(signal?: AbortSignal): Promise<OperationsSnapshot> {
     return this.request<OperationsSnapshot>(
       ENDPOINTS.operationsSnapshot,
+      signal === undefined ? {} : { signal },
+    );
+  }
+
+  /**
+   * Sağlayıcılar ve Modeller: local-AI readiness, composed once at backend
+   * startup from `engineering.localai`'s real capability/host-probe
+   * authorities. Never cached here across renders.
+   */
+  providersSnapshot(signal?: AbortSignal): Promise<_ProvidersSnapshotResponse> {
+    return this.request<_ProvidersSnapshotResponse>(
+      ENDPOINTS.providersSnapshot,
       signal === undefined ? {} : { signal },
     );
   }

@@ -34,7 +34,9 @@ from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.engineering.localai import host_probe
 from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
-from arkali.surfaces.command import contracts, factory, factory_history, workflow_contracts
+from arkali.surfaces.command import (
+    contracts, factory, factory_history, providers, workflow_contracts,
+)
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
     BROWSER_SLICE,
@@ -117,6 +119,43 @@ def _operations_wiring(pdp: PolicyDecisionPoint):
         return WorkflowExecutor(session, pdp, vocabulary, approval_gate)
 
     return job_recovery_factory, executor_factory, pdp, host_probe.probe_host
+
+
+def _providers_wiring(repo_root: pathlib.Path):
+    """Mirrors `scripts/run_command_center.py`'s own `_providers_wiring`
+    exactly, so `/api/providers/snapshot` is drift-tested against the same
+    real `compose_real_capability_authority`/`host_probe` composition a live
+    caller reaches - not a narrower stand-in."""
+    from arkali.engineering.localai import host_probe
+    from arkali.engineering.localai.capability_query import (
+        compose_real_capability_authority,
+    )
+    from arkali.engineering.localai.ollama_adapter import OllamaAdapter
+    from arkali.surfaces.command.providers import _ProvidersSnapshotResponse
+    from arkali.surfaces.operations.contracts import DimensionReading
+
+    authority = compose_real_capability_authority(repo_root, OllamaAdapter(), "9B")
+
+    def snapshot() -> _ProvidersSnapshotResponse:
+        model_id = authority.default_capability_id
+        if model_id is None:
+            local_runtime = DimensionReading.not_configured("local_runtime", "n/a")
+            configured_model = DimensionReading.not_configured("configured_model", "n/a")
+        else:
+            local_runtime = DimensionReading.real("local_runtime", 1.0, model_id)
+            configured_model = DimensionReading.real("configured_model", 1.0, model_id)
+        host = host_probe.probe_host()
+        accelerator = (
+            DimensionReading.real("accelerator", 1.0, host.accelerator_detail)
+            if host.accelerator_present
+            else DimensionReading.not_configured("accelerator", host.accelerator_detail)
+        )
+        return _ProvidersSnapshotResponse(
+            local_runtime=local_runtime, configured_model=configured_model,
+            accelerator=accelerator,
+        )
+
+    return snapshot
 
 
 def _factory_submitter_wiring(pdp: PolicyDecisionPoint):
@@ -275,6 +314,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             factory_submitter=_factory_submitter_wiring(pdp),
             preview_bridge=_preview_bridge_wiring(pdp, tmp_path_factory.mktemp("preview-bridge-var")),
             product_change=_product_change_wiring(),
+            providers_wiring=_providers_wiring(REPO),
         ),
     )
 
@@ -365,7 +405,10 @@ def surface_contract_names() -> frozenset[str]:
     this surface publishes even though `surfaces.command` does not declare
     the class.
     """
-    modules = (contracts, workflow_contracts, operations_contracts, factory_history, factory)
+    modules = (
+        contracts, workflow_contracts, operations_contracts, factory_history, factory,
+        providers,
+    )
     return frozenset(
         name
         for module in modules

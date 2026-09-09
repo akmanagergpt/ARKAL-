@@ -208,6 +208,22 @@ export interface OperationsSnapshot {
 }
 
 /**
+ * Sağlayıcılar ve Modeller (Command Center Wave 2, Surface A): the same
+ * `DimensionReading` shape Operations already uses, never a second
+ * telemetry contract. Composed once at backend startup from
+ * `engineering.localai`'s real capability/host-probe authorities.
+ *
+ * Name matches the backend Pydantic class verbatim, underscore included -
+ * the same convention `_ChangePromotionResponse`/`_JobCheckpointResponse`
+ * already establish for a private (budget-exempt) response model.
+ */
+export interface _ProvidersSnapshotResponse {
+  local_runtime: DimensionReading;
+  configured_model: DimensionReading;
+  accelerator: DimensionReading;
+}
+
+/**
  * Read-only Phase 30 production-history shapes.
  *
  * NOT A LIVE ORCHESTRATOR VIEW. This is what the staged-generation
