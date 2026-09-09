@@ -75,6 +75,10 @@ from arkali.surfaces.command.product_change_bridge import _ProductChangeWiring
 from arkali.surfaces.command.product_change_routes import _build_product_change_router
 from arkali.surfaces.command.product_preview_resolution import _PreviewBridgeWiring
 from arkali.surfaces.command.providers import _build_providers_router, ProvidersSnapshotSource
+from arkali.surfaces.command.code_intelligence import (
+    _build_code_intelligence_router,
+    CodeIntelligenceSnapshotSource,
+)
 from arkali.surfaces.command.revision_preview_routes import _build_revision_preview_router
 from arkali.surfaces.command.operations import Wiring as OperationsWiring
 from arkali.surfaces.command.operations import _build_operations_router
@@ -116,6 +120,11 @@ class _CommandExtensions:
     #: the route entirely, the identical additive-and-optional shape every
     #: extension above already uses.
     providers_wiring: ProvidersSnapshotSource | None = None
+    #: Kod Zekâsı (Command Center Wave 2B, Surface B) -- see
+    #: `code_intelligence.py`'s own module docstring. `None` (the default)
+    #: omits the route entirely, the identical additive-and-optional shape
+    #: every extension above already uses.
+    code_intelligence_wiring: CodeIntelligenceSnapshotSource | None = None
 
 
 def _project_response(record: ProjectRecord) -> ProjectResponse:
@@ -405,11 +414,12 @@ def create_app(
     # for the identical reason -- keeping this branch out of `create_app`
     # itself so its own cyclomatic-complexity budget is not spent again.
     _include_revision_preview_router(app, extensions, session_scope, guard, refuse, pep, clock)
-    # Sağlayıcılar ve Modeller (Wave 2, Surface A): additive and optional,
-    # the identical extracted-function shape, for the identical reason --
-    # a branch inline here measured `create_app` at 13 against a budget of
-    # 12 (found by running the gate, not assumed).
+    # Sağlayıcılar ve Modeller (Wave 2A) and Kod Zekâsı (Wave 2B): additive
+    # and optional, the identical extracted-function shape, for the
+    # identical reason -- a branch inline here measured `create_app` at 13
+    # against a budget of 12 (found by running the gate, not assumed).
     _include_providers_router(app, extensions, guard)
+    _include_code_intelligence_router(app, extensions, guard)
     return app
 
 
@@ -419,6 +429,16 @@ def _include_providers_router(
     if extensions is None or extensions.providers_wiring is None:
         return
     app.include_router(_build_providers_router(guard, extensions.providers_wiring))
+
+
+def _include_code_intelligence_router(
+    app: FastAPI, extensions: _CommandExtensions | None, guard: Callable[[str], None],
+) -> None:
+    if extensions is None or extensions.code_intelligence_wiring is None:
+        return
+    app.include_router(
+        _build_code_intelligence_router(guard, extensions.code_intelligence_wiring)
+    )
 
 
 def _include_revision_preview_router(

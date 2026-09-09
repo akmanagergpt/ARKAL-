@@ -224,6 +224,37 @@ export interface _ProvidersSnapshotResponse {
 }
 
 /**
+ * Kod Zekâsı (Command Center Wave 2B, Surface B): real, live architecture
+ * gate results - never a cached figure. Reused verbatim from
+ * `surfaces.operations.ai_review_bundle.ArchitectureSummary`, the same
+ * class the existing (backend-only) `/api/operations/architecture` route
+ * already returns.
+ */
+export interface ArchitectureSummary {
+  gates_passed: number;
+  gates_total: number;
+  violations: string[];
+}
+
+/** One internal bounded-context area and how many real import edges target
+ * it - never a file-level edge or an absolute path. */
+export interface _CodeIntelligenceDependencyArea {
+  area: string;
+  dependent_count: number;
+}
+
+/**
+ * Kod Zekâsı: how many Python files exist under `backend/arkali`, which
+ * internal areas the rest of the codebase depends on most (bounded top 8),
+ * and whether the architecture gate is currently clean.
+ */
+export interface _CodeIntelligenceSnapshotResponse {
+  module_count: number;
+  top_dependencies: _CodeIntelligenceDependencyArea[];
+  architecture: ArchitectureSummary;
+}
+
+/**
  * Read-only Phase 30 production-history shapes.
  *
  * NOT A LIVE ORCHESTRATOR VIEW. This is what the staged-generation

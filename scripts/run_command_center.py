@@ -99,6 +99,11 @@ from arkali.surfaces.command.providers import (  # noqa: E402
     _build_providers_router,
     _ProvidersSnapshotResponse,
 )
+from arkali.surfaces.command.code_intelligence import (  # noqa: E402
+    CodeIntelligenceSnapshotSource,
+    _build_code_intelligence_router,
+    _observe_code_intelligence,
+)
 from arkali.surfaces.operations.contracts import DimensionReading  # noqa: E402
 from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
 from arkali.engineering.product_change.change_plan import ChangePlan  # noqa: E402
@@ -241,6 +246,21 @@ def _providers_wiring(repo_root: pathlib.Path) -> ProvidersSnapshotSource:
             configured_model=configured_model,
             accelerator=accelerator,
         )
+
+    return snapshot
+
+
+def _code_intelligence_wiring(repo_root: pathlib.Path) -> CodeIntelligenceSnapshotSource:
+    """Kod Zekâsı composition-root wiring - each real call re-derives the
+    snapshot fresh from `backend/arkali`'s own real source, the identical
+    "re-derived on every call, never cached" discipline the existing
+    `/api/operations/architecture` route already established for the same
+    underlying `observe_architecture` call.
+    """
+    backend_arkali_root = repo_root / "backend" / "arkali"
+
+    def snapshot():  # noqa: ANN202
+        return _observe_code_intelligence(backend_arkali_root, repo_root)
 
     return snapshot
 
@@ -576,6 +596,7 @@ def main(argv: list[str]) -> int:
             preview_bridge=_preview_bridge_wiring(ROOT),
             product_change=_product_change_wiring(ROOT, database),
             providers_wiring=_providers_wiring(ROOT),
+            code_intelligence_wiring=_code_intelligence_wiring(ROOT),
         ),
     )
     print(f"command center on http://{args.host}:{args.port} over {database}")

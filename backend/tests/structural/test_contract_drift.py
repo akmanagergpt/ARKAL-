@@ -35,7 +35,7 @@ from arkali.engineering.localai import host_probe
 from arkali.execution.durable.recovery import JobRecovery
 from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_url
 from arkali.surfaces.command import (
-    contracts, factory, factory_history, providers, workflow_contracts,
+    code_intelligence, contracts, factory, factory_history, providers, workflow_contracts,
 )
 from arkali.surfaces.command.contracts import (
     BACKEND_ONLY,
@@ -44,7 +44,7 @@ from arkali.surfaces.command.contracts import (
     ErrorResponse,
 )
 from arkali.surfaces.command.app import _CommandExtensions, create_app
-from arkali.surfaces.operations import contracts as operations_contracts
+from arkali.surfaces.operations import ai_review_bundle, contracts as operations_contracts
 from tests.structural.typescript_reader import (
     FRONTEND_SRC,
     REPO,
@@ -154,6 +154,21 @@ def _providers_wiring(repo_root: pathlib.Path):
             local_runtime=local_runtime, configured_model=configured_model,
             accelerator=accelerator,
         )
+
+    return snapshot
+
+
+def _code_intelligence_wiring(repo_root: pathlib.Path):
+    """Mirrors `scripts/run_command_center.py`'s own
+    `_code_intelligence_wiring` exactly, so `/api/code-intelligence/snapshot`
+    is drift-tested against the same real composition a live caller
+    reaches."""
+    from arkali.surfaces.command.code_intelligence import _observe_code_intelligence
+
+    backend_arkali_root = repo_root / "backend" / "arkali"
+
+    def snapshot():
+        return _observe_code_intelligence(backend_arkali_root, repo_root)
 
     return snapshot
 
@@ -315,6 +330,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             preview_bridge=_preview_bridge_wiring(pdp, tmp_path_factory.mktemp("preview-bridge-var")),
             product_change=_product_change_wiring(),
             providers_wiring=_providers_wiring(REPO),
+            code_intelligence_wiring=_code_intelligence_wiring(REPO),
         ),
     )
 
@@ -407,7 +423,7 @@ def surface_contract_names() -> frozenset[str]:
     """
     modules = (
         contracts, workflow_contracts, operations_contracts, factory_history, factory,
-        providers,
+        providers, code_intelligence, ai_review_bundle,
     )
     return frozenset(
         name

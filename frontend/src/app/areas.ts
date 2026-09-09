@@ -16,7 +16,7 @@ export const COMMAND_AREAS: readonly CommandArea[] = [
   { id: 'providers', label: 'Sağlayıcılar ve Modeller', description: 'Model kullanılabilirliği', available: true },
   { id: 'operations', label: 'Operasyonlar', description: 'Sistem ve çalışma durumu', available: true },
   { id: 'knowledge', label: 'Bilgi', description: 'Doğrulanmış bilgi ve bileşenler', available: false },
-  { id: 'code-intelligence', label: 'Kod Zekâsı', description: 'Kod görünümü ve analizler', available: false },
+  { id: 'code-intelligence', label: 'Kod Zekâsı', description: 'Kod görünümü ve analizler', available: true },
   { id: 'evolution', label: 'Evrim', description: 'Ürün ve çekirdek evrimi', available: false },
   { id: 'extensions', label: 'Uzantılar', description: 'Eklentiler ve entegrasyonlar', available: false },
   { id: 'security', label: 'Güvenlik', description: 'Politikalar ve güvenlik bulguları', available: false },

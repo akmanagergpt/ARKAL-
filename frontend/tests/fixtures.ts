@@ -9,6 +9,7 @@
  */
 
 import type {
+  _CodeIntelligenceSnapshotResponse,
   FactoryHistorySnapshot,
   LifecycleMachineResponse,
   OperationsSnapshot,
@@ -284,6 +285,27 @@ export const PROVIDERS_SNAPSHOT_NOT_CONFIGURED: _ProvidersSnapshotResponse = {
   accelerator: {
     dimension: 'accelerator', detail: 'nvidia-smi not found on PATH; no accelerator detected',
     ...NOT_CONFIGURED_READING,
+  },
+};
+
+export const CODE_INTELLIGENCE_SNAPSHOT: _CodeIntelligenceSnapshotResponse = {
+  module_count: 327,
+  top_dependencies: [
+    { area: 'kernel.contracts', dependent_count: 113 },
+    { area: 'engineering.factory', dependent_count: 77 },
+    { area: 'control.policy', dependent_count: 71 },
+  ],
+  architecture: { gates_passed: 8, gates_total: 8, violations: [] },
+};
+
+export const CODE_INTELLIGENCE_SNAPSHOT_WITH_VIOLATIONS: _CodeIntelligenceSnapshotResponse = {
+  module_count: 327,
+  top_dependencies: [
+    { area: 'kernel.contracts', dependent_count: 113 },
+  ],
+  architecture: {
+    gates_passed: 7, gates_total: 8,
+    violations: ['architecture_budget_violation: context surfaces.command: public surface 41 > 40'],
   },
 };
 

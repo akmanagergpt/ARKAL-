@@ -187,6 +187,7 @@ describe('ArkaliApiClient', () => {
       'POST /api/workflows/{workflow_id}/executions/{execution_id}/approve',
       'GET /api/operations/snapshot',
       'GET /api/providers/snapshot',
+      'GET /api/code-intelligence/snapshot',
       'GET /api/factory/history',
       'POST /api/factory/goals',
       'POST /api/candidates/{candidate_id}/preview',

@@ -16,6 +16,7 @@
 import type {
   ApproveExecutionRequest,
   _ChangePromotionResponse,
+  _CodeIntelligenceSnapshotResponse,
   CreateProjectRequest,
   CreateRevisionRequest,
   _FactoryGoalRequest,
@@ -75,6 +76,7 @@ export const ENDPOINTS = {
   },
   operationsSnapshot: { method: 'GET', path: '/api/operations/snapshot' },
   providersSnapshot: { method: 'GET', path: '/api/providers/snapshot' },
+  codeIntelligenceSnapshot: { method: 'GET', path: '/api/code-intelligence/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
   startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
@@ -368,6 +370,19 @@ export class ArkaliApiClient {
   providersSnapshot(signal?: AbortSignal): Promise<_ProvidersSnapshotResponse> {
     return this.request<_ProvidersSnapshotResponse>(
       ENDPOINTS.providersSnapshot,
+      signal === undefined ? {} : { signal },
+    );
+  }
+
+  /**
+   * Kod Zekâsı: a bounded module-count/top-dependency-area/architecture-
+   * health summary, composed fresh from `engineering.codeintel`'s real
+   * import graph and the real architecture gate on every call - never a
+   * raw graph, never cached here.
+   */
+  codeIntelligenceSnapshot(signal?: AbortSignal): Promise<_CodeIntelligenceSnapshotResponse> {
+    return this.request<_CodeIntelligenceSnapshotResponse>(
+      ENDPOINTS.codeIntelligenceSnapshot,
       signal === undefined ? {} : { signal },
     );
   }
