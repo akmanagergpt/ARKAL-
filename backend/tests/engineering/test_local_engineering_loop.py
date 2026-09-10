@@ -224,6 +224,25 @@ def test_different_fingerprint_still_stops_after_budget(loop, prepared):
     assert result["repair_budget"]["consumption"]["attempts"] == 1
 
 
+def test_invalid_repair_plan_is_fingerprinted_and_stops_without_third_call(loop, prepared):
+    model = _model("x = 1\n")
+    valid_infer = model.infer
+    def infer(*args, **kwargs):
+        if model.calls == 1:
+            model.calls += 1
+            return SimpleNamespace(state=SimpleNamespace(value="PASS"), detail="",
+                                   output=json.dumps({"task_specification": "not a ChangePlan"}),
+                                   elapsed_seconds=0.125)
+        return valid_infer(*args, **kwargs)
+    model.infer = infer
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+    assert result["plan_invalid"] and not result["verification_passed"]
+    assert result["repair_fingerprint"] and result["local_model_calls"] == 2
+    assert result["automatic_retries"] == 1 and model.calls == 2
+    assert result["repair_budget"]["consumption"]["attempts"] == 1
+
+
 def test_c26_policy_contains_no_concrete_model_identity(loop):
     source = Path(loop.__file__).read_text(encoding="utf-8")
     assert "qwen2.5-coder" not in source

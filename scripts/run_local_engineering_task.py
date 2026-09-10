@@ -21,6 +21,8 @@ import sys
 import tempfile
 import time
 
+from pydantic import ValidationError
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 
@@ -39,6 +41,7 @@ from arkali.engineering.localai.ollama_adapter import OllamaAdapter
 from arkali.engineering.localai.host_probe import probe_host
 from arkali.engineering.localai.suitability import LocalSelection, LocalSelectionRequest, select_local_model
 from arkali.engineering.product_change.change_plan import ChangePlan
+from arkali.engineering.product_change.errors import ModelPlanInvalidError
 from arkali.engineering.product_change.inspection import _is_sensitive_path
 from arkali.engineering.product_change.modification import _apply_changeset, _extract_json_object, _validate_changeset
 from arkali.engineering.product_change.verification import verify_changeset
@@ -119,7 +122,19 @@ def _execute_attempt(prompt, source, workspace, model, acceptance_check, selecti
     if result.state.value != "PASS":
         raise ValueError("local inference failed: " + redact_raw_secrets(result.detail))
     assert_no_raw_secret(result.output, sink="local engineering output")
-    plan = ChangePlan.model_validate_json(_extract_json_object(result.output))
+    try:
+        plan = ChangePlan.model_validate_json(_extract_json_object(result.output))
+    except (ModelPlanInvalidError, ValidationError) as error:
+        return {
+            "plan": {"operations": []}, "changed_files": list(source),
+            "verification_passed": False,
+            "syntax_failures": ("invalid_change_plan: " + redact_raw_secrets(str(error)),),
+            "acceptance": {"passed": False, "detail": "model output was not a valid ChangePlan"},
+            "model_seconds": result.elapsed_seconds, "verification_seconds": 0.0,
+            "local_model_calls": 1, "external_execution_calls": 0,
+            "automatic_retries": 0, "promotion": "NOT_PROMOTED",
+            "plan_invalid": True,
+        }
     if len(plan.operations) > MAX_EDITABLE_FILES or any(
         op.operation != "update" or op.path not in source for op in plan.operations
     ):
@@ -157,7 +172,7 @@ def execute_once(task, package, prompt, source, workspace, model, acceptance_che
 
 def _classify_verification_failure(_report):
     """Reuse the canonical campaign vocabulary for generated-solution failure."""
-    return CANDIDATE_DEFECT
+    return MODEL_VARIANCE if _report.get("plan_invalid") else CANDIDATE_DEFECT
 
 
 def _fingerprint(report, selection, failure_class, *, outcome):
