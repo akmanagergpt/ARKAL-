@@ -262,6 +262,7 @@ def _repair_execution_failure(source, error):
 def execute_bounded_repair(
     task, package, prompt, source, workspace, model, acceptance_check,
     initial_selection, descriptors, *, selector=select_local_model, selection_host=None,
+    persist_initial_failure=None,
 ):
     """Initial attempt plus at most one C-26-ledger-authorized local repair."""
     initial = execute_once(
@@ -272,8 +273,20 @@ def execute_bounded_repair(
         return initial
     failure_class = _classify_verification_failure(initial)
     initial_fp = _fingerprint(initial, initial_selection, failure_class, outcome="rejected")
+    if persist_initial_failure is None:
+        raise ValueError("initial failure persistence is required before repair")
+    initial_failure_ref = persist_initial_failure({
+        "task_id": package.task_id, "phase": "initial_verification_failed",
+        "verification_passed": False, "failure_class": failure_class,
+        "initial_fingerprint": initial_fp.fingerprint,
+        "fingerprint": initial_fp.model_dump(mode="json"),
+        "repair_status": "NOT_STARTED", "promotion": "NOT_PROMOTED",
+    })
+    if not initial_failure_ref:
+        raise ValueError("initial failure persistence returned no evidence reference")
     ledger = _repair_ledger(package.task_id)
     initial.update(initial_fingerprint=initial_fp.fingerprint,
+                   initial_failure_ref=initial_failure_ref,
                    repair_eligible=failure_class in REPAIR_ELIGIBLE_FAILURES,
                    repair_invoked=False, repair_budget=ledger.model_dump(mode="json"))
     if not initial["repair_eligible"]:
@@ -311,6 +324,7 @@ def execute_bounded_repair(
     )
     repair.update(
         initial_verification=False, initial_fingerprint=initial_fp.fingerprint,
+        initial_failure_ref=initial_failure_ref,
         repair_eligible=True, repair_invoked=True,
         repair_provider_model=f"{repair_selection.provider}:{repair_selection.model_id}",
         repair_selection_reason=repair_selection.reason,
@@ -399,9 +413,42 @@ def main():
             return {"passed": check.returncode == 0,
                     "detail": redact_raw_secrets((check.stdout + check.stderr)[-4000:])}
 
+        def persist_initial_failure(evidence):
+            payload = json.dumps(evidence, ensure_ascii=False, sort_keys=True).encode()
+            initial_provenance = ProvenanceInput(
+                producer_agent="local-engineering", provider_model=f"{selection.provider}:{selection.model_id}",
+                task_id=args.task_id, specification_version="local-engineering-c26-initial/1",
+                context_hash=package.context_hash,
+            )
+            with unit_of_work(create_session_factory(evidence_engine)) as session:
+                artifacts = ArtifactStore(session, ArtifactBlobStore(
+                    ROOT / "var/factory/evidence/blobs",
+                    PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store")))
+                initial_ref = artifacts.register(payload, initial_provenance)
+            with unit_of_work(create_session_factory(evidence_engine)) as session:
+                artifacts = ArtifactStore(session, ArtifactBlobStore(
+                    ROOT / "var/factory/evidence/blobs",
+                    PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store")))
+                if artifacts.get(initial_ref) is None:
+                    raise ValueError("initial failure artifact was not durable")
+            with unit_of_work(factory) as session:
+                jobs(session).checkpoint(args.task_id, {
+                    "phase": "initial_verification_failed",
+                    "initial_failure_ref": initial_ref,
+                    "initial_fingerprint": evidence["initial_fingerprint"],
+                    "failure_class": evidence["failure_class"],
+                    "repair_status": "NOT_STARTED", "promotion": "NOT_PROMOTED",
+                })
+            with unit_of_work(factory) as session:
+                persisted = jobs(session).checkpoints(args.task_id)[-1].payload
+                if persisted.get("initial_failure_ref") != initial_ref:
+                    raise ValueError("initial failure checkpoint was not durable")
+            return initial_ref
+
         report = execute_bounded_repair(
             task, package, prompt, source, workspace, model, acceptance_check,
             selection, descriptors, selection_host=selection_host,
+            persist_initial_failure=persist_initial_failure,
         )
         report.update(task_id=args.task_id, context_hash=package.context_hash, context_ref=context_ref,
                       context_items=len(package.items), context_bytes=len(prompt.encode()),

@@ -70,6 +70,18 @@ def _descriptors():
     )
 
 
+def _persisted(events=None, *, fail=False):
+    def persist(evidence):
+        if events is not None:
+            events.append(("persist", evidence["initial_fingerprint"]))
+        if fail:
+            raise ValueError("persistence unavailable")
+        persist.evidence = evidence
+        return "sha256:persisted-initial-failure"
+    persist.evidence = None
+    return persist
+
+
 def test_context_binds_exact_source_and_provenance(loop, prepared):
     task, package, prompt, sources, workspace = prepared
     assert task.context_package == package.context_hash
@@ -175,7 +187,7 @@ def test_eligible_failure_uses_ledger_and_one_canonical_repair(loop, prepared):
     outcomes = iter((False, True))
     result = loop.execute_bounded_repair(
         *prepared, model, lambda: {"passed": next(outcomes)},
-        _selection(), _descriptors())
+        _selection(), _descriptors(), persist_initial_failure=_persisted())
     assert result["verification_passed"] and result["repair_invoked"]
     assert result["repair_provider_model"] == "ollama:large"
     assert result["repair_budget"]["consumption"]["attempts"] == 1
@@ -183,6 +195,8 @@ def test_eligible_failure_uses_ledger_and_one_canonical_repair(loop, prepared):
     assert result["automatic_retries"] == 1 and result["promotion"] == "NOT_PROMOTED"
     assert result["repair_context_bytes"] <= loop.MAX_CONTEXT_BYTES
     assert result["repair_context_hash"]
+    assert result["initial_failure_ref"] == "sha256:persisted-initial-failure"
+    assert result["initial_fingerprint"] in result["_repair_context_payload"]["prompt"]
     assert "PREVIOUS PROPOSAL DIFF" in result["_repair_context_payload"]["prompt"]
     assert '"previous_plan"' not in result["_repair_context_payload"]["prompt"]
 
@@ -213,7 +227,8 @@ def test_ineligible_failure_stops_without_repair(loop, prepared, monkeypatch):
     monkeypatch.setattr(loop, "_classify_verification_failure",
                         lambda report: "infrastructure_failure")
     result = loop.execute_bounded_repair(
-        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+        persist_initial_failure=_persisted())
     assert not result["repair_eligible"] and model.calls == 1
     assert not result["repair_invoked"] and result["promotion"] == "NOT_PROMOTED"
     assert result["repair_budget"]["consumption"]["attempts"] == 0
@@ -224,7 +239,8 @@ def test_same_fingerprint_stops_after_single_repair(loop, prepared):
     initial = _selection()
     result = loop.execute_bounded_repair(
         *prepared, model, lambda: {"passed": False}, initial, _descriptors(),
-        selector=lambda descriptors, request, **kwargs: initial)
+        selector=lambda descriptors, request, **kwargs: initial,
+        persist_initial_failure=_persisted())
     assert result["same_fingerprint"] and model.calls == 2
     assert result["automatic_retries"] == 1
     assert result["repair_budget"]["consumption"]["attempts"] == 1
@@ -234,7 +250,7 @@ def test_different_fingerprint_still_stops_after_budget(loop, prepared):
     model = _model("x = 1\n")
     result = loop.execute_bounded_repair(
         *prepared, model, lambda: {"passed": False},
-        _selection(), _descriptors())
+        _selection(), _descriptors(), persist_initial_failure=_persisted())
     assert not result["same_fingerprint"] and model.calls == 2
     assert result["automatic_retries"] == 1
     assert result["repair_budget"]["consumption"]["attempts"] == 1
@@ -252,7 +268,8 @@ def test_invalid_repair_plan_is_fingerprinted_and_stops_without_third_call(loop,
         return valid_infer(*args, **kwargs)
     model.infer = infer
     result = loop.execute_bounded_repair(
-        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+        persist_initial_failure=_persisted())
     assert result["plan_invalid"] and not result["verification_passed"]
     assert result["repair_fingerprint"] and result["local_model_calls"] == 2
     assert result["automatic_retries"] == 1 and model.calls == 2
@@ -264,7 +281,8 @@ def test_repair_context_refusal_is_honest_and_calls_no_second_model(loop, prepar
     monkeypatch.setattr(loop, "_compile_repair_context",
                         lambda *args: (_ for _ in ()).throw(ValueError("bounded refusal")))
     result = loop.execute_bounded_repair(
-        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+        persist_initial_failure=_persisted())
     assert not result["repair_invoked"] and result["repair_stop_reason"] == "bounded refusal"
     assert model.calls == 1 and result["repair_budget"]["consumption"]["attempts"] == 0
 
@@ -280,10 +298,39 @@ def test_repair_provider_failure_is_fingerprinted_and_stops(loop, prepared):
         return valid_infer(*args, **kwargs)
     model.infer = infer
     result = loop.execute_bounded_repair(
-        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+        persist_initial_failure=_persisted())
     assert result["repair_invoked"] and result["repair_fingerprint"]
     assert result["repair_budget"]["fingerprints"][0]["root_cause_class"] == "infrastructure_failure"
     assert model.calls == 2 and result["automatic_retries"] == 1
+
+
+def test_initial_failure_persists_before_repair_selection(loop, prepared):
+    model = _model("x = 1\n")
+    events = []
+    persist = _persisted(events)
+    def selector(descriptors, request, **kwargs):
+        events.append(("selector", persist.evidence["initial_fingerprint"]))
+        return _selection("large", "high")
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+        selector=selector, persist_initial_failure=persist)
+    assert [event[0] for event in events] == ["persist", "selector"]
+    assert events[0][1] == events[1][1] == result["initial_fingerprint"]
+
+
+def test_persistence_failure_prevents_repair_inference(loop, prepared):
+    model = _model("x = 1\n")
+    selector_called = False
+    def selector(*args, **kwargs):
+        nonlocal selector_called
+        selector_called = True
+        return _selection("large", "high")
+    with pytest.raises(ValueError, match="persistence unavailable"):
+        loop.execute_bounded_repair(
+            *prepared, model, lambda: {"passed": False}, _selection(), _descriptors(),
+            selector=selector, persist_initial_failure=_persisted(fail=True))
+    assert model.calls == 1 and not selector_called
 
 
 def test_c26_policy_contains_no_concrete_model_identity(loop):
