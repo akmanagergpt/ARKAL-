@@ -43,6 +43,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
+from arkali.engineering.factory.frontend_actionability_preflight import _create_access_findings, _error_recovery_findings
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _frontend_local_import_findings,
     _react_router_missing_import_findings,
@@ -510,7 +511,7 @@ def _ux_spec_shell_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     spec, frontend = _parsed_spec_and_frontend(files)
     if spec is None:
         return []
-    return _navigation_reconciliation_findings(spec, frontend) + _raw_json_dump_findings(frontend)
+    return _navigation_reconciliation_findings(spec, frontend) + _raw_json_dump_findings(frontend) + _error_recovery_findings(spec, frontend, SemanticFinding)  # type: ignore[return-value]
 
 
 def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -541,6 +542,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
         )
         + _form_quality_findings(frontend)
         + _state_coverage_findings(spec, frontend)
+        + _create_access_findings(spec, frontend, SemanticFinding)  # type: ignore[operator]
         + _destructive_confirmation_findings(spec, frontend)
     )
 

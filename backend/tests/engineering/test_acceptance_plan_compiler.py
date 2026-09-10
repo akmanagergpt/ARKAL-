@@ -121,6 +121,13 @@ class TestTwoResourcesWithASchemaDrivenRelationship:
         assert scenario.related_create_payload is not None
         assert "crate_id" not in scenario.related_create_payload
 
+    def test_browser_values_are_preserved_for_every_create_capable_module(self) -> None:
+        scenario = _compile_acceptance_plan(self._files())
+        assert set(scenario.browser_create_values_by_resource) == {"crates", "crate_items"}
+        assert scenario.browser_create_values_by_resource["crates"]["label"]
+        assert scenario.browser_create_values_by_resource["crate_items"]["quantity"]
+        assert scenario.http_negative_probe is True
+
     def test_a_field_ending_in_id_with_no_matching_model_is_not_a_relationship(self) -> None:
         """`external_id` ends in `_id` and is an integer, but no declared
         model is named (singular or plural) "external" -- must be treated

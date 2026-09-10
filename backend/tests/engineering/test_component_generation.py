@@ -152,7 +152,7 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     "frontend_ui": {
         "frontend/src/App.js": (
             "import { fetchWorks } from './client';\n"
-            "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+            "function App() { fetchWorks(); return <button onClick={fetchWorks}>retry loading empty error works</button>; }\n"
             "export default App;\n"
         ),
         "frontend/src/index.js": (
@@ -168,7 +168,7 @@ HAPPY_PATH_FILES: dict[str, dict[str, str]] = {
     "frontend_forms": {
         "frontend/src/App.js": (
             "import { fetchWorks } from './client';\n"
-            "function App() { fetchWorks(); return 'loading empty error works'; }\n"
+            "function App() { fetchWorks(); return <button onClick={fetchWorks}>retry loading empty error works</button>; }\n"
             "export default App;\n"
         ),
     },
@@ -1313,6 +1313,78 @@ def test_frontend_client_is_silent_once_files_carry_the_real_prefix() -> None:
     assert frontend_contract_findings(files) == []
 
 
+def test_frontend_client_rejects_fetch_that_parses_non_success_as_domain_data() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "export async function fetchWidgets() {\n"
+            "  const response = await fetch('http://localhost:5000/widgets');\n"
+            "  return response.json();\n"
+            "}\n"
+        ),
+    }
+    findings = frontend_contract_findings(files)
+    assert any(f.code == "frontend_client_missing_http_failure_branch" for f in findings)
+
+
+def test_frontend_client_accepts_fetch_with_a_real_status_failure_branch() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "export async function fetchWidgets() {\n"
+            "  const response = await fetch('/widgets');\n"
+            "  if (!response.ok) throw new Error(`HTTP ${response.status}`);\n"
+            "  return response.json();\n"
+            "}\n"
+        ),
+    }
+    assert frontend_contract_findings(files) == []
+
+
+def test_frontend_client_does_not_false_positive_axios_default_failure_semantics() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "import axios from 'axios';\n"
+            "export async function fetchWidgets() { return (await axios.get('/widgets')).data; }\n"
+        ),
+    }
+    assert frontend_contract_findings(files) == []
+
+
+def test_frontend_client_rejects_unsafe_fetch_then_json_chain() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "export function fetchWidgets() {\n"
+            "  return fetch('/widgets').then(response => response.json());\n"
+            "}\n"
+        ),
+    }
+    findings = frontend_contract_findings(files)
+    assert any(f.code == "frontend_client_missing_http_failure_branch" for f in findings)
+
+
+def test_frontend_client_accepts_failure_aware_fetch_then_chain() -> None:
+    from arkali.engineering.factory.http_contract_preflight import frontend_contract_findings
+
+    files = {
+        "frontend/src/apiClient.js": (
+            "export function fetchWidgets() {\n"
+            "  return fetch('/widgets').then(response => {\n"
+            "    if (!response.ok) throw new Error('request failed');\n"
+            "    return response.json();\n"
+            "  });\n"
+            "}\n"
+        ),
+    }
+    assert frontend_contract_findings(files) == []
+
+
 def _output_flat(files: dict[str, str]) -> str:
     return json.dumps(files)
 
@@ -1333,9 +1405,10 @@ def test_the_enriched_semantic_finding_reaches_the_real_retry_context() -> None:
     })
     good = _output({
         "frontend/src/apiClient.js": (
-            "export async function getOverdueBooks() {\n"
-            "  const response = await fetch('/api/books/overdue');\n"
-            "  return response.json();\n}\n"
+                "export async function getOverdueBooks() {\n"
+                "  const response = await fetch('/api/books/overdue');\n"
+                "  if (!response.ok) throw new Error(`HTTP ${response.status}`);\n"
+                "  return response.json();\n}\n"
         ),
     })
     model = _QueueModel([(HonestState.PASS, bad), (HonestState.PASS, good)])

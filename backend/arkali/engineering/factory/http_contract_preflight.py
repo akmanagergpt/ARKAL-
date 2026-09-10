@@ -26,7 +26,67 @@ def frontend_contract_findings(files: Mapping[str, str]) -> list[SemanticFinding
         for path, source in files.items()
         if path.startswith("frontend/src/")
     )
-    return _cors_findings(backend, frontend) + _contract_drift_findings(backend, frontend)
+    return (
+        _cors_findings(backend, frontend)
+        + _contract_drift_findings(backend, frontend)
+        + _fetch_failure_semantics_findings(files)
+    )
+
+
+_AWAIT_FETCH_BINDING = re.compile(
+    r"(?:const|let|var)\s+(?P<name>[A-Za-z_$][\w$]*)\s*=\s*await\s+fetch\s*\(",
+)
+_FETCH_THEN_BINDING = re.compile(
+    r"fetch\s*\([\s\S]{0,800}?\)\s*\.\s*then\s*\(\s*(?:async\s*)?\(?\s*"
+    r"(?P<name>[A-Za-z_$][\w$]*)\s*\)?\s*=>",
+)
+
+
+def _fetch_failure_semantics_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    """Reject Fetch bodies consumed as domain data before an HTTP check.
+
+    Fetch resolves normally for 4xx/5xx, unlike axios. The check follows the
+    response binding and permits returning an unconsumed Response to a caller
+    that owns the status decision; it does not require one exact code style.
+    """
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not path.startswith("frontend/src/") or "fetch" not in source:
+            continue
+        for match in _AWAIT_FETCH_BINDING.finditer(source):
+            name = match.group("name")
+            remainder = source[match.end():]
+            parse = re.search(rf"\b{re.escape(name)}\s*\.\s*(?:json|text)\s*\(", remainder)
+            if parse is None:
+                continue
+            before_parse = remainder[:parse.start()]
+            if re.search(rf"\b{re.escape(name)}\s*\.\s*(?:ok|status)\b", before_parse):
+                continue
+            findings.append(SemanticFinding(
+                code="frontend_client_missing_http_failure_branch", path=path,
+                detail=(
+                    f"fetch response {name!r} is parsed as domain data without first "
+                    "checking its HTTP ok/status value; non-2xx responses must enter "
+                    "the client's error path before their body is used as success data"
+                ),
+            ))
+        for match in _FETCH_THEN_BINDING.finditer(source):
+            name = match.group("name")
+            body = source[match.end():match.end() + 800]
+            parse = re.search(rf"\b{re.escape(name)}\s*\.\s*(?:json|text)\s*\(", body)
+            if parse is None:
+                continue
+            before_parse = body[:parse.start()]
+            if re.search(rf"\b{re.escape(name)}\s*\.\s*(?:ok|status)\b", before_parse):
+                continue
+            findings.append(SemanticFinding(
+                code="frontend_client_missing_http_failure_branch", path=path,
+                detail=(
+                    f"fetch callback response {name!r} is parsed as domain data without "
+                    "first checking its HTTP ok/status value"
+                ),
+            ))
+    return findings
 
 
 def _frontend_src_missing_findings(files: Mapping[str, str]) -> list[SemanticFinding]:

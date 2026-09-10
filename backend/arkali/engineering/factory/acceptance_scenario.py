@@ -102,6 +102,11 @@ class _AcceptanceScenario(BaseModel):
     browser_create_values: dict[str, str] | None = None
     browser_update_values: dict[str, str] | None = None
     browser_related_values: dict[str, str] | None = None
+    browser_create_values_by_resource: dict[str, dict[str, str]] = Field(default_factory=dict)
+    #: Enables the canonical browser journey's real backend non-2xx probe.
+    #: False keeps older explicit/frozen scenarios backward compatible;
+    #: newly compiled scenarios opt in below.
+    http_negative_probe: bool = False
 
     def resource(self, name: str) -> _ResourceScenario:
         for resource in self.resources:

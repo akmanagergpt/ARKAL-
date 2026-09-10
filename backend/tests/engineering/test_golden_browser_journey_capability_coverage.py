@@ -166,6 +166,7 @@ def _label_input(field: str) -> str:
 def _list_page(
     resource: str, singular: str, rows: list[dict], display_field: str,
     *, create_control: bool, delete_control: bool, primary: str, related: str | None,
+    client_fetch: bool = False,
 ) -> str:
     items = "".join(
         f'<li>{row.get(display_field, "")} '
@@ -190,9 +191,27 @@ def _list_page(
         """ % (resource, resource)
         if delete_control else ""
     )
+    fetch_script = (
+        f"""<div id="request-state"></div><button id="retry" hidden>Retry</button>
+        <script>
+        async function loadResource() {{
+          const response = await fetch('http://localhost:5000/{resource}');
+          if (!response.ok) throw new Error('request failed');
+          await response.json();
+          document.getElementById('request-state').textContent = 'loaded';
+          document.getElementById('retry').hidden = true;
+        }}
+        document.getElementById('retry').addEventListener('click', loadResource);
+        loadResource().catch(function() {{
+          document.getElementById('request-state').textContent = 'error';
+          document.getElementById('retry').hidden = false;
+        }});
+        </script>"""
+        if client_fetch else ""
+    )
     return (
         f"<html><body>{_nav(primary, related)}<h1>{resource}</h1>{create_link}<ul>{items}</ul>"
-        f"{delete_script}</body></html>"
+        f"{delete_script}{fetch_script}</body></html>"
     )
 
 
@@ -242,6 +261,7 @@ def _make_frontend_handler(
     edit_prefill_correct: bool,
     store: _Store,
     render_no_nav: bool = False,
+    http_negative_probe: bool = False,
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args: object) -> None:  # noqa: ANN401
@@ -278,6 +298,7 @@ def _make_frontend_handler(
                 self._route_resource(
                     parts, primary, primary_singular, primary_fields, primary_display,
                     create_control=True, prefill_correct=edit_prefill_correct,
+                    client_fetch=http_negative_probe,
                 )
                 return
 
@@ -294,13 +315,13 @@ def _make_frontend_handler(
         def _route_resource(
             self, parts: list[str], resource: str, singular: str, fields: tuple[str, ...],
             display_field: str, *, create_control: bool, prefill_correct: bool,
-            create_extra_fields: tuple[str, ...] = (),
+            create_extra_fields: tuple[str, ...] = (), client_fetch: bool = False,
         ) -> None:
             if len(parts) == 1:
                 self._html(_list_page(
                     resource, singular, store.list(resource), display_field,
                     create_control=create_control, delete_control=(resource == primary),
-                    primary=primary, related=related,
+                    primary=primary, related=related, client_fetch=client_fetch,
                 ))
                 return
             if len(parts) == 2 and parts[1] == "create":
@@ -351,6 +372,7 @@ def _scenario_json(
     related_relationship_field: str, related_actions: tuple[str, ...],
     primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
     single_destination: bool = False,
+    http_negative_probe: bool = False,
 ) -> pathlib.Path:
     scenario = {
         "scenario_id": "capability-coverage-fixture",
@@ -381,6 +403,7 @@ def _scenario_json(
         "browser_create_values": {f: f"browser-create-{f}" for f in primary_fields},
         "browser_update_values": {primary_fields[0]: f"browser-update-{primary_fields[0]}"},
         "browser_related_values": {f: f"browser-related-{f}" for f in related_fields} if related else None,
+        "http_negative_probe": http_negative_probe,
     }
     path = tmp_path / "scenario.json"
     path.write_text(json.dumps(scenario), encoding="utf-8")
@@ -395,6 +418,7 @@ def _run_journey(
     primary_actions: tuple[str, ...] = ("create", "edit", "delete", "view"),
     single_destination: bool = False,
     render_no_nav: bool | None = None,
+    http_negative_probe: bool = False,
 ) -> subprocess.CompletedProcess:
     if not _free(BACKEND_PORT) or not _free(FRONTEND_PORT):
         pytest.skip(f"ports {BACKEND_PORT}/{FRONTEND_PORT} are not free on this host")
@@ -418,6 +442,7 @@ def _run_journey(
         related_relationship_field=related_relationship_field,
         related_create_control=related_create_control, edit_prefill_correct=edit_prefill_correct,
         store=store, render_no_nav=effective_no_nav,
+        http_negative_probe=http_negative_probe,
     ))
     backend_thread = threading.Thread(target=backend.serve_forever, daemon=True)
     frontend_thread = threading.Thread(target=frontend.serve_forever, daemon=True)
@@ -432,6 +457,7 @@ def _run_journey(
             related=related, related_singular=related_singular, related_fields=related_fields,
             related_relationship_field=related_relationship_field, related_actions=related_actions,
             primary_actions=primary_actions, single_destination=single_destination,
+            http_negative_probe=http_negative_probe,
         )
         args = [
             "node", str(JOURNEY), "--candidate", "capability-coverage-fixture",
@@ -614,3 +640,10 @@ class TestExistingValidJourneyStillPasses:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert "BROWSER_JOURNEY_PASS" in result.stdout
+
+
+class TestNegativeHttpSemantics:
+    def test_real_backend_non_2xx_enters_error_then_retry_recovers(self, tmp_path: pathlib.Path) -> None:
+        result = _domain_a(tmp_path, http_negative_probe=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert '"negativeHttpStatus":404' in result.stdout

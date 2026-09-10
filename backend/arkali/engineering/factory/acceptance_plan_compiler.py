@@ -365,6 +365,11 @@ def _assemble_scenario(
     if related_name is not None:
         _related_resource, related_payload, _upd, browser_related, _bupd = built[related_name]
     resources = tuple(r for r, *_rest in built.values())
+    browser_values_by_resource = {
+        name: browser_values
+        for name, (resource, _create, _update, browser_values, _browser_update) in built.items()
+        if "create" in resource.actions and browser_values
+    }
     return _AcceptanceScenario(
         scenario_id=f"compiled-{spec.product_title.lower().replace(' ', '-')}",
         resources=resources,
@@ -377,6 +382,8 @@ def _assemble_scenario(
         browser_create_values=browser_create or None,
         browser_update_values=browser_update or None,
         browser_related_values=browser_related,
+        browser_create_values_by_resource=browser_values_by_resource,
+        http_negative_probe=True,
     )
 
 

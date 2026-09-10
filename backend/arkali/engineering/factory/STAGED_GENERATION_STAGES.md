@@ -184,6 +184,11 @@ not satisfy this rule (golden-work-054, session evidence, frozen: a real
 qwen2.5-coder:14b wrote `{"createTask": "POST /tasks"}` — one JSON
 property per route, never an actual invocation — identically on two
 consecutive attempts). Every file this stage writes must be placed under the top-level frontend/src/ path — never a bare src/... path (factory-goal-mtqrbyqj-5m1bf8, real production evidence: a real model wrote real, correct, working client code at src/apiClient.js instead of frontend/src/apiClient.js; every check this stage's own checker performs filters by the frontend/src/ prefix, so the real, correct content was never actually inspected at all, and the wrong convention then propagated into frontend_ui's own visible prior context, which reported every one of its own checks as missing for the wrong reason).
+For Fetch specifically, inspect the returned Response's HTTP success/status
+before parsing or returning its body as successful domain data; every non-2xx
+response enters the client's error path. Axios's normal non-2xx rejection
+semantics are already sufficient. Never turn a 4xx/5xx JSON error body into a
+successful record merely because parsing it succeeds.
 
 ### 8. frontend_ui
 Inputs: frontend_client, backend_contract, product_ux_spec
@@ -224,6 +229,9 @@ and payment models; the shipped frontend was one component rendering one
 the UI). Mutating forms, delete confirmation and post-mutation feedback
 are not this stage's concern — that is frontend_forms's job, immediately
 after this one.
+An error state backed by a recoverable read must expose an interactive retry,
+reload or equivalent recovery action; text that only says "error" is not a
+usable state.
 
 ### 9. frontend_forms
 Inputs: frontend_client, frontend_ui, product_ux_spec
@@ -240,8 +248,11 @@ qwen2.5-coder:14b's own real output for a module with a declared
 "delete" action added no delete control of any kind, on two consecutive
 real attempts — not a missing confirmation on an existing control, a
 missing control); add a visible success/feedback marker after a
-mutation completes. When edit/delete is reached through a separate
-routed page rather than an inline button (a real, legal choice — a
+mutation completes. For every module declaring "create", keep a real
+accessible create control reachable from that module's collection view even
+when the collection has no records; an empty-state branch must never hide the
+only path to its form. When edit/delete is reached through a separate routed
+page rather than an inline button (a real, legal choice — a
 route per record, e.g. `/students/edit/:id`), the list rendering itself
 must also gain a real Link or button, per record, navigating to that
 exact route built from the record's own real id: a route a direct URL

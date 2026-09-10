@@ -221,6 +221,16 @@ const singleDestination = scenario.navigation_destinations.length === 1;
 // never a route name, never a candidate-specific string -- decide which
 // real journey below actually runs.
 const primaryIsMutationCapable = (primary.actions || []).some((a) => a === 'create' || a === 'edit');
+const MAX_CREATE_MODULES = 6;
+const createCapableResources = scenario.resources.filter((resource) =>
+  (resource.actions || []).includes('create')
+);
+if (createCapableResources.length > MAX_CREATE_MODULES) {
+  throw new Error(
+    `bounded browser acceptance supports at most ${MAX_CREATE_MODULES} create modules; `
+    + `scenario declares ${createCapableResources.length}`
+  );
+}
 if (primaryIsMutationCapable && (!primaryBackendId || !/^\d+$/.test(primaryBackendId))) {
   throw new Error('--primary-id must identify the real backend-persisted primary record');
 }
@@ -286,6 +296,101 @@ async function clickInRow(page, rowText, pattern) {
   await control.click();
 }
 
+function browserValuesFor(resource) {
+  return scenario.browser_create_values_by_resource?.[resource.name]
+    || (resource.name === scenario.primary_resource ? scenario.browser_create_values : null)
+    || (resource.name === scenario.related_resource ? scenario.browser_related_values : null)
+    || {};
+}
+
+async function assertCreateReachable(page, resource) {
+  if (!(resource.actions || []).includes('create')) return;
+  if (!singleDestination || resource.name !== primary.name) {
+    await navigateTo(page, navPattern(resource.navigation_label));
+  }
+  const candidates = [
+    page.getByRole('link', { name: createButtonPattern(resource.singular_label) }),
+    page.getByRole('button', { name: createButtonPattern(resource.singular_label) }),
+  ];
+  if ((await candidates[0].count()) + (await candidates[1].count()) === 0) {
+    throw new Error(
+      `${resource.name} declares a mandatory create capability but no reachable create control `
+      + 'exists on its collection/empty-state surface'
+    );
+  }
+  const control = await firstVisible(candidates);
+  await expect(control).toBeVisible();
+}
+
+async function createSecondaryResource(page, resource, knownIds) {
+  await navigateTo(page, navPattern(resource.navigation_label));
+  await clickNamed(page, createButtonPattern(resource.singular_label));
+  for (const [fieldName, targetResource] of Object.entries(resource.relationship_fields || {})) {
+    const targetId = knownIds[targetResource];
+    if (!targetId) {
+      throw new Error(
+        `cannot safely exercise ${resource.name} create: relationship ${fieldName} requires `
+        + `an observable id for ${targetResource}`
+      );
+    }
+    await fillByLabel(page, fieldPattern(fieldName), String(targetId));
+  }
+  const values = browserValuesFor(resource);
+  await fillFields(page, resource.editable_form_fields, values);
+  await clickNamed(page, new RegExp(`create.*${resource.singular_label.toLowerCase()}|save|submit`, 'i'));
+  await waitForMutation(
+    mutations,
+    (m) => m.method === 'POST' && m.url.includes(resource.collection_route),
+    `${resource.name} form did not emit a real POST ${resource.collection_route} request`,
+  );
+  const visibleValue = Object.values(values)[0];
+  await navigateTo(page, navPattern(resource.navigation_label));
+  if (visibleValue) await expect(page.getByText(String(visibleValue), { exact: false })).toBeVisible();
+  await page.reload({ waitUntil: 'networkidle' });
+  if (visibleValue) await expect(page.getByText(String(visibleValue), { exact: false })).toBeVisible();
+}
+
+async function exerciseNegativeHttpPath(page, resource) {
+  let backendStatus = null;
+  const consoleCountBeforeProbe = consoleErrors.length;
+  const collectionPath = new URL(resource.collection_route, API).pathname;
+  await page.route('**/*', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (requestUrl.port !== '5000' || requestUrl.pathname !== collectionPath) {
+      await route.continue();
+      return;
+    }
+    const missingUrl = new URL(`${resource.collection_route.replace(/\/$/, '')}/2147483647`, requestUrl.origin);
+    const response = await route.fetch({ url: missingUrl.toString() });
+    backendStatus = response.status();
+    await route.fulfill({ response });
+  });
+  if (singleDestination && resource.name === primary.name) {
+    await page.reload({ waitUntil: 'networkidle' });
+  } else {
+    await navigateTo(page, navPattern(resource.navigation_label));
+  }
+  await page.waitForLoadState('networkidle');
+  if (backendStatus === null || backendStatus < 400) {
+    throw new Error(`negative HTTP probe for ${resource.name} did not receive a real backend non-2xx`);
+  }
+  const recovery = await firstVisible([
+    page.getByRole('button', { name: /retry|try again|reload|recover|refresh/i }),
+    page.getByRole('link', { name: /retry|try again|reload|recover|refresh/i }),
+  ]);
+  await expect(recovery).toBeVisible();
+  await expect(page.locator(`a[href$="/${2147483647}"], button[data-id="${2147483647}"]`)).toHaveCount(0);
+  await page.unroute('**/*');
+  await recovery.click();
+  await page.waitForLoadState('networkidle');
+  const expectedBrowserNetworkNoise = /^Failed to load resource: the server responded with a status of \d+/;
+  const retained = consoleErrors.filter(
+    (message, index) => index < consoleCountBeforeProbe || !expectedBrowserNetworkNoise.test(message),
+  );
+  consoleErrors.splice(0, consoleErrors.length, ...retained);
+  return backendStatus;
+}
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const consoleErrors = [];
@@ -315,6 +420,13 @@ try {
     await expect(page.getByRole('navigation')).toBeVisible();
     await navigateTo(page, navPattern(primary.navigation_label));
   }
+
+  // Q02/Q03: every spec+backend-reconciled create promise is checked,
+  // including an initially empty module. No resource name is special here.
+  for (const resource of createCapableResources) {
+    await assertCreateReachable(page, resource);
+  }
+  if (!singleDestination) await navigateTo(page, navPattern(primary.navigation_label));
 
   if (primaryIsMutationCapable) {
     const createValues = scenario.browser_create_values || {};
@@ -399,44 +511,19 @@ try {
       `delete flow did not emit a real DELETE ${primary.collection_route}/${createdId} request`,
     );
 
-    if (related) {
-      await navigateTo(page, navPattern(related.navigation_label));
-      // Gap 7(a), module docstring: "create" declared in `related.actions`
-      // is a real, spec+backend-reconciled promise (`acceptance_plan_
-      // compiler.py`'s own `_resolved_actions`) -- a missing control for a
-      // declared-mandatory capability is a real FAIL, never a silent skip.
-      // SKIP stays legitimate only when neither the candidate's own
-      // product_ux_spec.json nor its own real backend routes ever declared
-      // "create" for this resource in the first place.
-      const relatedMustCreate = (related.actions || []).includes('create');
-      const relatedCreate = page.getByRole('link', { name: createButtonPattern(related.singular_label) });
-      const relatedCreateCount = await relatedCreate.count();
-      if (relatedMustCreate && relatedCreateCount === 0) {
-        throw new Error(
-          `${related.name} declares a mandatory "create" capability (both product_ux_spec.json and the `
-          + 'real backend agree it exists) but no reachable create control was found anywhere on the '
-          + `${related.navigation_label} page`
-        );
-      }
-      if (relatedCreateCount) {
-        await relatedCreate.first().click();
-        const relationshipField = Object.keys(related.relationship_fields || {})[0];
-        if (relationshipField) {
-          await fillByLabel(page, fieldPattern(relationshipField), primaryBackendId);
-        }
-        await fillFields(page, related.editable_form_fields, scenario.browser_related_values || {});
-        await clickNamed(page, new RegExp(`create.*${related.singular_label.toLowerCase()}|save|submit`, 'i'));
-        await waitForMutation(
-          mutations,
-          (m) => m.method === 'POST' && m.url.includes(related.collection_route),
-          `${related.name} form did not emit a real POST ${related.collection_route} request`,
-        );
-      }
+    const knownIds = { [primary.name]: primaryBackendId };
+    for (const resource of createCapableResources) {
+      if (resource.name === primary.name) continue;
+      await createSecondaryResource(page, resource, knownIds);
     }
   }
   // (8, module docstring): a read-only primary's entire observable promise
   // is real navigation -- already proven above by `navigateTo(primary)` --
   // with no console/page/network error; nothing further is asked of it.
+
+  const negativeHttpStatus = scenario.http_negative_probe
+    ? await exerciseNegativeHttpPath(page, primary)
+    : null;
 
   if (!singleDestination) {
     // (9, module docstring): for a single-destination scenario,
@@ -449,7 +536,7 @@ try {
     throw new Error(JSON.stringify({ consoleErrors, pageErrors, failedRequests }));
   }
   console.log(JSON.stringify({
-    outcome: 'BROWSER_JOURNEY_PASS', candidate, mutations,
+    outcome: 'BROWSER_JOURNEY_PASS', candidate, mutations, negativeHttpStatus,
     validation: primaryIsMutationCapable
       ? 'empty required form emitted no mutation'
       : 'read-only primary: real navigation only, no mutation attempted',

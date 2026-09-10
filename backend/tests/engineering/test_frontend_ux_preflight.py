@@ -115,8 +115,10 @@ function App() {
     <nav>
       <Link to="/">Dashboard</Link>
       <Link to="/products">Products</Link>
+      <Link to="/products/create">Create Product</Link>
       <Link to="/categories">Categories</Link>
       <Link to="/orders">Orders</Link>
+      <Link to="/orders/create">Create Order</Link>
     </nav>
   );
 }
@@ -132,7 +134,7 @@ function ProductForm() {
 function OrdersList() {
   if (loading) return <div>loading</div>;
   if (empty) return <div>empty</div>;
-  if (error) return <div>error</div>;
+  if (error) return <div>error <button onClick={retry}>Retry</button></div>;
   const onDelete = () => { if (window.confirm("Are you sure?")) { deleteOrder(); } };
   return <div>success</div>;
 }
@@ -261,6 +263,28 @@ def test_f_a_professional_multi_module_shell_structurally_passes() -> None:
     assert _unreachable_module_findings(files) == []
 
 
+def test_create_capability_requires_a_reachable_create_control_even_when_empty() -> None:
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS
+        .replace('<Link to="/products/create">Create Product</Link>', "")
+        .replace("function ProductForm() {", "function ProductForm() { createProduct(); "),
+    }
+    findings = _ux_spec_mutation_findings(files)
+    assert any(f.code == "frontend_ui_create_unreachable_from_empty_state" for f in findings)
+
+
+def test_recoverable_error_state_requires_an_interactive_recovery_control() -> None:
+    files = {
+        **_valid_spec_files(),
+        "frontend/src/App.js": _PROFESSIONAL_SHELL_JS.replace(
+            '<div>error <button onClick={retry}>Retry</button></div>', '<div>error</div>',
+        ),
+    }
+    findings = _ux_spec_shell_findings(files)
+    assert any(f.code == "frontend_ui_error_state_not_actionable" for f in findings)
+
+
 def _with_products_edit_action(files: dict[str, str]) -> dict[str, str]:
     spec = json.loads(files["product/ux_spec.json"])
     for module in spec["modules"]:
@@ -373,7 +397,10 @@ def test_g_a_genuinely_single_purpose_product_is_not_forced_into_a_shell() -> No
     }
     files = {
         **backend, "product/ux_spec.json": json.dumps(spec),
-        "frontend/src/NotesList.js": "<ul>{notes.map(n => <li>{n.title}</li>)}</ul> notes",
+        "frontend/src/NotesList.js": (
+            "<ul>{notes.map(n => <li>{n.title}</li>)}</ul> notes "
+            "<button onClick={retry}>Retry</button>"
+        ),
     }
     assert _ux_spec_shell_findings(files) == []
     assert _ux_spec_mutation_findings(files) == []
