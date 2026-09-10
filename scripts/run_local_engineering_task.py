@@ -1,15 +1,18 @@
-"""D-037: one local task, existing contracts/owners, no retry or promotion.
+"""D-037/D-039: one local task, at most one C-26 repair, no promotion.
 
 Composition belongs here like run_product_change_worker, not in C-22/C-23.
 Source and acceptance tests are explicitly selected by the human caller.
-Only existing file updates are admitted in Phase 1. The model receives text,
-never tools, and only trusted acceptance tests execute (not model commands).
+Only existing file updates are admitted. The model receives text, never tools,
+and only trusted acceptance tests execute (not model commands). D-039 reuses
+the C-26 fingerprint and ledger; no local counter or third call exists.
 """
 from __future__ import annotations
 
 import argparse
+from decimal import Decimal
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -27,6 +30,9 @@ from arkali.engineering.agent.context_kinds import ContextKindAuthority
 from arkali.engineering.agent.context_package import ContextItem, ContextPackage
 from arkali.engineering.agent.harness_task import HarnessTask
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
+from arkali.engineering.candidate.campaign_budget import (
+    CANDIDATE_DEFECT, MODEL_VARIANCE,
+)
 from arkali.engineering.factory.component_generation import DEFAULT_TIMEOUT_SECONDS
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter
 from arkali.engineering.localai.host_probe import probe_host
@@ -35,6 +41,9 @@ from arkali.engineering.product_change.change_plan import ChangePlan
 from arkali.engineering.product_change.inspection import _is_sensitive_path
 from arkali.engineering.product_change.modification import _apply_changeset, _extract_json_object, _validate_changeset
 from arkali.engineering.product_change.verification import verify_changeset
+from arkali.engineering.repair.contracts import (
+    RepairBudget, RepairBudgetLedger, RepairFingerprint, content_hash,
+)
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput
 from arkali.execution.durable.job_store import JobStore, JobSubmission
@@ -45,6 +54,7 @@ from arkali.kernel.persistence.session import create_session_factory, unit_of_wo
 MAX_CONTEXT_BYTES = 16 * 1024
 MAX_SOURCE_FILES = 5
 MAX_EDITABLE_FILES = 2
+REPAIR_ELIGIBLE_FAILURES = frozenset((CANDIDATE_DEFECT, MODEL_VARIANCE))
 
 
 def _digest(payload: bytes) -> str:
@@ -103,16 +113,8 @@ def compile_task(root, task_id, request, paths, acceptance, workspace, *, select
     return task, package, prompt, source
 
 
-def execute_once(task, package, prompt, source, workspace, model, acceptance_check, selection: LocalSelection | None = None):
-    """No loop. The caller persists the result through existing truth owners."""
-    if task.repair_budget != 0 or task.tools or task.permissions or model.runtime != "ollama":
-        raise ValueError("Phase 1 permits only tool-free, zero-repair local execution")
-    if task.context_package != package.context_hash or task.workspace != str(workspace.root):
-        raise ValueError("task/package/workspace binding mismatch")
-    selected_model = selection.model_id if selection else getattr(model, "model_id", "")
-    if not selected_model:
-        raise ValueError("no canonical local model selection supplied")
-    result = model.infer(selected_model, prompt, timeout_seconds=DEFAULT_TIMEOUT_SECONDS)
+def _execute_attempt(prompt, source, workspace, model, acceptance_check, selection):
+    result = model.infer(selection.model_id, prompt, timeout_seconds=DEFAULT_TIMEOUT_SECONDS)
     if result.state.value != "PASS":
         raise ValueError("local inference failed: " + redact_raw_secrets(result.detail))
     assert_no_raw_secret(result.output, sink="local engineering output")
@@ -137,6 +139,145 @@ def execute_once(task, package, prompt, source, workspace, model, acceptance_che
             "promotion": "NOT_PROMOTED"}
 
 
+def execute_once(task, package, prompt, source, workspace, model, acceptance_check, selection: LocalSelection | None = None):
+    """One initial attempt, retained as the zero-repair Phase-1 seam."""
+    if task.repair_budget != 0 or task.tools or task.permissions or model.runtime != "ollama":
+        raise ValueError("local execution must be tool-free, zero-repair and Ollama-only")
+    if task.context_package != package.context_hash or task.workspace != str(workspace.root):
+        raise ValueError("task/package/workspace binding mismatch")
+    selected = selection or LocalSelection(
+        provider=model.runtime, model_id=getattr(model, "model_id", ""), complexity="low",
+        reason="test-supplied local model", switch_required=False, candidates_considered=(),
+    )
+    if not selected.model_id:
+        raise ValueError("no canonical local model selection supplied")
+    return _execute_attempt(prompt, source, workspace, model, acceptance_check, selected)
+
+
+def _classify_verification_failure(_report):
+    """Reuse the canonical campaign vocabulary for generated-solution failure."""
+    return CANDIDATE_DEFECT
+
+
+def _fingerprint(report, selection, failure_class, *, outcome):
+    evidence = json.dumps({
+        "acceptance": report.get("acceptance"),
+        "syntax_failures": report.get("syntax_failures"),
+    }, sort_keys=True, default=str).encode()
+    return RepairFingerprint(
+        failure_signature=content_hash(evidence), root_cause_class=failure_class,
+        files=tuple(report["changed_files"]), strategy="bounded_local_change",
+        provider_model=f"{selection.provider}:{selection.model_id}", outcome=outcome,
+    )
+
+
+def _repair_ledger(task_id):
+    return RepairBudgetLedger(candidate_id=task_id, budget=RepairBudget(
+        attempts=1, ai_calls=1, elapsed_seconds=int(DEFAULT_TIMEOUT_SECONDS) + 60,
+        cost=Decimal("0"), touched_files=MAX_EDITABLE_FILES, regression_delta=0,
+    ))
+
+
+def _compile_repair_context(task, package, source, workspace, report, fingerprint, selection):
+    proposed = {path: (workspace.snapshot / path).read_text(encoding="utf-8") for path in source}
+    repair_contract = {
+        "original_task": task.task_specification,
+        "protected_constraints": "grounded updates only; no tools, new files, dependencies or promotion",
+        "previous_plan": report["plan"], "verification": {
+            "acceptance": report["acceptance"], "syntax_failures": report["syntax_failures"],
+        },
+        "failure_fingerprint": fingerprint.model_dump(mode="json"),
+    }
+    items = package.items + (
+        ContextItem(kind="failures", identifier=fingerprint.fingerprint,
+                    origin="deterministic verification of the initial isolated proposal"),
+    )
+    repair_package = ContextPackage.compiled(
+        ContextKindAuthority.load(ROOT), package_id=package.task_id + "-repair-context",
+        task_id=package.task_id, items=items,
+    )
+    repair_task = HarnessTask(
+        task_specification=task.task_specification, context_package=repair_package.context_hash,
+        tools=(), permissions=(), workspace=task.workspace,
+        environment=f"{selection.provider}:{selection.model_id}",
+        acceptance_target=task.acceptance_target, repair_budget=1,
+    )
+    repair_prompt = (
+        "Return only schema-valid ChangePlan JSON. Repair the prior proposed update using the "
+        "deterministic failure evidence. Preserve contracts and update only the grounded files.\n"
+        + json.dumps(repair_contract, ensure_ascii=False, sort_keys=True)
+        + "\nC-22 REPAIR:\n" + repair_task.model_dump_json()
+        + "\nC-23 REPAIR:\n" + repair_package.model_dump_json()
+        + "\nAUTHORITATIVE BASE SOURCE:\n"
+        + json.dumps({p: data.decode("utf-8") for p, data in source.items()}, ensure_ascii=False)
+        + "\nCURRENT FAILED PROPOSAL:\n" + json.dumps(proposed, ensure_ascii=False)
+    )
+    assert_no_raw_secret(repair_prompt, sink="local engineering repair prompt")
+    if len(repair_prompt.encode()) > MAX_CONTEXT_BYTES:
+        raise ValueError("repair context byte budget exceeded; no truncation")
+    return repair_task, repair_package, repair_prompt
+
+
+def execute_bounded_repair(
+    task, package, prompt, source, workspace, model, acceptance_check,
+    initial_selection, descriptors, *, selector=select_local_model, selection_host=None,
+):
+    """Initial attempt plus at most one C-26-ledger-authorized local repair."""
+    initial = execute_once(
+        task, package, prompt, source, workspace, model, acceptance_check, initial_selection,
+    )
+    initial.update(initial_provider_model=f"{initial_selection.provider}:{initial_selection.model_id}")
+    if initial["verification_passed"]:
+        return initial
+    failure_class = _classify_verification_failure(initial)
+    initial_fp = _fingerprint(initial, initial_selection, failure_class, outcome="rejected")
+    initial.update(initial_fingerprint=initial_fp.fingerprint,
+                   repair_eligible=failure_class in REPAIR_ELIGIBLE_FAILURES)
+    if not initial["repair_eligible"]:
+        return initial
+    ledger = _repair_ledger(package.task_id)
+    repair_selection = selector(
+        tuple(descriptors), LocalSelectionRequest(
+            complexity="high", required_capabilities=("coding",),
+            warm_model_id=initial_selection.model_id,
+        ), host=selection_host,
+    )
+    repair_task, repair_package, repair_prompt = _compile_repair_context(
+        task, package, source, workspace, initial, initial_fp, repair_selection,
+    )
+    current = {path: (workspace.snapshot / path).read_bytes() for path in source}
+    repair = _execute_attempt(
+        repair_prompt, current, workspace, model, acceptance_check, repair_selection,
+    )
+    final_fp = _fingerprint(
+        repair, repair_selection, failure_class,
+        outcome="resolved" if repair["verification_passed"] else "rejected",
+    )
+    ledger = ledger.record(
+        final_fp, ai_calls=1,
+        elapsed_seconds=max(1, math.ceil(repair["model_seconds"] + repair["verification_seconds"])),
+        cost=Decimal("0"), touched_files=len(repair["changed_files"]), regression_delta=0,
+    )
+    repair.update(
+        initial_verification=False, initial_fingerprint=initial_fp.fingerprint,
+        repair_eligible=True, repair_invoked=True,
+        repair_provider_model=f"{repair_selection.provider}:{repair_selection.model_id}",
+        repair_selection_reason=repair_selection.reason,
+        repair_switch_required=repair_selection.switch_required,
+        repair_context_hash=repair_package.context_hash,
+        repair_context_items=len(repair_package.items),
+        repair_context_bytes=len(repair_prompt.encode()),
+        repair_fingerprint=final_fp.fingerprint,
+        same_fingerprint=final_fp.fingerprint == initial_fp.fingerprint,
+        repair_budget=ledger.model_dump(mode="json"),
+        local_model_calls=2, automatic_retries=1,
+        _repair_context_payload={"harness_task": repair_task.model_dump(),
+                                 "context_package": repair_package.model_dump(),
+                                 "prompt": repair_prompt},
+    )
+    return repair
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--task-id", required=True)
@@ -153,11 +294,13 @@ def main():
     if not sep or not node.isidentifier() or test_path in args.source:
         raise ValueError("a trusted acceptance node outside editable scope is required")
     model = OllamaAdapter(json_mode=True, max_output_tokens=4096)
+    descriptors = model.list_models()
+    selection_host = probe_host()
     selection = select_local_model(
-        model.list_models(),
+        descriptors,
         LocalSelectionRequest(complexity=args.complexity, required_capabilities=("coding",),
                               warm_model_id=args.warm_model),
-        host=probe_host(),
+        host=selection_host,
     )
     pdp = PolicyDecisionPoint.load(ROOT)
     engine = create_persistence_engine(sqlite_url(ROOT / "var/command_center.db"))
@@ -205,7 +348,10 @@ def main():
             return {"passed": check.returncode == 0,
                     "detail": redact_raw_secrets((check.stdout + check.stderr)[-4000:])}
 
-        report = execute_once(task, package, prompt, source, workspace, model, acceptance_check, selection)
+        report = execute_bounded_repair(
+            task, package, prompt, source, workspace, model, acceptance_check,
+            selection, descriptors, selection_host=selection_host,
+        )
         report.update(task_id=args.task_id, context_hash=package.context_hash, context_ref=context_ref,
                       context_items=len(package.items), context_bytes=len(prompt.encode()),
                       source_files=list(source), workspace=str(workspace.root), provider_model=f"{selection.provider}:{selection.model_id}",
@@ -217,6 +363,17 @@ def main():
         with unit_of_work(create_session_factory(evidence_engine)) as session:
             artifacts = ArtifactStore(session, ArtifactBlobStore(ROOT / "var/factory/evidence/blobs",
                 PolicyEnforcementPoint(pdp, "evidence.artifact.blob_store")))
+            repair_payload = report.pop("_repair_context_payload", None)
+            if repair_payload is not None:
+                repair_provenance = ProvenanceInput(
+                    producer_agent="local-engineering",
+                    provider_model=report["repair_provider_model"], task_id=args.task_id,
+                    specification_version="local-engineering-c26/1",
+                    context_hash=report["repair_context_hash"],
+                )
+                report["repair_context_ref"] = artifacts.register(
+                    json.dumps(repair_payload, ensure_ascii=False).encode(), repair_provenance,
+                )
             report_ref = artifacts.register(json.dumps(report, ensure_ascii=False).encode(), provenance)
         with unit_of_work(factory) as session:
             jobs(session).checkpoint(args.task_id, {"phase": "reviewable" if report["verification_passed"] else "verification_failed",

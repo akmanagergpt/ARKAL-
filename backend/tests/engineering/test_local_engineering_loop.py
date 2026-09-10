@@ -53,6 +53,23 @@ def _model(content, *, runtime="ollama", state="PASS"):
     return model
 
 
+def _selection(model_id="small", complexity="low"):
+    from arkali.engineering.localai.suitability import LocalSelection
+    return LocalSelection(provider="ollama", model_id=model_id, complexity=complexity,
+                          reason="test selection", switch_required=False,
+                          candidates_considered=(model_id,))
+
+
+def _descriptors():
+    from arkali.engineering.localai.adapter import LocalModelDescriptor
+    return (
+        LocalModelDescriptor(runtime="ollama", model_id="small", parameter_size="7B",
+                             capabilities=("coding",)),
+        LocalModelDescriptor(runtime="ollama", model_id="large", parameter_size="14B",
+                             capabilities=("coding",)),
+    )
+
+
 def test_context_binds_exact_source_and_provenance(loop, prepared):
     task, package, prompt, sources, workspace = prepared
     assert task.context_package == package.context_hash
@@ -127,6 +144,66 @@ def test_provider_failure_does_not_mutate(loop, prepared):
         loop.execute_once(*prepared, model, lambda: {"passed": True})
     assert model.calls == 1
     assert (prepared[-1].snapshot / "sample.py").read_bytes() == prepared[3]["sample.py"]
+
+
+def test_bounded_repair_initial_pass_uses_zero_repair(loop, prepared):
+    model = _model('def describe():\n    """Clear description."""\n    return 1\n')
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": True}, _selection(), _descriptors())
+    assert result["verification_passed"] and model.calls == 1
+    assert result["automatic_retries"] == 0 and "repair_invoked" not in result
+    assert result["promotion"] == "NOT_PROMOTED"
+
+
+def test_eligible_failure_uses_ledger_and_one_canonical_repair(loop, prepared):
+    model = _model('def describe():\n    """Clear description."""\n    return 1\n')
+    outcomes = iter((False, True))
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": next(outcomes)},
+        _selection(), _descriptors())
+    assert result["verification_passed"] and result["repair_invoked"]
+    assert result["repair_provider_model"] == "ollama:large"
+    assert result["repair_budget"]["consumption"]["attempts"] == 1
+    assert result["local_model_calls"] == 2 and model.calls == 2
+    assert result["automatic_retries"] == 1 and result["promotion"] == "NOT_PROMOTED"
+    assert result["repair_context_bytes"] <= loop.MAX_CONTEXT_BYTES
+    assert result["repair_context_hash"]
+
+
+def test_ineligible_failure_stops_without_repair(loop, prepared, monkeypatch):
+    model = _model("x = 1\n")
+    monkeypatch.setattr(loop, "_classify_verification_failure",
+                        lambda report: "infrastructure_failure")
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+    assert not result["repair_eligible"] and model.calls == 1
+    assert "repair_invoked" not in result and result["promotion"] == "NOT_PROMOTED"
+
+
+def test_same_fingerprint_stops_after_single_repair(loop, prepared):
+    model = _model("x = 1\n")
+    initial = _selection()
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, initial, _descriptors(),
+        selector=lambda descriptors, request, **kwargs: initial)
+    assert result["same_fingerprint"] and model.calls == 2
+    assert result["automatic_retries"] == 1
+    assert result["repair_budget"]["consumption"]["attempts"] == 1
+
+
+def test_different_fingerprint_still_stops_after_budget(loop, prepared):
+    model = _model("x = 1\n")
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False},
+        _selection(), _descriptors())
+    assert not result["same_fingerprint"] and model.calls == 2
+    assert result["automatic_retries"] == 1
+    assert result["repair_budget"]["consumption"]["attempts"] == 1
+
+
+def test_c26_policy_contains_no_concrete_model_identity(loop):
+    source = Path(loop.__file__).read_text(encoding="utf-8")
+    assert "qwen2.5-coder" not in source
 
 
 def test_external_provider_refused(loop, prepared):
@@ -206,5 +283,23 @@ def test_live_slug_documentation_acceptance():
     assert "underscore" in documentation.lower()
     assert "empty" in documentation.lower()
     # Only this docstring may differ; model code is never executed.
+    new.body[0] = old.body[0]
+    assert ast.dump(before, include_attributes=False) == ast.dump(after, include_attributes=False)
+
+
+def test_live_model_descriptor_documentation_acceptance():
+    """Trusted C-26 demonstration criteria; proposed code is parsed, not imported."""
+    location = os.environ.get("ARKALI_REVIEW_WORKSPACE")
+    if not location:
+        pytest.skip("only runs on the real isolated proposal")
+    root = Path(location)
+    path = "backend/arkali/engineering/localai/adapter.py"
+    before = ast.parse((root / "baseline" / path).read_text(encoding="utf-8"))
+    after = ast.parse((root / "snapshot" / path).read_text(encoding="utf-8"))
+    old = next(n for n in before.body if isinstance(n, ast.ClassDef) and n.name == "LocalModelDescriptor")
+    new = next(n for n in after.body if isinstance(n, ast.ClassDef) and n.name == "LocalModelDescriptor")
+    documentation = ast.get_docstring(new) or ""
+    assert "runtime" in documentation.lower()
+    assert "capabil" in documentation.lower()
     new.body[0] = old.body[0]
     assert ast.dump(before, include_attributes=False) == ast.dump(after, include_attributes=False)
