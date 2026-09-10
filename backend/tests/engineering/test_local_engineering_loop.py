@@ -119,6 +119,21 @@ def test_editable_secret_source_refused(loop, tmp_path):
         loop._source(tmp_path, "source.py")
 
 
+def test_trusted_acceptance_has_separate_finite_non_prompt_budget(loop, tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    payload = ("# trusted deterministic assertion\n" * 700).encode()
+    path = tmp_path / "acceptance.py"
+    path.write_bytes(payload)
+    subprocess.run(["git", "add", "acceptance.py"], cwd=tmp_path, check=True)
+    with pytest.raises(ValueError, match="byte budget"):
+        loop._source(tmp_path, "acceptance.py")
+    assert loop._source(
+        tmp_path, "acceptance.py", max_bytes=loop.MAX_ACCEPTANCE_TEST_BYTES) == payload
+    path.write_bytes(b"#" * (loop.MAX_ACCEPTANCE_TEST_BYTES + 1))
+    with pytest.raises(ValueError, match="byte budget"):
+        loop._source(tmp_path, "acceptance.py", max_bytes=loop.MAX_ACCEPTANCE_TEST_BYTES)
+
+
 def test_single_success_is_isolated_verified_unpromoted(loop, prepared):
     model = _model('def describe():\n    """Clear description."""\n    return 1\n')
     base = prepared[3]["sample.py"]

@@ -56,6 +56,7 @@ from arkali.kernel.persistence.engine import create_persistence_engine, sqlite_u
 from arkali.kernel.persistence.session import create_session_factory, unit_of_work
 
 MAX_CONTEXT_BYTES = 16 * 1024
+MAX_ACCEPTANCE_TEST_BYTES = 64 * 1024
 MAX_SOURCE_FILES = 5
 MAX_EDITABLE_FILES = 2
 REPAIR_ELIGIBLE_FAILURES = frozenset((CANDIDATE_DEFECT, MODEL_VARIANCE))
@@ -65,7 +66,7 @@ def _digest(payload: bytes) -> str:
     return "sha256:" + hashlib.sha256(payload).hexdigest()
 
 
-def _source(root: Path, relative: str) -> bytes:
+def _source(root: Path, relative: str, *, max_bytes: int = MAX_CONTEXT_BYTES) -> bytes:
     path = Path(relative)
     if path.is_absolute() or ".." in path.parts or _is_sensitive_path(relative):
         raise ValueError("excluded source path")
@@ -74,8 +75,8 @@ def _source(root: Path, relative: str) -> bytes:
         raise ValueError("source containment refused")
     subprocess.run(["git", "ls-files", "--error-unmatch", "--", relative],
                    cwd=root, check=True, capture_output=True)
-    if target.stat().st_size > MAX_CONTEXT_BYTES:
-        raise ValueError("source exceeds context budget")
+    if target.stat().st_size > max_bytes:
+        raise ValueError("source exceeds declared byte budget")
     data = target.read_bytes()
     # Never rewrite a source from a redacted approximation of its real bytes.
     if redact_raw_secrets(data.decode("utf-8")) != data.decode("utf-8"):
@@ -340,7 +341,7 @@ def main():
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT).strip():
         raise ValueError("main must be clean before the local attempt")
     test_path, sep, node = args.acceptance_test.partition("::")
-    test_bytes = _source(ROOT, test_path)
+    test_bytes = _source(ROOT, test_path, max_bytes=MAX_ACCEPTANCE_TEST_BYTES)
     if not sep or not node.isidentifier() or test_path in args.source:
         raise ValueError("a trusted acceptance node outside editable scope is required")
     model = OllamaAdapter(json_mode=True, max_output_tokens=4096)
