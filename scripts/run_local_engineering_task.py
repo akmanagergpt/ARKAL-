@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from decimal import Decimal
+import difflib
 import hashlib
 import json
 import math
@@ -180,10 +181,22 @@ def _repair_ledger(task_id):
 
 def _compile_repair_context(task, package, source, workspace, report, fingerprint, selection):
     proposed = {path: (workspace.snapshot / path).read_text(encoding="utf-8") for path in source}
+    proposal_diffs = {
+        path: "".join(difflib.unified_diff(
+            data.decode("utf-8").splitlines(keepends=True),
+            proposed[path].splitlines(keepends=True),
+            fromfile=f"baseline/{path}", tofile=f"proposal/{path}", n=3,
+        ))
+        for path, data in source.items()
+    }
     repair_contract = {
         "original_task": task.task_specification,
         "protected_constraints": "grounded updates only; no tools, new files, dependencies or promotion",
-        "previous_plan": report["plan"], "verification": {
+        "previous_operations": [
+            {key: operation[key] for key in ("operation", "path", "rationale")}
+            for operation in report["plan"]["operations"]
+        ],
+        "verification": {
             "acceptance": report["acceptance"], "syntax_failures": report["syntax_failures"],
         },
         "failure_fingerprint": fingerprint.model_dump(mode="json"),
@@ -210,7 +223,7 @@ def _compile_repair_context(task, package, source, workspace, report, fingerprin
         + "\nC-23 REPAIR:\n" + repair_package.model_dump_json()
         + "\nAUTHORITATIVE BASE SOURCE:\n"
         + json.dumps({p: data.decode("utf-8") for p, data in source.items()}, ensure_ascii=False)
-        + "\nCURRENT FAILED PROPOSAL:\n" + json.dumps(proposed, ensure_ascii=False)
+        + "\nPREVIOUS PROPOSAL DIFF:\n" + json.dumps(proposal_diffs, ensure_ascii=False)
     )
     assert_no_raw_secret(repair_prompt, sink="local engineering repair prompt")
     if len(repair_prompt.encode()) > MAX_CONTEXT_BYTES:

@@ -168,6 +168,29 @@ def test_eligible_failure_uses_ledger_and_one_canonical_repair(loop, prepared):
     assert result["automatic_retries"] == 1 and result["promotion"] == "NOT_PROMOTED"
     assert result["repair_context_bytes"] <= loop.MAX_CONTEXT_BYTES
     assert result["repair_context_hash"]
+    assert "PREVIOUS PROPOSAL DIFF" in result["_repair_context_payload"]["prompt"]
+    assert '"previous_plan"' not in result["_repair_context_payload"]["prompt"]
+
+
+def test_repair_context_is_delta_focused_under_budget(loop, prepared, monkeypatch):
+    padding = "# stable contract padding\n" * 180
+    baseline = ("value = 1\n" + padding).encode()
+    proposed = "value = 2\n" + padding
+    monkeypatch.setattr(loop, "_source", lambda *args: baseline)
+    workspace = prepared[-1]
+    task, package, _, source = loop.compile_task(
+        loop.ROOT, "delta", "Adjust value", ["sample.py"], "trusted-test", workspace.root)
+    workspace.write("snapshot/sample.py", proposed.encode())
+    report = {"plan": {"operations": [{"operation": "update", "path": "sample.py",
+                                         "content": proposed, "rationale": "bounded change"}]},
+              "changed_files": ["sample.py"], "acceptance": {"passed": False},
+              "syntax_failures": ()}
+    selection = _selection()
+    fingerprint = loop._fingerprint(report, selection, "candidate_defect", outcome="rejected")
+    _, _, prompt = loop._compile_repair_context(
+        task, package, source, workspace, report, fingerprint, selection)
+    assert len(prompt.encode()) <= loop.MAX_CONTEXT_BYTES
+    assert prompt.count("# stable contract padding") < 200
 
 
 def test_ineligible_failure_stops_without_repair(loop, prepared, monkeypatch):
