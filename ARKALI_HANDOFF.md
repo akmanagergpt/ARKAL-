@@ -1287,7 +1287,7 @@ next_exact_action_phase: "30"
 accepted_human_gates: ["HUMAN_GATE_1", "HUMAN_GATE_2", "HUMAN_GATE_3", "HUMAN_GATE_4", "HUMAN_GATE_6"]
 adr_accepted: 9
 adr_proposed: 1
-open_blocker_high: []
+open_blocker_high: ["F-0095"]
 
 authoritative_sources:
   - docs/ARKALI_GENESIS_V2_MASTER_SPECIFICATION.md
