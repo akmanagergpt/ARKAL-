@@ -34,7 +34,7 @@ from arkali.engineering.agent.context_package import ContextItem, ContextPackage
 from arkali.engineering.agent.harness_task import HarnessTask
 from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.candidate.campaign_budget import (
-    CANDIDATE_DEFECT, MODEL_VARIANCE,
+    CANDIDATE_DEFECT, INFRASTRUCTURE_FAILURE, MODEL_VARIANCE,
 )
 from arkali.engineering.factory.component_generation import DEFAULT_TIMEOUT_SECONDS
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter
@@ -246,6 +246,18 @@ def _compile_repair_context(task, package, source, workspace, report, fingerprin
     return repair_task, repair_package, repair_prompt
 
 
+def _repair_execution_failure(source, error):
+    return {
+        "plan": {"operations": []}, "changed_files": list(source),
+        "verification_passed": False,
+        "syntax_failures": ("repair_execution_failure: " + redact_raw_secrets(str(error)),),
+        "acceptance": {"passed": False, "detail": "repair execution failed safely"},
+        "model_seconds": 0.0, "verification_seconds": 0.0,
+        "local_model_calls": 1, "external_execution_calls": 0,
+        "automatic_retries": 0, "promotion": "NOT_PROMOTED",
+    }
+
+
 def execute_bounded_repair(
     task, package, prompt, source, workspace, model, acceptance_check,
     initial_selection, descriptors, *, selector=select_local_model, selection_host=None,
@@ -259,26 +271,36 @@ def execute_bounded_repair(
         return initial
     failure_class = _classify_verification_failure(initial)
     initial_fp = _fingerprint(initial, initial_selection, failure_class, outcome="rejected")
+    ledger = _repair_ledger(package.task_id)
     initial.update(initial_fingerprint=initial_fp.fingerprint,
-                   repair_eligible=failure_class in REPAIR_ELIGIBLE_FAILURES)
+                   repair_eligible=failure_class in REPAIR_ELIGIBLE_FAILURES,
+                   repair_invoked=False, repair_budget=ledger.model_dump(mode="json"))
     if not initial["repair_eligible"]:
         return initial
-    ledger = _repair_ledger(package.task_id)
-    repair_selection = selector(
-        tuple(descriptors), LocalSelectionRequest(
-            complexity="high", required_capabilities=("coding",),
-            warm_model_id=initial_selection.model_id,
-        ), host=selection_host,
-    )
-    repair_task, repair_package, repair_prompt = _compile_repair_context(
-        task, package, source, workspace, initial, initial_fp, repair_selection,
-    )
+    try:
+        repair_selection = selector(
+            tuple(descriptors), LocalSelectionRequest(
+                complexity="high", required_capabilities=("coding",),
+                warm_model_id=initial_selection.model_id,
+            ), host=selection_host,
+        )
+        repair_task, repair_package, repair_prompt = _compile_repair_context(
+            task, package, source, workspace, initial, initial_fp, repair_selection,
+        )
+    except ValueError as error:
+        initial["repair_stop_reason"] = redact_raw_secrets(str(error))
+        return initial
     current = {path: (workspace.snapshot / path).read_bytes() for path in source}
-    repair = _execute_attempt(
-        repair_prompt, current, workspace, model, acceptance_check, repair_selection,
-    )
+    try:
+        repair = _execute_attempt(
+            repair_prompt, current, workspace, model, acceptance_check, repair_selection,
+        )
+        final_class = failure_class
+    except Exception as error:
+        repair = _repair_execution_failure(source, error)
+        final_class = INFRASTRUCTURE_FAILURE
     final_fp = _fingerprint(
-        repair, repair_selection, failure_class,
+        repair, repair_selection, final_class,
         outcome="resolved" if repair["verification_passed"] else "rejected",
     )
     ledger = ledger.record(

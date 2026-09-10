@@ -200,7 +200,8 @@ def test_ineligible_failure_stops_without_repair(loop, prepared, monkeypatch):
     result = loop.execute_bounded_repair(
         *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
     assert not result["repair_eligible"] and model.calls == 1
-    assert "repair_invoked" not in result and result["promotion"] == "NOT_PROMOTED"
+    assert not result["repair_invoked"] and result["promotion"] == "NOT_PROMOTED"
+    assert result["repair_budget"]["consumption"]["attempts"] == 0
 
 
 def test_same_fingerprint_stops_after_single_repair(loop, prepared):
@@ -241,6 +242,33 @@ def test_invalid_repair_plan_is_fingerprinted_and_stops_without_third_call(loop,
     assert result["repair_fingerprint"] and result["local_model_calls"] == 2
     assert result["automatic_retries"] == 1 and model.calls == 2
     assert result["repair_budget"]["consumption"]["attempts"] == 1
+
+
+def test_repair_context_refusal_is_honest_and_calls_no_second_model(loop, prepared, monkeypatch):
+    model = _model("x = 1\n")
+    monkeypatch.setattr(loop, "_compile_repair_context",
+                        lambda *args: (_ for _ in ()).throw(ValueError("bounded refusal")))
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+    assert not result["repair_invoked"] and result["repair_stop_reason"] == "bounded refusal"
+    assert model.calls == 1 and result["repair_budget"]["consumption"]["attempts"] == 0
+
+
+def test_repair_provider_failure_is_fingerprinted_and_stops(loop, prepared):
+    model = _model("x = 1\n")
+    valid_infer = model.infer
+    def infer(*args, **kwargs):
+        if model.calls == 1:
+            model.calls += 1
+            return SimpleNamespace(state=SimpleNamespace(value="FAIL"), detail="transport stopped",
+                                   output="", elapsed_seconds=0.125)
+        return valid_infer(*args, **kwargs)
+    model.infer = infer
+    result = loop.execute_bounded_repair(
+        *prepared, model, lambda: {"passed": False}, _selection(), _descriptors())
+    assert result["repair_invoked"] and result["repair_fingerprint"]
+    assert result["repair_budget"]["fingerprints"][0]["root_cause_class"] == "infrastructure_failure"
+    assert model.calls == 2 and result["automatic_retries"] == 1
 
 
 def test_c26_policy_contains_no_concrete_model_identity(loop):
