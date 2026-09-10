@@ -9,6 +9,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 
 class SpaHandler(SimpleHTTPRequestHandler):
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
     def send_head(self):  # noqa: ANN201
         requested = pathlib.Path(self.directory) / self.path.lstrip("/").split("?", 1)[0]
         if self.path != "/" and not requested.exists():

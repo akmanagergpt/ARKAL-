@@ -214,6 +214,8 @@ def test_production_server_returns_the_spa_for_a_browser_history_route(
 ) -> None:
     index = tmp_path / "index.html"
     index.write_text("spa-shell", encoding="utf-8")
+    asset = tmp_path / "app.js"
+    asset.write_text("app-shell", encoding="utf-8")
     script = REPO / "scripts" / "serve_spa.py"
     spec = importlib.util.spec_from_file_location("serve_spa", script)
     assert spec and spec.loader
@@ -230,7 +232,18 @@ def test_production_server_returns_the_spa_for_a_browser_history_route(
             f"http://127.0.0.1:{server.server_port}/students", timeout=2,
         ) as response:
             assert response.status == 200
+            assert response.headers["Cache-Control"] == "no-store"
+            assert response.headers["Pragma"] == "no-cache"
+            assert response.headers["Expires"] == "0"
             assert response.read() == b"spa-shell"
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{server.server_port}/app.js", timeout=2,
+        ) as response:
+            assert response.status == 200
+            assert response.headers["Cache-Control"] == "no-store"
+            assert response.headers["Pragma"] == "no-cache"
+            assert response.headers["Expires"] == "0"
+            assert response.read() == b"app-shell"
     finally:
         server.shutdown()
         server.server_close()
