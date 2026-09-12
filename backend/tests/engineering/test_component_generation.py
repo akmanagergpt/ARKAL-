@@ -11,12 +11,14 @@ from arkali.engineering.candidate.workspace import WorkspaceAuthority
 from arkali.engineering.factory.component_generation import (
     DEFAULT_MAX_OUTPUT_TOKENS,
     DEFAULT_TIMEOUT_SECONDS,
+    MAX_STAGE_ATTEMPTS,
     _apply_deterministic_repairs,
     _backend_contract_findings,
     _backend_implementation_stage_findings,
     _cors_boundary_stage_findings,
     _frontend_ui_findings,
     _parse_stage_envelope,
+    _schema_only_findings,
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError
@@ -1728,3 +1730,136 @@ def test_the_enriched_semantic_finding_reaches_the_real_retry_context() -> None:
     second_payload = json.loads(model.prompts[1])
     assert "object literal" in second_payload["prior_attempt_failure"]
     assert "frontend/src/apiClient.js" in stage_files
+
+
+# -- F-0100 PATH A (BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP), preventive
+# generation-rule strengthening -----------------------------------------
+#
+# Real, frozen evidence: `factory-goal-mtyeas61-75cn2k`'s own historical
+# failure, and three further bounded live reproductions (P1/P2/P3, all
+# syntax-valid but all using the identical anti-pattern), showed
+# `backend_schema` systematically re-reading backend_contract's own JSON
+# files at RUNTIME (`json.load`) and dynamically synthesizing `CREATE
+# TABLE` text through nested f-string/dict-access composition, rather
+# than the direct/literal emission the stage's own pre-existing rule
+# already intends. `STAGED_GENERATION_STAGES.md#2` now names this
+# anti-pattern explicitly. This is a generation-instruction change only:
+# the checker (`_schema_only_findings`) and retry mechanism are
+# byte-unchanged, proven below by continuing to accept the exact real
+# P1/P2/P3 output.
+
+#: The exact real content all three bounded live reproductions produced
+#: (`sha256:142caca2b0...`), byte-identical across P1/P2/P3 -- syntax
+#: valid, but exhibiting every element the new rule text now names:
+#: runtime `json.load`, dynamic dict traversal via `.items()`, and
+#: f-string-synthesized `CREATE TABLE` text.
+_F0100_DYNAMIC_DERIVATION_DB_PY = (
+    "import sqlite3\nimport json\n\n"
+    "with open('backend/models/equipment.json', 'r') as f:\n"
+    "    equipment_schema = json.load(f)\n\n"
+    "with open('backend/models/rentals.json', 'r') as f:\n"
+    "    rentals_schema = json.load(f)\n\n"
+    "conn = sqlite3.connect('tool_rental.db')\n"
+    "cursor = conn.cursor()\n\n"
+    "create_equipment_table = f\"CREATE TABLE IF NOT EXISTS "
+    "{equipment_schema['table_name']} (\"\n"
+    "create_equipment_table += ', '.join([f\"{field} {field_type}\" "
+    "for field, field_type in equipment_schema['fields'].items()])\n"
+    "create_equipment_table += \")\"\n"
+    "cursor.execute(create_equipment_table)\n\n"
+    "conn.commit()\nconn.close()\n"
+)
+
+
+class TestF0100BackendSchemaPreventiveRule:
+    """A. direct/literal schema construction is required. B.
+    backend_contract is named as the generation-time source of schema
+    truth. C/D/E. runtime `json.load` re-derivation, dynamic field
+    traversal and nested f-string SQL synthesis are each named and
+    discouraged. F. table/column identifiers are required to be emitted
+    directly."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("backend_schema").rule
+
+    def test_a_direct_literal_construction_is_required(self) -> None:
+        rule = self._rule()
+        assert "DIRECT" in rule and "LITERAL" in rule
+
+    def test_b_backend_contract_named_as_the_source_of_truth(self) -> None:
+        rule = self._rule()
+        assert "backend_contract's own JSON files already state" in rule
+        assert "directly out of your own visible context" in rule
+
+    def test_c_runtime_json_load_rederivation_is_discouraged(self) -> None:
+        rule = self._rule()
+        assert "reopens or `json.load`s backend_contract's own JSON" in rule
+        assert "application runtime" in rule
+
+    def test_d_dynamic_field_traversal_is_discouraged(self) -> None:
+        rule = self._rule()
+        assert "dynamically traverses a runtime-loaded model dict" in rule
+
+    def test_e_nested_f_string_sql_synthesis_is_discouraged(self) -> None:
+        rule = self._rule()
+        assert "nested f-string or dict-access composition" in rule
+        assert "CREATE TABLE" in rule
+
+    def test_f_identifiers_must_be_emitted_directly(self) -> None:
+        rule = self._rule()
+        assert "written out by its own real name" in rule
+
+    def test_g_the_existing_literal_happy_path_fixture_still_passes(self) -> None:
+        """Item G: the current expected `backend_schema` output contract
+        is unchanged -- the pre-existing literal fixture every other test
+        already relies on still produces zero findings."""
+        findings = _schema_only_findings(HAPPY_PATH_FILES["backend_schema"])
+        assert findings == []
+
+    def test_h_the_checker_still_accepts_valid_dynamic_derivation_output(self) -> None:
+        """This is a generation-INSTRUCTION change, never a new runtime
+        checker: the real P1/P2/P3 output is syntactically complete and
+        must continue to pass exactly as it did live -- prevention is
+        pursued at the prompt/rule level, not by rejecting valid Python
+        the model might still produce despite the new instruction."""
+        files = {"backend/db.py": _F0100_DYNAMIC_DERIVATION_DB_PY}
+        assert _schema_only_findings(files) == []
+
+    def test_i_stage_vocabulary_and_retry_budget_are_unchanged(self) -> None:
+        """H/I: the planner's own stage graph and the real bounded-attempt
+        ceiling are untouched by a prose-only rule change."""
+        stages = StageVocabulary.load(REPO).stages()
+        assert len(stages) == 11
+        decl = next(s for s in stages if s.name == "backend_schema")
+        assert decl.order == 2
+        assert decl.inputs == ("backend_contract",)
+        assert MAX_STAGE_ATTEMPTS == 4
+
+    def test_j_no_python_syntax_structured_hint_was_added(self) -> None:
+        """PATH B is explicitly deferred this turn."""
+        from arkali.engineering.factory.stage_prompting import _SUPPORTED_HINT_INVARIANTS
+
+        assert "python_syntax" not in _SUPPORTED_HINT_INVARIANTS
+
+    def test_historical_replay_the_real_anti_pattern_is_named_by_every_element(self) -> None:
+        """Section 11: without a model call, prove the new rule text would
+        explicitly discourage the exact real historical/P1-P3 construct --
+        every element the fixture actually exhibits (runtime `json.load`,
+        `.items()`-driven dynamic traversal, an f-string building `CREATE
+        TABLE` text) is named in the rule as something never to do, and
+        the fixture itself is never patched, normalized or rewritten."""
+        rule = self._rule()
+        fixture = _F0100_DYNAMIC_DERIVATION_DB_PY
+        assert "json.load(f)" in fixture and "json.load" in rule
+        assert ".items()" in fixture and "traverses a runtime-loaded model dict" in rule
+        assert 'f"CREATE TABLE' in fixture and "CREATE TABLE" in rule
+        # The fixture's own real bytes are never rewritten by this test.
+        assert fixture.count("json.load(f)") == 2
+
+    def test_no_golden_domain_token_leaked_into_the_new_rule_text(self) -> None:
+        rule = self._rule()
+        banned = ("student", "payment", "course", "task", "/tasks", "/students")
+        lowered = rule.lower()
+        for token in banned:
+            assert token not in lowered, token

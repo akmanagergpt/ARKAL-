@@ -74,6 +74,34 @@ wrote `from backend.data_model import data_model` in `backend/db.py` —
 never used anywhere in the file — and the real, first `pytest`
 collection of this real candidate failed outright with
 `ModuleNotFoundError: No module named 'backend.data_model'`).
+F-0100 (`BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP`, real evidence:
+`factory-goal-mtyeas61-75cn2k`, confirmed systemic across three further
+bounded live reproductions) — a distinct anti-pattern from golden-work-067's
+own `import` mistake above: given backend_contract's own real table and
+field names already present in this stage's own visible context, a real
+qwen2.5-coder:14b still opened and re-read those same JSON files at
+RUNTIME inside the generated Python (`json.load`), then dynamically
+walked the resulting dict and synthesized `CREATE TABLE` text through
+nested f-string/dict-access composition — syntactically valid on three of
+four real samples, but genuinely truncated mid-construct on the fourth (an
+unescaped embedded quote inside the synthesized f-string prematurely ended
+the model's own JSON response). The schema you write must be DIRECT and
+LITERAL: read every real table name and field name/type backend_contract's
+own JSON files already state, directly out of your own visible context,
+and write them as literal Python source, the same way this stage's own
+column/field-name rule above already requires — for example
+`cursor.execute("CREATE TABLE IF NOT EXISTS equipment (id INTEGER, name
+TEXT, status TEXT)")`, every identifier written out by its own real name.
+Never write code that reopens or `json.load`s backend_contract's own JSON
+files at application runtime merely to reconstruct information already
+supplied during generation; never dynamically traverses a runtime-loaded
+model dict to build a column list; and never synthesizes `CREATE
+TABLE`/schema text through nested f-string or dict-access composition when
+every real name and type is already known at generation time — never, for
+example, `with open('backend/models/equipment.json') as f: model =
+json.load(f)` followed by building the statement from `model['fields']`
+at runtime. This constrains only how the already-required schema is
+written, never which underlying schema or migration technology is chosen.
 
 ### 3. backend_implementation
 Inputs: backend_contract, backend_schema
