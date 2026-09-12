@@ -132,24 +132,36 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "(or otherwise defined) in that same file's own scope -- calling an "
         "undeclared name is a real runtime error, not a syntax error"
     ),
-    #: F-0097 (`BACKEND_CONTRACT_MULTI_MODEL_CONVERGENCE_GAP`, real
-    #: repository evidence: `factory-goal-mtw5byq6-irjabg` -- two
-    #: otherwise-complete, individually valid model objects wrapped in one
-    #: top-level JSON array, the identical structural fingerprint on both
-    #: permitted attempts). `backend_contract`'s own rule
-    #: (`STAGED_GENERATION_STAGES.md#1`) already states the two canonical
-    #: multi-model forms; this hint restates the specific invariant the
-    #: array shape violates so a retry has something more actionable than
-    #: the raw "no backend/*.json file declares a data model" finding text,
-    #: which a model that can already see "fields" on each array element
-    #: can otherwise misread as already satisfied.
+    #: F-0097 (`BACKEND_CONTRACT_MULTI_MODEL_CONVERGENCE_GAP`, real evidence:
+    #: `factory-goal-mtw5byq6-irjabg` -- two otherwise-complete model
+    #: objects wrapped in one top-level JSON array) and F-0098 (`BACKEND_
+    #: CONTRACT_MULTI_MODEL_KEY_CONVENTION_GAP`, real evidence: `factory-
+    #: goal-mtxqltea-oatre4` -- two otherwise-complete model objects keyed
+    #: directly by their own names at the top level), both the identical
+    #: structural fingerprint on both permitted attempts, both real
+    #: evidence that PROSE ALONE describing the legal shape is not
+    #: sufficient: F-0098's own real failure reproduced a literal reading
+    #: of this very hint's own pre-F-0098 wording ("nest every model's own
+    #: fields under that model's own key") as "the model's OWN NAME becomes
+    #: a top-level key" rather than the intended "under a literal top-level
+    #: `fields` key" -- a real, self-diagnosed ambiguity, not model
+    #: unreliability. This hint now states one canonical target only (one
+    #: file per model, `STAGED_GENERATION_STAGES.md#1`'s own new-generation
+    #: rule) with a literal worked example, and names both rejected shapes
+    #: explicitly and literally rather than describing them in words a
+    #: retry could reasonably misread.
     "backend_contract_no_models": (
-        "a data-model file's top-level JSON value must be an OBJECT, never "
-        "an ARRAY -- do not wrap multiple complete model objects in a "
-        "top-level list; for more than one model, write one top-level "
-        "object per file, or nest every model's own fields under that "
-        "model's own key inside one file's top-level object, preserving "
-        "each model's real fields and table_name unchanged"
+        "produce ONE JSON FILE PER MODEL, never a single combined file -- "
+        "for two models, write two separate files, each its own top-level "
+        "OBJECT carrying real \"table_name\"/\"fields\" content, for "
+        "example one file as {\"table_name\": \"members\", \"fields\": "
+        "{...}} and a second, separate file as {\"table_name\": "
+        "\"trainers\", \"fields\": {...}}. Never a top-level ARRAY "
+        "([{...}, {...}]). Never a top-level object keyed directly by "
+        "each model's own name ({\"members\": {...}, \"trainers\": "
+        "{...}}). Preserve every real field and table_name already "
+        "written; correct only which file(s) they live in and each "
+        "file's own top-level shape"
     ),
 }
 

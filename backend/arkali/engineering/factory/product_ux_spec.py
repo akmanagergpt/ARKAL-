@@ -205,6 +205,19 @@ def _is_multi_model_field_map(fields: object) -> bool:
     file's own path stem) instead of three real ones — blind to exactly
     the shape `frontend_ux_preflight._unreachable_module_findings`'s own
     len(models) >= 2 gate exists to catch.
+
+    HISTORICAL/BACKWARD-COMPATIBILITY READ PATH ONLY (F-0098). `STAGED_
+    GENERATION_STAGES.md#1`'s own rule now names ONE FILE PER MODEL as the
+    sole target for new generation — real evidence, `F-0097`/`F-0098`,
+    both real repeated `backend_contract_no_models` stalls, showed that
+    offering this wrapper as an equally-legal choice (described in prose,
+    never a literal example) was itself ambiguous enough for a model to
+    invent a third, uncanonicalized shape instead of reliably choosing
+    between the two. This function's own real behavior is UNCHANGED and
+    stays correct for any historical candidate that already used the
+    wrapper — it is simply no longer prompted for going forward, so new
+    candidates are expected to exercise the one-file-per-model branch of
+    `_model_names_in_document` below instead.
     """
     if not isinstance(fields, dict) or not fields:
         return False

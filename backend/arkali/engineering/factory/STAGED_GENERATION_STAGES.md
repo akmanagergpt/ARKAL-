@@ -19,18 +19,31 @@ backend/ whose content is a JSON array of route objects, each carrying
 "path" and "method" ("GET"/"POST"/"PUT"/"DELETE"/"PATCH"); and at least
 one JSON file under backend/ whose content is a JSON object describing a
 data model, carrying a "fields" key. The top-level JSON value of a data-model
-file must always be an OBJECT, never an ARRAY — when the product legitimately
-has more than one data model, represent them only in one of the two forms
-this pipeline already recognizes (product_ux_spec's own rule below names
-both): one data-model file per model, each its own top-level object; or one
-file whose top-level object nests every model's own fields under that
-model's own key. Never wrap multiple complete model objects inside a JSON
-array (F-0097, real production evidence: `factory-goal-mtw5byq6-irjabg`'s
-own real `backend/models.json` held two otherwise-complete, individually
-valid `{"table_name": ..., "fields": {...}}` objects inside one top-level
-array — every field genuinely correct, only the wrapping shape was not one
-of the two canonical forms). This is the real shape a real local
-model produced unprompted for this exact rule (golden-work-045, frozen
+file must always be an OBJECT, never an ARRAY. For NEW generation, when the
+product has more than one data model, the sole required representation is
+ONE FILE PER MODEL — never combine models into a single file. For example,
+two models are declared as two separate files, each an object carrying its
+own "table_name" and "fields":
+`backend/models/members.json`: `{"table_name": "members", "fields": {"id": "integer", "name": "string"}}`
+`backend/models/trainers.json`: `{"table_name": "trainers", "fields": {"id": "integer", "name": "string"}}`
+Never emit a top-level array of model objects (F-0097, real production
+evidence: `factory-goal-mtw5byq6-irjabg`'s own real `backend/models.json`
+held two otherwise-complete, individually valid `{"table_name": ...,
+"fields": {...}}` objects inside one top-level array — every field
+genuinely correct, only the wrapping shape was wrong). Never emit a
+top-level object keyed directly by each model's own name, for example
+`{"members": {"table_name": ..., "fields": {...}}, "trainers": {...}}`
+(F-0098, real production evidence: `factory-goal-mtxqltea-oatre4`'s own
+real `backend/models.json` held two otherwise-complete model objects this
+way — every field again genuinely correct, only the representation was not
+one-file-per-model). A historical single-file wrapper — one file whose
+only top-level key is literally `"fields"`, mapping each model's own name
+to that model's own field-definitions object, e.g. `{"fields": {"members":
+{...}, "trainers": {...}}}` — is still correctly read by this pipeline's
+own `product_ux_spec` stage for backward compatibility with earlier
+candidates that already used it, but it is not a target for new
+generation: always emit separate files instead. This is the real shape a
+real local model produced unprompted for this exact rule (golden-work-045, frozen
 evidence sha256:aabfc2e5f44758724d4941869eaccff28f3bfba18d76a5f39c044c32b7962eb5) —
 codified here rather than fought, since a schema-first contract is not a
 worse design than inline decorator stubs, only a different one this

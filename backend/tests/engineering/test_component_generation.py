@@ -577,12 +577,167 @@ def test_f0097_historical_artifact_replay_no_normalization() -> None:
 
     prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
     hint = _structured_hint_text([], prior_findings)
-    assert "top-level JSON value must be an OBJECT, never an ARRAY" in hint
+    assert "ONE JSON FILE PER MODEL" in hint
+    assert "Never a top-level ARRAY" in hint
     # The original, real bytes are represented unchanged -- never rewritten,
     # split, or reinterpreted as a different shape anywhere in this path.
     assert files["backend/models.json"] == _F0097_ARRAY_MODELS_JSON
     parsed_back = json.loads(files["backend/models.json"])
     assert isinstance(parsed_back, list) and len(parsed_back) == 2
+
+
+# -- F-0098 (BACKEND_CONTRACT_MULTI_MODEL_KEY_CONVENTION_GAP) ---------------
+#
+# Real, frozen repository evidence: `factory-goal-mtxqltea-oatre4` wrote a
+# real, otherwise-complete `backend/models.json` as a top-level JSON OBJECT
+# keyed directly by each model's own name (never F-0097's array) and
+# repeated the identical `backend_contract_no_models` fingerprint on both
+# permitted attempts. F-0097's own fix is confirmed still correct (the
+# array remains rejected); this is a distinct real shape neither of the two
+# pre-F-0098 canonical forms matched. The approved fix canonicalizes NEW
+# generation on ONE FILE PER MODEL only; the historical single-file wrapper
+# stays reader-supported for backward compatibility but is no longer
+# prompted for.
+
+#: The exact real shape `factory-goal-mtxqltea-oatre4`'s own frozen artifact
+#: (`sha256:b9c721bf...`) recorded for `backend/models.json`.
+_F0098_NAMED_OBJECT_MODELS_JSON = json.dumps({
+    "members": {
+        "table_name": "members",
+        "fields": {
+            "id": "INTEGER PRIMARY KEY", "name": "TEXT NOT NULL",
+            "email": "TEXT NOT NULL", "membership_date": "DATE",
+        },
+    },
+    "trainers": {
+        "table_name": "trainers",
+        "fields": {
+            "id": "INTEGER PRIMARY KEY", "name": "TEXT NOT NULL",
+            "email": "TEXT NOT NULL", "specialization": "TEXT",
+        },
+    },
+})
+
+#: The historical single-file wrapper form (golden-work-064) -- must
+#: remain parseable/accepted for backward compatibility; never the new
+#: prompted target.
+_HISTORICAL_WRAPPER_MODELS_JSON = json.dumps({
+    "fields": {
+        "works": {"id": "integer"}, "tasks": {"id": "integer"},
+    },
+})
+
+
+def test_a_named_top_level_object_still_fails_backend_contract() -> None:
+    """D. The F-0098 shape -- a top-level object keyed directly by each
+    model's own name -- is still rejected; the validator's own boundary
+    did not move."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/members", "method": "GET"}]),
+        "backend/models.json": _F0098_NAMED_OBJECT_MODELS_JSON,
+    })
+    codes = {f.code for f in findings}
+    assert "backend_contract_no_models" in codes
+
+
+def test_one_file_per_model_canonical_shape_passes() -> None:
+    """A/B. The new sole prompted target -- two models as two separate
+    files, each its own canonical object -- passes with no finding."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/members", "method": "GET"}]),
+        "backend/models/members.json": json.dumps(
+            {"table_name": "members", "fields": {"id": "integer"}}
+        ),
+        "backend/models/trainers.json": json.dumps(
+            {"table_name": "trainers", "fields": {"id": "integer"}}
+        ),
+    })
+    assert not any(f.code == "backend_contract_no_models" for f in findings)
+
+
+def test_historical_wrapper_still_parses_for_backward_compatibility() -> None:
+    """C. The pre-F-0098 wrapper shape must remain accepted -- reader
+    behavior is unchanged, only the prompt-facing guidance moved."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/works", "method": "GET"}]),
+        "backend/models.json": _HISTORICAL_WRAPPER_MODELS_JSON,
+    })
+    assert not any(f.code == "backend_contract_no_models" for f in findings)
+
+    from arkali.engineering.factory.product_ux_spec import _backend_declared_models
+
+    names = _backend_declared_models({"backend/models.json": _HISTORICAL_WRAPPER_MODELS_JSON})
+    assert names == {"works", "tasks"}
+
+
+def test_backend_contract_no_models_hint_names_one_file_per_model_explicitly(
+    tmp_path: pathlib.Path,
+) -> None:
+    """F/G/H/I/J. The retry hint for the F-0098 shape must explicitly say
+    one-file-per-model, include a literal worked example, explicitly
+    reject both known-bad shapes by name, still thread back the previous
+    attempt's own bytes unchanged, and never touch the retry budget."""
+    queues = _happy_path_queues()
+    good = queues["backend_contract"][0]
+    bad = _output({
+        "backend/routes.json": json.dumps([{"path": "/members", "method": "GET"}]),
+        "backend/models.json": _F0098_NAMED_OBJECT_MODELS_JSON,
+    })
+    queues["backend_contract"] = [(HonestState.PASS, bad), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 2  # J. retry budget unchanged
+    second_payload = json.loads(prompts[1])
+    assert second_payload["repair_strategy"] == "structured_hint"
+    hint = second_payload["repair_hint"]
+    assert "ONE JSON FILE PER MODEL" in hint  # F
+    assert '{"table_name": "members", "fields": {...}}' in hint  # G: literal example
+    assert "Never a top-level ARRAY" in hint  # H: rejects F-0097's shape by name
+    assert '{"members": {...}, "trainers": {...}}' in hint  # H: rejects F-0098's shape by name
+    assert "useParams" not in hint
+    # I. previous-attempt output is still threaded back unchanged.
+    assert second_payload["previous_attempt_output"] == {
+        "backend/routes.json": json.dumps([{"path": "/members", "method": "GET"}]),
+        "backend/models.json": _F0098_NAMED_OBJECT_MODELS_JSON,
+    }
+
+
+def test_f0098_historical_artifact_replay_no_normalization() -> None:
+    """Historical replay of the real frozen F-0098 artifact
+    (`sha256:b9c721bf...`, `factory-goal-mtxqltea-oatre4`) through the
+    fixed detection + hint path, with no model call. Proves: the
+    named-object shape is still rejected, the failure maps to the new
+    hint, the hint's literal example makes the correction unambiguous, and
+    the original bytes are never rewritten -- no normalization, no schema
+    widening anywhere in this path."""
+    files = {
+        "backend/routes.json": json.dumps([
+            {"path": "/members", "method": "GET"},
+            {"path": "/members", "method": "POST"},
+            {"path": "/members/{id}", "method": "GET"},
+            {"path": "/members/{id}", "method": "PUT"},
+            {"path": "/members/{id}", "method": "DELETE"},
+            {"path": "/trainers", "method": "GET"},
+        ]),
+        "backend/models.json": _F0098_NAMED_OBJECT_MODELS_JSON,
+    }
+    findings = _backend_contract_findings(files)
+    assert [f.code for f in findings] == ["backend_contract_no_models"]
+
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
+    hint = _structured_hint_text([], prior_findings)
+    assert "ONE JSON FILE PER MODEL" in hint
+    assert '{"members": {...}, "trainers": {...}}' in hint
+    # K / no normalization: the original, real bytes are represented
+    # unchanged -- never rewritten, split, or reinterpreted.
+    assert files["backend/models.json"] == _F0098_NAMED_OBJECT_MODELS_JSON
+    parsed_back = json.loads(files["backend/models.json"])
+    assert isinstance(parsed_back, dict) and set(parsed_back) == {"members", "trainers"}
 
 
 def test_the_anti_loop_still_fires_when_previous_attempt_output_is_present(
