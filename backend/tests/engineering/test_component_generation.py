@@ -432,6 +432,159 @@ def test_previous_attempt_output_is_absent_after_a_contract_violation(
     assert "violates the contract" in second_payload["prior_attempt_failure"]
 
 
+# -- F-0097 (BACKEND_CONTRACT_MULTI_MODEL_CONVERGENCE_GAP) ------------------
+#
+# Real, frozen repository evidence: `factory-goal-mtw5byq6-irjabg` wrote a
+# real, otherwise-complete `backend/models.json` as a top-level JSON ARRAY
+# of two individually valid `{table_name, fields}` objects and repeated the
+# identical `backend_contract_no_models` fingerprint on both permitted
+# attempts (ARK-ERR-0116). These tests regression-guard the fix generically
+# -- never by candidate id -- and prove the validator's own acceptance
+# boundary did not move.
+
+#: The exact real shape `factory-goal-mtw5byq6-irjabg`'s own frozen artifact
+#: (`sha256:6b3840a2...`) recorded for `backend/models.json`.
+_F0097_ARRAY_MODELS_JSON = json.dumps([
+    {
+        "table_name": "maintenance_tasks",
+        "fields": {
+            "id": "integer", "task_name": "string",
+            "description": "string", "status": "string",
+        },
+    },
+    {
+        "table_name": "service_providers",
+        "fields": {
+            "id": "integer", "provider_name": "string",
+            "contact_info": "string", "service_type": "string",
+        },
+    },
+])
+
+
+def test_a_top_level_array_of_valid_models_still_fails_backend_contract() -> None:
+    """A. The validator's own acceptance boundary must not move: two
+    otherwise-complete model objects wrapped in a top-level array is still
+    rejected."""
+    findings = _backend_contract_findings({
+        "backend/routes.json": json.dumps(
+            [{"path": "/maintenance_tasks", "method": "GET"}]
+        ),
+        "backend/models.json": _F0097_ARRAY_MODELS_JSON,
+    })
+    codes = {f.code for f in findings}
+    assert "backend_contract_no_models" in codes
+
+
+def test_the_canonical_object_shape_still_passes_backend_contract() -> None:
+    """B/G. The two already-canonical shapes -- one object per file, and
+    one file nesting multiple models under their own keys -- both still
+    pass, unchanged."""
+    one_file_per_model = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/works", "method": "GET"}]),
+        "backend/models.json": json.dumps(
+            {"table_name": "works", "fields": {"id": "integer"}}
+        ),
+    })
+    assert not any(f.code == "backend_contract_no_models" for f in one_file_per_model)
+
+    nested_multi_model = _backend_contract_findings({
+        "backend/routes.json": json.dumps([{"path": "/works", "method": "GET"}]),
+        "backend/models.json": json.dumps(
+            {"fields": {"works": {"id": "integer"}, "tasks": {"id": "integer"}}}
+        ),
+    })
+    assert not any(f.code == "backend_contract_no_models" for f in nested_multi_model)
+
+
+def test_backend_contract_no_models_injects_the_structured_retry_hint(
+    tmp_path: pathlib.Path,
+) -> None:
+    """C/D. `backend_contract` (stage 1, `Inputs: none`) has no real
+    `mutation_contracts` -- before this fix, `repair_strategy`/`repair_hint`
+    were nested entirely inside `if mutation_contracts:` and this stage
+    could never receive either. The retry hint must now be present and
+    must explicitly name the object-vs-array invariant, never the
+    mutation-specific worked example (`useParams`) that would misdirect a
+    stage this early in the pipeline."""
+    queues = _happy_path_queues()
+    good = queues["backend_contract"][0]
+    bad = _output({
+        "backend/routes.json": json.dumps(
+            [{"path": "/maintenance_tasks", "method": "GET"}]
+        ),
+        "backend/models.json": _F0097_ARRAY_MODELS_JSON,
+    })
+    queues["backend_contract"] = [(HonestState.PASS, bad), good]
+    factory = _factory(queues)
+    generate_staged_model_product(
+        _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+    )
+    prompts = factory.models["backend_contract"].prompts  # type: ignore[attr-defined]
+    assert len(prompts) == 2  # F. retry count/budget unchanged: one retry, as before
+    second_payload = json.loads(prompts[1])
+    assert second_payload["repair_strategy"] == "structured_hint"
+    hint = second_payload["repair_hint"]
+    assert "OBJECT" in hint and "ARRAY" in hint
+    assert "backend_contract_no_models" in hint
+    # Never the frontend-mutation worked example -- this stage has no
+    # route/useParams concern of any kind.
+    assert "useParams" not in hint
+    assert "mutation_contracts" not in second_payload  # no frontend contract exists for this stage
+    # E. previous-attempt output is still threaded back unchanged.
+    assert second_payload["previous_attempt_output"] == {
+        "backend/routes.json": json.dumps([{"path": "/maintenance_tasks", "method": "GET"}]),
+        "backend/models.json": _F0097_ARRAY_MODELS_JSON,
+    }
+
+
+def test_stage_vocabulary_and_planner_shape_are_unchanged(tmp_path: pathlib.Path) -> None:
+    """H. The F-0097 fix touches only stage 1's rule prose and prompt
+    construction -- the planner's own stage graph (count, order, declared
+    inputs) must be byte-identical to before."""
+    vocabulary = StageVocabulary.load(REPO)
+    stages = vocabulary.stages()
+    assert len(stages) == 11
+    backend_contract = next(s for s in stages if s.name == "backend_contract")
+    assert backend_contract.inputs == ()
+    assert backend_contract.order == 1
+
+
+def test_f0097_historical_artifact_replay_no_normalization() -> None:
+    """Historical replay of the real frozen F-0097 artifact
+    (`sha256:6b3840a2...`, `factory-goal-mtw5byq6-irjabg`) through the
+    fixed detection + hint path, with no model call. Proves: the array is
+    still rejected, the failure maps to the new hint, the hint carries the
+    exact corrective invariant, and the original bytes are never rewritten
+    -- no normalization, no schema widening anywhere in this path."""
+    files = {
+        "backend/routes.json": json.dumps([
+            {"path": "/maintenance_tasks", "method": "POST"},
+            {"path": "/maintenance_tasks", "method": "GET"},
+            {"path": "/maintenance_tasks/{id}", "method": "PUT"},
+            {"path": "/maintenance_tasks/{id}", "method": "DELETE"},
+            {"path": "/service_providers", "method": "POST"},
+            {"path": "/service_providers", "method": "GET"},
+            {"path": "/service_providers/{id}", "method": "PUT"},
+            {"path": "/service_providers/{id}", "method": "DELETE"},
+        ]),
+        "backend/models.json": _F0097_ARRAY_MODELS_JSON,
+    }
+    findings = _backend_contract_findings(files)
+    assert [f.code for f in findings] == ["backend_contract_no_models"]
+
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
+    hint = _structured_hint_text([], prior_findings)
+    assert "top-level JSON value must be an OBJECT, never an ARRAY" in hint
+    # The original, real bytes are represented unchanged -- never rewritten,
+    # split, or reinterpreted as a different shape anywhere in this path.
+    assert files["backend/models.json"] == _F0097_ARRAY_MODELS_JSON
+    parsed_back = json.loads(files["backend/models.json"])
+    assert isinstance(parsed_back, list) and len(parsed_back) == 2
+
+
 def test_the_anti_loop_still_fires_when_previous_attempt_output_is_present(
     tmp_path: pathlib.Path,
 ) -> None:

@@ -18,7 +18,18 @@ no app instance, no decorator yet. Declare at least one JSON file under
 backend/ whose content is a JSON array of route objects, each carrying
 "path" and "method" ("GET"/"POST"/"PUT"/"DELETE"/"PATCH"); and at least
 one JSON file under backend/ whose content is a JSON object describing a
-data model, carrying a "fields" key. This is the real shape a real local
+data model, carrying a "fields" key. The top-level JSON value of a data-model
+file must always be an OBJECT, never an ARRAY — when the product legitimately
+has more than one data model, represent them only in one of the two forms
+this pipeline already recognizes (product_ux_spec's own rule below names
+both): one data-model file per model, each its own top-level object; or one
+file whose top-level object nests every model's own fields under that
+model's own key. Never wrap multiple complete model objects inside a JSON
+array (F-0097, real production evidence: `factory-goal-mtw5byq6-irjabg`'s
+own real `backend/models.json` held two otherwise-complete, individually
+valid `{"table_name": ..., "fields": {...}}` objects inside one top-level
+array — every field genuinely correct, only the wrapping shape was not one
+of the two canonical forms). This is the real shape a real local
 model produced unprompted for this exact rule (golden-work-045, frozen
 evidence sha256:aabfc2e5f44758724d4941869eaccff28f3bfba18d76a5f39c044c32b7962eb5) —
 codified here rather than fought, since a schema-first contract is not a

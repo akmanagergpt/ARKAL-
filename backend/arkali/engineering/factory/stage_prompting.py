@@ -132,6 +132,25 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "(or otherwise defined) in that same file's own scope -- calling an "
         "undeclared name is a real runtime error, not a syntax error"
     ),
+    #: F-0097 (`BACKEND_CONTRACT_MULTI_MODEL_CONVERGENCE_GAP`, real
+    #: repository evidence: `factory-goal-mtw5byq6-irjabg` -- two
+    #: otherwise-complete, individually valid model objects wrapped in one
+    #: top-level JSON array, the identical structural fingerprint on both
+    #: permitted attempts). `backend_contract`'s own rule
+    #: (`STAGED_GENERATION_STAGES.md#1`) already states the two canonical
+    #: multi-model forms; this hint restates the specific invariant the
+    #: array shape violates so a retry has something more actionable than
+    #: the raw "no backend/*.json file declares a data model" finding text,
+    #: which a model that can already see "fields" on each array element
+    #: can otherwise misread as already satisfied.
+    "backend_contract_no_models": (
+        "a data-model file's top-level JSON value must be an OBJECT, never "
+        "an ARRAY -- do not wrap multiple complete model objects in a "
+        "top-level list; for more than one model, write one top-level "
+        "object per file, or nest every model's own fields under that "
+        "model's own key inside one file's top-level object, preserving "
+        "each model's real fields and table_name unchanged"
+    ),
 }
 
 
@@ -159,6 +178,22 @@ def _structured_hint_text(
     mutation_contracts: list[dict[str, object]],
     prior_findings: tuple[tuple[str, str, str], ...] = (),
 ) -> str:
+    blocks = _prior_finding_hint_blocks(prior_findings)
+    if not mutation_contracts:
+        # F-0097. A stage with no real frontend mutation concern at all
+        # (e.g. `backend_contract`, stage 1 -- `_mutation_contracts_for_
+        # stage` returns `None` for any stage that does not declare both
+        # `product_ux_spec` and `frontend_client` as real inputs) has no
+        # real edit/delete route-identifier pattern to work an example
+        # from; the worked-example preamble below names react-router/
+        # useParams concepts that would misdirect a JSON-shape defect this
+        # early in the pipeline. Only the real, code-specific structural-
+        # finding blocks apply here -- never the mutation-specific example.
+        return (
+            "This is a retry. Do not simply reword the previous attempt -- "
+            "resolve the exact structural invariant(s) below without "
+            "reintroducing any defect already fixed:\n" + "\n".join(blocks)
+        )
     example = _worked_example_from_contracts(mutation_contracts)
     text = (
         "This is a retry. Do not simply reword the previous attempt -- apply this "
@@ -177,7 +212,6 @@ def _structured_hint_text(
         "user-entered form field -- do not render an input for it; "
         "mutation_contracts.form_fields already excludes it."
     )
-    blocks = _prior_finding_hint_blocks(prior_findings)
     if blocks:
         text += (
             "\n\nThe previous attempt's own real findings also include the "
@@ -246,7 +280,22 @@ def _stage_prompt(
     mutation_contracts = _mutation_contracts_for_stage(declaration.inputs, visible_files)
     if mutation_contracts:
         payload["mutation_contracts"] = mutation_contracts
+    #: F-0097. `mutation_contracts` is `None` for any stage with no real
+    #: frontend mutation concern at all (e.g. `backend_contract`, stage 1)
+    #: -- before this fix, such a stage could never receive `repair_
+    #: strategy`/`repair_hint` at all, regardless of `_SUPPORTED_HINT_
+    #: INVARIANTS`'s own contents, since both were nested entirely inside
+    #: `if mutation_contracts:` above. A stage with real, supported prior
+    #: findings but no mutation contract now still escalates and receives
+    #: its own structural-finding hint (via `_structured_hint_text`'s own
+    #: no-mutation-contracts branch) -- additive only: every stage that
+    #: already had `mutation_contracts` keeps the exact same payload it
+    #: always did.
+    has_supported_findings = bool(_prior_finding_hint_blocks(prior_findings))
+    if mutation_contracts or (
+        repair_strategy == _STRUCTURED_HINT_REPAIR_STRATEGY and has_supported_findings
+    ):
         payload["repair_strategy"] = repair_strategy
         if repair_strategy == _STRUCTURED_HINT_REPAIR_STRATEGY:
-            payload["repair_hint"] = _structured_hint_text(mutation_contracts, prior_findings)
+            payload["repair_hint"] = _structured_hint_text(mutation_contracts or [], prior_findings)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
