@@ -60,6 +60,7 @@ from arkali.engineering.factory.product_preflight import (  # noqa: E402
     ProductSemanticPreflightError,
     inspect_product_files,
 )
+from arkali.engineering.localai.adapter import CompletionMetadata  # noqa: E402
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.engineering.localai.openai_compatible_adapter import (  # noqa: E402
     DEFAULT_ENDPOINT as OPENAI_COMPATIBLE_DEFAULT_ENDPOINT,
@@ -308,10 +309,15 @@ def main(argv: list[str]) -> int:
         )
     except ModelGenerationError as error:
         elapsed = round(time.monotonic() - started, 1)
+        last_completion = getattr(error, "last_completion_metadata", None)
         payload = json.dumps({
             "candidate_id": args.candidate_id, "outcome": "STAGE_FAILED",
             "error": str(error), "elapsed_seconds": elapsed,
             "last_raw_output": getattr(error, "last_raw_output", ""),
+            "last_completion_metadata": (
+                last_completion.model_dump()
+                if isinstance(last_completion, CompletionMetadata) else None
+            ),
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, args.candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",

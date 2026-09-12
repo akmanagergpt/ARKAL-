@@ -503,6 +503,7 @@ def _generate_one_stage(
                 f"exhausting the remaining bounded attempts: {failure}"
             )
             error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
+            error.last_completion_metadata = outcome.completion  # type: ignore[attr-defined]
             raise error
         previous_failure = failure
     # The raw last-attempt output is retained on the exception (not just the
@@ -514,6 +515,7 @@ def _generate_one_stage(
         f"stage {declaration.name!r} exhausted {max_attempts} attempts: {failure}"
     )
     error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
+    error.last_completion_metadata = outcome.completion  # type: ignore[attr-defined]
     raise error
 
 

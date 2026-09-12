@@ -10,6 +10,20 @@ def _source() -> str:
     return SCRIPT.read_text(encoding="utf-8")
 
 
+def test_terminal_stage_failed_payload_preserves_completion_metadata() -> None:
+    """F-0100 (`BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP`), observability
+    phase. The same terminal-evidence seam `last_raw_output` already uses
+    now also carries the bounded, provider-reported completion facts for
+    that exact same last attempt -- observation only, no new store."""
+    source = _source()
+    stage_failed_block = source[
+        source.index('except ModelGenerationError as error:'):
+        source.index("ledger.record_state(\n            args.candidate_id, STAGE_FAILED")
+    ]
+    assert 'getattr(error, "last_completion_metadata", None)' in stage_failed_block
+    assert '"last_completion_metadata"' in stage_failed_block
+
+
 def test_a_candidate_identity_is_claimed_in_the_ledger_before_any_workspace_is_allocated() -> None:
     """golden-work-124: WorkspaceAuthority.allocate only refuses a live
     directory collision; the ledger must claim the identity first, so a

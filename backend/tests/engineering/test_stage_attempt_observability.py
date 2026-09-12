@@ -299,6 +299,87 @@ def test_k_the_observability_mechanism_itself_names_no_golden_domain_token() -> 
 
 
 # ---------------------------------------------------------------------------
+# F-0100 (`BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP`), observability phase.
+# `InferenceResult.completion` (bounded, provider-reported completion
+# facts) must reach the terminal `ModelGenerationError` -- the exact same
+# seam `last_raw_output` already proves above, and the one this
+# investigation's own real evidence (`goal-mtyeas61-75cn2k`) was actually
+# read from -- never a behavior change to the retry loop itself.
+# ---------------------------------------------------------------------------
+
+
+class _CompletionAwareQueueModel(_QueueModel):
+    """The exact real `_QueueModel` every existing test already uses,
+    additionally injecting a real `CompletionMetadata` per queued outcome
+    -- proves the field threads through the real retry loop to the
+    terminal error, never only a unit test of its own existence."""
+
+    def __init__(
+        self, outcomes: list[tuple[HonestState, str]], completions: list[object],
+    ) -> None:
+        super().__init__(outcomes)
+        self._completions = list(completions)
+
+    def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0):  # noqa: ANN201
+        result = super().infer(model_id, prompt, timeout_seconds=timeout_seconds)
+        return result.model_copy(update={"completion": self._completions.pop(0)})
+
+
+def test_l_completion_metadata_reaches_the_terminal_error_from_the_last_attempt(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Mirrors the real `goal-mtyeas61-75cn2k` shape: two attempts repeat
+    the identical failure fingerprint and ARK-ERR-0116 stops early, before
+    exhausting the real bounded budget. `ModelGenerationError.
+    last_completion_metadata` must reflect the LAST (most recent)
+    attempt's own real completion facts -- the same "always reflects the
+    most recent attempt" semantics `last_raw_output` already has, never
+    attempt 1's stale facts."""
+    from arkali.engineering.localai.adapter import CompletionMetadata
+
+    queues = _one_attempt_queues()
+    broken = _output({"frontend/src/App.js": _BROKEN_APP_JS})
+    completion_1 = CompletionMetadata(
+        completed=True, finish_reason="stop", output_token_count=50, prompt_token_count=900,
+    )
+    completion_2 = CompletionMetadata(
+        completed=True, finish_reason="stop", output_token_count=52, prompt_token_count=1000,
+    )
+    model = _CompletionAwareQueueModel(
+        [(HonestState.PASS, broken), (HonestState.PASS, broken)], [completion_1, completion_2],
+    )
+
+    def factory(stage_name: str):  # noqa: ANN202
+        if stage_name == "frontend_forms":
+            return model, "test-model"
+        return _QueueModel(queues[stage_name]), "test-model"
+
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+    assert excinfo.value.last_completion_metadata == completion_2  # type: ignore[attr-defined]
+
+
+def test_m_completion_metadata_is_none_when_the_source_reports_none(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Backward compatibility: the real, unmodified `_QueueModel`
+    (`InferenceResult.completion`'s own default) still converges and
+    still raises with `last_completion_metadata` honestly `None` --
+    never a guessed value."""
+    queues = _one_attempt_queues()
+    broken = _output({"frontend/src/App.js": _BROKEN_APP_JS})
+    queues["frontend_forms"] = [(HonestState.PASS, broken), (HonestState.PASS, broken)]
+
+    with pytest.raises(ModelGenerationError) as excinfo:
+        generate_staged_model_product(
+            _blueprint(), _factory(queues), _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+    assert excinfo.value.last_completion_metadata is None  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
 # `_ObservedModel` (scripts/run_staged_generation.py) -- the script-layer
 # wrapper that actually freezes attempt evidence via the real, existing
 # ArtifactStore/_freeze() mechanism. Imported directly (a valid Python

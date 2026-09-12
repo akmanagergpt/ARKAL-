@@ -74,6 +74,19 @@ def test_terminal_stage_failed_payload_preserves_last_raw_output() -> None:
     assert '"last_raw_output": getattr(error, "last_raw_output", "")' in stage_failed_block
 
 
+def test_terminal_stage_failed_payload_preserves_completion_metadata() -> None:
+    """F-0100. The same terminal-evidence seam `last_raw_output` already
+    uses now also carries the bounded, provider-reported completion facts
+    for that exact same last attempt -- observation only, no new store."""
+    source = _source()
+    stage_failed_block = source[
+        source.index('except ModelGenerationError as error:'):
+        source.index("ledger.record_state(\n            candidate_id, STAGE_FAILED")
+    ]
+    assert 'getattr(error, "last_completion_metadata", None)' in stage_failed_block
+    assert '"last_completion_metadata"' in stage_failed_block
+
+
 def test_only_one_freeze_function_exists_no_second_evidence_store() -> None:
     """REUSE, never CREATE: `_ObservedModel.record_attempt` must call THIS
     script's own already-existing `_freeze()`, not a second one."""

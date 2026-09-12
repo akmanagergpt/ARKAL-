@@ -98,6 +98,7 @@ from arkali.engineering.factory.product_preflight import (  # noqa: E402
     ProductSemanticPreflightError,
     inspect_product_files,
 )
+from arkali.engineering.localai.adapter import CompletionMetadata  # noqa: E402
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput  # noqa: E402
@@ -353,10 +354,18 @@ def main(argv: list[str]) -> int:
         )
     except ModelGenerationError as error:
         elapsed = round(time.monotonic() - started, 1)
+        last_completion = getattr(error, "last_completion_metadata", None)
         payload = json.dumps({
             "candidate_id": candidate_id, "outcome": "STAGE_FAILED",
             "error": str(error), "elapsed_seconds": elapsed,
             "last_raw_output": getattr(error, "last_raw_output", ""),
+            # F-0100. Bounded, provider-reported completion facts for the
+            # exact attempt `last_raw_output` came from -- observation
+            # only, no classification or decision is made from it here.
+            "last_completion_metadata": (
+                last_completion.model_dump()
+                if isinstance(last_completion, CompletionMetadata) else None
+            ),
         }, sort_keys=True).encode()
         ref = _freeze(
             payload, candidate_id, f"sha256:{__import__('hashlib').sha256(payload).hexdigest()}",

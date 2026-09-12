@@ -61,6 +61,35 @@ class RuntimeProbeResult(BaseModel):
     endpoint: str = ""
 
 
+class CompletionMetadata(BaseModel):
+    """Bounded, provider-reported facts about how one real inference call
+    ended - a completion FACT the runtime itself reported, never a retry
+    or budget DECISION ARKALI made about it (F-0100's own observability-
+    before-behavior boundary: this phase records truth, it does not act
+    on it). Generic across runtimes: field names name no one provider's
+    own vocabulary (never `done`/`done_reason`, Ollama's own names), so a
+    future adapter reporting the same kind of fact under different keys
+    (e.g. an OpenAI-compatible `finish_reason`/`usage.completion_tokens`)
+    can populate this same shape without pretending to have Ollama-
+    specific concepts. `InferenceResult.completion` being `None` means
+    the runtime reported nothing usable here - read `state`/`detail` for
+    whether the call itself succeeded, never infer completion facts from
+    output shape or absence of this field."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    #: Whether the runtime itself reported the generation as finished.
+    #: Never inferred from output shape or length.
+    completed: bool = True
+    #: The runtime's own stated reason the generation ended (e.g. "stop",
+    #: "length"), verbatim - never mapped to a taxonomy or acted on here.
+    finish_reason: str = ""
+    #: Tokens the runtime reports it generated for this call.
+    output_token_count: int = 0
+    #: Tokens the runtime reports it consumed from the prompt.
+    prompt_token_count: int = 0
+
+
 class InferenceResult(BaseModel):
     """The outcome of one bounded, real inference call. Never fabricated:
     `state` is `PASS` only when the runtime genuinely returned output within
@@ -81,6 +110,10 @@ class InferenceResult(BaseModel):
     #: cannot accidentally persist unbounded model text; callers persist only
     #: validated, content-addressed artifacts.
     output: str = Field(default="", max_length=1_000_000, repr=False, exclude=True)
+    #: F-0100. `None` when the runtime/adapter reports no completion facts
+    #: (every call site that existed before this field, and any call that
+    #: returned before a real response was ever received) - never guessed.
+    completion: CompletionMetadata | None = None
 
 
 @runtime_checkable
@@ -112,6 +145,7 @@ __all__ = [
     "HonestState",
     "LocalModelDescriptor",
     "RuntimeProbeResult",
+    "CompletionMetadata",
     "InferenceResult",
     "LocalRuntimeAdapter",
 ]

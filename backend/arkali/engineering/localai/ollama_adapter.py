@@ -30,6 +30,7 @@ import urllib.request
 from urllib.parse import urlparse
 
 from arkali.engineering.localai.adapter import (
+    CompletionMetadata,
     HonestState,
     InferenceResult,
     LocalModelDescriptor,
@@ -229,6 +230,30 @@ class OllamaAdapter:
                 elapsed_seconds=time.monotonic() - started,
             )
         text = str(payload.get("response", ""))
+        # F-0100 (`BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP`, observability
+        # phase). Ollama's own non-streaming response already carries `done`/
+        # `done_reason`/`eval_count`/`prompt_eval_count` in this exact
+        # `payload` -- previously read into this local variable and then
+        # discarded entirely, keeping only `response` text. A genuinely
+        # short, mid-construct-truncated real response (`goal-mtyeas61-
+        # 75cn2k`, `backend_schema`) left no way to tell whether Ollama
+        # itself reported the generation as finished, or ARKALI's own read
+        # path was the one that stopped early -- this call is non-streaming
+        # (`stream: false`) and reads the full HTTP body in one blocking
+        # `response.read()`, so that second possibility was already
+        # structurally ruled out, but nothing recorded it. Observation
+        # only: retaining this changes no request, no option, no retry, no
+        # budget -- the exact same bytes are sent and the exact same
+        # `text` becomes `output`/`output_excerpt` as before.
+        completion = (
+            CompletionMetadata(
+                completed=bool(payload.get("done")),
+                finish_reason=str(payload.get("done_reason", "")),
+                output_token_count=int(payload.get("eval_count", 0) or 0),
+                prompt_token_count=int(payload.get("prompt_eval_count", 0) or 0),
+            )
+            if "done" in payload else None
+        )
         return InferenceResult(
             runtime=RUNTIME,
             model_id=model_id,
@@ -237,6 +262,7 @@ class OllamaAdapter:
             elapsed_seconds=elapsed,
             output_excerpt=text[:200],
             output=text,
+            completion=completion,
         )
 
 

@@ -183,6 +183,11 @@ class InferenceOutcome(Protocol):
     state: HonestState
     detail: str
     output: str
+    #: F-0100. Opaque here by design - this structural Protocol exists so
+    #: `engineering.factory` never gains a direct edge to `engineering.
+    #: localai`'s own concrete `CompletionMetadata` type; callers thread
+    #: this through unread, never inspecting it themselves.
+    completion: object | None
 
 
 class ModelSource(Protocol):
