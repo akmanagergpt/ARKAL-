@@ -592,3 +592,106 @@ class TestMultiFindingRealConvergence:
         assert second_payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
         assert "frontend_client_call_missing_import" in second_payload["prior_attempt_failure"]
         assert "frontend_client_call_missing_import" in second_payload["repair_hint"]
+
+
+#: F-0099 (`FRONTEND_FORMS_LIST_LINK_WIRING_CONVERGENCE_GAP`). The real,
+#: frozen `(code, path, detail)` findings from `factory-goal-mty4pvfe-vxppwp`
+#: (`sha256:ec9585c3...`, STAGE_FAILED at `frontend_forms`, attempts 2/3
+#: identical fingerprint) -- never re-typed by hand for the two already-
+#: hinted route findings, and copied verbatim from the real ARK-ERR-0116
+#: error string for all three.
+_F0099_FINDINGS: tuple[tuple[str, str, str], ...] = (
+    (
+        "frontend_route_unreachable", "frontend/src/App.js",
+        "<Route path='/pets/edit/:id'> in frontend/src/App.js is never reached from "
+        "anywhere else in the real frontend -- '/pets/edit/' appears nowhere but this "
+        "exact declaration, so no real Link, button or navigation call anywhere ever "
+        "constructs a matching URL",
+    ),
+    (
+        "frontend_route_unreachable", "frontend/src/App.js",
+        "<Route path='/pets/delete/:id'> in frontend/src/App.js is never reached from "
+        "anywhere else in the real frontend -- '/pets/delete/' appears nowhere but this "
+        "exact declaration, so no real Link, button or navigation call anywhere ever "
+        "constructs a matching URL",
+    ),
+    (
+        "frontend_ui_create_unreachable_from_empty_state", "frontend/src/",
+        "module 'pets' declares create, but no accessible interactive create/add/new "
+        "control associated with it remains reachable; the action must be usable even "
+        "when the collection is empty",
+    ),
+)
+
+
+class TestF0099EmptyStateHintCoverage:
+    """F-0099. The Q02 empty-state-create finding code did not have a
+    structured-hint entry, so a retry sharing this exact fingerprint with
+    the already-hinted `frontend_route_unreachable` findings above received
+    guidance for those two but nothing for this third, simultaneous one."""
+
+    def test_a_the_q02_code_is_now_in_the_supported_map(self) -> None:
+        assert "frontend_ui_create_unreachable_from_empty_state" in _SUPPORTED_HINT_INVARIANTS
+
+    def test_b_the_q02_hint_states_reachability_survives_zero_records(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "zero records" in invariant or "empty" in invariant
+        assert "reachable" in invariant
+
+    def test_c_the_q02_hint_never_requires_an_exact_button_label(self) -> None:
+        """No exact word-matching requirement such as a button labelled
+        'Create' -- multiple real, legal control shapes are named instead,
+        and styling/wording is explicitly left unconstrained."""
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "labelled" not in invariant.lower()
+        assert "No specific label" in invariant
+
+    def test_d_the_route_unreachable_hint_is_still_present_and_unchanged(self) -> None:
+        """Preserve the existing route hint byte-for-byte -- this fix is
+        additive only."""
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"] == (
+            "a declared parameterized route must be reachable through a real Link, "
+            "button, or navigation call somewhere else in the frontend, built from "
+            "the same static path prefix the route itself declares"
+        )
+
+    def test_e_all_three_simultaneous_f0099_finding_classes_compose(self) -> None:
+        """The historical F-0099 replay: route-reachability guidance (one
+        block, per the existing per-code dedup -- see test_f) and
+        empty-state-create guidance must both reach the same retry hint at
+        once -- never one overwriting the other."""
+        text = _structured_hint_text([], _F0099_FINDINGS)
+        assert "/pets/edit/" in text  # first same-code finding, per existing dedup
+        assert "module 'pets' declares create" in text
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"] in text
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"] in text
+
+    def test_f_the_two_same_code_route_findings_collapse_to_one_block(self) -> None:
+        """F-0099's own real evidence has TWO `frontend_route_unreachable`
+        findings (edit + delete) -- existing per-code dedup collapses them
+        to one block; only the empty-state finding (a different code)
+        contributes a second block. Pre-existing behavior, unchanged."""
+        blocks = _prior_finding_hint_blocks(_F0099_FINDINGS)
+        assert len(blocks) == 2
+        codes = {c for c, _p, _d in _F0099_FINDINGS}
+        assert codes == {"frontend_route_unreachable", "frontend_ui_create_unreachable_from_empty_state"}
+
+    def test_g_no_pets_or_candidate_specific_token_in_the_invariant(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "pets" not in invariant.lower()
+
+    def test_h_the_real_stage_prompt_payload_carries_all_three(self) -> None:
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        raw_failure = "; ".join(f"{c}:{p}:{d}" for c, p, d in _F0099_FINDINGS)
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, raw_failure,
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY, prior_findings=_F0099_FINDINGS,
+        ))
+        assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_ui_create_unreachable_from_empty_state" in payload["repair_hint"]
+        assert "frontend_route_unreachable" in payload["repair_hint"]
+        # I. previous-attempt output / retry budget concerns are exercised by
+        # `TestMultiFindingRealConvergence` end-to-end; this test isolates the
+        # hint-composition path alone.
+        assert "frontend_ui_create_unreachable_from_empty_state" in payload["prior_attempt_failure"]

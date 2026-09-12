@@ -163,6 +163,32 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "written; correct only which file(s) they live in and each "
         "file's own top-level shape"
     ),
+    #: F-0099 (`FRONTEND_FORMS_LIST_LINK_WIRING_CONVERGENCE_GAP`, real
+    #: evidence: `factory-goal-mty4pvfe-vxppwp`). Wave B's own new
+    #: `frontend_ui_create_unreachable_from_empty_state` check (`_create_
+    #: access_findings`) fires correctly -- a module declares "create" but
+    #: no interactive create control remains reachable once the collection
+    #: is empty -- but had no entry here, so a retry sharing this exact
+    #: fingerprint with the already-hinted `frontend_route_unreachable`
+    #: findings above received guidance for those two but nothing for this
+    #: third, simultaneous one. Never a literal repair, never a required
+    #: label -- `STAGED_GENERATION_STAGES.md#9`'s own rule already states
+    #: this same invariant at generation time; this hint restates it only
+    #: for a retry that already violated it.
+    "frontend_ui_create_unreachable_from_empty_state": (
+        "a module that declares create must expose a real, accessible "
+        "interactive control that lets a user start creating a new item "
+        "for that module, and that control must remain reachable even "
+        "when the collection currently holds zero records -- a toolbar "
+        "action, a page-level primary action, and an empty-state "
+        "call-to-action are all real, legal choices. Never render the "
+        "only such control inside a map/list of existing items, since it "
+        "then disappears exactly when the collection is empty and the "
+        "control is needed most. No specific label, wording, or styling "
+        "is required -- what matters is that the control exists in the "
+        "rendered output and stays reachable independent of how many "
+        "records the collection holds"
+    ),
 }
 
 
