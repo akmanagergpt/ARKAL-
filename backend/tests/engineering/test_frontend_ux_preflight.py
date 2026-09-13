@@ -13,6 +13,7 @@ from arkali.engineering.factory.frontend_ux_preflight import (
     _form_quality_findings,
     _shadowed_route_findings,
     _unreachable_parameterized_route_findings,
+    _update_like_client_exports,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
     _unreachable_module_findings,
@@ -765,6 +766,83 @@ def test_exported_js_names_recognizes_a_real_commonjs_alias_module() -> None:
     )
     names = _exported_js_names(client_text)
     assert {"getCustomers", "updateCustomer"} <= names
+
+
+class TestAsyncEsmExportRecognition:
+    """goal-mtzww02l-48k6h3 (session evidence, frozen): a real
+    qwen2.5-coder:14b wrote a real, complete, correctly-wired
+    `apiClient.js` declaring every real CRUD function as plain ESM
+    `export async function name(...)`, no CommonJS -- `_INLINE_EXPORT_
+    PATTERN` (byte-identical to `frontend_client_call_preflight
+    ._CLIENT_INLINE_EXPORT`, independently duplicated) only ever allowed
+    `const`/`function` directly after `export`, never an intervening
+    `async`, so `_update_like_client_exports` came back empty and a
+    real, correct edit route calling a real `updateDriver`/`updateOrder`
+    was flagged as `frontend_ui_missing_edit_ui` -- the same
+    false-positive shape golden-work-101/124 already fixed for two
+    different CommonJS export shapes, now extended to this distinct,
+    plain-ESM one."""
+
+    def test_a_export_async_function_is_recognized_as_update_like(self) -> None:
+        files = {
+            "frontend/src/apiClient.js": (
+                "export async function updateThing(id, data) { return fetch('/x/' + id); }\n"
+            ),
+        }
+        assert "updateThing" in _update_like_client_exports(files)
+
+    def test_b_valid_async_edit_ui_no_longer_triggers_missing_edit_ui(self) -> None:
+        api_client = (
+            "export async function getThings() { return []; }\n"
+            "export async function updateThing(id, data) { return {}; }\n"
+        )
+        thing_form = (
+            "import { updateThing } from './apiClient';\n"
+            "function ThingForm({ id }) { updateThing(id, {}); return null; }\n"
+        )
+        spec = json.dumps({
+            "product_title": "Things", "primary_roles": ["staff"],
+            "modules": [{
+                "name": "things", "navigation_label": "Things", "presentation": "table",
+                "actions": ["create", "edit"],
+                "forms": [{"name": "ThingForm", "fields": ["name"]}],
+                "search_filter": False,
+                "states": {"loading": True, "empty": True, "error": True, "success": True},
+            }],
+            "navigation_destinations": ["Things"],
+            "design_system": {
+                "typography_scale": ["base"], "spacing_scale": ["sm"],
+                "component_conventions": ["table"], "responsive": "desktop-first",
+                "accessible_focus_contrast": True,
+            },
+            "destructive_action_confirmation": False,
+        })
+        files = {
+            "product/ux_spec.json": spec,
+            "frontend/src/apiClient.js": api_client,
+            "frontend/src/ThingForm.js": thing_form,
+        }
+        codes = {f.code for f in _ux_spec_mutation_findings(files)}
+        assert "frontend_ui_missing_edit_ui" not in codes
+
+    def test_c_a_plain_non_exported_update_function_does_not_count(self) -> None:
+        files = {
+            "frontend/src/apiClient.js": (
+                "async function updateThing(id, data) { return fetch('/x/' + id); }\n"
+            ),
+        }
+        assert "updateThing" not in _update_like_client_exports(files)
+
+    def test_d_existing_commonjs_alias_support_from_f0101_is_unchanged(self) -> None:
+        client_text = (
+            "const apiClient = {\n"
+            "  getCustomers: async () => { return []; },\n"
+            "  updateCustomer: async (id, data) => { return {}; }\n"
+            "};\n"
+            "module.exports = apiClient;\n"
+        )
+        names = _exported_js_names(client_text)
+        assert {"getCustomers", "updateCustomer"} <= names
 
 
 class TestFormControlAccessibleName:

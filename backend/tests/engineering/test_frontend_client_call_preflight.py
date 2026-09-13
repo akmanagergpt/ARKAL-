@@ -330,3 +330,78 @@ def test_a_bare_call_is_still_flagged_even_when_the_file_also_imports_the_client
     findings = _client_call_missing_import_findings(files)
     assert len(findings) == 1
     assert "deleteStudent" in findings[0].detail
+
+
+#: goal-mtzww02l-48k6h3 (session evidence, frozen), verbatim real
+#: apiClient.js: every real CRUD function declared as plain ESM
+#: `export async function name(...)`, no CommonJS anywhere.
+_ASYNC_ESM_API_CLIENT = (
+    "async function fetchWithCheck(url, options) { return fetch(url, options); }\n\n"
+    "export async function getDrivers() { return fetchWithCheck('/drivers'); }\n\n"
+    "export async function createDriver(driver) { return fetchWithCheck('/drivers'); }\n\n"
+    "export async function updateDriver(id, driver) { return fetchWithCheck('/drivers/' + id); }\n\n"
+    "export async function deleteDriver(id) { return fetchWithCheck('/drivers/' + id); }\n"
+)
+
+
+class TestAsyncEsmExportRecognition:
+    """F-0102-class (`goal-mtzww02l-48k6h3`, session evidence, frozen): a
+    real qwen2.5-coder:14b wrote a real, complete, correctly-wired
+    `apiClient.js` using plain ESM `export async function name(...)` for
+    every one of 10 real CRUD functions -- `_CLIENT_INLINE_EXPORT` only
+    ever allowed `const`/`function` directly after `export`, never an
+    intervening `async`, so `_client_exported_names` came back completely
+    empty and every real file's every real import of these real exports
+    was flagged as phantom -- the same false-positive shape golden-
+    work-101/124 already fixed for two different CommonJS shapes, now
+    extended to this distinct, plain-ESM one."""
+
+    def test_a_plain_export_function_is_still_recognized(self) -> None:
+        assert _client_exported_names("export function foo() {}") == frozenset({"foo"})
+
+    def test_b_export_async_function_is_now_recognized(self) -> None:
+        assert _client_exported_names(
+            "export async function updateDriver(id, data) {}",
+        ) == frozenset({"updateDriver"})
+
+    def test_c_export_const_remains_recognized(self) -> None:
+        assert _client_exported_names(
+            "export const bar = async () => {};",
+        ) == frozenset({"bar"})
+
+    def test_d_multiple_async_exported_functions_are_all_discovered(self) -> None:
+        assert _client_exported_names(_ASYNC_ESM_API_CLIENT) == frozenset({
+            "getDrivers", "createDriver", "updateDriver", "deleteDriver",
+        })
+
+    def test_e_a_non_exported_async_function_is_not_treated_as_exported(self) -> None:
+        assert _client_exported_names(
+            "async function helper() {}\nexport async function real() {}",
+        ) == frozenset({"real"})
+
+    def test_f_phantom_import_check_is_silent_against_the_real_async_client(self) -> None:
+        files = {
+            "frontend/src/apiClient.js": _ASYNC_ESM_API_CLIENT,
+            "frontend/src/DriverForm.js": (
+                "import { createDriver, updateDriver } from './apiClient';\n"
+                "function DriverForm({ id }) { "
+                "if (id) { updateDriver(id, {}); } else { createDriver({}); } "
+                "return null; }\n"
+            ),
+        }
+        assert _phantom_client_import_findings(files) == []
+
+    def test_f_missing_import_check_still_uses_the_new_export_set_correctly(self) -> None:
+        """The mirror-image checker must gain the same recognition: a
+        real call to a real async-exported function with no matching
+        import is still caught, not silenced by this fix."""
+        files = {
+            "frontend/src/apiClient.js": _ASYNC_ESM_API_CLIENT,
+            "frontend/src/DriverDelete.js": (
+                "function DriverDelete({ id }) { "
+                "return <button onClick={() => deleteDriver(id)}>Delete</button>; }\n"
+            ),
+        }
+        findings = _client_call_missing_import_findings(files)
+        assert len(findings) == 1
+        assert "deleteDriver" in findings[0].detail

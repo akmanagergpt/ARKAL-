@@ -72,7 +72,17 @@ _CONFIRM_MARKERS = ("confirm(", "are you sure", "window.confirm")
 #: `_action_ui_findings`'s own prior rule ("a create/edit action needs
 #: *a* `<form>` somewhere") was satisfied vacuously by the create form
 #: alone.
-_INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|function)\s+(\w+)")
+#: goal-mtzww02l-48k6h3 (session evidence, frozen): a real qwen2.5-coder:14b
+#: wrote a real, complete, correctly-wired `apiClient.js` declaring every
+#: real CRUD function as `export async function name(...) {...}` -- plain
+#: ESM, no CommonJS -- but the pattern below only ever allowed `const`/
+#: `function` directly after `export`, never an intervening `async`, so
+#: `update_like_exports` came back empty and a real, correct edit route
+#: calling a real `updateDriver`/`updateOrder` was flagged as missing edit
+#: UI -- the same false-positive shape golden-work-101/124 already fixed
+#: for two different CommonJS export shapes, now extended to this
+#: distinct, plain-ESM one.
+_INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|(?:async\s+)?function)\s+(\w+)")
 #: golden-work-081 (session evidence, frozen): every real candidate this
 #: session's own `frontend_client` output has actually used -- declare
 #: every function as a plain top-level `async function name(...)`, then

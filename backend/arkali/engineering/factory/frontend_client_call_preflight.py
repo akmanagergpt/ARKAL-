@@ -58,7 +58,16 @@ from collections.abc import Mapping
 
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
-_CLIENT_INLINE_EXPORT = re.compile(r"export\s+(?:const|function)\s+(\w+)")
+#: goal-mtzww02l-48k6h3 (session evidence, frozen): a real qwen2.5-coder:14b
+#: wrote a real, complete, correctly-wired `apiClient.js` using plain ESM
+#: `export async function getDrivers() {...}` for every one of 10 real CRUD
+#: functions -- the original pattern only allowed `const`/`function`
+#: directly after `export`, never an intervening `async`, so `exported` came
+#: back completely empty and every real file's every real import of these
+#: real exports was flagged as phantom, the same false-positive shape
+#: golden-work-101/124 already fixed for two different CommonJS shapes, now
+#: extended to this distinct, plain-ESM one.
+_CLIENT_INLINE_EXPORT = re.compile(r"export\s+(?:const|(?:async\s+)?function)\s+(\w+)")
 _CLIENT_GROUPED_EXPORT = re.compile(r"export\s*\{([^}]*)\}")
 #: golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
 #: wrote a real, complete, correctly-wired `apiClient.js` using CommonJS

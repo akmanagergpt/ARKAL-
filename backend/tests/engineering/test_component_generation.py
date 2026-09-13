@@ -16,6 +16,7 @@ from arkali.engineering.factory.component_generation import (
     _backend_contract_findings,
     _backend_implementation_stage_findings,
     _cors_boundary_stage_findings,
+    _frontend_forms_findings,
     _frontend_ui_findings,
     _parse_stage_envelope,
     _schema_only_findings,
@@ -1863,3 +1864,311 @@ class TestF0100BackendSchemaPreventiveRule:
         lowered = rule.lower()
         for token in banned:
             assert token not in lowered, token
+
+
+class TestAsyncEsmExportCheckerFix:
+    """goal-mtzww02l-48k6h3 (session evidence, frozen). The real, terminal
+    `frontend_forms` attempt 3 (recovered, unmodified, from the real
+    content-addressed evidence blob `sha256:099fac5bc1570d3110c97ed0fe3d58
+    fc1b979985d7b53d1cfede35e2d306a7fb`) genuinely implements real edit
+    routes, real reachable create controls at empty state, and real
+    `htmlFor`+`id` labels -- but `_CLIENT_INLINE_EXPORT`/
+    `_INLINE_EXPORT_PATTERN` never allowed `async` between `export` and
+    `function`, so the real, correctly-exported `apiClient.js` (plain ESM
+    `export async function name(...)`, no CommonJS) was seen as exporting
+    nothing at all, and every real, correct call/import of its 10 real
+    functions was rejected as phantom or as a missing edit UI. This merges
+    the real persisted `visible_files` this stage never touched (`product/
+    ux_spec.json`, `frontend/src/apiClient.js`) with the real terminal
+    attempt's own `stage_files` -- byte-for-byte the same merge shape
+    `component_generation._generate_one_stage` uses in production -- and
+    replays it through the real, unmodified `_frontend_forms_findings`
+    dispatch, no model call."""
+
+    _UX_SPEC = (
+        '{"product_title": "Courier Management System", "primary_roles": '
+        '["Courier Manager", "Dispatcher"], "modules": [{"name": "drivers", '
+        '"navigation_label": "Drivers", "presentation": "table", "actions": '
+        '["create", "edit", "delete", "view"], "forms": [{"name": '
+        '"create_driver", "fields": ["name", "contact"]}, {"name": '
+        '"edit_driver", "fields": ["name", "contact"]}], "search_filter": '
+        'true, "states": {"loading": true, "empty": true, "error": true, '
+        '"success": true}}, {"name": "orders", "navigation_label": '
+        '"Orders", "presentation": "table", "actions": ["create", "edit", '
+        '"delete", "view"], "forms": [{"name": "create_order", "fields": '
+        '["driver_id", "destination", "status"]}, {"name": "edit_order", '
+        '"fields": ["driver_id", "destination", "status"]}], '
+        '"search_filter": true, "states": {"loading": true, "empty": true, '
+        '"error": true, "success": true}}], "navigation_destinations": '
+        '["Drivers", "Orders"], "design_system": {"typography_scale": '
+        '["h1", "h2", "h3", "body", "caption"], "spacing_scale": ["xs", '
+        '"sm", "md", "lg", "xl"], "component_conventions": ["button", '
+        '"input", "table", "card"], "responsive": "desktop-first", '
+        '"accessible_focus_contrast": true}}'
+    )
+
+    _API_CLIENT = (
+        "const API_BASE_URL = 'http://localhost:5000';\n\n"
+        "async function fetchWithCheck(url, options) {\n"
+        "  const response = await fetch(url, options);\n"
+        "  if (!response.ok) {\n"
+        "    throw new Error(`HTTP error! status: ${response.status}`);\n"
+        "  }\n"
+        "  return response.json();\n"
+        "}\n\n"
+        "export async function getDrivers() {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/drivers`, { method: 'GET' });\n"
+        "}\n\n"
+        "export async function createDriver(driver) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/drivers`, {\n"
+        "    method: 'POST',\n"
+        "    headers: { 'Content-Type': 'application/json' },\n"
+        "    body: JSON.stringify(driver)\n"
+        "  });\n"
+        "}\n\n"
+        "export async function getDriver(id) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/drivers/${id}`, { method: 'GET' });\n"
+        "}\n\n"
+        "export async function updateDriver(id, driver) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/drivers/${id}`, {\n"
+        "    method: 'PUT',\n"
+        "    headers: { 'Content-Type': 'application/json' },\n"
+        "    body: JSON.stringify(driver)\n"
+        "  });\n"
+        "}\n\n"
+        "export async function deleteDriver(id) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/drivers/${id}`, { method: 'DELETE' });\n"
+        "}\n\n"
+        "export async function getOrders() {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/orders`, { method: 'GET' });\n"
+        "}\n\n"
+        "export async function createOrder(order) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/orders`, {\n"
+        "    method: 'POST',\n"
+        "    headers: { 'Content-Type': 'application/json' },\n"
+        "    body: JSON.stringify(order)\n"
+        "  });\n"
+        "}\n\n"
+        "export async function getOrder(id) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, { method: 'GET' });\n"
+        "}\n\n"
+        "export async function updateOrder(id, order) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, {\n"
+        "    method: 'PUT',\n"
+        "    headers: { 'Content-Type': 'application/json' },\n"
+        "    body: JSON.stringify(order)\n"
+        "  });\n"
+        "}\n\n"
+        "export async function deleteOrder(id) {\n"
+        "  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, { method: 'DELETE' });\n"
+        "}\n"
+    )
+
+    _DRIVER_FORM = (
+        "import React, { useState, useEffect } from 'react';\n"
+        "import { useParams } from 'react-router-dom';\n"
+        "import { createDriver, updateDriver } from './apiClient';\n\n"
+        "const DriverForm = ({ onSubmit, initialData }) => {\n"
+        "  const { id } = useParams();\n"
+        "  const [formData, setFormData] = useState(initialData || {});\n"
+        "  useEffect(() => { setFormData(initialData || {}); }, [initialData]);\n"
+        "  const handleSubmit = async (e) => {\n"
+        "    e.preventDefault();\n"
+        "    if (id) { await onSubmit(id, formData); } else { await onSubmit(formData); }\n"
+        "  };\n"
+        "  return (\n"
+        "    <form onSubmit={handleSubmit}>\n"
+        "      <label htmlFor=\"name\">Name:</label>\n"
+        "      <input type=\"text\" id=\"name\" name=\"name\" value={formData.name || ''} required />\n"
+        "      <button type=\"submit\">{id ? 'Update Driver' : 'Create Driver'}</button>\n"
+        "    </form>\n"
+        "  );\n"
+        "};\n\n"
+        "export default DriverForm;\n"
+    )
+
+    _ORDER_FORM = (
+        "import React, { useState, useEffect } from 'react';\n"
+        "import { useParams } from 'react-router-dom';\n"
+        "import { createOrder, updateOrder } from './apiClient';\n\n"
+        "const OrderForm = ({ onSubmit, initialData }) => {\n"
+        "  const { id } = useParams();\n"
+        "  const [formData, setFormData] = useState(initialData || {});\n"
+        "  useEffect(() => { setFormData(initialData || {}); }, [initialData]);\n"
+        "  const handleSubmit = async (e) => {\n"
+        "    e.preventDefault();\n"
+        "    if (id) { await onSubmit(id, formData); } else { await onSubmit(formData); }\n"
+        "  };\n"
+        "  return (\n"
+        "    <form onSubmit={handleSubmit}>\n"
+        "      <label htmlFor=\"status\">Status:</label>\n"
+        "      <input type=\"text\" id=\"status\" name=\"status\" value={formData.status || ''} required />\n"
+        "      <button type=\"submit\">{id ? 'Update Order' : 'Create Order'}</button>\n"
+        "    </form>\n"
+        "  );\n"
+        "};\n\n"
+        "export default OrderForm;\n"
+    )
+
+    _DRIVERS_LIST = (
+        "import React, { useState, useEffect } from 'react';\n"
+        "import { getDrivers, createDriver } from './apiClient';\n"
+        "import DriverForm from './DriverForm';\n"
+        "import { Link } from 'react-router-dom';\n\n"
+        "const DriversList = () => {\n"
+        "  const [drivers, setDrivers] = useState([]);\n"
+        "  const [showForm, setShowForm] = useState(false);\n"
+        "  const handleCreate = async (driver) => { await createDriver(driver); setShowForm(false); };\n"
+        "  return (\n"
+        "    <div>\n"
+        "      <h2>Drivers</h2>\n"
+        "      {showForm && <DriverForm onSubmit={handleCreate} />}\n"
+        "      {!showForm && (<button onClick={() => setShowForm(true)}>Create Driver</button>)}\n"
+        "      {drivers.length === 0 ? (<div>No drivers found.</div>) : (\n"
+        "        <ul>{drivers.map(driver => (\n"
+        "          <li key={driver.id}>{driver.name}"
+        "<Link to={`/drivers/edit/${driver.id}`}>Edit</Link>"
+        "<Link to={`/drivers/delete/${driver.id}`}>Delete</Link></li>\n"
+        "        ))}</ul>\n"
+        "      )}\n"
+        "    </div>\n"
+        "  );\n"
+        "};\n\n"
+        "export default DriversList;\n"
+    )
+
+    _ORDERS_LIST = (
+        "import React, { useState, useEffect } from 'react';\n"
+        "import { getOrders, createOrder } from './apiClient';\n"
+        "import OrderForm from './OrderForm';\n"
+        "import { Link } from 'react-router-dom';\n\n"
+        "const OrdersList = () => {\n"
+        "  const [orders, setOrders] = useState([]);\n"
+        "  const [showForm, setShowForm] = useState(false);\n"
+        "  const handleCreate = async (order) => { await createOrder(order); setShowForm(false); };\n"
+        "  return (\n"
+        "    <div>\n"
+        "      <h2>Orders</h2>\n"
+        "      {showForm && <OrderForm onSubmit={handleCreate} />}\n"
+        "      {!showForm && (<button onClick={() => setShowForm(true)}>Create Order</button>)}\n"
+        "      {orders.length === 0 ? (<div>No orders found.</div>) : (\n"
+        "        <ul>{orders.map(order => (\n"
+        "          <li key={order.id}>{order.status}"
+        "<Link to={`/orders/edit/${order.id}`}>Edit</Link>"
+        "<Link to={`/orders/delete/${order.id}`}>Delete</Link></li>\n"
+        "        ))}</ul>\n"
+        "      )}\n"
+        "    </div>\n"
+        "  );\n"
+        "};\n\n"
+        "export default OrdersList;\n"
+    )
+
+    #: The real terminal attempt's own `App.js` -- unmodified. It calls
+    #: `updateDriver(id, driver)`/`updateOrder(id, order)` directly inside
+    #: its own inline route-render callbacks but never imports either name
+    #: from `./apiClient` -- a real, genuine, previously-masked defect (see
+    #: `test_corrected_replay_surfaces_the_real_app_js_missing_import` below).
+    _APP_JS = (
+        "import React from 'react';\n"
+        "import { BrowserRouter as Router, Route, Switch, Link, Redirect, useParams } "
+        "from 'react-router-dom';\n"
+        "import DriversList from './DriversList';\n"
+        "import OrdersList from './OrdersList';\n"
+        "import DriverForm from './DriverForm';\n"
+        "import OrderForm from './OrderForm';\n"
+        "import DriverDelete from './DriverDelete';\n"
+        "import OrderDelete from './OrderDelete';\n\n"
+        "const App = () => {\n"
+        "  return (\n"
+        "    <Router>\n"
+        "      <div>\n"
+        "        <Switch>\n"
+        "          <Route exact path=\"/drivers\" component={DriversList} />\n"
+        "          <Route exact path=\"/drivers/create\" "
+        "component={() => <DriverForm onSubmit={createDriver} />} />\n"
+        "          <Route path=\"/drivers/edit/:id\" component={() => <DriverForm onSubmit="
+        "{async (driver) => { const { id } = useParams(); await updateDriver(id, driver); }} />} />\n"
+        "          <Route path=\"/drivers/delete/:id\" component={DriverDelete} />\n"
+        "          <Route exact path=\"/orders\" component={OrdersList} />\n"
+        "          <Route exact path=\"/orders/create\" "
+        "component={() => <OrderForm onSubmit={createOrder} />} />\n"
+        "          <Route path=\"/orders/edit/:id\" component={() => <OrderForm onSubmit="
+        "{async (order) => { const { id } = useParams(); await updateOrder(id, order); }} />} />\n"
+        "          <Route path=\"/orders/delete/:id\" component={OrderDelete} />\n"
+        "        </Switch>\n"
+        "      </div>\n"
+        "    </Router>\n"
+        "  );\n"
+        "};\n\n"
+        "export default App;\n"
+    )
+
+    _DRIVER_DELETE = (
+        "import React, { useState } from 'react';\n"
+        "import { useParams } from 'react-router-dom';\n"
+        "import { deleteDriver } from './apiClient';\n\n"
+        "const DriverDelete = () => {\n"
+        "  const { id } = useParams();\n"
+        "  const handleDelete = async () => { await deleteDriver(id); };\n"
+        "  return (<button onClick={handleDelete}>Delete</button>);\n"
+        "};\n\n"
+        "export default DriverDelete;\n"
+    )
+
+    _ORDER_DELETE = (
+        "import React, { useState } from 'react';\n"
+        "import { useParams } from 'react-router-dom';\n"
+        "import { deleteOrder } from './apiClient';\n\n"
+        "const OrderDelete = () => {\n"
+        "  const { id } = useParams();\n"
+        "  const handleDelete = async () => { await deleteOrder(id); };\n"
+        "  return (<button onClick={handleDelete}>Delete</button>);\n"
+        "};\n\n"
+        "export default OrderDelete;\n"
+    )
+
+    def _merged_files(self) -> dict[str, str]:
+        #: `visible_files` (never regenerated by this stage's own attempt 3)
+        #: merged with the real terminal `stage_files`, byte-for-byte the
+        #: `{**visible_files, **stage_files}` shape `_generate_one_stage`
+        #: itself uses.
+        visible_files = {
+            "product/ux_spec.json": self._UX_SPEC,
+            "frontend/src/apiClient.js": self._API_CLIENT,
+        }
+        stage_files = {
+            "frontend/src/DriverForm.js": self._DRIVER_FORM,
+            "frontend/src/OrderForm.js": self._ORDER_FORM,
+            "frontend/src/DriversList.js": self._DRIVERS_LIST,
+            "frontend/src/OrdersList.js": self._ORDERS_LIST,
+            "frontend/src/App.js": self._APP_JS,
+            "frontend/src/DriverDelete.js": self._DRIVER_DELETE,
+            "frontend/src/OrderDelete.js": self._ORDER_DELETE,
+        }
+        return {**visible_files, **stage_files}
+
+    def test_corrected_replay_no_longer_flags_phantom_client_imports(self) -> None:
+        codes = {f.code for f in _frontend_forms_findings(self._merged_files())}
+        assert "frontend_phantom_client_import" not in codes
+
+    def test_corrected_replay_no_longer_flags_missing_edit_ui(self) -> None:
+        codes = {f.code for f in _frontend_forms_findings(self._merged_files())}
+        assert "frontend_ui_missing_edit_ui" not in codes
+
+    def test_corrected_replay_surfaces_the_real_app_js_missing_import(self) -> None:
+        """The secondary, previously-masked real defect: fixing the
+        async-export recognition gap makes `_client_call_missing_import_
+        findings` accurate again, and it now correctly reports that the
+        real, unmodified `App.js` calls `updateDriver`/`updateOrder`
+        directly without importing either from `./apiClient` -- a real
+        `ReferenceError` the moment either edit route renders. This finding
+        is expected and desirable; it is not fixed by this change."""
+        findings = [
+            f for f in _frontend_forms_findings(self._merged_files())
+            if f.code == "frontend_client_call_missing_import"
+        ]
+        assert len(findings) == 1
+        assert findings[0].path == "frontend/src/App.js"
+        assert "updateDriver" in findings[0].detail
+        assert "updateOrder" in findings[0].detail
