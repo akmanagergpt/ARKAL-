@@ -646,10 +646,12 @@ class TestF0099EmptyStateHintCoverage:
         assert "labelled" not in invariant.lower()
         assert "No specific label" in invariant
 
-    def test_d_the_route_unreachable_hint_is_still_present_and_unchanged(self) -> None:
-        """Preserve the existing route hint byte-for-byte -- this fix is
-        additive only."""
-        assert _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"] == (
+    def test_d_the_route_unreachable_hint_still_states_the_original_reachability_rule(self) -> None:
+        """F-0099 recurrence (`factory-goal-mtzkvowr-998jly`) strengthened
+        this hint's wording; the original reachability sentence is
+        preserved as a prefix, never removed -- only extended."""
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert invariant.startswith(
             "a declared parameterized route must be reachable through a real Link, "
             "button, or navigation call somewhere else in the frontend, built from "
             "the same static path prefix the route itself declares"
@@ -695,6 +697,139 @@ class TestF0099EmptyStateHintCoverage:
         # `TestMultiFindingRealConvergence` end-to-end; this test isolates the
         # hint-composition path alone.
         assert "frontend_ui_create_unreachable_from_empty_state" in payload["prior_attempt_failure"]
+
+
+class TestF0099RecurrenceHintStrengthening:
+    """F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
+    `frontend_route_unreachable` x4 and `frontend_ui_create_unreachable_
+    from_empty_state` x2, both against real list components rendering zero
+    interactive elements that the retry's own output never touched). These
+    two hints already existed and were already delivered; this class proves
+    the strengthened wording now says what the recurrence showed was
+    missing, without narrowing the checker or prescribing an exact repair."""
+
+    def test_a_route_hint_states_a_declared_route_alone_is_insufficient(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert "alone is never sufficient" in invariant
+
+    def test_b_route_hint_names_the_rendered_list_item_surface(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert "existing rendered list/item surface" in invariant
+
+    def test_c_route_hint_says_existing_component_modification_may_be_required(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert "modify that existing component" in invariant
+
+    def test_d_route_hint_ties_the_action_to_the_specific_record(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert "associated with that specific record" in invariant
+        assert "record's own real id" in invariant
+
+    def test_e_route_hint_prescribes_no_exact_wording(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert "No exact button text, route string, DOM shape, or styling" in invariant
+
+    def test_f_route_hint_names_no_domain_or_candidate_specific_token(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        banned = ("customer", "ticket", "customerlist", "ticketlist", "pets", "student")
+        lowered = invariant.lower()
+        for token in banned:
+            assert token not in lowered, token
+
+    def test_g_empty_state_hint_covers_zero_records_explicitly(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "zero records" in invariant
+
+    def test_h_empty_state_hint_requires_a_reachable_create_action(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "real, accessible interactive control" in invariant
+        assert "remain reachable" in invariant
+
+    def test_i_empty_state_hint_says_existing_component_modification_may_be_required(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "that existing component is where the reachable control is missing and must " \
+            "be modified" in invariant
+
+    def test_j_empty_state_hint_rejects_a_per_record_only_control(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "Never render the only such control inside a map/list of existing items" in invariant
+
+    def test_k_empty_state_hint_rejects_a_route_declared_elsewhere_as_sufficient(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "declaring a create route elsewhere" in invariant
+        assert "does not resolve this finding" in invariant
+
+    def test_l_empty_state_hint_prescribes_no_exact_wording(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"]
+        assert "No specific label, wording, or styling is required" in invariant
+
+    def test_m_composed_recurrence_hint_carries_both_strengthened_invariants_and_dedups(
+        self,
+    ) -> None:
+        """Historical replay of the real recurrence finding set (4 route +
+        2 empty-state) through the real composer: both strengthened
+        invariants appear, together, and the 4 identical-code route
+        findings still collapse to exactly one block -- proves neither
+        block suppresses the other and per-code dedup is unchanged."""
+        recurrence_findings: tuple[tuple[str, str, str], ...] = (
+            (
+                "frontend_route_unreachable", "frontend/src/App.js",
+                "<Route path='/customers/edit/:id'> is never reached from anywhere else "
+                "in the real frontend",
+            ),
+            (
+                "frontend_route_unreachable", "frontend/src/App.js",
+                "<Route path='/customers/delete/:id'> is never reached from anywhere "
+                "else in the real frontend",
+            ),
+            (
+                "frontend_route_unreachable", "frontend/src/App.js",
+                "<Route path='/tickets/edit/:id'> is never reached from anywhere else "
+                "in the real frontend",
+            ),
+            (
+                "frontend_route_unreachable", "frontend/src/App.js",
+                "<Route path='/tickets/delete/:id'> is never reached from anywhere else "
+                "in the real frontend",
+            ),
+            (
+                "frontend_ui_create_unreachable_from_empty_state", "frontend/src/",
+                "module 'customers' declares create, but no accessible interactive "
+                "create/add/new control remains reachable at zero records",
+            ),
+            (
+                "frontend_ui_create_unreachable_from_empty_state", "frontend/src/",
+                "module 'tickets' declares create, but no accessible interactive "
+                "create/add/new control remains reachable at zero records",
+            ),
+        )
+        blocks = _prior_finding_hint_blocks(recurrence_findings)
+        assert len(blocks) == 2
+        text = _structured_hint_text([], recurrence_findings)
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"] in text
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_ui_create_unreachable_from_empty_state"] in text
+
+    def test_n_retry_budget_and_repair_strategy_selection_are_unchanged(self) -> None:
+        """No convergence-engine behavior changed this turn -- only hint
+        text. `_repair_strategy_for_attempt` still escalates to the
+        structured-hint strategy starting at attempt 2, unchanged."""
+        assert _repair_strategy_for_attempt(1) == _DEFAULT_REPAIR_STRATEGY
+        assert _repair_strategy_for_attempt(2) == _STRUCTURED_HINT_REPAIR_STRATEGY
+
+    def test_o_previous_attempt_output_wiring_is_unchanged(self) -> None:
+        """`_stage_prompt` still threads `previous_attempt_files` into
+        `previous_attempt_output` unchanged by this turn's hint-wording
+        edit."""
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        prior_files = {"frontend/src/App.js": "// prior attempt content"}
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, "frontend_route_unreachable:frontend/src/App.js:x",
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY,
+            prior_findings=(("frontend_route_unreachable", "frontend/src/App.js", "x"),),
+            previous_attempt_files=prior_files,
+        ))
+        assert payload["previous_attempt_output"] == prior_files
 
 
 #: F-0101 (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`). The
@@ -776,11 +911,12 @@ class TestF0101LabelHintCoverage:
         assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
         assert "frontend_ui_form_control_unlabelled" in payload["repair_hint"]
 
-    def test_h_retry_budget_and_route_hint_are_unchanged(self) -> None:
-        """No behavior change to any prior finding's own hint or to how
-        many attempts a stage gets."""
+    def test_h_retry_budget_is_unchanged_and_route_hint_retains_its_original_rule(self) -> None:
+        """No behavior change to how many attempts a stage gets; the route
+        hint's own original reachability sentence (predating both F-0099
+        and its later recurrence fix) is still present as a prefix."""
         route_invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
-        assert route_invariant == (
+        assert route_invariant.startswith(
             "a declared parameterized route must be reachable through a real Link, "
             "button, or navigation call somewhere else in the frontend, built from "
             "the same static path prefix the route itself declares"

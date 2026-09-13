@@ -112,10 +112,37 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
 #: only codes this stage's own preflight suite already enforces belong here,
 #: never a new check invented to have something to hint about.
 _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    #: F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
+    #: `frontend_route_unreachable` x4, ARK-ERR-0116 exhausted). This hint
+    #: already existed and was already delivered; the recurrence traced to
+    #: real generated `CustomerList.js`/`TicketList.js`-shaped components
+    #: (names withheld here deliberately -- domain-independent) rendering
+    #: only bare `<li>{record.field}</li>` with zero interactive elements,
+    #: while the model's own retry output added new files (routes, forms)
+    #: without ever touching that existing list component -- even though
+    #: `STAGED_GENERATION_STAGES.md#9` already names this exact required
+    #: edit (golden-work-088/089). The wording below now names the
+    #: existing list/item surface as the relevant place to fix, explicitly
+    #: states that route/App.js/form-only changes do not resolve this
+    #: while that surface stays unreachable, and directs a retry to modify
+    #: that existing component when the gap is there -- never a stricter
+    #: DOM shape, button text, or route string requirement.
     "frontend_route_unreachable": (
         "a declared parameterized route must be reachable through a real Link, "
         "button, or navigation call somewhere else in the frontend, built from "
-        "the same static path prefix the route itself declares"
+        "the same static path prefix the route itself declares -- a declared "
+        "route alone is never sufficient. The relevant place to add this is "
+        "the resource's own existing rendered list/item surface: each record "
+        "shown there must expose a real, accessible edit and/or delete action "
+        "associated with that specific record, built from that record's own "
+        "real id. Changing only the route declarations, App.js, or a form "
+        "component does not resolve this finding while the existing list/item "
+        "component still renders no reachable action for any record -- if the "
+        "reachability gap is in that existing component, modify that existing "
+        "component; adding the action anywhere else does not fix it. No exact "
+        "button text, route string, DOM shape, or styling is required -- what "
+        "matters is that a real, accessible path from the rendered list to "
+        "that route exists"
     ),
     "frontend_root_path_unreachable": (
         "the application's own root path (\"/\") must resolve to a real render "
@@ -175,6 +202,15 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
     #: label -- `STAGED_GENERATION_STAGES.md#9`'s own rule already states
     #: this same invariant at generation time; this hint restates it only
     #: for a retry that already violated it.
+    #: F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
+    #: `frontend_ui_create_unreachable_from_empty_state` x2, same run as
+    #: the `frontend_route_unreachable` recurrence above). Real generated
+    #: list components' own empty-state branches rendered only static text
+    #: with zero controls, and the retry never touched those existing
+    #: components. Extended below to name the existing list/empty-state
+    #: component as the place to fix when it owns that branch, and to
+    #: state explicitly that a route declared elsewhere, or a control
+    #: reachable only once records exist, does not resolve this.
     "frontend_ui_create_unreachable_from_empty_state": (
         "a module that declares create must expose a real, accessible "
         "interactive control that lets a user start creating a new item "
@@ -184,10 +220,17 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "call-to-action are all real, legal choices. Never render the "
         "only such control inside a map/list of existing items, since it "
         "then disappears exactly when the collection is empty and the "
-        "control is needed most. No specific label, wording, or styling "
-        "is required -- what matters is that the control exists in the "
-        "rendered output and stays reachable independent of how many "
-        "records the collection holds"
+        "control is needed most. If the module's own existing list/"
+        "collection component owns the branch that renders when there are "
+        "zero records, that existing component is where the reachable "
+        "control is missing and must be modified -- declaring a create "
+        "route elsewhere, or leaving the control reachable only once "
+        "records already exist, does not resolve this finding. Preserve "
+        "the existing list's own already-correct loading/error/populated-"
+        "state rendering while adding the missing reachable action. No "
+        "specific label, wording, or styling is required -- what matters "
+        "is that the control exists in the rendered output and stays "
+        "reachable independent of how many records the collection holds"
     ),
     #: F-0101B (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`,
     #: real evidence: `factory-goal-mtz6bst2-myhr15`). Every generated
