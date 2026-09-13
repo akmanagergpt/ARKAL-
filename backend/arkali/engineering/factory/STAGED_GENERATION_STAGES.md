@@ -290,7 +290,15 @@ Inputs: frontend_client, frontend_ui, product_ux_spec
 Rule: add real, labelled form UI, wired to frontend_client's real
 create/update calls, for every module product_ux_spec declares a
 "create" or "edit" action for, with a visible validation marker (never a
-bare unlabelled input); for every module product_ux_spec declares a
+bare unlabelled input). "Labelled" means a real accessible-name
+association a screen reader can expose, never merely visible adjacent
+text: pair a `<label htmlFor="x">` with a matching `id="x"` on the
+control, wrap the control directly inside its own `<label>`, or give the
+control a non-empty `aria-label`/`aria-labelledby` — any one of these is
+a real, legal choice (F-0101, real evidence: `factory-goal-mtz6bst2-
+myhr15`; a real qwen2.5-coder:14b wrote a real `<label>` immediately
+next to every real input on every real attempt, satisfied by the visible
+text alone, associated with nothing); for every module product_ux_spec declares a
 "delete" action for, add a real delete control (e.g. a button) wired to
 frontend_client's real delete call — this stage owns that control, not
 just its confirmation step, since nothing upstream writes one — gated

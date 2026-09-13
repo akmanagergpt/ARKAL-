@@ -189,6 +189,27 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "rendered output and stays reachable independent of how many "
         "records the collection holds"
     ),
+    #: F-0101B (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`,
+    #: real evidence: `factory-goal-mtz6bst2-myhr15`). Every generated
+    #: form control had a real, visible `<label>` immediately next to it,
+    #: but never associated by any mechanism a screen reader recognizes --
+    #: `STAGED_GENERATION_STAGES.md#9`'s own rule already says "labelled",
+    #: which the model satisfied literally (a label exists) without
+    #: satisfying what the real checker requires (the label is exposed as
+    #: the control's own accessible name). No exact wording or one single
+    #: mechanism is prescribed; any real association the checker already
+    #: accepts is a legal fix.
+    "frontend_ui_form_control_unlabelled": (
+        "every real input, select, or textarea must have a real accessible "
+        "name a screen reader can expose -- visible adjacent label text "
+        "alone, with no programmatic association, does not count. Any of "
+        "the following real, legal mechanisms is enough: a `<label "
+        "htmlFor=\"x\">` paired with a matching `id=\"x\"` on the control; "
+        "wrapping the control directly inside its own `<label>` element; "
+        "or a non-empty `aria-label`/`aria-labelledby` on the control "
+        "itself. Fix the association, not the visible wording -- no "
+        "specific label text or styling is required"
+    ),
 }
 
 

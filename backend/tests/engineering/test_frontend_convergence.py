@@ -695,3 +695,93 @@ class TestF0099EmptyStateHintCoverage:
         # `TestMultiFindingRealConvergence` end-to-end; this test isolates the
         # hint-composition path alone.
         assert "frontend_ui_create_unreachable_from_empty_state" in payload["prior_attempt_failure"]
+
+
+#: F-0101 (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`). The
+#: real, frozen `(code, path, detail)` findings from
+#: `factory-goal-mtz6bst2-myhr15` (`sha256:70a83649...`, STAGE_FAILED at
+#: `frontend_forms`, full 4-attempt budget exhausted) -- copied verbatim
+#: from the real ARK-ERR-0116 error string. `frontend_ui_missing_edit_ui`
+#: is a real historical checker false positive, fixed at the checker
+#: level (`_exported_js_names`), never given a retry hint here; only
+#: `frontend_ui_form_control_unlabelled` -- the genuine defect -- gets one.
+_F0101_FINDINGS: tuple[tuple[str, str, str], ...] = (
+    (
+        "frontend_ui_missing_edit_ui", "frontend/src/",
+        "product_ux_spec declares an edit action but the frontend never "
+        "references an update/edit-named client function anywhere -- a "
+        "create form alone does not satisfy a declared edit action",
+    ),
+    (
+        "frontend_ui_form_control_unlabelled", "frontend/src/",
+        "every input/select/textarea must have an accessible name: "
+        "associate a label with htmlFor+id, wrap the control in its "
+        "label, or use a non-empty aria-label/aria-labelledby; adjacent "
+        "label text alone is not exposed as the control's accessible name",
+    ),
+)
+
+
+class TestF0101LabelHintCoverage:
+    """F-0101B. `frontend_ui_form_control_unlabelled` did not have a
+    structured hint entry, unlike `frontend_ui_create_unreachable_from_
+    empty_state` (F-0099) before it -- the same class of gap, a
+    different finding code."""
+
+    def test_a_the_label_code_is_now_in_the_supported_map(self) -> None:
+        assert "frontend_ui_form_control_unlabelled" in _SUPPORTED_HINT_INVARIANTS
+
+    def test_b_the_label_hint_names_every_real_legal_mechanism(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_form_control_unlabelled"]
+        assert "htmlFor" in invariant
+        assert "aria-label" in invariant
+        assert "aria-labelledby" in invariant
+        assert "label" in invariant.lower()
+
+    def test_c_the_label_hint_never_requires_exact_wording(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_form_control_unlabelled"]
+        assert "no specific label text" in invariant.lower()
+
+    def test_d_no_candidate_specific_token_in_the_invariant(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_form_control_unlabelled"]
+        banned = ("customer", "ticket", "student", "payment", "course", "pets", "task")
+        lowered = invariant.lower()
+        for token in banned:
+            assert token not in lowered, token
+
+    def test_e_the_missing_edit_ui_code_never_received_a_hint(self) -> None:
+        """The checker fix (`_exported_js_names`) resolves this class at
+        the source; a retry hint was never needed for it and none was
+        added."""
+        assert "frontend_ui_missing_edit_ui" not in _SUPPORTED_HINT_INVARIANTS
+
+    def test_f_the_historical_f0101_replay_hints_only_the_genuine_finding(self) -> None:
+        """Section 16's own explicit requirement: after the checker fix,
+        replaying the exact real historical finding set must compose a
+        hint for the genuine label defect, and never invent guidance for
+        the (now-impossible) false edit finding, which this dict still
+        does not name."""
+        text = _structured_hint_text([], _F0101_FINDINGS)
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_ui_form_control_unlabelled"] in text
+        assert "frontend_ui_missing_edit_ui" not in text
+
+    def test_g_the_real_stage_prompt_payload_carries_the_label_hint(self) -> None:
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        raw_failure = "; ".join(f"{c}:{p}:{d}" for c, p, d in _F0101_FINDINGS)
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, raw_failure,
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY, prior_findings=_F0101_FINDINGS,
+        ))
+        assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_ui_form_control_unlabelled" in payload["repair_hint"]
+
+    def test_h_retry_budget_and_route_hint_are_unchanged(self) -> None:
+        """No behavior change to any prior finding's own hint or to how
+        many attempts a stage gets."""
+        route_invariant = _SUPPORTED_HINT_INVARIANTS["frontend_route_unreachable"]
+        assert route_invariant == (
+            "a declared parameterized route must be reachable through a real Link, "
+            "button, or navigation call somewhere else in the frontend, built from "
+            "the same static path prefix the route itself declares"
+        )

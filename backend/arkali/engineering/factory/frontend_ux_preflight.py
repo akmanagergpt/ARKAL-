@@ -44,6 +44,7 @@ import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.frontend_actionability_preflight import _create_access_findings, _error_recovery_findings
+from arkali.engineering.factory.frontend_js_semantics import _commonjs_alias_export_names
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _frontend_local_import_findings,
     _react_router_missing_import_findings,
@@ -128,7 +129,10 @@ def _exported_js_names(client_text: str) -> frozenset[str]:
             name = part.strip().split(":")[0].strip()
             if name:
                 names.add(name)
-    return frozenset(names)
+    # F-0101 (real evidence: `factory-goal-mtz6bst2-myhr15`'s own
+    # `apiClient.js`): `const api = {...}; module.exports = api;` -- see
+    # `frontend_js_semantics._commonjs_alias_export_names`'s own docstring.
+    return frozenset(names) | _commonjs_alias_export_names(client_text)
 
 
 #: Deliberately excludes "error" -- an async-fetch error state (already

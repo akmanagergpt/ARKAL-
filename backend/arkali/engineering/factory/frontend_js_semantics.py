@@ -146,7 +146,50 @@ def _balanced_brace_body(text: str, open_brace_index: int) -> str:
     return text[open_brace_index + 1:]
 
 
+#: `const X = {...}; module.exports = X;` (also `let`/`var`) -- a real,
+#: statically-provable CommonJS re-export idiom (F-0101, real evidence:
+#: `factory-goal-mtz6bst2-myhr15`'s own `apiClient.js`) distinct from
+#: `module.exports = { name, ... };`'s own inline literal
+#: (`frontend_ux_preflight._COMMONJS_EXPORTS_BLOCK`): the object literal is
+#: assigned to a local identifier first, then that identifier alone is
+#: exported. The real property VALUES here are async arrow functions with
+#: their own nested `{...}` bodies, so a naive `[^}]*` capture -- the
+#: shape `_COMMONJS_EXPORTS_BLOCK` itself safely uses only because its own
+#: real evidence never nested a brace -- would stop at the first nested
+#: closing brace, never the real end of the object literal; `_balanced_
+#: brace_body` above already exists for exactly this.
+_LOCAL_OBJECT_LITERAL_DECLARATION = re.compile(r"(?:const|let|var)\s+(\w+)\s*=\s*\{")
+#: A property name at the start of its own line, followed by `:` (explicit
+#: key/value), `,` (shorthand with more properties after it), or nothing
+#: but the line's own end (a trailing shorthand property with no comma,
+#: immediately before the literal's own closing brace) -- real generated
+#: object-literal bodies this pipeline has produced always write one
+#: property per line; never attempts to parse past the colon into the
+#: value expression itself.
+_PROPERTY_NAME_LINE = re.compile(r"^\s*([A-Za-z_$][\w$]*)\s*(?::|,|$)", re.M)
+
+
+def _commonjs_alias_export_names(source: str) -> frozenset[str]:
+    """Real property names from `const X = {...}; module.exports = X;`
+    (also `let`/`var`) found anywhere in `source` -- empty when `source`
+    never uses this exact, statically-provable idiom. Conservative by
+    construction: an unresolved identifier (`module.exports =
+    someImportedOrUnknownName;`), a multi-hop alias (`const a = b;
+    module.exports = a;`), and any mutation after declaration are all left
+    unrecognized rather than guessed -- only an identifier whose own local
+    declaration is a real, present object literal is ever resolved, and
+    only the property names statically visible in that one literal."""
+    names: set[str] = set()
+    for declaration in _LOCAL_OBJECT_LITERAL_DECLARATION.finditer(source):
+        local_name = declaration.group(1)
+        if not re.search(rf"module\.exports\s*=\s*{re.escape(local_name)}\s*;", source):
+            continue
+        body = _balanced_brace_body(source, declaration.end() - 1)
+        names.update(match.group(1) for match in _PROPERTY_NAME_LINE.finditer(body))
+    return frozenset(names)
+
+
 __all__ = [
-    "_all_function_definitions", "_balanced_brace_body", "_component_destructured_props",
-    "_function_parameters", "_function_parameters_across_files",
+    "_all_function_definitions", "_balanced_brace_body", "_commonjs_alias_export_names",
+    "_component_destructured_props", "_function_parameters", "_function_parameters_across_files",
 ]

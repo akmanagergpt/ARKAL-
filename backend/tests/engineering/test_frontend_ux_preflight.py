@@ -10,6 +10,7 @@ from arkali.engineering.factory.frontend_manifest_preflight import (
 )
 from arkali.engineering.factory.frontend_ux_preflight import (
     _exported_js_names,
+    _form_quality_findings,
     _shadowed_route_findings,
     _unreachable_parameterized_route_findings,
     _ux_spec_mutation_findings,
@@ -745,3 +746,145 @@ def test_exported_js_names_recognizes_a_real_commonjs_module() -> None:
         "};\n"
     )
     assert _exported_js_names(client_text) == frozenset({"getTasks", "createTask"})
+
+
+def test_exported_js_names_recognizes_a_real_commonjs_alias_module() -> None:
+    """F-0101 (real evidence: `factory-goal-mtz6bst2-myhr15`'s own
+    `apiClient.js`): `const apiClient = {...}; module.exports = apiClient;`
+    -- a real, statically-provable CommonJS re-export idiom distinct from
+    `module.exports = { name, ... };` above, since the object literal
+    sits on the declaration line, not the `module.exports =` line
+    itself. Before this fix `_exported_js_names` saw zero exports for
+    this real shape, exactly as it once did for the inline shape above."""
+    client_text = (
+        "const apiClient = {\n"
+        "  getCustomers: async () => { return []; },\n"
+        "  updateCustomer: async (id, data) => { return {}; }\n"
+        "};\n"
+        "module.exports = apiClient;\n"
+    )
+    names = _exported_js_names(client_text)
+    assert {"getCustomers", "updateCustomer"} <= names
+
+
+class TestFormControlAccessibleName:
+    """F-0101B (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`,
+    real evidence: `factory-goal-mtz6bst2-myhr15`). The checker's own
+    real semantics, unchanged by this finding's fix -- proven both ways:
+    every real, legal accessible-name mechanism still passes, and the
+    real historical bare-sibling shape still fails."""
+
+    @staticmethod
+    def _unlabelled(frontend: str) -> bool:
+        return any(
+            f.code == "frontend_ui_form_control_unlabelled"
+            for f in _form_quality_findings(frontend)
+        )
+
+    def test_a_htmlfor_id_pairing_passes(self) -> None:
+        frontend = (
+            "<form><label htmlFor='name'>Name</label>"
+            "<input id='name' /></form>"
+        )
+        assert not self._unlabelled(frontend)
+
+    def test_b_wrapping_label_passes(self) -> None:
+        frontend = "<form><label>Name<input /></label></form>"
+        assert not self._unlabelled(frontend)
+
+    def test_c_aria_label_passes(self) -> None:
+        frontend = "<form><input aria-label='Name' /></form>"
+        assert not self._unlabelled(frontend)
+
+    def test_d_aria_labelledby_passes(self) -> None:
+        frontend = (
+            "<form><span id='name-label'>Name</span>"
+            "<input aria-labelledby='name-label' /></form>"
+        )
+        assert not self._unlabelled(frontend)
+
+    def test_e_bare_sibling_label_and_input_fails(self) -> None:
+        """The exact real historical shape: a visible `<label>` exists,
+        immediately next to its `<input>`, associated with nothing."""
+        frontend = "<form><label>Name</label><input /></form>"
+        assert any(
+            f.code == "frontend_ui_form_control_unlabelled"
+            for f in _form_quality_findings(frontend)
+        )
+
+
+def test_f0101_historical_replay_edit_false_positive_gone_label_defect_remains() -> None:
+    """F-0101's own real historical evidence (`factory-goal-mtz6bst2-
+    myhr15`, no model call): merging the real persisted 8-stage workspace
+    with the real terminal `frontend_forms` attempt's own frozen raw
+    output (`sha256:70a83649...`) reproduces the exact real STAGE_FAILED
+    finding pair. After this fix, `frontend_ui_missing_edit_ui` must be
+    gone (the real update/edit exports are now recognized) while
+    `frontend_ui_form_control_unlabelled` must still fire -- the checker
+    fix and the generation-guidance fix are separate concerns; the real
+    historical malformed accessibility output is never made to pass."""
+    customer_form = (
+        "import React, { useState, useEffect } from 'react';\n"
+        "const CustomerForm = ({ onSubmit, id }) => {\n"
+        "  const [formData, setFormData] = useState({ name: '', email: '', phone: '' });\n"
+        "  return (\n"
+        "    <form onSubmit={() => onSubmit(id, formData)}>\n"
+        "      <div><label>Name:</label>"
+        "<input type='text' name='name' value={formData.name} required /></div>\n"
+        "      <div><label>Email:</label>"
+        "<input type='email' name='email' value={formData.email} required /></div>\n"
+        "      <button type='submit'>Save</button>\n"
+        "    </form>\n"
+        "  );\n"
+        "};\n"
+        "export default CustomerForm;\n"
+    )
+    app_js = (
+        "import React from 'react';\n"
+        "import { Route, Switch, useParams } from 'react-router-dom';\n"
+        "import CustomerForm from './components/CustomerForm';\n"
+        "import apiClient from './apiClient';\n"
+        "const App = () => (\n"
+        "  <Switch>\n"
+        "    <Route path='/customers/edit/:id' component={() => {\n"
+        "      const { id } = useParams();\n"
+        "      return <CustomerForm onSubmit={apiClient.updateCustomer} id={id} />;\n"
+        "    }} />\n"
+        "  </Switch>\n"
+        ");\n"
+        "export default App;\n"
+    )
+    api_client = (
+        "const apiClient = {\n"
+        "  getCustomers: async () => { return []; },\n"
+        "  updateCustomer: async (id, data) => { return {}; }\n"
+        "};\n"
+        "module.exports = apiClient;\n"
+    )
+    spec = json.dumps({
+        "product_title": "Customer Support", "primary_roles": ["staff"],
+        "modules": [{
+            "name": "customers", "navigation_label": "Customers", "presentation": "table",
+            "actions": ["create", "edit"],
+            "forms": [{"name": "CustomerForm", "fields": ["name", "email"]}],
+            "search_filter": False,
+            "states": {"loading": True, "empty": True, "error": True, "success": True},
+        }],
+        "navigation_destinations": ["Customers"],
+        "design_system": {
+            "typography_scale": ["base"], "spacing_scale": ["sm"],
+            "component_conventions": ["table"], "responsive": "desktop-first",
+            "accessible_focus_contrast": True,
+        },
+        "destructive_action_confirmation": False,
+    })
+    files = {
+        "product/ux_spec.json": spec,
+        "frontend/src/App.js": app_js,
+        "frontend/src/apiClient.js": api_client,
+        "frontend/src/components/CustomerForm.js": customer_form,
+    }
+    findings = _ux_spec_mutation_findings(files)
+    codes = {f.code for f in findings}
+    assert "frontend_ui_missing_edit_ui" not in codes
+    assert "frontend_ui_form_control_unlabelled" in codes
