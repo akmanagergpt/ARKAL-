@@ -344,7 +344,14 @@ routed component's function (import `useParams` from
 `'react-router-dom'`), then pass `id` to the update/delete client call —
 never an `id` prop on the routed component itself, which the children
 Route form used here never receives (golden-work-113/115, session
-evidence, frozen). When one form component is reused for both create and
+evidence, frozen). Any real frontend_client function this stage's own
+generated code calls or otherwise references in a given file — a direct
+call (`updateThing(id, data)`), a callback/prop reference
+(`onSubmit={createThing}`), or an event-handler reference
+(`onClick={deleteThing}`) — must be imported from its declaring module, or
+otherwise defined, in that exact same file's own scope: naming an exported
+function without importing it there is a real runtime error the moment
+that code path runs, never merely a syntax error. When one form component is reused for both create and
 edit, its own call to the submit prop must pass every argument the edit
 route's own handler declares, in order — reusing the create route's
 shorter call unchanged at edit silently shifts every argument

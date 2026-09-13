@@ -2172,3 +2172,75 @@ class TestAsyncEsmExportCheckerFix:
         assert findings[0].path == "frontend/src/App.js"
         assert "updateDriver" in findings[0].detail
         assert "updateOrder" in findings[0].detail
+
+    def test_the_frozen_app_js_still_produces_the_real_finding_after_the_rule_change(
+        self,
+    ) -> None:
+        """Section 11: the stage-9 prevention rule is generation-time
+        prose only -- it must never relax what the checker itself accepts.
+        The real, frozen, historical `App.js` (unpatched) must still
+        produce `frontend_client_call_missing_import` exactly as before;
+        this replay is evidence that the defect class the new rule text
+        addresses is real, not a repair of the frozen candidate itself."""
+        findings = [
+            f for f in _frontend_forms_findings(self._merged_files())
+            if f.code == "frontend_client_call_missing_import"
+        ]
+        assert len(findings) == 1
+        assert findings[0].path == "frontend/src/App.js"
+
+
+class TestFrontendFormsClientImportPreventionRule:
+    """`FRONTEND_CLIENT_IMPORT_RULE_GAP` (real evidence: the frozen terminal
+    `frontend_forms` attempt from `goal-mtzww02l-48k6h3`, no model call):
+    `App.js` genuinely called `updateDriver(id, driver)`/`updateOrder(id,
+    order)` and genuinely referenced `createDriver`/`createOrder` as bare
+    `onSubmit={createDriver}`-style callback props, without importing any
+    of the four from `./apiClient` -- a real, mechanically-confirmed
+    generation-time prevention gap: `STAGED_GENERATION_STAGES.md#9`
+    already required importing `useParams` for route params, but stated
+    no general invariant that a called-or-referenced `frontend_client`
+    export must be imported in the same file that uses it. The checker
+    (`frontend_client_call_preflight.py`, already correct after the
+    async-ESM-export fix), the structured retry hint
+    (`_SUPPORTED_HINT_INVARIANTS["frontend_client_call_missing_import"]`,
+    already adequate and unchanged), and convergence/retry-context are all
+    untouched by this fix -- prose-only, additive, prevention side only."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("frontend_forms").rule
+
+    def test_a_a_direct_client_call_must_be_imported_or_defined(self) -> None:
+        rule = self._rule()
+        assert "calls or otherwise references" in rule
+        assert "updateThing(id, data)" in rule
+
+    def test_b_a_callback_prop_reference_must_be_imported_or_defined(self) -> None:
+        rule = self._rule()
+        assert "onSubmit={createThing}" in rule
+
+    def test_c_an_event_handler_reference_must_be_imported_or_defined(self) -> None:
+        rule = self._rule()
+        assert "onClick={deleteThing}" in rule
+
+    def test_d_the_same_file_scope_requirement_is_explicit(self) -> None:
+        rule = self._rule()
+        assert "that exact same file's own scope" in rule
+        assert "must be imported from its declaring module, or" in rule
+        assert "otherwise defined" in rule
+
+    def test_e_the_new_rule_text_is_generic_with_no_domain_token(self) -> None:
+        rule = self._rule()
+        # Only the new sentence's own generic placeholder names -- never
+        # this session's real candidate domain.
+        banned = ("driver", "order", "app.js", "apiclient", "courier")
+        new_sentence_start = rule.index("Any real frontend_client function")
+        new_sentence = rule[new_sentence_start:new_sentence_start + 400].lower()
+        for token in banned:
+            assert token not in new_sentence, token
+
+    def test_f_the_existing_useparams_rule_is_preserved(self) -> None:
+        rule = self._rule()
+        assert "const { id } = useParams();" in rule
+        assert "import `useParams` from" in rule
