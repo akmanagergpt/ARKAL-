@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _frontend_local_import_findings,
@@ -909,26 +910,93 @@ class TestFrontendUiUnusedClientStageScope:
         assert len(findings) == 1
         assert "getThings" in findings[0].detail
 
-    def test_i_the_known_substring_precision_defect_remains_deferred(self) -> None:
+    def test_i_the_former_substring_precision_defect_is_now_fixed(self) -> None:
         """`FRONTEND_UI_UNUSED_CHECKER_SUBSTRING_PRECISION_DEFECT`, real
         evidence-shaped (`factory-goal-mu0pvv20-b2uuo8`'s own `getOrder`/
-        `getOrders` naming pair) -- `name not in ui` is plain substring
-        containment, not identifier/call matching. Two genuinely distinct,
-        genuinely unused ZERO-ARGUMENT read exports (`getWork`, `getWorks`)
-        are BOTH required by today's stage-scope-corrected invariant; the
-        checker still, wrongly, treats `getWork` as used purely because
-        the real, called `getWorks()` contains it as a literal prefix.
-        NOT fixed by this turn -- this documents the known, independent,
-        still-open imprecision so a future fix is never skipped as
-        already resolved by the stage-scope change alone."""
+        `getOrders` naming pair): `name not in ui` used to be plain
+        substring containment, silently treating a genuinely-uncalled
+        `getWork` as used purely because the real, called `getWorks()`
+        contains it as a literal prefix. Usage detection is now a real
+        JS-identifier-boundary match, so this genuinely-unused,
+        zero-argument, stage-8-required export is correctly flagged."""
         client = "export function getWork() {}\nexport function getWorks() {}"
-        # getWork() is genuinely never called -- only getWorks() is -- so a
-        # precise check would still flag getWork. The known defect: it does
-        # not, because "getWork" is a literal substring of the called
-        # "getWorks()". This asserts the CURRENT (defective) behavior, not
-        # the correct one, so a future fix does not silently double-count
-        # this test as already-passing evidence of correctness.
-        assert _unused_client_export_findings(client, "getWorks();") == []
+        findings = _unused_client_export_findings(client, "getWorks();")
+        assert len(findings) == 1
+        assert "getWork'" in findings[0].detail
+        assert "getWorks" not in findings[0].detail
+
+
+class TestFrontendUiUnusedClientIdentifierPrecision:
+    """`FRONTEND_UI_UNUSED_CHECKER_SUBSTRING_PRECISION_DEFECT` (real
+    evidence: `factory-goal-mu0pvv20-b2uuo8`'s own `getOrder(id)`/
+    `getOrders()` naming pair). `name not in ui` was plain substring
+    containment, not real JavaScript identifier matching: a genuinely
+    uncalled export whose name happens to be a literal prefix, suffix, or
+    otherwise-embedded substring of a different real identifier was
+    silently treated as used. Replaced with a real identifier-boundary
+    match (not immediately preceded or followed by a letter, digit, `_`,
+    or `$`) so only a real standalone reference -- call or bare
+    callback/binding -- counts as usage."""
+
+    def test_a_an_exact_direct_call_is_recognized(self) -> None:
+        client = "export function getThing() {}"
+        assert _unused_client_export_findings(client, "getThing();") == []
+
+    def test_b_an_exact_callback_reference_is_recognized(self) -> None:
+        client = "export function getThing() {}"
+        assert _unused_client_export_findings(client, "onClick={getThing}") == []
+        assert _unused_client_export_findings(client, "const loader = getThing;") == []
+
+    def test_c_a_prefix_collision_is_rejected(self) -> None:
+        """`getThing` must not be considered used merely because the
+        real, called `getThings()` contains it as a literal prefix."""
+        client = "export function getThing() {}\nexport function getThings() {}"
+        findings = _unused_client_export_findings(client, "getThings();")
+        assert len(findings) == 1 and "getThing'" in findings[0].detail
+
+    def test_d_a_suffix_collision_is_rejected(self) -> None:
+        client = "export function getThing() {}"
+        findings = _unused_client_export_findings(client, "getThingExtra();")
+        assert len(findings) == 1 and "getThing" in findings[0].detail
+
+    def test_e_an_underscore_collision_is_rejected(self) -> None:
+        client = "export function getThing() {}"
+        findings = _unused_client_export_findings(client, "helper_getThing();")
+        assert len(findings) == 1 and "getThing" in findings[0].detail
+
+    def test_f_a_dollar_sign_collision_is_rejected(self) -> None:
+        client = "export function getThing() {}"
+        assert len(_unused_client_export_findings(client, "$mygetThing")) == 1
+        assert len(_unused_client_export_findings(client, "getThing$alias")) == 1
+
+    def test_g_a_zero_argument_required_export_collision_is_reported(self) -> None:
+        """A generic list/read pair the stage-scope fix never exempts
+        (both zero-argument) -- proves this fix independently of the
+        single-record exemption."""
+        client = "export function getItem() {}\nexport function getItems() {}"
+        findings = _unused_client_export_findings(client, "getItems();")
+        assert len(findings) == 1
+        assert findings[0].detail == "frontend_ui never calls client export(s) ['getItem']"
+
+    def test_h_real_getorder_getorders_matcher_precision(self) -> None:
+        """Exercises the matcher directly, not only final finding output
+        -- the exact real naming pair from `factory-goal-mu0pvv20-b2uuo8`."""
+        boundary = re.compile(rf"(?<![\w$]){re.escape('getOrder')}(?![\w$])")
+        assert boundary.search("getOrders();") is None
+        assert boundary.search("getOrder(id);") is not None
+
+    def test_i_frozen_warehouse_replay_still_absent(self) -> None:
+        """Composition proof: the stage-scope exemption and the identifier-
+        precision fix must both hold simultaneously on the same real,
+        frozen bytes this session's own two fixes were each evidenced by."""
+        client = (
+            "export async function getInventory() { return fetchWithCheck(); }\n"
+            "export async function getInventoryItem(id) { return fetchWithCheck(); }\n"
+            "export async function getOrders() { return fetchWithCheck(); }\n"
+            "export async function getOrder(id) { return fetchWithCheck(); }\n"
+        )
+        ui = "getInventory(); getOrders();"
+        assert _unused_client_export_findings(client, ui) == []
 
 
 class TestFormControlAccessibleName:

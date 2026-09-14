@@ -238,15 +238,30 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
     # (a record identifier) is therefore exempt here exactly like a
     # mutation export already is -- required only once something record-
     # specific exists to call it with, never merely because it exists.
+    #
+    # goal-mu0pvv20-b2uuo8 (session evidence, frozen): a real, independent
+    # precision defect in this same check -- `name not in ui`, plain
+    # substring containment, treated the real, genuinely-uncalled
+    # `getOrder(id)` as referenced purely because the real, called
+    # `getOrders()` contains it as a literal prefix; the real candidate's
+    # own stage-scope exemption above happens to also cover `getOrder`,
+    # so this never surfaced as THIS candidate's own failure, but the
+    # same collision would silently hide a genuinely-uncalled ZERO-
+    # ARGUMENT export too. Replaced with a real JS-identifier-boundary
+    # match (not preceded/followed by a real identifier character:
+    # letters, digits, `_`, or `$`) so a direct call, a bare callback/
+    # reference, and a `const x = name` binding all still count as real
+    # usage, but a name that is only ever a substring of a different,
+    # longer real identifier never does.
     exported = _exported_js_names(client)
     read_only_exports = {n for n in exported if not _MUTATION_EXPORT_NAME.match(n)
                           and not re.search(rf"{n}\s*\(\s*\w", client)}
-    uncalled = sorted(name for name in read_only_exports if name not in ui)
+    uncalled = sorted(name for name in read_only_exports
+                       if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", ui))
     if not uncalled:
         return []
-    return [SemanticFinding(
-        code="frontend_ui_client_unused", path="frontend/src/",
-        detail=f"frontend_ui never calls client export(s) {uncalled!r}")]
+    return [SemanticFinding(code="frontend_ui_client_unused", path="frontend/src/",
+                             detail=f"frontend_ui never calls client export(s) {uncalled!r}")]
 
 
 def _frontend_ui_only_text(files: Mapping[str, str]) -> str:
