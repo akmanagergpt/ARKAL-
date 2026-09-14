@@ -349,21 +349,30 @@ def _schema_context_findings(backend_text: str) -> list[SemanticFinding]:
 
 
 def _framework_api_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
+    # goal-mu1hy9w1-qn30iv (session evidence, frozen): a real, live
+    # candidate declared `flask==2.3.2` and genuinely used
+    # `@app.before_first_request` -- a real, live `pytest` collection
+    # failure (`AttributeError: 'Flask' object has no attribute
+    # 'before_first_request'`) proved this hook is genuinely absent
+    # starting at Flask 2.3.0, not only at major version 3 as this
+    # check's own prior major-only comparison assumed; `2 >= 3` is
+    # false, so the real, wired-in whole-product gate silently passed
+    # this exact real incompatibility through to acceptance. Comparing
+    # the real declared (major, minor) tuple against (2, 3) instead
+    # catches the real removal boundary precisely, in either major line.
     requirements = files.get("backend/requirements.txt", "").lower()
-    flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)", requirements)
+    flask_match = re.search(r"(?m)^flask\s*==\s*(\d+)(?:\.(\d+))?", requirements)
     backend = "\n".join(
         source.lower()
         for path, source in files.items()
         if path.startswith("backend/") and path.endswith(".py")
     )
-    if flask_match and int(flask_match.group(1)) >= 3 and "before_first_request" in backend:
-        return [
-            SemanticFinding(
-                code="removed_framework_api",
-                path="backend/",
-                detail="Flask 3 removed the before_first_request hook",
-            )
-        ]
+    flask_version = (
+        (int(flask_match.group(1)), int(flask_match.group(2) or 0)) if flask_match else None
+    )
+    if flask_version and flask_version >= (2, 3) and "before_first_request" in backend:
+        return [SemanticFinding(code="removed_framework_api", path="backend/",
+                                 detail="Flask 2.3+ removed the before_first_request hook")]
     return []
 
 

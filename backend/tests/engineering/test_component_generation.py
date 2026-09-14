@@ -2339,6 +2339,47 @@ class TestFrontendFormsClientImportPreventionRule:
         assert "import `useParams` from" in rule
 
 
+class TestBackendImplementationFrameworkCompatibilityRule:
+    """`BACKEND_ACCEPTANCE_COMPATIBILITY_GAP` (real evidence: `factory-
+    goal-mu1hy9w1-qn30iv`): a real, live candidate declared
+    `flask==2.3.2` and genuinely used `@app.before_first_request` -- a
+    Flask lifecycle hook removed starting at Flask 2.3.0 -- to call its
+    own real one-time schema setup. `backend_implementation`'s own rule
+    said nothing about framework API/version compatibility, only that
+    schema-creation code must actually be imported (a different, already-
+    covered concern). Prose-only; the checker's own corrected invariant
+    lives in `product_preflight.py::_framework_api_findings`."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("backend_implementation").rule
+
+    def test_a_the_removed_hook_is_explicitly_named(self) -> None:
+        rule = self._rule()
+        assert "before_first_request" in rule
+        assert "removed" in rule.lower()
+
+    def test_b_the_flask_2_3_removal_boundary_is_named(self) -> None:
+        rule = self._rule()
+        assert "Flask 2.3" in rule
+
+    def test_c_a_compatible_alternative_is_prescribed(self) -> None:
+        rule = self._rule()
+        assert "module level" in rule.lower()
+
+    def test_d_the_existing_schema_import_rule_is_preserved(self) -> None:
+        rule = self._rule()
+        assert "the routes file must actually import" in rule
+
+    def test_e_the_new_sentence_carries_no_candidate_domain_token(self) -> None:
+        rule = self._rule()
+        banned = ("photography", "photo session", "client_id", "studio")
+        start = rule.index("Never call a")
+        new_sentence = rule[start:start + 600].lower()
+        for token in banned:
+            assert token not in new_sentence, token
+
+
 class TestFrontendUiStageScopeRule:
     """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` (real evidence:
     `factory-goal-mu0pvv20-b2uuo8`): `STAGED_GENERATION_STAGES.md#8`

@@ -13,6 +13,7 @@ from arkali.engineering.factory.model_product_generation import (
     generate_model_product,
     generate_model_product_bounded,
 )
+from arkali.engineering.factory.product_preflight import _framework_api_findings
 from arkali.engineering.localai.adapter import HonestState, InferenceResult
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -575,6 +576,88 @@ def test_removed_framework_hook_is_rejected_for_selected_version(
             "model-1",
             _workspace(tmp_path),
         )
+
+
+class TestFrameworkApiVersionThreshold:
+    """`BACKEND_ACCEPTANCE_COMPATIBILITY_GAP` (real evidence: `factory-
+    goal-mu1hy9w1-qn30iv`). `_framework_api_findings` only ever compared
+    Flask's own declared MAJOR version against `3` -- a real, live
+    candidate declared `flask==2.3.2` and genuinely used
+    `@app.before_first_request`; a real, live `pytest` collection failure
+    (`AttributeError: 'Flask' object has no attribute
+    'before_first_request'`) proved this hook is genuinely absent
+    starting at Flask 2.3.0, not only at major version 3 -- `2 >= 3` is
+    false, so the real, wired-in whole-product gate silently passed this
+    exact real incompatibility through to acceptance. Fixed by comparing
+    the real declared `(major, minor)` tuple against `(2, 3)`."""
+
+    _HOOK = "@app.before_first_request\ndef init(): pass\n"
+    _NO_HOOK = "app.run(debug=True)\n"
+
+    @staticmethod
+    def _findings(flask_pin: str, app_code: str) -> list:
+        files = {"backend/requirements.txt": flask_pin, "backend/app.py": app_code}
+        return _framework_api_findings(files)
+
+    def test_a_flask_2_3_0_with_hook_is_flagged(self) -> None:
+        findings = self._findings("flask==2.3.0\n", self._HOOK)
+        assert len(findings) == 1
+        assert findings[0].code == "removed_framework_api"
+
+    def test_b_flask_2_3_2_with_hook_is_flagged(self) -> None:
+        """The exact real version from the live candidate that silently
+        passed this check before the fix."""
+        findings = self._findings("flask==2.3.2\n", self._HOOK)
+        assert len(findings) == 1
+        assert findings[0].code == "removed_framework_api"
+
+    def test_c_flask_2_4_with_hook_is_flagged(self) -> None:
+        findings = self._findings("flask==2.4.1\n", self._HOOK)
+        assert len(findings) == 1
+
+    def test_d_flask_3_x_with_hook_remains_flagged(self) -> None:
+        """Preserves the pre-existing, already-correct Flask 3 behavior."""
+        findings = self._findings("flask==3.0.0\n", self._HOOK)
+        assert len(findings) == 1
+
+    def test_e_flask_2_2_9_with_hook_is_a_true_negative(self) -> None:
+        """`before_first_request` genuinely still exists in Flask 2.2.x;
+        this specific removed-API rule must not fire for it."""
+        assert self._findings("flask==2.2.9\n", self._HOOK) == []
+
+    def test_f_flask_2_3_2_without_the_hook_is_silent(self) -> None:
+        assert self._findings("flask==2.3.2\n", self._NO_HOOK) == []
+
+    def test_g_flask_3_x_with_a_compatible_pattern_is_silent(self) -> None:
+        assert self._findings("flask==3.0.0\n", self._NO_HOOK) == []
+
+    def test_h_unrelated_flask_api_usage_is_not_a_false_positive(self) -> None:
+        unrelated = "app.before_request(lambda: None)\n"
+        assert self._findings("flask==3.0.0\n", unrelated) == []
+
+    def test_i_frozen_photography_candidate_now_triggers_the_finding(self) -> None:
+        """Real, frozen, unmodified evidence (`factory-goal-mu1hy9w1-
+        qn30iv`): the exact real requirements.txt/app.py pair that
+        silently passed before this fix and genuinely failed real
+        `pytest` collection with a real `AttributeError`."""
+        requirements = "flask==2.3.2\nflask_cors>=3.0\npytest==7.4.0\nWerkzeug<3\n"
+        app_py = (
+            "import sqlite3\n"
+            "from flask import Flask, request, jsonify\n"
+            "from flask_cors import CORS\n"
+            "from backend.db import init_db, DB_SCHEMA\n\n"
+            "app = Flask(__name__)\n"
+            "CORS(app)\n\n"
+            "@app.before_first_request\n"
+            "def create_tables():\n"
+            "    init_db('photography_studio.db')\n"
+        )
+        findings = _framework_api_findings({
+            "backend/requirements.txt": requirements,
+            "backend/app.py": app_py,
+        })
+        assert len(findings) == 1
+        assert findings[0].code == "removed_framework_api"
 
 
 def test_fastapi_decorators_are_real_routes_and_mutation_contracts(

@@ -135,7 +135,18 @@ the real application starts (factory-goal-mtpnp9af-yeldck, real
 production evidence: `backend/db.py` correctly created its own real
 table on import, but `backend/app.py` never imported it, and the real,
 first `pytest` run in a genuinely fresh environment failed outright with
-`sqlite3.OperationalError: no such table: overdue_books`). Cross-origin
+`sqlite3.OperationalError: no such table: overdue_books`). Never call a
+Flask lifecycle hook removed from modern Flask releases (e.g.
+`@app.before_first_request`, removed starting at Flask 2.3) to run
+one-time schema setup (goal-mu1hy9w1-qn30iv, real production evidence:
+a real candidate declared `flask==2.3.2` and used exactly this real,
+already-removed hook to call its own real `init_db(...)`, and the real,
+first `pytest` collection in a genuinely fresh environment failed
+outright with `AttributeError: 'Flask' object has no attribute
+'before_first_request'`) — for this pipeline's own simple, non-app-
+factory Flask script, call that same one-time setup directly at module
+level, immediately after the real application instance is created,
+which is valid in every Flask release old or new. Cross-origin
 access is not this stage's concern — that is backend_cors_boundary's
 job, immediately after this one.
 
