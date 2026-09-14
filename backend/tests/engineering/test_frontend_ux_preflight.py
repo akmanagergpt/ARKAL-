@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import re
 
+from arkali.engineering.factory.frontend_actionability_preflight import _create_access_findings
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _frontend_local_import_findings,
     _react_router_missing_import_findings,
@@ -13,13 +15,14 @@ from arkali.engineering.factory.frontend_ux_preflight import (
     _exported_js_names,
     _form_quality_findings,
     _shadowed_route_findings,
+    _unreachable_module_findings,
     _unreachable_parameterized_route_findings,
     _unused_client_export_findings,
     _update_like_client_exports,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
-    _unreachable_module_findings,
 )
+from arkali.engineering.factory.semantic_finding import SemanticFinding
 from tests.engineering.test_product_ux_spec import (
     _GOLDEN_WORK_064_DATA_MODEL,
     _valid_spec_files,
@@ -276,6 +279,138 @@ def test_create_capability_requires_a_reachable_create_control_even_when_empty()
     }
     findings = _ux_spec_mutation_findings(files)
     assert any(f.code == "frontend_ui_create_unreachable_from_empty_state" for f in findings)
+
+
+class TestEmptyStateCreateReachabilityControlFlow:
+    """`F0099_CHECKER_FALSE_NEGATIVE` (real evidence: `factory-goal-
+    mu1hy9w1-qn30iv`). `_create_access_findings` searched the entire
+    concatenated frontend text for a matching create control, with no
+    control-flow awareness -- a real zero-record early return (`if
+    (clients.length === 0) return <div>No clients found</div>;`)
+    genuinely occurred, in both real modules, BEFORE the real, later
+    `return (...)` containing the real, correctly-worded `<Link
+    to="/clients/create">Create Client</Link>`, so this check was
+    satisfied even though the real create control is genuinely
+    unreachable at zero records. `STAGED_GENERATION_STAGES.md#9`
+    already states the correct invariant ("an empty-state branch must
+    never hide the only path to its form"); this was checker under-
+    enforcement, not a requirement gap. The same finding code
+    (`frontend_ui_create_unreachable_from_empty_state`) is reused --
+    no new taxonomy."""
+
+    class _Module:
+        def __init__(self, name: str, actions: tuple[str, ...]) -> None:
+            self.name = name
+            self.navigation_label = name.capitalize()
+            self.actions = actions
+
+    class _Spec:
+        def __init__(self, modules: list) -> None:
+            self.modules = modules
+
+    @staticmethod
+    def _finding(code: str, path: str, detail: str) -> object:
+        return SemanticFinding(code=code, path=path, detail=detail)
+
+    def _findings(self, frontend: str, module_names: tuple[str, ...] = ("clients",)) -> list:
+        modules = [self._Module(n, ("create", "view")) for n in module_names]
+        return _create_access_findings(self._Spec(modules), frontend, self._finding)
+
+    def test_a_zero_state_without_create_is_flagged(self) -> None:
+        frontend = "if (clients.length === 0) return <div>No clients found</div>;"
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_b_create_inside_the_zero_state_branch_passes(self) -> None:
+        frontend = (
+            "if (clients.length === 0) return <div>No clients"
+            "<Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        assert self._findings(frontend) == []
+
+    def test_c_no_zero_state_detected_falls_back_to_whole_file(self) -> None:
+        """No recognized zero-record condition exists at all -- the
+        existing, unchanged whole-file behavior is preserved."""
+        frontend = "return <div><Link to='/clients/create'>Create Client</Link></div>;"
+        assert self._findings(frontend) == []
+
+    def test_d_loading_branch_then_zero_state_with_create_passes(self) -> None:
+        frontend = (
+            "if (loading) return <div>Loading</div>; "
+            "if (clients.length === 0) return <div>No clients"
+            "<Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        assert self._findings(frontend) == []
+
+    def test_e_create_only_after_the_early_return_is_flagged(self) -> None:
+        """The real defect class: a real create control genuinely exists
+        in the file, but only in code the zero-record branch's own
+        early `return` makes unreachable."""
+        frontend = (
+            "if (clients.length === 0) return <div>No clients found</div>; "
+            "return <div><Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_f_a_different_modules_control_does_not_satisfy_this_module(self) -> None:
+        frontend = (
+            "if (clients.length === 0) return <div>No clients found</div>; "
+            "return <div><Link to='/sessions/create'>Create Session</Link></div>;"
+        )
+        codes = {f.code for f in self._findings(frontend, ("clients",))}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_g_braced_zero_state_form_is_extracted_correctly(self) -> None:
+        frontend = (
+            "if (clients.length === 0) { return <div>No clients found</div>; } "
+            "return <div><Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_h_brace_less_zero_state_form_is_extracted_correctly(self) -> None:
+        frontend = (
+            "if (clients.length === 0) return <div>No clients"
+            "<Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        assert self._findings(frontend) == []
+
+    def test_i_length_less_than_one_is_recognized(self) -> None:
+        frontend = "if (clients.length < 1) return <div>No clients found</div>;"
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_j_bang_length_is_recognized(self) -> None:
+        frontend = "if (!clients.length) return <div>No clients found</div>;"
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_k_unrecognized_zero_state_shape_falls_back_safely(self) -> None:
+        """A zero-state condition with extra content the narrow regex
+        does not recognize must never become a new false positive --
+        the existing whole-file behavior is preserved."""
+        frontend = (
+            "if (clients.length === 0 && !loading) { return <div>Empty</div>; } "
+            "return <div><Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        assert self._findings(frontend) == []
+
+    def test_l_frozen_photography_candidate_flags_both_modules(self) -> None:
+        """Real, frozen, unmodified evidence: the real, on-disk
+        `factory-goal-mu1hy9w1-qn30iv` candidate's own App.js, read
+        verbatim (never copied inline) so this test cannot drift from
+        the actual frozen bytes."""
+        candidate_app_js = (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "var" / "factory" / "candidates" / "factory-goal-mu1hy9w1-qn30iv"
+            / "frontend" / "src" / "App.js"
+        )
+        app_js = candidate_app_js.read_text(encoding="utf-8")
+        findings = self._findings(app_js, ("clients", "sessions"))
+        codes = {f.code for f in findings}
+        assert codes == {"frontend_ui_create_unreachable_from_empty_state"}
+        assert len(findings) == 2
 
 
 def test_recoverable_error_state_requires_an_interactive_recovery_control() -> None:
