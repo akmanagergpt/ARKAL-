@@ -2590,3 +2590,219 @@ export default Orders;"""
     }
     findings = _frontend_ui_findings(files)
     assert "frontend_ui_client_unused" not in {f.code for f in findings}
+
+
+def test_frozen_library_frontend_ui_replay_no_longer_flags_client_unused() -> None:
+    """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` recurrence (real
+    evidence: `factory-goal-mu183yam-d09hsx`, no model call). The real,
+    frozen, terminal `frontend_ui` attempt's own exact bytes -- a real,
+    correct `apiClient.js` using the CommonJS object-property async
+    arrow shape (`getBook: async (id) => {...}`) alongside the real
+    `App.js`/`index.js` that only ever call the bulk `getBooks()`/
+    `getBorrowers()` via `apiClient.getBooks()`/`apiClient.getBorrowers()`
+    property access -- must no longer produce `frontend_ui_client_unused`
+    now that the arity regex recognizes this real, valid syntax shape.
+    Stage-scope correction, not a candidate-specific exception: the same
+    real bytes, unmodified."""
+    api_client = """const axios = require('axios');
+
+const API_BASE_URL = 'http://localhost:5000';
+
+const apiClient = {
+  getBooks: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/books`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to fetch books');
+    }
+  },
+
+  createBook: async (bookData) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/books`, bookData);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to create book');
+    }
+  },
+
+  getBook: async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/books/${id}`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to fetch book');
+    }
+  },
+
+  updateBook: async (id, bookData) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/books/${id}`, bookData);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to update book');
+    }
+  },
+
+  deleteBook: async (id) => {
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/books/${id}`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to delete book');
+    }
+  },
+
+  getBorrowers: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/borrowers`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to fetch borrowers');
+    }
+  },
+
+  createBorrower: async (borrowerData) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/borrowers`, borrowerData);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to create borrower');
+    }
+  },
+
+  getBorrower: async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/borrowers/${id}`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to fetch borrower');
+    }
+  },
+
+  updateBorrower: async (id, borrowerData) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/borrowers/${id}`, borrowerData);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to update borrower');
+    }
+  },
+
+  deleteBorrower: async (id) => {
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/borrowers/${id}`);
+      return response.data;
+    } catch (error) {
+      throw new Error('Failed to delete borrower');
+    }
+  }
+};
+
+module.exports = apiClient;"""
+    app_js = """import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Switch, Redirect } from 'react-router-dom';
+import apiClient from './apiClient';
+
+const BooksList = () => {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const data = await apiClient.getBooks();
+        setBooks(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBooks();
+  }, []);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error} <button onClick={() => setLoading(true)}>Retry</button></div>;
+  if (books.length === 0) return <div>No books found</div>;
+
+  return (
+    <ul>
+      {books.map(book => (
+        <li key={book.id}>{book.title}</li>
+      ))}
+    </ul>
+  );
+};
+
+const BorrowersList = () => {
+  const [borrowers, setBorrowers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchBorrowers = async () => {
+      try {
+        const data = await apiClient.getBorrowers();
+        setBorrowers(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBorrowers();
+  }, []);
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error} <button onClick={() => setLoading(true)}>Retry</button></div>;
+  if (borrowers.length === 0) return <div>No borrowers found</div>;
+
+  return (
+    <ul>
+      {borrowers.map(borrower => (
+        <li key={borrower.id}>{borrower.name}</li>
+      ))}
+    </ul>
+  );
+};
+
+const App = () => {
+  return (
+    <Router>
+      <div>
+        <nav>
+          <ul>
+            <li><a href='/books'>Books</a></li>
+            <li><a href='/borrowers'>Borrowers</a></li>
+          </ul>
+        </nav>
+        <Switch>
+          <Route exact path="/">
+            <Redirect to="/books" />
+          </Route>
+          <Route path='/books' component={BooksList} />
+          <Route path='/borrowers' component={BorrowersList} />
+        </Switch>
+      </div>
+    </Router>
+  );
+};
+
+export default App;"""
+    index_js = """import React from 'react';
+import ReactDOM from 'react-dom';
+import App from './App';
+
+ReactDOM.render(<App />, document.getElementById('root'));"""
+    files = {
+        "frontend/src/apiClient.js": api_client,
+        "frontend/src/App.js": app_js,
+        "frontend/src/index.js": index_js,
+    }
+    findings = _frontend_ui_findings(files)
+    assert "frontend_ui_client_unused" not in {f.code for f in findings}

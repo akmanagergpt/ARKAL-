@@ -253,9 +253,27 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
     # reference, and a `const x = name` binding all still count as real
     # usage, but a name that is only ever a substring of a different,
     # longer real identifier never does.
+    #
+    # goal-mu183yam-d09hsx (session evidence, frozen): the single-record
+    # arity check above only ever recognized a name directly followed by
+    # `(` -- a real `const apiClient = { getBook: async (id) => {...},
+    # ... }; module.exports = apiClient;` (the same real, valid CommonJS
+    # object-property shape F-0101's own `_commonjs_alias_export_names`
+    # already recognizes for NAME discovery) puts `: async ` between the
+    # property name and its own real parameter list, so `getBook`/
+    # `getBorrower` -- real, genuine single-record getters -- were left
+    # in the required set and `frontend_ui_client_unused` fired on code
+    # that never needed to call them. The arity regex now optionally
+    # skips a leading `:`/`=` (object-property or const-arrow) and one
+    # bare keyword (`async`, `function`, or any other single word --
+    # never anchored to a fixed list, since only a real `(` immediately
+    # after decides arity) before requiring the real, non-empty
+    # parameter list -- the same additive shape this file's own export-
+    # name recognition already established for the identical class of
+    # syntax gap.
     exported = _exported_js_names(client)
     read_only_exports = {n for n in exported if not _MUTATION_EXPORT_NAME.match(n)
-                          and not re.search(rf"{n}\s*\(\s*\w", client)}
+                          and not re.search(rf"{n}\s*(?:[:=]\s*\w*\s*)?\(\s*[^\s)]", client)}
     uncalled = sorted(name for name in read_only_exports
                        if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", ui))
     if not uncalled:

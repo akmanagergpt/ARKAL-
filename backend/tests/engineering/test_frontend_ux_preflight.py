@@ -999,6 +999,111 @@ class TestFrontendUiUnusedClientIdentifierPrecision:
         assert _unused_client_export_findings(client, ui) == []
 
 
+class TestFrontendUiSingleRecordGetterArityShapes:
+    """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` recurrence (real
+    evidence: `factory-goal-mu183yam-d09hsx`). The single-record arity
+    check only ever recognized a name directly followed by `(` -- a
+    real `const apiClient = { getBook: async (id) => {...}, ... };
+    module.exports = apiClient;` (the same real, valid CommonJS
+    object-property shape F-0101's own `_commonjs_alias_export_names`
+    already recognizes for NAME discovery) puts `: async ` between the
+    property name and its own real parameter list, so `getBook`/
+    `getBorrower` -- real, genuine single-record getters -- were left
+    in the required set. The arity regex now optionally skips a
+    leading `:`/`=` and one bare keyword before requiring the real,
+    non-empty parameter list. Classification is by syntax/arity only,
+    never by singular/plural naming."""
+
+    @staticmethod
+    def _findings(client: str, ui: str) -> list:
+        return _unused_client_export_findings(client, ui)
+
+    def test_a_commonjs_zero_arg_async_arrow_is_required(self) -> None:
+        client = "const c = { getThings: async () => {} }; module.exports = c;"
+        assert self._findings(client, "") != []
+
+    def test_b_commonjs_async_arrow_with_arg_is_deferred(self) -> None:
+        client = (
+            "const c = { getThings: async () => {}, getThing: async (id) => {} };"
+            "module.exports = c;"
+        )
+        assert self._findings(client, "getThings();") == []
+
+    def test_c_commonjs_zero_arg_plain_arrow_is_required(self) -> None:
+        client = "const c = { getThings: () => {} }; module.exports = c;"
+        assert self._findings(client, "") != []
+
+    def test_d_commonjs_plain_arrow_with_arg_is_deferred(self) -> None:
+        client = (
+            "const c = { getThings: () => {}, getThing: (id) => {} };"
+            "module.exports = c;"
+        )
+        assert self._findings(client, "getThings();") == []
+
+    def test_e_direct_async_function_with_arg_is_deferred(self) -> None:
+        client = "export async function getThing(id) { return id; }"
+        assert self._findings(client, "") == []
+
+    def test_f_direct_async_function_zero_arg_is_required(self) -> None:
+        client = "export async function getThing() { return 1; }"
+        assert self._findings(client, "") != []
+
+    def test_g_const_async_arrow_with_arg_is_deferred(self) -> None:
+        client = "export const getThing = async (id) => { return id; };"
+        assert self._findings(client, "") == []
+
+    def test_h_const_async_arrow_zero_arg_is_required(self) -> None:
+        client = "export const getThing = async () => { return 1; };"
+        assert self._findings(client, "") != []
+
+    def test_i_multi_parameter_commonjs_arrow_is_deferred(self) -> None:
+        client = (
+            "const c = { getThings: async () => {}, "
+            "getThing: async (id, options) => {} }; module.exports = c;"
+        )
+        assert self._findings(client, "getThings();") == []
+
+    def test_j_whitespace_variations_are_tolerated(self) -> None:
+        tight = "const c = { getThing:async(id)=>{} }; module.exports = c;"
+        loose = "const c = { getThing : async ( id ) => {} }; module.exports = c;"
+        for client in (tight, loose):
+            assert self._findings(client, "") == []
+
+    def test_k_frozen_library_getbook_getborrower_are_deferred(self) -> None:
+        """Section 8: real, frozen `apiClient.js` (unmodified) -- `getBook`/
+        `getBorrower` must now be classified as single-record getters."""
+        api_client = """const apiClient = {
+  getBooks: async () => { return []; },
+  createBook: async (bookData) => { return {}; },
+  getBook: async (id) => { return {}; },
+  updateBook: async (id, bookData) => { return {}; },
+  deleteBook: async (id) => { return {}; },
+  getBorrowers: async () => { return []; },
+  createBorrower: async (borrowerData) => { return {}; },
+  getBorrower: async (id) => { return {}; },
+  updateBorrower: async (id, borrowerData) => { return {}; },
+  deleteBorrower: async (id) => { return {}; }
+};
+module.exports = apiClient;
+"""
+        ui = "getBooks(); getBorrowers();"
+        assert self._findings(api_client, ui) == []
+
+    def test_l_frozen_library_collection_getters_remain_required(self) -> None:
+        api_client = """const apiClient = {
+  getBooks: async () => { return []; },
+  getBook: async (id) => { return {}; },
+  getBorrowers: async () => { return []; },
+  getBorrower: async (id) => { return {}; }
+};
+module.exports = apiClient;
+"""
+        findings = self._findings(api_client, "getBooks();")
+        assert len(findings) == 1
+        assert "getBorrowers" in findings[0].detail
+        assert "getBorrower'" not in findings[0].detail
+
+
 class TestFormControlAccessibleName:
     """F-0101B (`FRONTEND_UI_EDIT_EXPORT_MISDETECTION_AND_LABEL_HINT_GAP`,
     real evidence: `factory-goal-mtz6bst2-myhr15`). The checker's own
