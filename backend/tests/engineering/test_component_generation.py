@@ -18,12 +18,16 @@ from arkali.engineering.factory.component_generation import (
     _cors_boundary_stage_findings,
     _frontend_forms_findings,
     _frontend_ui_findings,
+    _generate_one_stage,
+    _MAX_TIMEOUT_SCALE,
     _parse_stage_envelope,
+    _REF_PROMPT_CHARS,
     _schema_only_findings,
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.generation_stages import StageVocabulary
+from arkali.engineering.factory.stage_prompting import _stage_prompt
 from arkali.engineering.localai.adapter import HonestState, InferenceResult
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -55,10 +59,12 @@ class _QueueModel:
         self._outcomes = list(outcomes)
         self.prompts: list[str] = []
         self.model_ids: list[str] = []
+        self.timeouts: list[float] = []
 
     def infer(self, model_id: str, prompt: str, *, timeout_seconds: float = 30.0) -> InferenceResult:
         self.prompts.append(prompt)
         self.model_ids.append(model_id)
+        self.timeouts.append(timeout_seconds)
         state, output = self._outcomes.pop(0)
         return InferenceResult(
             runtime="test-runtime", model_id=model_id, state=state,
@@ -1126,6 +1132,93 @@ def test_default_timeout_covers_default_output_budget_at_measured_floor() -> Non
     measured_floor_tokens_per_second = 7.0
     worst_case_generation_seconds = DEFAULT_MAX_OUTPUT_TOKENS / measured_floor_tokens_per_second
     assert DEFAULT_TIMEOUT_SECONDS >= worst_case_generation_seconds * 1.5
+
+
+class TestStageAwareTimeout:
+    """`FRONTEND_FORMS_TIMEOUT_BUDGET_MISMATCH` (real evidence: `factory-
+    goal-mu1chcxk-nlk6u7`). `DEFAULT_TIMEOUT_SECONDS` budgets only real,
+    measured OUTPUT-token throughput and assumes every stage's own real
+    prompt stays near the size the `frontend_ui`-stage calibration was
+    built against. The real, measured `frontend_ui` prompt for this exact
+    candidate was 13681 real characters; `frontend_forms`'s own real
+    prompt for the identical candidate, one stage later with real prior
+    frontend_ui output now also visible, was 20063 real characters (a
+    real 1.47x ratio) -- and it genuinely timed out twice at the unscaled
+    base budget, with a real, empty `last_raw_output` both times.
+    `_REF_PROMPT_CHARS` is that real, measured `frontend_ui` figure,
+    rounded up slightly so a normal-sized prompt stays at exactly the
+    base timeout; `_MAX_TIMEOUT_SCALE` bounds the scale-up so a malformed
+    or pathologically large prompt can never request an unbounded wait."""
+
+    @staticmethod
+    def _effective(prompt_chars: int) -> float:
+        return DEFAULT_TIMEOUT_SECONDS * min(
+            max(1.0, prompt_chars / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
+
+    def test_a_burden_at_or_below_reference_stays_at_base(self) -> None:
+        assert self._effective(1000) == DEFAULT_TIMEOUT_SECONDS
+        assert self._effective(_REF_PROMPT_CHARS) == DEFAULT_TIMEOUT_SECONDS
+
+    def test_b_burden_above_reference_scales_upward(self) -> None:
+        scaled = self._effective(_REF_PROMPT_CHARS * 2)
+        assert scaled == pytest.approx(DEFAULT_TIMEOUT_SECONDS * 2)
+        assert scaled > DEFAULT_TIMEOUT_SECONDS
+
+    def test_c_very_large_burden_stops_at_the_explicit_cap(self) -> None:
+        assert self._effective(_REF_PROMPT_CHARS * 100) == pytest.approx(
+            DEFAULT_TIMEOUT_SECONDS * _MAX_TIMEOUT_SCALE)
+
+    def test_d_real_frontend_ui_burden_stays_near_base(self) -> None:
+        """The real, measured `frontend_ui` prompt for `factory-goal-
+        mu1chcxk-nlk6u7` (13681 chars) is at or below `_REF_PROMPT_CHARS`."""
+        assert self._effective(13681) == DEFAULT_TIMEOUT_SECONDS
+
+    def test_e_real_frontend_forms_burden_exceeds_878s(self) -> None:
+        """The real, measured `frontend_forms` prompt for the identical
+        candidate (20063 chars) that genuinely timed out at the old,
+        unscaled base budget now receives a materially larger one."""
+        assert self._effective(20063) > DEFAULT_TIMEOUT_SECONDS
+        assert self._effective(20063) == pytest.approx(1257.83, abs=0.1)
+
+    def test_f_base_timeout_is_never_reduced(self) -> None:
+        for prompt_chars in (0, 1, 500, _REF_PROMPT_CHARS - 1, _REF_PROMPT_CHARS):
+            assert self._effective(prompt_chars) == DEFAULT_TIMEOUT_SECONDS
+
+    def test_g_formula_carries_no_stage_or_domain_hardcoding(self) -> None:
+        """The formula is a pure function of character count alone --
+        the same real prompt length yields the same effective timeout
+        regardless of which stage produced it."""
+        assert self._effective(20063) == self._effective(20063)
+
+    def test_h_end_to_end_wiring_passes_the_computed_timeout(self) -> None:
+        """Proves `_generate_one_stage` actually passes the computed,
+        per-attempt effective timeout to `model.infer` -- not merely
+        that the formula exists in isolation."""
+        declaration = StageVocabulary.load(REPO).stage("backend_contract")
+        big_visible = {"frontend/src/apiClient.js": "x" * (_REF_PROMPT_CHARS * 2)}
+        model = _QueueModel([(HonestState.PASS, _output(HAPPY_PATH_FILES["backend_contract"]))])
+        _generate_one_stage(
+            declaration, _blueprint(), model, "test-model", big_visible,
+            timeout_seconds=DEFAULT_TIMEOUT_SECONDS, max_attempts=1,
+        )
+        assert len(model.timeouts) == 1
+        assert model.timeouts[0] > DEFAULT_TIMEOUT_SECONDS
+
+    def test_i_retry_attempt_recomputes_from_the_larger_prompt(self) -> None:
+        """Attempt 2's own prompt grows via `previous_attempt_files`;
+        its own effective timeout must be recomputed, not reused from
+        attempt 1, and may legitimately be larger."""
+        declaration = StageVocabulary.load(REPO).stage("backend_contract")
+        rejected = _output({"backend/models/widgets.json": "not json"})
+        accepted = _output(HAPPY_PATH_FILES["backend_contract"])
+        model = _QueueModel([(HonestState.PASS, rejected), (HonestState.PASS, accepted)])
+        _generate_one_stage(
+            declaration, _blueprint(), model, "test-model", {},
+            timeout_seconds=DEFAULT_TIMEOUT_SECONDS, max_attempts=2,
+        )
+        assert len(model.timeouts) == 2
+        assert len(model.prompts[1]) > len(model.prompts[0])
+        assert model.timeouts[1] >= model.timeouts[0]
 
 
 # -- F-0080 (DOUBLE_SERIALIZATION_DEFECT) -----------------------------------
@@ -2806,3 +2899,90 @@ ReactDOM.render(<App />, document.getElementById('root'));"""
     }
     findings = _frontend_ui_findings(files)
     assert "frontend_ui_client_unused" not in {f.code for f in findings}
+
+
+def test_frozen_trucking_burden_replay_uses_the_real_stage_prompt_path() -> None:
+    """`FRONTEND_FORMS_TIMEOUT_BUDGET_MISMATCH` (real evidence: `factory-
+    goal-mu1chcxk-nlk6u7`, no model call). Reconstructs the real
+    `frontend_ui` and `frontend_forms` prompts for the exact candidate
+    that genuinely timed out, using the same real `_stage_prompt`
+    production helper the live pipeline itself calls -- not a hand-
+    computed character count. Proves the corrected formula assigns
+    `frontend_ui` its own unscaled base timeout and `frontend_forms`
+    a materially larger one, from the real bytes alone."""
+    app_py = "import sqlite3\nfrom flask import Flask, request, jsonify\nfrom flask_cors import CORS\nfrom backend.db import init_db, VEHICLES_SCHEMA, MAINTENANCE_SCHEMA\n\napp = Flask(__name__)\n\n# Enable CORS for all routes\nCORS(app)\n\n# Initialize the database\ninit_db()\n\n# Set up row factory for better JSON serialization\n@app.before_request\ndef before_request():\n    app.db = sqlite3.connect('trucking_company.db')\n    app.db.row_factory = sqlite3.Row\n\n@app.teardown_request\ndef teardown_request(exception):\n    if hasattr(app, 'db'):\n        app.db.close()\n\n# Vehicle routes\n@app.route('/vehicles', methods=['GET'])\ndef get_vehicles():\n    cursor = app.db.cursor()\n    cursor.execute('SELECT * FROM vehicles')\n    vehicles = [dict(row) for row in cursor.fetchall()]\n    return jsonify(vehicles)\n\n@app.route('/vehicles', methods=['POST'])\ndef create_vehicle():\n    data = request.get_json()\n    cursor = app.db.cursor()\n    cursor.execute('INSERT INTO vehicles (make, model, year, license_plate) VALUES (?, ?, ?, ?)',\n                   (data['make'], data['model'], data['year'], data['license_plate']))\n    app.db.commit()\n    vehicle_id = cursor.lastrowid\n    return jsonify({'id': vehicle_id, **data}), 201\n\n@app.route('/vehicles/<int:id>', methods=['GET'])\ndef get_vehicle(id):\n    cursor = app.db.cursor()\n    cursor.execute('SELECT * FROM vehicles WHERE id = ?', (id,))\n    vehicle = dict(cursor.fetchone()) if cursor.fetchone() else None\n    return jsonify(vehicle) if vehicle else ('', 404)\n\n@app.route('/vehicles/<int:id>', methods=['PUT'])\ndef update_vehicle(id):\n    data = request.get_json()\n    cursor = app.db.cursor()\n    cursor.execute('UPDATE vehicles SET make = ?, model = ?, year = ?, license_plate = ? WHERE id = ?',\n                   (data['make'], data['model'], data['year'], data['license_plate'], id))\n    app.db.commit()\n    return jsonify(data)\n\n@app.route('/vehicles/<int:id>', methods=['DELETE'])\ndef delete_vehicle(id):\n    cursor = app.db.cursor()\n    cursor.execute('DELETE FROM vehicles WHERE id = ?', (id,))\n    app.db.commit()\n    return '', 204\n\n# Maintenance routes\n@app.route('/maintenance', methods=['GET'])\ndef get_maintenance():\n    cursor = app.db.cursor()\n    cursor.execute('SELECT * FROM maintenance')\n    maintenance_records = [dict(row) for row in cursor.fetchall()]\n    return jsonify(maintenance_records)\n\n@app.route('/maintenance', methods=['POST'])\ndef create_maintenance():\n    data = request.get_json()\n    cursor = app.db.cursor()\n    cursor.execute('INSERT INTO maintenance (vehicle_id, date, description, cost) VALUES (?, ?, ?, ?)',\n                   (data['vehicle_id'], data['date'], data['description'], data['cost']))\n    app.db.commit()\n    maintenance_id = cursor.lastrowid\n    return jsonify({'id': maintenance_id, **data}), 201\n\n@app.route('/maintenance/<int:id>', methods=['GET'])\ndef get_maintenance_record(id):\n    cursor = app.db.cursor()\n    cursor.execute('SELECT * FROM maintenance WHERE id = ?', (id,))\n    maintenance_record = dict(cursor.fetchone()) if cursor.fetchone() else None\n    return jsonify(maintenance_record) if maintenance_record else ('', 404)\n\n@app.route('/maintenance/<int:id>', methods=['PUT'])\ndef update_maintenance_record(id):\n    data = request.get_json()\n    cursor = app.db.cursor()\n    cursor.execute('UPDATE maintenance SET vehicle_id = ?, date = ?, description = ?, cost = ? WHERE id = ?',\n                   (data['vehicle_id'], data['date'], data['description'], data['cost'], id))\n    app.db.commit()\n    return jsonify(data)\n\n@app.route('/maintenance/<int:id>', methods=['DELETE'])\ndef delete_maintenance_record(id):\n    cursor = app.db.cursor()\n    cursor.execute('DELETE FROM maintenance WHERE id = ?', (id,))\n    app.db.commit()\n    return '', 204\n\nif __name__ == '__main__':\n    app.run(debug=True)"
+    db_py = '''import sqlite3
+
+DB_NAME = 'trucking_company.db'
+
+VEHICLES_SCHEMA = """
+CREATE TABLE IF NOT EXISTS vehicles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    make TEXT NOT NULL,
+    model TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    license_plate TEXT NOT NULL
+)
+"""
+
+MAINTENANCE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS maintenance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vehicle_id INTEGER NOT NULL,
+    date DATE NOT NULL,
+    description TEXT NOT NULL,
+    cost FLOAT NOT NULL,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+)
+"""
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute(VEHICLES_SCHEMA)
+    cursor.execute(MAINTENANCE_SCHEMA)
+    conn.commit()
+    conn.close()
+
+if __name__ == '__main__':
+    init_db()'''
+    vehicles_json = '{\n  "table_name": "vehicles",\n  "fields": {\n    "id": "integer",\n    "make": "string",\n    "model": "string",\n    "year": "integer",\n    "license_plate": "string"\n  }\n}'
+    maintenance_json = '{\n  "table_name": "maintenance",\n  "fields": {\n    "id": "integer",\n    "vehicle_id": "integer",\n    "date": "date",\n    "description": "string",\n    "cost": "float"\n  }\n}'
+    routes_json = '[\n  {\n    "path": "/vehicles",\n    "method": "GET"\n  },\n  {\n    "path": "/vehicles",\n    "method": "POST"\n  },\n  {\n    "path": "/vehicles/{id}",\n    "method": "GET"\n  },\n  {\n    "path": "/vehicles/{id}",\n    "method": "PUT"\n  },\n  {\n    "path": "/vehicles/{id}",\n    "method": "DELETE"\n  },\n  {\n    "path": "/maintenance",\n    "method": "GET"\n  },\n  {\n    "path": "/maintenance",\n    "method": "POST"\n  },\n  {\n    "path": "/maintenance/{id}",\n    "method": "GET"\n  },\n  {\n    "path": "/maintenance/{id}",\n    "method": "PUT"\n  },\n  {\n    "path": "/maintenance/{id}",\n    "method": "DELETE"\n  }\n]'
+    ux_spec_json = '{"product_title": "Trucking Company Management System", "primary_roles": ["Trucking Company Administrator", "Maintenance Manager"], "modules": [{"name": "vehicles", "navigation_label": "Vehicles", "presentation": "table", "actions": ["create", "edit", "delete", "view"], "forms": [{"name": "vehicle_form", "fields": ["make", "model", "year", "license_plate"]}], "search_filter": true, "states": {"loading": true, "empty": true, "error": true, "success": true}}, {"name": "maintenance", "navigation_label": "Maintenance Records", "presentation": "table", "actions": ["create", "edit", "delete", "view"], "forms": [{"name": "maintenance_form", "fields": ["vehicle_id", "date", "description", "cost"]}], "search_filter": true, "states": {"loading": true, "empty": true, "error": true, "success": true}}], "navigation_destinations": ["Vehicles", "Maintenance Records"], "design_system": {"typography_scale": ["h1", "h2", "h3", "body", "caption"], "spacing_scale": ["xs", "sm", "md", "lg", "xl"], "component_conventions": ["button", "input", "table", "form"], "responsive": "desktop-first", "accessible_focus_contrast": true}}'
+    api_client_js = "const axios = require('axios');\n\nconst API_BASE_URL = 'http://localhost:5000';\n\nconst apiClient = {\n  // Vehicle API\n  getVehicles: async () => {\n    const response = await axios.get(`${API_BASE_URL}/vehicles`);\n    return response.data;\n  },\n  createVehicle: async (vehicleData) => {\n    const response = await axios.post(`${API_BASE_URL}/vehicles`, vehicleData);\n    return response.data;\n  },\n  getVehicle: async (id) => {\n    const response = await axios.get(`${API_BASE_URL}/vehicles/${id}`);\n    return response.data;\n  },\n  updateVehicle: async (id, vehicleData) => {\n    const response = await axios.put(`${API_BASE_URL}/vehicles/${id}`, vehicleData);\n    return response.data;\n  },\n  deleteVehicle: async (id) => {\n    await axios.delete(`${API_BASE_URL}/vehicles/${id}`);\n  },\n\n  // Maintenance API\n  getMaintenanceRecords: async () => {\n    const response = await axios.get(`${API_BASE_URL}/maintenance`);\n    return response.data;\n  },\n  createMaintenanceRecord: async (maintenanceData) => {\n    const response = await axios.post(`${API_BASE_URL}/maintenance`, maintenanceData);\n    return response.data;\n  },\n  getMaintenanceRecord: async (id) => {\n    const response = await axios.get(`${API_BASE_URL}/maintenance/${id}`);\n    return response.data;\n  },\n  updateMaintenanceRecord: async (id, maintenanceData) => {\n    const response = await axios.put(`${API_BASE_URL}/maintenance/${id}`, maintenanceData);\n    return response.data;\n  },\n  deleteMaintenanceRecord: async (id) => {\n    await axios.delete(`${API_BASE_URL}/maintenance/${id}`);\n  }\n};\n\nmodule.exports = apiClient;"
+    app_js = 'import React, { useState, useEffect } from \'react\';\nimport { BrowserRouter as Router, Route, Switch, Link, Redirect } from \'react-router-dom\';\nimport apiClient from \'./apiClient\';\n\nconst VehicleList = () => {\n  const [vehicles, setVehicles] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(false);\n\n  useEffect(() => {\n    const fetchVehicles = async () => {\n      try {\n        const data = await apiClient.getVehicles();\n        setVehicles(data);\n      } catch (err) {\n        setError(true);\n      } finally {\n        setLoading(false);\n      }\n    };\n\n    fetchVehicles();\n  }, []);\n\n  if (loading) return <div>Loading...</div>;\n  if (error) return <div>Error! <button onClick={() => window.location.reload()}>Retry</button></div>;\n  if (vehicles.length === 0) return <div>No vehicles found.</div>;\n\n  return (\n    <ul>\n      {vehicles.map(vehicle => (\n        <li key={vehicle.id}>{vehicle.make} {vehicle.model}</li>\n      ))}\n    </ul>\n  );\n};\n\nconst MaintenanceList = () => {\n  const [maintenanceRecords, setMaintenanceRecords] = useState([]);\n  const [loading, setLoading] = useState(true);\n  const [error, setError] = useState(false);\n\n  useEffect(() => {\n    const fetchMaintenanceRecords = async () => {\n      try {\n        const data = await apiClient.getMaintenanceRecords();\n        setMaintenanceRecords(data);\n      } catch (err) {\n        setError(true);\n      } finally {\n        setLoading(false);\n      }\n    };\n\n    fetchMaintenanceRecords();\n  }, []);\n\n  if (loading) return <div>Loading...</div>;\n  if (error) return <div>Error! <button onClick={() => window.location.reload()}>Retry</button></div>;\n  if (maintenanceRecords.length === 0) return <div>No maintenance records found.</div>;\n\n  return (\n    <ul>\n      {maintenanceRecords.map(record => (\n        <li key={record.id}>{record.date} - {record.description}</li>\n      ))}\n    </ul>\n  );\n};\n\nconst App = () => {\n  return (\n    <Router>\n      <div>\n        <nav>\n          <ul>\n            <li><Link to="/vehicles">Vehicles</Link></li>\n            <li><Link to="/maintenance">Maintenance Records</Link></li>\n          </ul>\n        </nav>\n        <Switch>\n          <Route exact path="/">\n            <Redirect to="/vehicles" />\n          </Route>\n          <Route path="/vehicles" component={VehicleList} />\n          <Route path="/maintenance" component={MaintenanceList} />\n        </Switch>\n      </div>\n    </Router>\n  );\n};\n\nexport default App;'
+    index_js = "import React from 'react';\nimport ReactDOM from 'react-dom';\nimport App from './App';\n\nReactDOM.render(<App />, document.getElementById('root'));"
+    ui_visible = {
+        "backend/app.py": app_py, "backend/db.py": db_py,
+        "backend/models/vehicles.json": vehicles_json,
+        "backend/models/maintenance.json": maintenance_json,
+        "backend/routes.json": routes_json,
+        "product/ux_spec.json": ux_spec_json,
+        "frontend/src/apiClient.js": api_client_js,
+    }
+    forms_visible = {**ui_visible, "frontend/src/App.js": app_js, "frontend/src/index.js": index_js}
+    ui_decl = StageVocabulary.load(REPO).stage("frontend_ui")
+    forms_decl = StageVocabulary.load(REPO).stage("frontend_forms")
+    goal_text = (
+        "1. The system must persist vehicles and maintenance records for a small trucking "
+        "company using SQLite with at least 2 tables.\n"
+        "2. The backend must expose at least 8 REST API endpoints supporting full create, "
+        "read, update and delete operations for both vehicles and maintenance records.\n"
+        "3. The frontend must allow creating, viewing, editing and deleting both vehicles "
+        "and maintenance records within 2 screens.\n"
+        "4. The backend must respond within 500 ms for a single record request under "
+        "normal load."
+    )
+    blueprint = derive_blueprint(goal_text, AuthorityMap.load(REPO))
+    ui_prompt = _stage_prompt(ui_decl, blueprint, ui_visible, None, None)
+    forms_prompt = _stage_prompt(forms_decl, blueprint, forms_visible, None, None)
+    assert len(ui_prompt) == 13681
+    assert len(forms_prompt) == 20063
+    ui_timeout = DEFAULT_TIMEOUT_SECONDS * min(
+        max(1.0, len(ui_prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
+    forms_timeout = DEFAULT_TIMEOUT_SECONDS * min(
+        max(1.0, len(forms_prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
+    assert ui_timeout == DEFAULT_TIMEOUT_SECONDS
+    assert forms_timeout > DEFAULT_TIMEOUT_SECONDS
+    assert forms_timeout == pytest.approx(1257.83, abs=0.1)

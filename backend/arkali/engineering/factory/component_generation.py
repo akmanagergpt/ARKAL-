@@ -132,6 +132,24 @@ DEFAULT_MAX_OUTPUT_TOKENS = 4096
 #: One full generation at the measured floor, plus a 50% margin for
 #: prompt evaluation and real host variance (thermal, background load).
 DEFAULT_TIMEOUT_SECONDS = (DEFAULT_MAX_OUTPUT_TOKENS / _MEASURED_MIN_TOKENS_PER_SECOND) * 1.5
+#: FRONTEND_FORMS_TIMEOUT_BUDGET_MISMATCH (real evidence: `factory-goal-
+#: mu1chcxk-nlk6u7`). `DEFAULT_TIMEOUT_SECONDS` above budgets only real,
+#: measured OUTPUT-token throughput; it assumes every stage's own real
+#: prompt (rule text plus real `visible_files`, rebuilt fresh each
+#: attempt) stays near the size the `frontend_ui`-stage calibration above
+#: was built against -- the real, measured `frontend_ui` prompt for this
+#: exact candidate was 13681 real characters. `frontend_forms`'s own real
+#: prompt for the identical candidate, one stage later with real prior
+#: frontend_ui output now also visible, was 20063 real characters (a real
+#: 1.47x ratio) -- and it genuinely timed out twice running at the
+#: unscaled base budget, with a real, empty `last_raw_output` both times.
+#: `_REF_PROMPT_CHARS` is that real, measured `frontend_ui` figure,
+#: rounded up slightly so a normal `frontend_ui`-scale prompt stays at
+#: exactly the base timeout; `_MAX_TIMEOUT_SCALE` bounds the resulting
+#: scale-up so a malformed or pathologically large real prompt can never
+#: request an unbounded wait.
+_REF_PROMPT_CHARS = 14000
+_MAX_TIMEOUT_SCALE = 3.0
 
 
 class _StageEnvelope(BaseModel):
@@ -431,7 +449,9 @@ def _generate_one_stage(
             repair_strategy=strategy, prior_findings=last_findings,
             previous_attempt_files=previous_attempt_files,
         )
-        outcome = model.infer(model_id, prompt, timeout_seconds=timeout_seconds)
+        effective_timeout = timeout_seconds * min(
+            max(1.0, len(prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
+        outcome = model.infer(model_id, prompt, timeout_seconds=effective_timeout)
         last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
@@ -473,10 +493,8 @@ def _generate_one_stage(
                 stage_files = _apply_deterministic_repairs(visible_files, stage_files)
                 findings = _stage_findings(declaration.name, {**visible_files, **stage_files})
                 if not findings:
-                    _notify_attempt(
-                        model, declaration.name, attempt_number, strategy, prompt,
-                        outcome.output, (), None,
-                    )
+                    _notify_attempt(model, declaration.name, attempt_number, strategy, prompt,
+                                     outcome.output, (), None)
                     return stage_files
                 last_findings = tuple((f.code, f.path, f.detail) for f in findings)
                 failure = "; ".join(f"{f.code}:{f.path}:{f.detail}" for f in findings)
@@ -484,10 +502,8 @@ def _generate_one_stage(
                 # become the NEXT attempt's own visible prior output -- see
                 # the retry-loop docstring above.
                 previous_attempt_files = stage_files
-        _notify_attempt(
-            model, declaration.name, attempt_number, strategy, prompt,
-            outcome.output, last_findings, failure,
-        )
+        _notify_attempt(model, declaration.name, attempt_number, strategy, prompt,
+                         outcome.output, last_findings, failure)
         # ANTI-LOOP, generic across every stage: two consecutive attempts
         # rejected for the identical normalized reason (same code, path
         # and detail) will not resolve on a blind third/fourth retry —
