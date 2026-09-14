@@ -244,18 +244,24 @@ successful record merely because parsing it succeeds.
 
 ### 8. frontend_ui
 Inputs: frontend_client, backend_contract, product_ux_spec
-Rule: the UI calls every non-mutating (read) function frontend_client
-exports and renders loading, empty and error states — a mutating export
-(create/update/edit/delete) is not this stage's concern to call, since
-the sentence below already assigns wiring it to frontend_forms; a
-literal "every function" reading is impossible to satisfy for any real
-product with mutations, since frontend_forms has not run yet at this
-point (golden-work-082, session evidence, frozen: fixing a real
+Rule: the UI calls every non-mutating (read) collection/list function
+frontend_client exports and renders loading, empty and error states — a
+mutating export (create/update/edit/delete) is not this stage's concern
+to call, since the sentence below already assigns wiring it to
+frontend_forms; a literal "every function" reading is impossible to
+satisfy for any real product with mutations, since frontend_forms has
+not run yet at this point (golden-work-082, session evidence, frozen: fixing a real
 extraction bug in the validator that enforces this rule, previously
 silently inert against every real candidate's actual `export { ... }`
 syntax, made it enforce this sentence literally for the first time ever
 and immediately exhausted frontend_ui's full attempt budget on every
-declared mutation export). Render only field names backend_contract's
+declared mutation export). A read function whose own declared signature
+takes an identifying argument (a single record's own read, rather than
+a collection's) is likewise not this stage's concern to call merely
+because it exists: its own real, natural consumer is a later
+record-specific detail or edit view, and this stage renders only the
+collection/list surface — requiring it here is exactly as premature as
+requiring a mutation export here. Render only field names backend_contract's
 own data-model JSON actually declares (its "fields" object) — never invent
 or guess one (golden-work-062, session evidence, frozen: a real model
 rendered task.name in a JSX list item when the real declared model has no

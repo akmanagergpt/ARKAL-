@@ -226,15 +226,27 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
     # frontend_forms has not run yet at this point. Only a non-mutating
     # (read) export can genuinely be "uncalled" here; #8's own text is
     # corrected alongside this fix.
+    #
+    # goal-mu0pvv20-b2uuo8 (session evidence, frozen): the same class of
+    # gap recurring one level deeper. `getInventoryItem(id)`, a real,
+    # correctly-declared single-record read export, is genuinely never
+    # called by frontend_ui's own real, correct list-only rendering --
+    # a single-record getter's own real, established consumer is a later
+    # record-specific detail/edit view (frontend_forms's own concern, per
+    # #9's `initialData` convention), not this stage's list/collection
+    # shell. A read export whose own declared signature takes an argument
+    # (a record identifier) is therefore exempt here exactly like a
+    # mutation export already is -- required only once something record-
+    # specific exists to call it with, never merely because it exists.
     exported = _exported_js_names(client)
-    read_only_exports = {name for name in exported if not _MUTATION_EXPORT_NAME.match(name)}
+    read_only_exports = {n for n in exported if not _MUTATION_EXPORT_NAME.match(n)
+                          and not re.search(rf"{n}\s*\(\s*\w", client)}
     uncalled = sorted(name for name in read_only_exports if name not in ui)
     if not uncalled:
         return []
     return [SemanticFinding(
         code="frontend_ui_client_unused", path="frontend/src/",
-        detail=f"frontend_ui never calls client export(s) {uncalled!r}",
-    )]
+        detail=f"frontend_ui never calls client export(s) {uncalled!r}")]
 
 
 def _frontend_ui_only_text(files: Mapping[str, str]) -> str:

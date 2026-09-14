@@ -13,6 +13,7 @@ from arkali.engineering.factory.frontend_ux_preflight import (
     _form_quality_findings,
     _shadowed_route_findings,
     _unreachable_parameterized_route_findings,
+    _unused_client_export_findings,
     _update_like_client_exports,
     _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
@@ -843,6 +844,91 @@ class TestAsyncEsmExportRecognition:
         )
         names = _exported_js_names(client_text)
         assert {"getCustomers", "updateCustomer"} <= names
+
+
+class TestFrontendUiUnusedClientStageScope:
+    """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` (real evidence:
+    `factory-goal-mu0pvv20-b2uuo8`). `apiClient.js` genuinely, correctly
+    declared `getInventoryItem(id)`; frontend_ui's own real, correct
+    list-only rendering (`Inventory.js`/`Orders.js`, calling only the bulk
+    `getInventory()`/`getOrders()`) never called it, and never needed to --
+    a single-record getter's own real, established consumer is a later
+    record-specific detail/edit view (frontend_forms's own concern, per
+    #9's `initialData` convention), not this stage's list/collection
+    shell. A read export whose own declared signature takes an argument
+    is now exempt here exactly like a mutation export already is; a
+    genuinely unused zero-argument (list/collection) read export must
+    still be flagged, and total non-integration must still be flagged."""
+
+    def test_a_a_used_list_getter_passes(self) -> None:
+        client = "export function getThings() {}"
+        assert _unused_client_export_findings(client, "getThings();") == []
+
+    def test_b_an_unused_single_record_getter_is_exempt(self) -> None:
+        client = "export function getThings() {}\nexport function getThing(id) {}"
+        assert _unused_client_export_findings(client, "getThings();") == []
+
+    def test_c_an_unused_list_getter_still_fails(self) -> None:
+        client = "export function getThings() {}\nexport function getThing(id) {}"
+        findings = _unused_client_export_findings(client, "nothing calls the client here")
+        assert len(findings) == 1
+        assert "getThings" in findings[0].detail
+        assert "getThing'" not in findings[0].detail
+
+    def test_d_a_full_crud_surface_with_only_the_list_getter_used_passes(self) -> None:
+        client = (
+            "export function getThings() {}\n"
+            "export function getThing(id) {}\n"
+            "export function createThing(t) {}\n"
+            "export function updateThing(id, t) {}\n"
+            "export function deleteThing(id) {}\n"
+        )
+        assert _unused_client_export_findings(client, "getThings();") == []
+
+    def test_e_mutation_exports_remain_exempt_regardless_of_arity(self) -> None:
+        client = "export function getThings() {}\nexport function createThing(t) {}"
+        assert _unused_client_export_findings(client, "getThings();") == []
+
+    def test_f_multiple_modules_each_still_require_their_own_list_getter(self) -> None:
+        """Module A's own usage must never paper over module B's own,
+        separate, genuinely unused list getter."""
+        client = "export function getWidgets() {}\nexport function getGadgets() {}"
+        findings = _unused_client_export_findings(client, "getWidgets();")
+        assert len(findings) == 1
+        assert "getGadgets" in findings[0].detail
+
+    def test_g_the_single_record_exemption_is_generic_not_name_based(self) -> None:
+        """The exemption is driven by the real declared signature (an
+        argument), never a domain-specific name like 'Item' or 'ById'."""
+        client = "export function fetchWidget(widgetId) {}\nexport function fetchWidgets() {}"
+        assert _unused_client_export_findings(client, "fetchWidgets();") == []
+
+    def test_h_total_non_integration_is_still_rejected(self) -> None:
+        client = "export function getThings() {}"
+        findings = _unused_client_export_findings(client, "return <div>static</div>;")
+        assert len(findings) == 1
+        assert "getThings" in findings[0].detail
+
+    def test_i_the_known_substring_precision_defect_remains_deferred(self) -> None:
+        """`FRONTEND_UI_UNUSED_CHECKER_SUBSTRING_PRECISION_DEFECT`, real
+        evidence-shaped (`factory-goal-mu0pvv20-b2uuo8`'s own `getOrder`/
+        `getOrders` naming pair) -- `name not in ui` is plain substring
+        containment, not identifier/call matching. Two genuinely distinct,
+        genuinely unused ZERO-ARGUMENT read exports (`getWork`, `getWorks`)
+        are BOTH required by today's stage-scope-corrected invariant; the
+        checker still, wrongly, treats `getWork` as used purely because
+        the real, called `getWorks()` contains it as a literal prefix.
+        NOT fixed by this turn -- this documents the known, independent,
+        still-open imprecision so a future fix is never skipped as
+        already resolved by the stage-scope change alone."""
+        client = "export function getWork() {}\nexport function getWorks() {}"
+        # getWork() is genuinely never called -- only getWorks() is -- so a
+        # precise check would still flag getWork. The known defect: it does
+        # not, because "getWork" is a literal substring of the called
+        # "getWorks()". This asserts the CURRENT (defective) behavior, not
+        # the correct one, so a future fix does not silently double-count
+        # this test as already-passing evidence of correctness.
+        assert _unused_client_export_findings(client, "getWorks();") == []
 
 
 class TestFormControlAccessibleName:

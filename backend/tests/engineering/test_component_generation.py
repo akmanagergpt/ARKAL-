@@ -2244,3 +2244,349 @@ class TestFrontendFormsClientImportPreventionRule:
         rule = self._rule()
         assert "const { id } = useParams();" in rule
         assert "import `useParams` from" in rule
+
+
+class TestFrontendUiStageScopeRule:
+    """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` (real evidence:
+    `factory-goal-mu0pvv20-b2uuo8`): `STAGED_GENERATION_STAGES.md#8`
+    already exempted mutation exports from its own "the UI calls every
+    non-mutating function" wording (golden-work-082) but never extended
+    that same reasoning to a single-record read export -- its own real,
+    natural consumer is a later record-specific detail/edit view, exactly
+    as premature to require at this stage as a mutation export already
+    was. Prose-only; the checker's own corrected invariant lives in
+    `frontend_ux_preflight.py::_unused_client_export_findings`."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("frontend_ui").rule
+
+    def test_a_a_single_record_read_export_is_explicitly_exempted(self) -> None:
+        rule = self._rule()
+        assert "takes an identifying argument" in rule
+        assert "not this stage's concern to call merely" in rule
+
+    def test_b_the_exemption_names_the_later_record_specific_consumer(self) -> None:
+        rule = self._rule()
+        assert "a later record-specific detail or edit view" in rule
+
+    def test_c_the_collection_list_scope_is_explicit(self) -> None:
+        rule = self._rule()
+        assert "non-mutating (read) collection/list function" in rule
+        assert "collection/list surface" in rule
+
+    def test_d_the_existing_mutation_exemption_is_preserved(self) -> None:
+        rule = self._rule()
+        assert "mutating export (create/update/edit/delete) is not this stage's concern" in rule
+
+    def test_e_the_new_sentence_carries_no_candidate_domain_token(self) -> None:
+        rule = self._rule()
+        banned = ("inventory", "order", "warehouse", "getinventoryitem", "getorder")
+        start = rule.index("A read function whose own declared signature")
+        new_sentence = rule[start:start + 500].lower()
+        for token in banned:
+            assert token not in new_sentence, token
+
+
+
+def test_frozen_warehouse_frontend_ui_replay_no_longer_flags_client_unused() -> None:
+    """`FRONTEND_UI_UNUSED_CHECKER_STAGE_SCOPE_DEFECT` (real evidence:
+    `factory-goal-mu0pvv20-b2uuo8`, no model call). The real, frozen,
+    terminal `frontend_ui` attempt's own exact bytes -- a real, correct
+    `apiClient.js` declaring `getInventoryItem(id)`/`getOrder(id)`
+    alongside the real `App.js`/`Inventory.js`/`Orders.js`/`index.js`
+    that only ever call the bulk `getInventory()`/`getOrders()` -- must
+    no longer produce `frontend_ui_client_unused` now that a
+    single-record getter is exempt. Stage-scope correction, not a
+    candidate-specific exception: the same real bytes, unmodified."""
+    api_client = """const API_BASE_URL = 'http://localhost:5000';
+
+async function fetchWithCheck(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getInventory() {
+  return fetchWithCheck(`${API_BASE_URL}/inventory`, { method: 'GET' });
+}
+
+export async function createInventory(item) {
+  return fetchWithCheck(`${API_BASE_URL}/inventory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item)
+  });
+}
+
+export async function getInventoryItem(id) {
+  return fetchWithCheck(`${API_BASE_URL}/inventory/${id}`, { method: 'GET' });
+}
+
+export async function updateInventoryItem(id, item) {
+  return fetchWithCheck(`${API_BASE_URL}/inventory/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item)
+  });
+}
+
+export async function deleteInventoryItem(id) {
+  return fetchWithCheck(`${API_BASE_URL}/inventory/${id}`, { method: 'DELETE' });
+}
+
+export async function getOrders() {
+  return fetchWithCheck(`${API_BASE_URL}/orders`, { method: 'GET' });
+}
+
+export async function createOrder(order) {
+  return fetchWithCheck(`${API_BASE_URL}/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order)
+  });
+}
+
+export async function getOrder(id) {
+  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, { method: 'GET' });
+}
+
+export async function updateOrder(id, order) {
+  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order)
+  });
+}
+
+export async function deleteOrder(id) {
+  return fetchWithCheck(`${API_BASE_URL}/orders/${id}`, { method: 'DELETE' });
+}"""
+    app_js = """import React, { useState, useEffect } from 'react';
+import { getInventory, getOrders } from './apiClient';
+import { Link } from 'react-router-dom';
+
+const App = () => {
+  const [inventory, setInventory] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState(null);
+  const [ordersError, setOrdersError] = useState(null);
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const data = await getInventory();
+        setInventory(data);
+      } catch (error) {
+        setInventoryError(error.message);
+      } finally {
+        setInventoryLoading(false);
+      }
+    };
+
+    const fetchOrders = async () => {
+      try {
+        const data = await getOrders();
+        setOrders(data);
+      } catch (error) {
+        setOrdersError(error.message);
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+
+    fetchInventory();
+    fetchOrders();
+  }, []);
+
+  if (inventoryLoading || ordersLoading) {
+    return <div>Loading...</div>;
+  }
+
+  if (inventoryError || ordersError) {
+    return (
+      <div>
+        <p>Error loading data. Please try again.</p>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1>Warehouse Management System</h1>
+      <nav>
+        <ul>
+          <li><Link to="/inventory">Inventory</Link></li>
+          <li><Link to="/orders">Orders</Link></li>
+        </ul>
+      </nav>
+      <div>
+        <h2>Inventory</h2>
+        {inventory.length === 0 ? (
+          <p>No inventory items found.</p>
+        ) : (
+          <ul>
+            {inventory.map(item => (
+              <li key={item.id}>{item.name} - Quantity: {item.quantity} - Price: ${item.price}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h2>Orders</h2>
+        {orders.length === 0 ? (
+          <p>No orders found.</p>
+        ) : (
+          <ul>
+            {orders.map(order => (
+              <li key={order.id}>Item ID: {order.item_id} - Quantity: {order.quantity} - Order Date: {order.order_date}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default App;"""
+    index_js = """import React from 'react';
+import ReactDOM from 'react-dom';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import App from './App';
+import Inventory from './Inventory';
+import Orders from './Orders';
+
+ReactDOM.render(
+  <Router>
+    <Switch>
+      <Route path="/inventory" component={Inventory} />
+      <Route path="/orders" component={Orders} />
+      <Route path="/" component={App} />
+    </Switch>
+  </Router>,
+  document.getElementById('root')
+);"""
+    inventory_js = """import React, { useState, useEffect } from 'react';
+import { getInventory } from './apiClient';
+import { Link } from 'react-router-dom';
+
+const Inventory = () => {
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const data = await getInventory();
+        setInventory(data);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div>
+        <p>Error loading inventory. Please try again.</p>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>Inventory</h2>
+      {inventory.length === 0 ? (
+        <p>No inventory items found.</p>
+      ) : (
+        <ul>
+          {inventory.map(item => (
+            <li key={item.id}>{item.name} - Quantity: {item.quantity} - Price: ${item.price}</li>
+          ))}
+        </ul>
+      )}
+      <Link to="/inventory/create">Create New Inventory Item</Link>
+    </div>
+  );
+};
+
+export default Inventory;"""
+    orders_js = """import React, { useState, useEffect } from 'react';
+import { getOrders } from './apiClient';
+import { Link } from 'react-router-dom';
+
+const Orders = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const data = await getOrders();
+        setOrders(data);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div>
+        <p>Error loading orders. Please try again.</p>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2>Orders</h2>
+      {orders.length === 0 ? (
+        <p>No orders found.</p>
+      ) : (
+        <ul>
+          {orders.map(order => (
+            <li key={order.id}>Item ID: {order.item_id} - Quantity: {order.quantity} - Order Date: {order.order_date}</li>
+          ))}
+        </ul>
+      )}
+      <Link to="/orders/create">Create New Order</Link>
+    </div>
+  );
+};
+
+export default Orders;"""
+    files = {
+        "frontend/src/apiClient.js": api_client,
+        "frontend/src/App.js": app_js,
+        "frontend/src/index.js": index_js,
+        "frontend/src/Inventory.js": inventory_js,
+        "frontend/src/Orders.js": orders_js,
+    }
+    findings = _frontend_ui_findings(files)
+    assert "frontend_ui_client_unused" not in {f.code for f in findings}
