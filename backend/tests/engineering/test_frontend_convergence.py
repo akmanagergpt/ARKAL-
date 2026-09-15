@@ -5,7 +5,10 @@ import pathlib
 
 import pytest
 
-from arkali.engineering.factory.component_generation import generate_staged_model_product
+from arkali.engineering.factory.component_generation import (
+    _frontend_forms_findings,
+    generate_staged_model_product,
+)
 from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_callback_arity_preflight import (
     _callback_prop_arity_mismatch_findings,
@@ -543,7 +546,11 @@ class TestMultiFindingHintCoverage:
         selective."""
         decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
         visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
-        unsupported = ("frontend_ui_missing_success_feedback", "frontend/src/", "no success marker anywhere")
+        # `frontend_ui_missing_edit_ui` was a real historical checker false
+        # positive (F-0101), fixed at the checker level and deliberately
+        # never given a hint entry (see TestF0101LabelHintCoverage) --
+        # a stable, permanently-unsupported code for this example.
+        unsupported = ("frontend_ui_missing_edit_ui", "frontend/src/", "no edit UI reference anywhere")
         prior_findings = (_GOLDEN_WORK_131_FINDINGS[0], unsupported)
         raw_failure = "; ".join(f"{c}:{p}:{d}" for c, p, d in prior_findings)
         payload = json.loads(_stage_prompt(
@@ -1205,3 +1212,126 @@ class TestFrontendLocalImportFrozenReplay:
         prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
         text = _structured_hint_text([], prior_findings)
         assert _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"] in text
+
+
+class TestSuccessFeedbackHintCoverage:
+    """`FRONTEND_SUCCESS_FEEDBACK_RETRY_HINT_GAP` (real evidence: `factory-
+    goal-mu2h4fda-yyz4hh`). `frontend_ui_missing_success_feedback` did not
+    have a structured hint entry, unlike `frontend_client_call_missing_
+    import`/F-0099/F-0101/`frontend_local_import_unresolved` before it --
+    the same class of gap (a real, existing, unmodified checker fires
+    correctly, but a retry received only the raw finding text and the
+    generic mutation-contracts callback-arity hint, unrelated to this
+    finding). Analysis this session proved PREVENTION already complete
+    (`STAGED_GENERATION_STAGES.md#9` already states this invariant) --
+    this fix is convergence-only; the rule text is untouched."""
+
+    def test_a_the_code_is_now_in_the_supported_map(self) -> None:
+        assert "frontend_ui_missing_success_feedback" in _SUPPORTED_HINT_INVARIANTS
+
+    def test_b_the_hint_requires_feedback_only_after_genuine_success(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"]
+        assert "genuinely resolves" in invariant
+        assert "never before it resolves" in invariant
+
+    def test_c_the_hint_forbids_treating_error_as_success(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"]
+        assert "never on a failed attempt" in invariant
+        assert "a real error marker is never itself a success marker" in invariant
+
+    def test_d_the_hint_permits_either_the_form_or_the_parent(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"]
+        assert "in the form itself or in the parent component" in invariant
+
+    def test_e_the_hint_prescribes_no_specific_implementation(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"]
+        assert "No specific wording, library, modal, redirect, or component structure" in invariant
+
+    def test_f_no_candidate_specific_token_in_the_invariant(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"]
+        banned = ("patient", "appointment", "veterinary", "customer", "ticket", "student")
+        lowered = invariant.lower()
+        for token in banned:
+            assert token not in lowered, token
+
+    def test_g_the_real_stage_prompt_payload_carries_the_hint_and_the_failed_files(self) -> None:
+        """The canonical retry-prompt, reconstructed with realistic
+        `visible_files` (so the pre-existing generic mutation-contracts
+        callback-arity hint is present too, exactly as it was in the real
+        run) -- the next attempt's real prompt must simultaneously carry
+        the raw finding, the new actionable hint, the failed previous
+        frontend files, the pre-existing generic hint, and the normal
+        multi-file output contract."""
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        finding = (
+            "frontend_ui_missing_success_feedback", "frontend/src/",
+            "product_ux_spec declares a mutating action but the frontend shows no "
+            "success/feedback marker after it",
+        )
+        raw_failure = ":".join(finding)
+        failed_files = {"frontend/src/App.js": _WORK_FORM_JS}
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, raw_failure,
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY, prior_findings=(finding,),
+            previous_attempt_files=failed_files,
+        ))
+        assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_ui_missing_success_feedback" in payload["repair_hint"]
+        assert "add a visible success/feedback marker after a" in payload["task"]
+        assert payload["prior_attempt_failure"] == raw_failure
+        assert payload["previous_attempt_output"] == failed_files
+        # The pre-existing generic mutation-contracts hint is still present too.
+        assert "useParams()" in payload["repair_hint"]
+
+    def test_h_retry_budget_and_repair_strategy_selection_are_unchanged(self) -> None:
+        assert _repair_strategy_for_attempt(1) == _DEFAULT_REPAIR_STRATEGY
+        assert _repair_strategy_for_attempt(2) == _STRUCTURED_HINT_REPAIR_STRATEGY
+
+
+class TestSuccessFeedbackFrozenReplay:
+    """Prove parser output -> merged file set -> `frontend_forms` findings
+    -> hint lookup against the real, frozen `factory-goal-mu2h4fda-yyz4hh`
+    evidence blob's own real persisted bytes -- read fresh from disk,
+    never re-typed by hand -- with no model call. This also protects
+    c1e7785's own live-proven local-import behavior from regression: the
+    real merged state must show zero `frontend_local_import_unresolved`
+    findings alongside the one genuine success-feedback finding."""
+
+    @staticmethod
+    def _real_merged_files() -> dict[str, str]:
+        blob = (
+            REPO / "var" / "factory" / "evidence" / "blobs" / "sha256" / "3e"
+            / "3e0e21dc85fbabd956912c720e2bcdf523adacb8d75c4490640284b9e7fec3c3"
+        )
+        evidence = json.loads(blob.read_text(encoding="utf-8"))
+        raw = json.loads(evidence["last_raw_output"])
+        stage_files = {f["path"]: f["content"] for f in raw["files"]}
+        cand = REPO / "var" / "factory" / "candidates" / "factory-goal-mu2h4fda-yyz4hh"
+        visible = {
+            "product/ux_spec.json": (cand / "product/ux_spec.json").read_text(encoding="utf-8"),
+            "frontend/src/apiClient.js": (
+                cand / "frontend/src/apiClient.js"
+            ).read_text(encoding="utf-8"),
+            "frontend/src/index.js": (cand / "frontend/src/index.js").read_text(encoding="utf-8"),
+        }
+        return {**visible, **stage_files}
+
+    def test_a_the_real_merged_state_produces_exactly_the_one_real_finding(self) -> None:
+        findings = _frontend_forms_findings(self._real_merged_files())
+        codes = {f.code for f in findings}
+        assert codes == {"frontend_ui_missing_success_feedback"}
+        assert len(findings) == 1
+
+    def test_b_the_real_merged_state_has_no_local_import_regression(self) -> None:
+        """c1e7785 non-regression: the real candidate's own final attempt
+        legitimately split forms into separate files and emitted all of
+        them together -- zero unresolved local imports."""
+        findings = _frontend_local_import_findings(self._real_merged_files())
+        assert findings == []
+
+    def test_c_the_real_finding_maps_to_the_new_actionable_hint(self) -> None:
+        findings = _frontend_forms_findings(self._real_merged_files())
+        prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
+        text = _structured_hint_text([], prior_findings)
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_ui_missing_success_feedback"] in text

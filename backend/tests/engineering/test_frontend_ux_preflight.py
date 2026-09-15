@@ -15,6 +15,7 @@ from arkali.engineering.factory.frontend_ux_preflight import (
     _exported_js_names,
     _form_quality_findings,
     _shadowed_route_findings,
+    _state_coverage_findings,
     _unreachable_module_findings,
     _unreachable_parameterized_route_findings,
     _unused_client_export_findings,
@@ -411,6 +412,68 @@ class TestEmptyStateCreateReachabilityControlFlow:
         codes = {f.code for f in findings}
         assert codes == {"frontend_ui_create_unreachable_from_empty_state"}
         assert len(findings) == 2
+
+
+class TestSuccessFeedbackCoverage:
+    """`FRONTEND_SUCCESS_FEEDBACK_RETRY_HINT_GAP` (real evidence: `factory-
+    goal-mu2h4fda-yyz4hh`, session evidence, frozen). `_state_coverage_
+    findings` had no dedicated tests before this fix; these narrowly cover
+    its existing, unmodified behavior. Checker logic is byte-unchanged --
+    this turn only adds a retry-hint entry for the finding it already
+    correctly produces."""
+
+    class _Module:
+        def __init__(self, actions: tuple[str, ...]) -> None:
+            self.actions = actions
+
+    class _Spec:
+        def __init__(self, modules: list) -> None:
+            self.modules = modules
+
+    def _findings(self, frontend: str, actions: tuple[str, ...] = ("create",)) -> list:
+        spec = self._Spec([self._Module(actions)])
+        return _state_coverage_findings(spec, frontend)
+
+    def test_a_missing_feedback_is_flagged(self) -> None:
+        frontend = (
+            "async function handleSubmit() { await createPatient(formData); }"
+        )
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_missing_success_feedback" in codes
+
+    def test_b_visible_success_feedback_clears_it(self) -> None:
+        frontend = (
+            "const [success, setSuccess] = useState(false);"
+            "async function handleSubmit() { await createPatient(formData); setSuccess(true); }"
+            "{success && <div>Saved successfully!</div>}"
+        )
+        assert self._findings(frontend) == []
+
+    def test_c_error_only_feedback_does_not_satisfy_it(self) -> None:
+        """Error handling is a real, separate, already-required concern --
+        it must never itself be read as proof a mutation's own success
+        path was ever satisfied."""
+        frontend = (
+            "async function handleSubmit() { "
+            "try { await createPatient(formData); } catch (err) { setError(err.message); } }"
+            "{error && <div>Error: {error}</div>}"
+        )
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_missing_success_feedback" in codes
+
+    def test_d_no_mutating_action_needs_no_feedback(self) -> None:
+        frontend = "function List() { return <ul></ul>; }"
+        assert self._findings(frontend, actions=("view",)) == []
+
+    def test_e_known_lexical_limitation_unconditional_text_is_accepted(self) -> None:
+        """KNOWN_CHECKER_LIMITATION_NOT_IN_SCOPE: `_state_coverage_
+        findings` is a whole-file lexical substring check -- an
+        unconditional, always-rendered "success" string (never gated on
+        the mutation actually resolving) currently satisfies it too. This
+        turn documents that real, existing, unmodified behavior; it does
+        not extend or narrow it."""
+        frontend = "return <div>success</div>;"
+        assert self._findings(frontend) == []
 
 
 def test_recoverable_error_state_requires_an_interactive_recovery_control() -> None:

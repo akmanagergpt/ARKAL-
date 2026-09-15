@@ -277,6 +277,33 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "making this change, every other real local relative import in "
         "every emitted frontend file must still resolve"
     ),
+    #: FRONTEND_SUCCESS_FEEDBACK_RETRY_HINT_GAP (real evidence: `factory-
+    #: goal-mu2h4fda-yyz4hh`, ARK-ERR-0116 exhausted, session evidence,
+    #: frozen). The real checker fires correctly -- a real create/update/
+    #: delete call genuinely resolves and nothing in the rendered frontend
+    #: ever changes afterward, for either real mutating module, on all 4
+    #: real attempts -- but had no entry here, so a retry received only
+    #: the raw finding text and the generic mutation-contracts callback-
+    #: arity hint (a real, unrelated concern this candidate's own routes
+    #: already satisfied). `STAGED_GENERATION_STAGES.md#9`'s own rule
+    #: already states this same invariant ("add a visible success/
+    #: feedback marker after a mutation completes") at generation time;
+    #: this hint restates it only for a retry that already violated it.
+    "frontend_ui_missing_success_feedback": (
+        "product_ux_spec declares a mutating action, but the frontend "
+        "shows no visible marker confirming a mutation actually "
+        "succeeded. After a real create/update/delete call genuinely "
+        "resolves, render a real, visible confirmation to the user -- in "
+        "the form itself or in the parent component that owns the "
+        "mutation, whichever already renders once that call resolves. "
+        "Show it only once the mutation has genuinely succeeded, never "
+        "before it resolves and never on a failed attempt -- existing "
+        "error-state handling stays exactly as it is; a real error "
+        "marker is never itself a success marker. No specific wording, "
+        "library, modal, redirect, or component structure is required -- "
+        "what matters is that a real user, after a real successful "
+        "mutation, sees something that was not there before it succeeded"
+    ),
 }
 
 
