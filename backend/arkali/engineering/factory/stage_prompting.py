@@ -112,6 +112,12 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
 #: only codes this stage's own preflight suite already enforces belong here,
 #: never a new check invented to have something to hint about.
 _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    "python_syntax": (
+        "the emitted Python file is incomplete or syntactically invalid. Repair "
+        "the exact parser-reported location in the previous attempt, completing "
+        "every opened string, bracket, call, and statement, then return the whole "
+        "valid file rather than repeating or continuing the broken fragment"
+    ),
     #: F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
     #: `frontend_route_unreachable` x4, ARK-ERR-0116 exhausted). This hint
     #: already existed and was already delivered; the recurrence traced to

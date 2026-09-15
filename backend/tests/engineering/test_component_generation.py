@@ -769,7 +769,7 @@ def test_the_anti_loop_still_fires_when_previous_attempt_output_is_present(
     assert len(factory.models["backend_contract"].prompts) == 2  # type: ignore[attr-defined]
 
 
-def test_a_syntax_error_retry_can_see_the_previous_attempts_exact_broken_line(
+def test_a_syntax_error_retry_can_see_and_repair_the_previous_broken_line(
     tmp_path: pathlib.Path,
 ) -> None:
     """Real shape of `goal-mtm6qrdr-apus8c` (backend_cors_boundary): a
@@ -795,6 +795,8 @@ def test_a_syntax_error_retry_can_see_the_previous_attempts_exact_broken_line(
     second_payload = json.loads(prompts[1])
     assert "python_syntax" in second_payload["prior_attempt_failure"]
     assert "CREATE TABLE works (" in second_payload["previous_attempt_output"]["backend/main.py"]
+    assert "syntactically invalid" in second_payload["repair_hint"]
+    assert "return the whole valid file" in second_payload["repair_hint"]
 
 
 def test_a_module_parity_retry_can_see_the_previous_attempts_exact_invented_module(
@@ -1930,11 +1932,12 @@ class TestF0100BackendSchemaPreventiveRule:
         assert decl.inputs == ("backend_contract",)
         assert MAX_STAGE_ATTEMPTS == 4
 
-    def test_j_no_python_syntax_structured_hint_was_added(self) -> None:
-        """PATH B is explicitly deferred this turn."""
+    def test_j_python_syntax_structured_hint_is_generic(self) -> None:
         from arkali.engineering.factory.stage_prompting import _SUPPORTED_HINT_INVARIANTS
 
-        assert "python_syntax" not in _SUPPORTED_HINT_INVARIANTS
+        hint = _SUPPORTED_HINT_INVARIANTS["python_syntax"]
+        assert "parser-reported location" in hint
+        assert "whole valid file" in hint
 
     def test_historical_replay_the_real_anti_pattern_is_named_by_every_element(self) -> None:
         """Section 11: without a model call, prove the new rule text would
