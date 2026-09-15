@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import ast
 
-from arkali.engineering.factory.test_contract_preflight import _undefined_call_findings
+from arkali.engineering.factory.test_contract_preflight import (
+    _lifecycle_findings,
+    _undefined_call_findings,
+)
 
 
 def _findings(source: str, path: str = "tests/test_app.py") -> list:
@@ -72,3 +75,49 @@ def test_deduplicates_repeated_calls_to_the_same_undefined_name() -> None:
     )
     findings = _findings(source)
     assert len(findings) == 1
+
+
+def test_flags_mutating_sqlite_tests_that_share_persistent_rows() -> None:
+    files = {
+        "backend/app.py": "import sqlite3\n",
+        "tests/test_app.py": (
+            "import pytest\n"
+            "@pytest.fixture\n"
+            "def init_database():\n    init_db('app.db')\n"
+            "def test_create(client, init_database):\n"
+            "    client.post('/things', json={'name': 'x'})\n"
+            "def test_list(client, init_database):\n"
+            "    client.post('/things', json={'name': 'x'})\n"
+            "    assert len(client.get('/things').json) == 1\n"
+        ),
+    }
+    findings = _lifecycle_findings(files)
+    assert [finding.code for finding in findings] == [
+        "test_database_state_leaks_between_cases"
+    ]
+
+
+def test_accepts_mutating_sqlite_tests_with_per_test_temporary_database() -> None:
+    files = {
+        "backend/app.py": "import sqlite3\n",
+        "tests/test_app.py": (
+            "import pytest\n"
+            "@pytest.fixture\n"
+            "def database(tmp_path, monkeypatch):\n"
+            "    monkeypatch.setattr(app, 'DB_PATH', tmp_path / 'app.db')\n"
+            "def test_create(client, database):\n    client.post('/things')\n"
+            "def test_delete(client, database):\n    client.delete('/things/1')\n"
+        ),
+    }
+    assert _lifecycle_findings(files) == []
+
+
+def test_accepts_read_only_sqlite_tests_without_database_reset() -> None:
+    files = {
+        "backend/app.py": "import sqlite3\n",
+        "tests/test_app.py": (
+            "def test_list(client):\n    assert client.get('/things').status_code == 200\n"
+            "def test_get(client):\n    assert client.get('/things/1').status_code == 404\n"
+        ),
+    }
+    assert _lifecycle_findings(files) == []

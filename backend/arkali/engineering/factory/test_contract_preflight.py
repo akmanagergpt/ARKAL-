@@ -75,6 +75,44 @@ def _plain_import_findings(
     return findings
 
 
+def _mutating_test_count(files: Mapping[str, str]) -> int:
+    count = 0
+    for path, source in files.items():
+        if not path.startswith("tests/") or not path.endswith(".py"):
+            continue
+        for node in ast.parse(source).body:
+            if _is_test(node) and any(
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr in {"post", "put", "patch", "delete"}
+                for call in ast.walk(node)
+            ):
+                count += 1
+    return count
+
+
+def _database_state_finding(
+    files: Mapping[str, str], backend: str, tests: str
+) -> SemanticFinding | None:
+    isolation_markers = (
+        "tmp_path", "tmpdir", ":memory:", "temporarydirectory", "unlink(",
+        "remove(", "delete from", "drop table", "rollback(", "monkeypatch",
+    )
+    if "sqlite3" not in backend or _mutating_test_count(files) <= 1:
+        return None
+    if any(marker in tests.lower() for marker in isolation_markers):
+        return None
+    return SemanticFinding(
+        code="test_database_state_leaks_between_cases", path="tests/",
+        detail=(
+            "multiple tests mutate the same persistent SQLite database but no "
+            "per-test temporary database, cleanup, rollback or path override is "
+            "present; schema initialization alone preserves prior rows, so each "
+            "test must start from isolated state"
+        ),
+    )
+
+
 def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend = "\n".join(
         source
@@ -97,7 +135,8 @@ def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="TestClient must enter a context when schema bootstrap runs at startup",
             )
         ]
-    return []
+    database_finding = _database_state_finding(files, backend, tests)
+    return [database_finding] if database_finding else []
 
 
 def _function_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) -> set[str]:

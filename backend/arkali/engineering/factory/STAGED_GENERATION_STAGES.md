@@ -179,7 +179,10 @@ a reasonable Flask convention this rule never ruled out). Tests import
 only symbols backend_cors_boundary's application actually exports,
 declare every fixture they consume, enter the real application lifecycle
 context required by startup hooks, and contain at least one real
-assertion. A test that creates a row and later reads, updates or deletes
+assertion. Tests that mutate a file-backed database must isolate state per
+test (for example with a temporary database/path override, cleanup or
+rollback); merely calling schema initialization again preserves prior rows
+and makes later tests order-dependent. A test that creates a row and later reads, updates or deletes
 it by id must use the real id the create response actually returned
 (e.g. `response.json['id']`), never a hardcoded literal such as `1` —
 when a table's schema declares `AUTOINCREMENT` (backend_schema's own
