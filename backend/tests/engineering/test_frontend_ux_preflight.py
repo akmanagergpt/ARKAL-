@@ -786,6 +786,18 @@ def test_is_silent_when_the_relative_import_resolves_to_a_module_index() -> None
     assert _frontend_local_import_findings(files) == []
 
 
+def test_is_silent_when_the_relative_import_resolves_to_a_jsx_file() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "import CourseForm from './CourseForm';\nfunction App() { return <CourseForm />; }\n"
+        ),
+        "frontend/src/CourseForm.jsx": (
+            "const CourseForm = () => <form />;\nexport default CourseForm;\n"
+        ),
+    }
+    assert _frontend_local_import_findings(files) == []
+
+
 def test_local_import_resolution_is_relative_to_the_importing_files_own_directory() -> None:
     """A `../apiClient` import from a nested module file resolves against
     that file's own directory, not the frontend/src root."""

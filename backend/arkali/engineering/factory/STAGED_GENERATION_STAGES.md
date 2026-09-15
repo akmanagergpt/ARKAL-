@@ -368,7 +368,19 @@ call (`updateThing(id, data)`), a callback/prop reference
 (`onClick={deleteThing}`) — must be imported from its declaring module, or
 otherwise defined, in that exact same file's own scope: naming an exported
 function without importing it there is a real runtime error the moment
-that code path runs, never merely a syntax error. When one form component is reused for both create and
+that code path runs, never merely a syntax error. Any new local file this
+stage's own generated code imports via a relative path must resolve inside
+this same response's own file set: either emit that referenced file, with
+real, working implementation content, in this same response, or do not
+introduce the import at all and instead keep the implementation inline in
+the importing file, or reuse an already-resolvable existing local file —
+never assume a later stage will create it, since no later stage in this
+pipeline touches or re-emits this stage's own frontend files again (real
+evidence, factory-goal-mu1oieg4-3bye3k, session evidence, frozen: this
+stage's own real output introduced new relative imports for two of its own
+newly-referenced form components, but never once emitted either referenced
+file's own content, on all 4 real attempts, leaving a real, permanent
+`Module not found` build failure). When one form component is reused for both create and
 edit, its own call to the submit prop must pass every argument the edit
 route's own handler declares, in order — reusing the create route's
 shorter call unchanged at edit silently shifts every argument

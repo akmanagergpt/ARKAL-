@@ -10,6 +10,7 @@ from arkali.engineering.factory.errors import ModelGenerationError
 from arkali.engineering.factory.frontend_callback_arity_preflight import (
     _callback_prop_arity_mismatch_findings,
 )
+from arkali.engineering.factory.frontend_manifest_preflight import _frontend_local_import_findings
 from arkali.engineering.factory.frontend_mutation_contract import (
     _build_mutation_contracts,
     _mutation_contracts_for_stage,
@@ -99,6 +100,74 @@ _MISSING_IMPORT_APP_JS = (
     "<WorkForm onSubmit={async (title) => { const { id } = useParams(); "
     "await updateWork(id, title); }} />"
 )
+#: FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP. A deliberately
+#: create-only module (no edit/id/route concern at all) isolates the one
+#: fixture defect this class exists to prove converges: `./NoteForm` is
+#: a real relative import to a form component split into its own file --
+#: the exact real `frontend_local_import_unresolved` shape
+#: `factory-goal-mu1oieg4-3bye3k`'s own real output independently
+#: reproduced (two form components imported, neither ever emitted).
+#: `createNote` is imported from `./client` (already real and visible)
+#: and takes the same one argument `NoteForm`'s own `onSubmit(title)`
+#: call supplies, so this fixture triggers exactly the one intended
+#: finding -- never `frontend_client_call_missing_import` (the import is
+#: present) nor the callback-arity-mismatch class above (no route
+#: identifier is involved for a create-only action).
+_LOCAL_IMPORT_BACKEND_CONTRACT_FILES = {
+    "backend/routes/note_routes.json": json.dumps([
+        {"path": "/notes", "method": "GET", "model_fields": ["id", "title"]},
+        {"path": "/notes", "method": "POST", "model_fields": ["id", "title"]},
+    ]),
+    "backend/models/note_model.json": json.dumps(
+        {"table_name": "notes", "fields": {"id": {"type": "integer"}, "title": {"type": "string"}}}
+    ),
+}
+_LOCAL_IMPORT_UX_SPEC_JSON = json.dumps({
+    "product_title": "Notes",
+    "primary_roles": ["user"],
+    "modules": [{
+        "name": "notes",
+        "navigation_label": "Notes",
+        "presentation": "list",
+        "actions": ["create"],
+        "forms": [{"name": "note_form", "fields": ["title"]}],
+        "search_filter": False,
+        "states": {"loading": True, "empty": True, "error": True, "success": True},
+    }],
+    "navigation_destinations": ["Notes"],
+    "design_system": {
+        "typography_scale": ["base"], "spacing_scale": ["sm"],
+        "component_conventions": ["list"], "responsive": "desktop-first",
+        "accessible_focus_contrast": True,
+    },
+    "destructive_action_confirmation": False,
+})
+_LOCAL_IMPORT_CLIENT_JS = (
+    "export function createNote(title) { return fetch('/notes', {method:'POST'}); }\n"
+)
+_NOTE_FORM_JS = (
+    "function NoteForm({ onSubmit }) {\n"
+    "  const [title, setTitle] = React.useState('');\n"
+    "  const [success, setSuccess] = React.useState(false);\n"
+    "  const handleSubmit = async (e) => { e.preventDefault(); await onSubmit(title); "
+    "setSuccess(true); };\n"
+    "  return <form onSubmit={handleSubmit}><label>Title<input required value={title} "
+    "onChange={e=>setTitle(e.target.value)} /></label><button type='submit'>Submit</button>"
+    "{success && <div>Success!</div>}</form>;\n"
+    "}\n"
+)
+#: A real, reachable "Add Note" control is included here so this fixture
+#: exercises only the one convergence class this test exists to prove --
+#: `_create_access_findings` (F-0099/Wave B's own, already-correct, out
+#: of scope for this turn) is otherwise unrelated and must not fire.
+_LOCAL_IMPORT_BROKEN_APP_JS = (
+    "import React from 'react';\n"
+    "import { createNote } from './client';\n"
+    "import NoteForm from './NoteForm';\n"
+    "function App() { return (<div><button>Add Note</button>"
+    "<NoteForm onSubmit={createNote} /></div>); }\n"
+)
+_NOTE_FORM_STANDALONE_JS = _NOTE_FORM_JS + "export default NoteForm;\n"
 
 
 class TestMutationContractBuilder:
@@ -921,3 +990,218 @@ class TestF0101LabelHintCoverage:
             "button, or navigation call somewhere else in the frontend, built from "
             "the same static path prefix the route itself declares"
         )
+
+
+#: FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP. The real, frozen
+#: `(code, path, detail)` findings mechanically reproducible from
+#: `factory-goal-mu1oieg4-3bye3k` (`sha256:5cefea47...`, STAGE_FAILED at
+#: `frontend_forms`, full 4-attempt budget exhausted, `finish_reason:
+#: "stop"`, not truncated) -- copied verbatim from the real ARK-ERR-0116
+#: error string for both real, simultaneous missing local components.
+_LOCAL_IMPORT_FINDINGS: tuple[tuple[str, str, str], ...] = (
+    (
+        "frontend_local_import_unresolved", "frontend/src/App.js",
+        "frontend/src/App.js imports './EquipmentForm' but no such file exists "
+        "anywhere in this real candidate -- a real webpack build fails outright "
+        "with \"Module not found: Error: Can't resolve './EquipmentForm'\"",
+    ),
+    (
+        "frontend_local_import_unresolved", "frontend/src/App.js",
+        "frontend/src/App.js imports './RentalForm' but no such file exists "
+        "anywhere in this real candidate -- a real webpack build fails outright "
+        "with \"Module not found: Error: Can't resolve './RentalForm'\"",
+    ),
+)
+
+
+class TestFrontendLocalImportHintCoverage:
+    """`FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP`.
+    `frontend_local_import_unresolved` did not have a structured hint
+    entry, unlike `frontend_client_call_missing_import`/F-0099/F-0101B
+    before it -- the same class of gap (a real, existing, unmodified
+    checker fires correctly, but a retry received no actionable repair
+    instruction beyond the raw finding text), a different finding code
+    and a different repair shape (creating a whole new file is a legal
+    fix here; adding an import line for something that already exists,
+    F-0069's own shape, is not enough on its own)."""
+
+    def test_a_the_code_is_now_in_the_supported_map(self) -> None:
+        assert "frontend_local_import_unresolved" in _SUPPORTED_HINT_INVARIANTS
+
+    def test_b_the_hint_offers_the_emit_repair_action(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]
+        assert "emit the missing imported local file" in invariant
+        assert "real, working implementation content" in invariant
+
+    def test_c_the_hint_offers_the_remove_or_inline_repair_action(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]
+        assert "remove that" in invariant
+        assert "inline in the" in invariant
+        assert "reuse an already-existing local file" in invariant
+
+    def test_d_the_hint_forbids_assuming_a_future_stage_completes_it(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]
+        assert "a later stage or a future attempt will create the missing file" in invariant
+
+    def test_e_no_candidate_specific_token_in_the_invariant(self) -> None:
+        invariant = _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]
+        banned = (
+            "equipmentform", "rentalform", "equipment", "rental", "customer", "ticket", "student",
+        )
+        lowered = invariant.lower()
+        for token in banned:
+            assert token not in lowered, token
+
+    def test_f_the_frozen_real_replay_hints_both_missing_components_coherently(self) -> None:
+        """Replaying the exact real, frozen finding set from
+        `factory-goal-mu1oieg4-3bye3k` (two real findings, the identical
+        code) must never produce two contradictory or duplicate literal
+        blocks for the one code -- the same existing per-code dedup
+        `TestF0099RouteWiringHintCoverage` already proved for two
+        simultaneous `frontend_route_unreachable` findings: one
+        structured block, naming the first real observed detail. Both
+        real missing filenames still survive, unconditionally, in the
+        raw `prior_attempt_failure` string (proven in test_g below) --
+        only the new, selective enrichment ever drops the second."""
+        blocks = _prior_finding_hint_blocks(_LOCAL_IMPORT_FINDINGS)
+        assert len(blocks) == 1
+        text = _structured_hint_text([], _LOCAL_IMPORT_FINDINGS)
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"] in text
+        assert "./EquipmentForm" in text
+
+    def test_g_the_real_stage_prompt_payload_carries_the_hint_and_the_failed_app_js(self) -> None:
+        """The canonical retry-prompt, reconstructed: the next attempt's
+        real prompt must simultaneously carry the raw finding, the new
+        actionable repair hint, the failed previous App.js (via the
+        existing, unmodified `previous_attempt_output` mechanism), and
+        the normal multi-file output contract."""
+        decl = next(s for s in StageVocabulary.load(REPO).stages() if s.name == "frontend_forms")
+        visible = {"product/ux_spec.json": _UX_SPEC_JSON, "frontend/src/client.js": _CLIENT_JS}
+        raw_failure = "; ".join(f"{c}:{p}:{d}" for c, p, d in _LOCAL_IMPORT_FINDINGS)
+        failed_app_js = (
+            "import EquipmentForm from './EquipmentForm';\nimport RentalForm from './RentalForm';\n"
+        )
+        payload = json.loads(_stage_prompt(
+            decl, _blueprint(), visible, raw_failure,
+            repair_strategy=_STRUCTURED_HINT_REPAIR_STRATEGY, prior_findings=_LOCAL_IMPORT_FINDINGS,
+            previous_attempt_files={"frontend/src/App.js": failed_app_js},
+        ))
+        assert payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_local_import_unresolved" in payload["repair_hint"]
+        # Both real missing filenames survive, unconditionally, in the raw
+        # failure string -- even though the structured block above names
+        # only the first (test_f's own dedup proof).
+        assert "./EquipmentForm" in payload["prior_attempt_failure"]
+        assert "./RentalForm" in payload["prior_attempt_failure"]
+        assert payload["previous_attempt_output"]["frontend/src/App.js"] == failed_app_js
+        assert payload["output_contract"]["schema"] == {
+            "files": [{"path": "relative/posix/path", "content": "complete text"}],
+        }
+
+    def test_h_retry_budget_and_repair_strategy_selection_are_unchanged(self) -> None:
+        """No convergence-engine behavior changed this turn -- only rule
+        and hint text."""
+        assert _repair_strategy_for_attempt(1) == _DEFAULT_REPAIR_STRATEGY
+        assert _repair_strategy_for_attempt(2) == _STRUCTURED_HINT_REPAIR_STRATEGY
+
+
+class TestFrontendLocalImportConvergence:
+    def test_m_a_real_missing_local_component_file_converges_by_emitting_it(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """The new hint's own end-to-end proof, the same shape
+        `TestMultiFindingRealConvergence.test_l_...` already established
+        for a missing client-function import: a controlled `_QueueModel`
+        reproduces this session's own real `frontend_local_import_
+        unresolved` shape on attempt 1 (a real relative import to a form
+        component this stage's own output never emits), and a correctly
+        completed version -- emitting the previously-missing component
+        file alongside the unchanged App.js, in the SAME response -- on
+        attempt 2, proving the extended contract+hint actually converges
+        within budget, never merely that the checker rejects the broken
+        shape once in isolation."""
+        queues = _happy_path_queues()
+        queues["backend_contract"] = [
+            (HonestState.PASS, _output(_LOCAL_IMPORT_BACKEND_CONTRACT_FILES)),
+        ]
+        queues["product_ux_spec"] = [(HonestState.PASS, _output({
+            "product/ux_spec.json": _LOCAL_IMPORT_UX_SPEC_JSON,
+        }))]
+        queues["frontend_client"] = [(HonestState.PASS, _output({
+            "frontend/src/client.js": _LOCAL_IMPORT_CLIENT_JS,
+        }))]
+        broken = _output({"frontend/src/App.js": _LOCAL_IMPORT_BROKEN_APP_JS})
+        fixed = _output({
+            "frontend/src/App.js": _LOCAL_IMPORT_BROKEN_APP_JS,
+            "frontend/src/NoteForm.js": _NOTE_FORM_STANDALONE_JS,
+        })
+        queues["frontend_forms"] = [(HonestState.PASS, broken), (HonestState.PASS, fixed)]
+
+        factory = _factory(queues)
+        result = generate_staged_model_product(
+            _blueprint(), factory, _workspace(tmp_path), vocabulary=StageVocabulary.load(REPO),
+        )
+        assert "frontend/src/NoteForm.js" in result.files
+        assert "frontend/src/App.js" in result.files
+
+        forms_model = factory.models["frontend_forms"]  # type: ignore[attr-defined]
+        assert len(forms_model.prompts) == 2
+        second_payload = json.loads(forms_model.prompts[1])
+        assert second_payload["repair_strategy"] == _STRUCTURED_HINT_REPAIR_STRATEGY
+        assert "frontend_local_import_unresolved" in second_payload["prior_attempt_failure"]
+        assert "frontend_local_import_unresolved" in second_payload["repair_hint"]
+        assert (
+            second_payload["previous_attempt_output"]["frontend/src/App.js"]
+            == _LOCAL_IMPORT_BROKEN_APP_JS
+        )
+
+
+class TestFrontendLocalImportFrozenReplay:
+    """Section 18's own requirement: prove parser output -> merged file
+    set -> local-import checker -> hint lookup against the real, frozen
+    `factory-goal-mu1oieg4-3bye3k` evidence blob's own real persisted
+    bytes -- read fresh from disk, never re-typed by hand -- with no
+    model call."""
+
+    @staticmethod
+    def _real_evidence() -> dict:
+        blob = (
+            REPO / "var" / "factory" / "evidence" / "blobs" / "sha256" / "5c"
+            / "5cefea47b03c999fe4654f15d32fef7e3681b0f62b12f199cc7a67df104e2e46"
+        )
+        return json.loads(blob.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _real_merged_files() -> dict[str, str]:
+        """The real stage's own `{**visible_files, **stage_files}` merge
+        (`_generate_one_stage`, unchanged) -- `apiClient.js` is a real,
+        frozen, unmodified prior-stage (`frontend_client`) file this
+        stage's own output never touches, read fresh from the real
+        candidate workspace, never re-typed by hand."""
+        evidence = TestFrontendLocalImportFrozenReplay._real_evidence()
+        raw = json.loads(evidence["last_raw_output"])
+        stage_files = {f["path"]: f["content"] for f in raw["files"]}
+        api_client = (
+            REPO / "var" / "factory" / "candidates" / "factory-goal-mu1oieg4-3bye3k"
+            / "frontend" / "src" / "apiClient.js"
+        ).read_text(encoding="utf-8")
+        return {"frontend/src/apiClient.js": api_client, **stage_files}
+
+    def test_a_the_real_raw_output_parses_to_exactly_one_file(self) -> None:
+        evidence = self._real_evidence()
+        raw = json.loads(evidence["last_raw_output"])
+        assert [f["path"] for f in raw["files"]] == ["frontend/src/App.js"]
+
+    def test_b_the_real_merged_state_produces_both_local_import_findings(self) -> None:
+        findings = _frontend_local_import_findings(self._real_merged_files())
+        codes = {f.code for f in findings}
+        assert codes == {"frontend_local_import_unresolved"}
+        assert any("./EquipmentForm" in f.detail for f in findings)
+        assert any("./RentalForm" in f.detail for f in findings)
+        assert len(findings) == 2
+
+    def test_c_the_real_findings_map_to_the_new_actionable_hint(self) -> None:
+        findings = _frontend_local_import_findings(self._real_merged_files())
+        prior_findings = tuple((f.code, f.path, f.detail) for f in findings)
+        text = _structured_hint_text([], prior_findings)
+        assert _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"] in text

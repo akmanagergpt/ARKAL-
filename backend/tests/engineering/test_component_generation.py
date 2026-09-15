@@ -2339,6 +2339,62 @@ class TestFrontendFormsClientImportPreventionRule:
         assert "import `useParams` from" in rule
 
 
+class TestFrontendFormsLocalImportCompletenessRule:
+    """`FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP` (real evidence:
+    `factory-goal-mu1oieg4-3bye3k`, no model call): a real, live
+    candidate's own `frontend_forms` output introduced new relative
+    imports for two of its own newly-referenced form components but never
+    emitted either referenced file's own content, on all 4 real attempts,
+    leaving a real, permanent `Module not found` build failure.
+    `STAGED_GENERATION_STAGES.md#9` already required importing
+    frontend_client exports and useParams, but stated no general
+    invariant that a NEW local file this stage's own code imports must
+    resolve inside that same response. The checker
+    (`frontend_manifest_preflight.py::_frontend_local_import_findings`/
+    `_relative_import_resolves`, already correct), the structured retry
+    hint (`_SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]`,
+    added alongside this rule sentence), and parser/merge/retry-context
+    are otherwise untouched by this fix -- prose-only, additive,
+    prevention side plus one matching hint entry."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("frontend_forms").rule
+
+    def test_a_the_same_response_resolution_requirement_is_explicit(self) -> None:
+        rule = self._rule()
+        assert "must resolve inside" in rule
+        assert "this same response's own file set" in rule
+
+    def test_b_the_emit_alternative_is_explicit(self) -> None:
+        rule = self._rule()
+        assert "emit that referenced file, with" in rule
+        assert "real, working implementation content" in rule
+
+    def test_c_the_remove_or_inline_alternative_is_explicit(self) -> None:
+        rule = self._rule()
+        assert "do not introduce the import at all" in rule
+        assert "keep the implementation inline in" in rule
+        assert "reuse an already-resolvable existing local file" in rule
+
+    def test_d_assuming_a_later_stage_completes_it_is_explicitly_forbidden(self) -> None:
+        rule = self._rule()
+        assert "never assume a later stage will create it" in rule
+
+    def test_e_the_new_sentence_carries_no_candidate_domain_token(self) -> None:
+        rule = self._rule()
+        banned = ("equipmentform", "rentalform", "equipment", "rental")
+        start = rule.index("Any new local file this")
+        new_sentence = rule[start:start + 700].lower()
+        for token in banned:
+            assert token not in new_sentence, token
+
+    def test_f_the_existing_client_import_rule_is_preserved(self) -> None:
+        rule = self._rule()
+        assert "calls or otherwise references" in rule
+        assert "updateThing(id, data)" in rule
+
+
 class TestBackendImplementationFrameworkCompatibilityRule:
     """`BACKEND_ACCEPTANCE_COMPATIBILITY_GAP` (real evidence: `factory-
     goal-mu1hy9w1-qn30iv`): a real, live candidate declared
@@ -3019,11 +3075,15 @@ if __name__ == '__main__':
     ui_prompt = _stage_prompt(ui_decl, blueprint, ui_visible, None, None)
     forms_prompt = _stage_prompt(forms_decl, blueprint, forms_visible, None, None)
     assert len(ui_prompt) == 13681
-    assert len(forms_prompt) == 20063
+    # `frontend_forms`'s own rule text grew by the local-component-
+    # completeness sentence (`FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_
+    # GAP`); this exact byte count -- and the two derived timeouts below --
+    # move with it. `frontend_ui`'s own prompt is untouched.
+    assert len(forms_prompt) == 20925
     ui_timeout = DEFAULT_TIMEOUT_SECONDS * min(
         max(1.0, len(ui_prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
     forms_timeout = DEFAULT_TIMEOUT_SECONDS * min(
         max(1.0, len(forms_prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
     assert ui_timeout == DEFAULT_TIMEOUT_SECONDS
     assert forms_timeout > DEFAULT_TIMEOUT_SECONDS
-    assert forms_timeout == pytest.approx(1257.83, abs=0.1)
+    assert forms_timeout == pytest.approx(1311.87, abs=0.1)

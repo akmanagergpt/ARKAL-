@@ -253,6 +253,30 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "itself. Fix the association, not the visible wording -- no "
         "specific label text or styling is required"
     ),
+    #: FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP (real evidence:
+    #: `factory-goal-mu1oieg4-3bye3k`, `frontend_local_import_unresolved`
+    #: x2, ARK-ERR-0116 exhausted, session evidence, frozen). The real
+    #: checker fires correctly -- this stage's own generated code imports
+    #: a local file that does not exist anywhere in the candidate -- but
+    #: had no entry here, so a retry received only the raw finding text
+    #: and the generic "make the minimal edit" convergence rule, never an
+    #: explicit repair action; the same two dangling imports survived all
+    #: 4 real attempts. `STAGED_GENERATION_STAGES.md#9`'s own rule already
+    #: states this same invariant at generation time; this hint restates
+    #: it only for a retry that already violated it.
+    "frontend_local_import_unresolved": (
+        "a relative import in a generated frontend file does not resolve "
+        "to any real file in this candidate. Repair by doing exactly one "
+        "of: emit the missing imported local file, with real, working "
+        "implementation content, in this same response; or remove that "
+        "import and instead keep the implementation inline in the "
+        "importing file, or reuse an already-existing local file that "
+        "already resolves. Never leave the import in place while assuming "
+        "a later stage or a future attempt will create the missing file -- "
+        "no later stage re-emits this stage's own frontend files. After "
+        "making this change, every other real local relative import in "
+        "every emitted frontend file must still resolve"
+    ),
 }
 
 
