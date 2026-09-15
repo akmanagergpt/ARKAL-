@@ -117,7 +117,9 @@ JSON must include that row's own database-generated id (e.g.
 cursor.lastrowid) in the response, not only the submitted request body
 (golden-work-052/053, session evidence, frozen: a real model's own
 generated test asserted the response includes an id its own create route
-never returned). A route that fetches a single row with cursor.fetchone()
+never returned). SQLite exposes `lastrowid` on the cursor/INSERT result,
+not on `sqlite3.Connection`; `conn.lastrowid` is invalid and must never be
+used. A route that fetches a single row with cursor.fetchone()
 must convert it to a keyed object (e.g. conn.row_factory = sqlite3.Row
 plus dict(row), or an explicit column-name mapping) before passing it to
 jsonify — a bare tuple serializes as a JSON array, not an object with

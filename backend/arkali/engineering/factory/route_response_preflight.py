@@ -70,21 +70,41 @@ def _backend_python_functions(files: Mapping[str, str]):
                 yield path, source, node
 
 
+def _has_valid_lastrowid_owner(node: ast.AST) -> bool:
+    connection_names = {
+            call.func.value.id
+            for call in ast.walk(node)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in {"cursor", "commit"}
+            and isinstance(call.func.value, ast.Name)
+    }
+    lastrowid_owners = {
+            attr.value.id
+            for attr in ast.walk(node)
+            if isinstance(attr, ast.Attribute)
+            and attr.attr == "lastrowid"
+            and isinstance(attr.value, ast.Name)
+    }
+    return bool(lastrowid_owners and not (lastrowid_owners & connection_names))
+
+
 def _missing_generated_id_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     findings: list[SemanticFinding] = []
     for path, source, node in _backend_python_functions(files):
         segment = (ast.get_source_segment(source, node) or "").lower()
         if "insert into" not in segment or "jsonify" not in segment:
             continue
-        if "lastrowid" in segment:
+        if _has_valid_lastrowid_owner(node):
             continue
         findings.append(SemanticFinding(
             code="missing_generated_id_in_create_response", path=path,
             detail=(
                 f"function {node.name!r} executes a SQL INSERT and returns "
-                "JSON but never references cursor.lastrowid — add the row's "
-                "own generated id (e.g. cursor.lastrowid) to the response "
-                "instead of only the submitted request body"
+                "JSON but never references a valid cursor.lastrowid — add the "
+                "row's own generated id from the cursor/INSERT result (e.g. "
+                "cursor.lastrowid), never from sqlite3.Connection.lastrowid, "
+                "to the response instead of only the submitted request body"
             ),
         ))
     return findings

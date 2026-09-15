@@ -38,6 +38,36 @@ def test_is_silent_when_lastrowid_is_referenced() -> None:
     assert _missing_generated_id_findings({"backend/app.py": source}) == []
 
 
+def test_flags_lastrowid_read_from_sqlite_connection_instead_of_cursor() -> None:
+    source = (
+        "from flask import jsonify\n"
+        "def create_task():\n"
+        "    conn = get_db_connection()\n"
+        "    cursor = conn.cursor()\n"
+        "    cursor.execute('INSERT INTO tasks (title) VALUES (?)', (data['title'],))\n"
+        "    conn.commit()\n"
+        "    task_id = conn.lastrowid\n"
+        "    return jsonify({'id': task_id}), 201\n"
+    )
+    findings = _missing_generated_id_findings({"backend/app.py": source})
+    assert [finding.code for finding in findings] == ["missing_generated_id_in_create_response"]
+    assert "sqlite3.Connection.lastrowid" in findings[0].detail
+
+
+def test_flags_direct_connection_execute_followed_by_connection_lastrowid() -> None:
+    source = (
+        "def create_task():\n"
+        "    conn = get_db_connection()\n"
+        "    conn.execute('INSERT INTO tasks (title) VALUES (?)', (data['title'],))\n"
+        "    conn.commit()\n"
+        "    task_id = conn.lastrowid\n"
+        "    return jsonify({'id': task_id}), 201\n"
+    )
+    assert [
+        finding.code for finding in _missing_generated_id_findings({"backend/app.py": source})
+    ] == ["missing_generated_id_in_create_response"]
+
+
 def test_is_silent_when_no_insert_is_present() -> None:
     source = "def get_tasks():\n    cursor.execute('SELECT * FROM tasks')\n    return jsonify(cursor.fetchall())\n"
     assert _missing_generated_id_findings({"backend/app.py": source}) == []
