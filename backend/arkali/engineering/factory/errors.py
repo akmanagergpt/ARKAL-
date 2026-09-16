@@ -35,6 +35,13 @@ class ProductSemanticPreflightError(ContractViolation):
     code = "ARK-ERR-0117"
 
 
+def _model_generation_error(message: str, raw_output: str, completion: object) -> ModelGenerationError:
+    error = ModelGenerationError(message)
+    error.last_raw_output = raw_output  # type: ignore[attr-defined]
+    error.last_completion_metadata = completion  # type: ignore[attr-defined]
+    return error
+
+
 class StageVocabularyError(ContractViolation):
     """The staged-generation stage vocabulary document is missing or malformed."""
 

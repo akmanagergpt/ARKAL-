@@ -839,6 +839,32 @@ def test_stage_budget_exhaustion_raises_and_writes_nothing_for_that_candidate(
     assert not (workspace.root / "backend").exists()
 
 
+@pytest.mark.parametrize("state", [HonestState.NOT_CONFIGURED, HonestState.PASS])
+def test_empty_inference_is_terminal_without_content_retries(state: HonestState) -> None:
+    declaration = StageVocabulary.load(REPO).stage("backend_contract")
+    model = _QueueModel([(state, ""), (HonestState.PASS, _output(HAPPY_PATH_FILES["backend_contract"]))])
+    with pytest.raises(ModelGenerationError) as excinfo:
+        _generate_one_stage(
+            declaration, _blueprint(), model, "test-model", {},
+            timeout_seconds=DEFAULT_TIMEOUT_SECONDS, max_attempts=4,
+        )
+    assert "infrastructure inference failure on attempt 1" in str(excinfo.value)
+    assert len(model.prompts) == 1
+    assert excinfo.value.last_raw_output == ""  # type: ignore[attr-defined]
+    assert excinfo.value.last_completion_metadata is None  # type: ignore[attr-defined]
+
+
+def test_non_pass_inference_is_terminal_even_with_partial_output() -> None:
+    model = _QueueModel([(HonestState.NOT_CONFIGURED, "partial")])
+    with pytest.raises(ModelGenerationError) as excinfo:
+        _generate_one_stage(
+            StageVocabulary.load(REPO).stage("backend_contract"), _blueprint(), model,
+            "test-model", {}, timeout_seconds=DEFAULT_TIMEOUT_SECONDS, max_attempts=4,
+        )
+    assert excinfo.value.last_raw_output == "partial"  # type: ignore[attr-defined]
+    assert len(model.prompts) == 1
+
+
 def test_budget_exhaustion_retains_the_last_raw_model_output(
     tmp_path: pathlib.Path,
 ) -> None:

@@ -53,7 +53,7 @@ from arkali.engineering.factory.backend_stage_preflight import (
     _schema_only_findings,
 )
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
-from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.errors import ModelGenerationError, _model_generation_error
 from arkali.engineering.factory.frontend_client_call_preflight import (
     _client_call_missing_import_findings,
     _phantom_client_import_findings,
@@ -455,7 +455,11 @@ def _generate_one_stage(
         last_raw_output = outcome.output
         if outcome.state is not HonestState.PASS or not outcome.output.strip():
             failure = f"stage inference did not pass: {outcome.state.value}: {outcome.detail}"
-            last_findings = ()
+            _notify_attempt(model, declaration.name, attempt_number, strategy, prompt,
+                            outcome.output, (), failure)
+            raise _model_generation_error(
+                f"stage {declaration.name!r} infrastructure inference failure on attempt "
+                f"{attempt_number}: {failure}", last_raw_output, outcome.completion)
         else:
             envelope, parse_failure = _parse_stage_envelope(declaration.name, outcome.output)
             if envelope is None:
@@ -513,26 +517,22 @@ def _generate_one_stage(
         # another. This does not raise the bounded maximum; it stops
         # before spending it on a call already proven to repeat.
         if failure == previous_failure and attempt_number < max_attempts:
-            error = ModelGenerationError(
+            raise _model_generation_error(
                 f"stage {declaration.name!r} repeated the identical failure fingerprint "
                 f"on attempts {attempt_number - 1} and {attempt_number}, stopping before "
-                f"exhausting the remaining bounded attempts: {failure}"
+                f"exhausting the remaining bounded attempts: {failure}",
+                last_raw_output, outcome.completion,
             )
-            error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
-            error.last_completion_metadata = outcome.completion  # type: ignore[attr-defined]
-            raise error
         previous_failure = failure
     # The raw last-attempt output is retained on the exception (not just the
     # mechanical failure summary) so a caller can freeze real diagnostic
     # evidence — golden-work-043 and the first golden-work-045 stage failure
     # this session both had to be reported without it, since nothing else in
     # this pipeline persists a rejected attempt's actual bytes.
-    error = ModelGenerationError(
-        f"stage {declaration.name!r} exhausted {max_attempts} attempts: {failure}"
+    raise _model_generation_error(
+        f"stage {declaration.name!r} exhausted {max_attempts} attempts: {failure}",
+        last_raw_output, outcome.completion,
     )
-    error.last_raw_output = last_raw_output  # type: ignore[attr-defined]
-    error.last_completion_metadata = outcome.completion  # type: ignore[attr-defined]
-    raise error
 
 
 def generate_staged_model_product(
