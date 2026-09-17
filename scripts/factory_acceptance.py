@@ -94,14 +94,14 @@ def _load_scenario(path: pathlib.Path) -> _AcceptanceScenario:
 
 
 def _candidate_contract_files(candidate_dir: pathlib.Path) -> dict[str, str]:
-    """Every real `product/*.json` and `backend/*.json` file the candidate
+    """Every real product/backend contract, including backend/models/*.json,
     itself wrote, keyed `"<root>/<name>.json"` -- the same `files:
     Mapping[str, str]` shape every other stage-input reader in
     `engineering.factory` already consumes (`_parse_ux_spec`,
     `_backend_json_documents`), read fresh from the frozen candidate
     directory rather than re-derived from anything in memory."""
     files: dict[str, str] = {}
-    for sub in ("product", "backend"):
+    for sub in ("product", "backend", "backend/models"):
         directory = candidate_dir / sub
         if not directory.is_dir():
             continue

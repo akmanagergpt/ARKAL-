@@ -52,6 +52,20 @@ def _accept(module, candidate_id: str, source_candidate: pathlib.Path, *, skip_b
     return module._accept(candidate_id, source_candidate, scenario, path, skip_browser=skip_browser)
 
 
+def test_contract_reader_includes_per_model_contracts(tmp_path) -> None:  # noqa: ANN001
+    module = _module()
+    models = tmp_path / "backend" / "models"
+    models.mkdir(parents=True)
+    contract = {"table_name": "things", "fields": {"id": "integer", "name": "string"}}
+    (models / "things.json").write_text(json.dumps(contract), encoding="utf-8")
+    (tmp_path / "backend" / "routes.json").write_text("[]", encoding="utf-8")
+    files = module._candidate_contract_files(tmp_path)
+    assert json.loads(files["backend/models/things.json"]) == contract
+    assert files["backend/routes.json"] == "[]"
+    from arkali.engineering.factory.acceptance_plan_compiler import _model_field_types
+    assert _model_field_types(files)["things"] == contract["fields"]
+
+
 def test_stop_owns_only_the_passed_process(monkeypatch) -> None:  # noqa: ANN001
     module = _module()
     commands: list[list[str]] = []
