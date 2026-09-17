@@ -66,6 +66,136 @@ def test_contract_reader_includes_per_model_contracts(tmp_path) -> None:  # noqa
     assert _model_field_types(files)["things"] == contract["fields"]
 
 
+def _interrupted(module, monkeypatch, tmp_path):  # noqa: ANN001, ANN202
+    source, ledger = _seed_verified_candidate(module, monkeypatch, tmp_path, "factory-recovery-test")
+    ledger.begin_acceptance("factory-recovery-test", source)
+    ledger.record_state("factory-recovery-test", INTERRUPTED, source, detail={"result_sha256": "historical"})
+    return source, ledger
+
+
+def test_recovery_preserves_original_and_content(monkeypatch, tmp_path):  # noqa: ANN001
+    from types import SimpleNamespace
+    module = _module()
+    source, original = _interrupted(module, monkeypatch, tmp_path)
+    before = original.history("factory-recovery-test")
+    manifest = file_manifest(source)
+    verified = original.recovery_input("factory-recovery-test", source)
+    monkeypatch.setattr(module, "_find_operation_gate_grant", lambda *a: SimpleNamespace(identifier="human-grant"))
+    _stub_a_full_successful_journey(module, monkeypatch)
+    registrations = []
+    monkeypatch.setattr(module, "_register_managed_product", lambda c, l: registrations.append(l.history(c)) or {})
+    result = module._accept("factory-recovery-test", source, module._load_scenario(DEFAULT_SCENARIO_PATH),
+                            DEFAULT_SCENARIO_PATH, recovery={"execution_id": "new-execution", "input": verified,
+                                                            "reason": "approved recovery"})
+    assert result["outcome"] == "GOLDEN_ACCEPTANCE_PASS"
+    assert original.history("factory-recovery-test") == before
+    assert file_manifest(source) == manifest
+    scoped = CandidateLedger(original._root, execution_id="new-execution")
+    assert [e["state"] for e in scoped.history("factory-recovery-test")] == ["ACCEPTANCE_RUNNING", ACCEPTED]
+    detail = scoped.latest("factory-recovery-test")["detail"]
+    assert detail["recovery_of"] == verified["original_identity"]
+    assert detail["input_identity"] == verified["input_identity"]
+    assert detail["authorization_ref"] == "human-grant"
+    assert registrations[0][-1]["execution_id"] == "new-execution"
+
+
+def test_recovery_rejects_unauthorized_or_changed_input(monkeypatch, tmp_path):  # noqa: ANN001
+    module = _module()
+    source, ledger = _interrupted(module, monkeypatch, tmp_path)
+    monkeypatch.setattr(module, "_find_operation_gate_grant", lambda *a: None)
+    with pytest.raises(module.CandidateIntegrityError, match="authorization"):
+        module._recovery_authorization("factory-recovery-test", source)
+    verified = ledger.recovery_input("factory-recovery-test", source)
+    (source / "App.js").write_text("changed", encoding="utf-8")
+    with pytest.raises(module.CandidateIntegrityError):
+        CandidateLedger(ledger._root, execution_id="new").begin_recovery(
+            "factory-recovery-test", source, recovery_input=verified, authorization_ref="grant", reason="recovery")
+    assert ledger.classify("factory-recovery-test") == INTERRUPTED
+
+
+@pytest.mark.parametrize("terminal", [ACCEPTED, ACCEPTANCE_FAILED, INTERRUPTED])
+def test_recovery_terminal_never_overwrites_original(monkeypatch, tmp_path, terminal):  # noqa: ANN001
+    module = _module()
+    source, original = _interrupted(module, monkeypatch, tmp_path)
+    before = original.history("factory-recovery-test")
+    verified = original.recovery_input("factory-recovery-test", source)
+    scoped = CandidateLedger(original._root, execution_id="independent")
+    scoped.begin_recovery("factory-recovery-test", source, recovery_input=verified,
+                          authorization_ref="human-record", reason="approved")
+    scoped.record_state("factory-recovery-test", terminal, source)
+    assert original.history("factory-recovery-test") == before
+    assert scoped.classify("factory-recovery-test") == terminal
+    with pytest.raises(module.CandidateAcceptanceInProgressError):
+        scoped.begin_recovery("factory-recovery-test", source, recovery_input=verified,
+                              authorization_ref="human-record", reason="approved")
+
+
+@pytest.mark.parametrize("outcome", ["GOLDEN_ACCEPTANCE_PASS", "GOLDEN_ACCEPTANCE_FAILED", "ACCEPTANCE_INTERRUPTED"])
+def test_recovery_job_idempotency_and_independent_result(monkeypatch, tmp_path, outcome):  # noqa: ANN001
+    from types import SimpleNamespace
+    module = _module()
+    source, ledger = _interrupted(module, monkeypatch, tmp_path)
+    before = ledger.history("factory-recovery-test")
+    monkeypatch.setattr(module, "_find_operation_gate_grant", lambda *a: SimpleNamespace(identifier="grant"))
+    engine = module._upgraded_engine(tmp_path / "jobs.db")
+    monkeypatch.setattr(module, "_upgraded_engine", lambda p: engine)
+    calls = []
+    def accept(c, s, scenario, path, *, recovery):  # noqa: ANN001, ANN202
+        calls.append(recovery)
+        return {"outcome": outcome, "execution_id": recovery["execution_id"]}
+    monkeypatch.setattr(module, "_accept", accept)
+    scenario = module._load_scenario(DEFAULT_SCENARIO_PATH)
+    first = module._recover_acceptance("factory-recovery-test", source, scenario, DEFAULT_SCENARIO_PATH, reason="approved")
+    second = module._recover_acceptance("factory-recovery-test", source, scenario, DEFAULT_SCENARIO_PATH, reason="approved")
+    assert first == second and len(calls) == 1
+    assert first["execution_id"] != "factory-recovery-test"
+    assert ledger.history("factory-recovery-test") == before
+    with module.unit_of_work(module.create_session_factory(engine)) as session:
+        from arkali.control.policy.pep import PolicyEnforcementPoint
+        jobs = module.JobStore(session, PolicyEnforcementPoint(module.PolicyDecisionPoint.load(REPO), "execution.durable.job_store"))
+        job = jobs.require(first["execution_id"])
+        assert job.lifecycle_state == ("SUCCEEDED" if outcome == "GOLDEN_ACCEPTANCE_PASS" else "DEAD_LETTER")
+        assert job.payload["authorization_ref"] == "grant"
+        assert job.payload["input"]["original_execution"] == before[-1]
+
+
+def test_recovery_active_lock_prevents_duplicate(monkeypatch, tmp_path):  # noqa: ANN001
+    from types import SimpleNamespace
+    module = _module()
+    source, ledger = _interrupted(module, monkeypatch, tmp_path)
+    monkeypatch.setattr(module, "_find_operation_gate_grant", lambda *a: SimpleNamespace(identifier="grant"))
+    engine = module._upgraded_engine(tmp_path / "jobs.db")
+    monkeypatch.setattr(module, "_upgraded_engine", lambda p: engine)
+    lock = ledger._root / "factory-recovery-test.acceptance.lock"
+    lock.touch()
+    monkeypatch.setattr(module, "_accept", lambda *a, **k: pytest.fail("duplicate acceptance"))
+    result = module._recover_acceptance("factory-recovery-test", source, module._load_scenario(DEFAULT_SCENARIO_PATH),
+                                       DEFAULT_SCENARIO_PATH, reason="approved")
+    assert result["outcome"] == "ACCEPTANCE_ALREADY_IN_PROGRESS" and lock.exists()
+
+
+def test_recovery_exception_is_terminal_only_for_new_execution(monkeypatch, tmp_path):  # noqa: ANN001
+    from types import SimpleNamespace
+    module = _module()
+    source, ledger = _interrupted(module, monkeypatch, tmp_path)
+    before = ledger.history("factory-recovery-test")
+    monkeypatch.setattr(module, "_find_operation_gate_grant", lambda *a: SimpleNamespace(identifier="grant"))
+    engine = module._upgraded_engine(tmp_path / "jobs.db")
+    monkeypatch.setattr(module, "_upgraded_engine", lambda p: engine)
+    executions = []
+    def interrupted(c, s, scenario, path, *, recovery):  # noqa: ANN001
+        executions.append(recovery["execution_id"])
+        scoped = CandidateLedger(ledger._root, execution_id=recovery["execution_id"])
+        scoped.begin_recovery(c, s, recovery_input=recovery["input"], authorization_ref="grant", reason="approved")
+        raise RuntimeError("copy interrupted")
+    monkeypatch.setattr(module, "_accept", interrupted)
+    with pytest.raises(RuntimeError, match="copy interrupted"):
+        module._recover_acceptance("factory-recovery-test", source, module._load_scenario(DEFAULT_SCENARIO_PATH),
+                                   DEFAULT_SCENARIO_PATH, reason="approved")
+    assert CandidateLedger(ledger._root, execution_id=executions[0]).classify("factory-recovery-test") == INTERRUPTED
+    assert ledger.history("factory-recovery-test") == before
+
+
 def test_stop_owns_only_the_passed_process(monkeypatch) -> None:  # noqa: ANN001
     module = _module()
     commands: list[list[str]] = []

@@ -397,3 +397,17 @@ wholly separate scoping key (still ungranted).
 | HUMAN_GATE_6 | APPLY of a migration to real or stable data | **GRANTED for `PHASE_ACCEPTANCE` of the Phase 20 candidate only** — HGR-003, bound to candidate commit `73a968f`/digest `sha256:b94d28bb...202c2c`. **No `RUNTIME_OPERATION`-scope grant exists.** Any real future `APPLY_MIGRATION` against real or stable data still requires its own separate grant bound to the exact target/revision identity resolved at call time; HGR-003 does not authorize it |
 | HUMAN_GATE_7 | Final Production Release | not reached |
 | HUMAN_GATE_8 | Exception to a canonical architecture budget | not reached |
+
+## Scoped acceptance execution recovery authorization — 2026-09-17
+
+This operation-scope record uses the existing scoped authorization reader.
+`ACCEPTANCE_RECOVERY` is an operator authorization key, not a new phase gate,
+release grant, lifecycle state, or authority. The human operator explicitly
+authorized a new execution on the same verified auto-repair candidate, keeping
+its original `INTERRUPTED` execution immutable, with no generation or patching.
+Target is the digest of its exact original terminal ledger entry; revision is
+the digest of that entry's exact file manifest, computed by `recovery_input`.
+
+| ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
+|---|---|---|---|---|---|---|---|
+| HGR-009 | ACCEPTANCE_RECOVERY | ACCEPTANCE_RECOVERY | sha256:609207916e71188d4cce65f463b03f01081a58a81b6e7dca5450da1ebbb6eecf | sha256:75680bffb3054e011892898564368adaa63265c2b24cab215de0ee5e06b9a716 | human operator | GRANTED | Explicit human message: CANONICAL ACCEPTANCE RECOVERY PATH. Limited to new acceptance execution identity for factory-goal-mu2u58qo-5md7vc, original job goal-mu2u58qo-5md7vc. No terminal resurrection, candidate changes, generation, model call, or new Factory candidate. Results remain independent and durably linked. |

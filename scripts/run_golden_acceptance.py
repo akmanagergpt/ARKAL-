@@ -27,6 +27,7 @@ from factory_acceptance import (  # noqa: E402
     _accept,
     _candidate_contract_files,
     _resolve_scenario,
+    _recover_acceptance,
     _run,
 )
 
@@ -70,6 +71,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--skip-browser", action="store_true", help="diagnostic only; can never accept")
+    parser.add_argument("--recovery-reason", help="new authorized execution for immutable interrupted input")
     parser.add_argument(
         "--scenario", type=pathlib.Path, default=None,
         help="explicit AcceptanceScenario JSON override (ARK-REQ-0074: this runner names no "
@@ -89,9 +91,15 @@ def main(argv: list[str]) -> int:
         return 2
     scenario, scenario_path = resolved
 
-    result = _accept(
-        args.candidate_id, candidate_dir, scenario, scenario_path, skip_browser=args.skip_browser,
-    )
+    if args.recovery_reason:
+        if args.skip_browser:
+            parser.error("recovery requires the full production acceptance journey")
+        result = _recover_acceptance(args.candidate_id, candidate_dir, scenario, scenario_path,
+                                     reason=args.recovery_reason)
+    else:
+        result = _accept(
+            args.candidate_id, candidate_dir, scenario, scenario_path, skip_browser=args.skip_browser,
+        )
     if args.skip_browser and result["outcome"] == "GOLDEN_ACCEPTANCE_PASS":
         result["outcome"] = "GOLDEN_ACCEPTANCE_INCOMPLETE"
     print(json.dumps(result, ensure_ascii=False))

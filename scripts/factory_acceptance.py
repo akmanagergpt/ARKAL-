@@ -31,6 +31,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import uuid
 from dataclasses import dataclass, field
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
@@ -38,10 +39,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "backend"))
 from alembic import command as _alembic_command  # noqa: E402
 from alembic.config import Config as _AlembicConfig  # noqa: E402
 from arkali.control.policy.pdp import PolicyDecisionPoint  # noqa: E402
+from arkali.acceptance.human_gate_authorization import _find_operation_gate_grant  # noqa: E402
+from arkali.execution.durable.job_store import JobStore, JobSubmission  # noqa: E402
+from arkali.execution.durable.job_state_machine import RUNNING, SUCCEEDED, FAILED, DEAD_LETTER  # noqa: E402
 from arkali.control.policy.pep import PolicyEnforcementPoint  # noqa: E402
 from arkali.control.registry.project.registry import ProjectRegistry  # noqa: E402
 from arkali.engineering.candidate.ledger import (  # noqa: E402
     ACCEPTANCE_FAILED,
+    ACCEPTANCE_RUNNING,
     ACCEPTED,
     CandidateAcceptanceInProgressError,
     CandidateIntegrityError,
@@ -376,7 +381,7 @@ def _verify_read_only_survives_restart(
 def _accept(
     candidate_id: str, source_candidate: pathlib.Path,
     scenario: _AcceptanceScenario, scenario_path: pathlib.Path,
-    *, skip_browser: bool = False,
+    *, skip_browser: bool = False, recovery: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """The one real, generic acceptance journey. `source_candidate` is
     already resolved and already trusted by the caller (`run_golden_
@@ -384,9 +389,11 @@ def _accept(
     `run_factory_worker.py`'s own real `workspace.root` for a live
     production candidate) -- this function itself performs no identity
     resolution and holds no opinion on `candidate_id`'s own shape."""
-    ledger = CandidateLedger(CANDIDATES / "_ledger")
+    ledger = CandidateLedger(
+        CANDIDATES / "_ledger", execution_id=str(recovery["execution_id"]) if recovery else None,
+    )
     journey = Journey(candidate_id)
-    runtime = RUNTIMES / candidate_id / f"acceptance-{int(time.time())}"
+    runtime = RUNTIMES / candidate_id / f"acceptance-{uuid.uuid4().hex}"
     runtime.mkdir(parents=True, exist_ok=False)
     evidence = runtime / "evidence"
     evidence.mkdir()
@@ -402,7 +409,14 @@ def _accept(
     # acceptance attempt for the same candidate_id is refused outright.
     # Nothing about the source candidate is touched before this passes.
     try:
-        ledger.begin_acceptance(candidate_id, source_candidate)
+        if recovery:
+            _, grant = _recovery_authorization(candidate_id, source_candidate)
+            ledger.begin_recovery(
+                candidate_id, source_candidate, recovery_input=recovery["input"],
+                authorization_ref=grant.identifier, reason=str(recovery["reason"]),
+            )
+        else:
+            ledger.begin_acceptance(candidate_id, source_candidate)
     except CandidateIntegrityError as error:
         result = {
             "outcome": "CANDIDATE_INTEGRITY_FAILED", "candidate_id": candidate_id,
@@ -552,6 +566,9 @@ def _accept(
     finally:
         _stop(frontend)
         _stop(backend)
+        if recovery:
+            result["execution_id"] = recovery["execution_id"]
+            result["recovery_provenance"] = recovery
         result_path = evidence / "result.json"
         result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
         result_sha256 = hashlib.sha256(result_path.read_bytes()).hexdigest()
@@ -584,6 +601,86 @@ def _accept(
                 candidate_id, ledger,
             )
     return result
+
+
+def _recovery_authorization(candidate_id: str, source_candidate: pathlib.Path):  # noqa: ANN202
+    verified = CandidateLedger(CANDIDATES / "_ledger").recovery_input(candidate_id, source_candidate)
+    grant = _find_operation_gate_grant(
+        ROOT, "ACCEPTANCE_RECOVERY", "ACCEPTANCE_RECOVERY",
+        str(verified["original_identity"]), str(verified["input_identity"]),
+    )
+    if grant is None:
+        raise CandidateIntegrityError("acceptance recovery has no matching human authorization")
+    return verified, grant
+
+
+def _recover_acceptance(
+    candidate_id: str, source_candidate: pathlib.Path, scenario: _AcceptanceScenario,
+    scenario_path: pathlib.Path, *, reason: str,
+) -> dict[str, object]:
+    """Idempotent new Job execution; same verified input and acceptance engine."""
+    if not reason.strip():
+        raise ValueError("recovery reason is required")
+    verified, grant = _recovery_authorization(candidate_id, source_candidate)
+    key = hashlib.sha256(json.dumps({
+        "original": verified["original_identity"], "input": verified["input_identity"],
+        "scenario": hashlib.sha256(scenario_path.read_bytes()).hexdigest(),
+        "operation": "ACCEPTANCE_RECOVERY",
+    }, sort_keys=True).encode()).hexdigest()
+    pdp = PolicyDecisionPoint.load(ROOT)
+    engine = _upgraded_engine(ROOT / "var" / "command_center.db")
+    sessions = create_session_factory(engine)
+    lock = CANDIDATES / "_ledger" / f"{candidate_id}.acceptance.lock"
+    try:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+        except FileExistsError:
+            return {"outcome": "ACCEPTANCE_ALREADY_IN_PROGRESS", "candidate_id": candidate_id}
+        try:
+            with unit_of_work(sessions) as session:
+                jobs = JobStore(session, PolicyEnforcementPoint(pdp, "execution.durable.job_store"))
+                existing = jobs.find_submitted("acceptance_recovery", key)
+                if existing:
+                    checkpoints = jobs.checkpoints(existing.job_id)
+                    return checkpoints[-1].payload if checkpoints else {
+                        "outcome": "ACCEPTANCE_ALREADY_IN_PROGRESS", "execution_id": existing.job_id,
+                    }
+                execution_id = "acceptance-recovery-" + uuid.uuid4().hex
+                context = {"execution_id": execution_id, "input": verified,
+                           "authorization_ref": grant.identifier, "reason": reason,
+                           "scenario_sha256": hashlib.sha256(scenario_path.read_bytes()).hexdigest()}
+                if candidate_id.startswith("factory-goal-"):
+                    original_job = jobs.require(candidate_id.removeprefix("factory-"))
+                    context["original_job_id"] = original_job.job_id
+                jobs.submit(JobSubmission(job_id=execution_id, job_type="acceptance_recovery",
+                                          idempotency_key=key, payload=context))
+                jobs.transition(execution_id, RUNNING)
+            try:
+                result = _accept(candidate_id, source_candidate, scenario, scenario_path, recovery=context)
+            except BaseException as error:
+                result = {"outcome": "ACCEPTANCE_INTERRUPTED", "execution_id": execution_id,
+                          "candidate_id": candidate_id, "error": str(error), "recovery_provenance": context}
+                scoped = CandidateLedger(CANDIDATES / "_ledger", execution_id=execution_id)
+                if scoped.classify(candidate_id) == ACCEPTANCE_RUNNING:
+                    scoped.record_state(candidate_id, INTERRUPTED, source_candidate, detail=result)
+                with unit_of_work(sessions) as session:
+                    jobs = JobStore(session, PolicyEnforcementPoint(pdp, "execution.durable.job_store"))
+                    jobs.checkpoint(execution_id, result)
+                    jobs.transition(execution_id, FAILED)
+                    jobs.transition(execution_id, DEAD_LETTER)
+                raise
+            with unit_of_work(sessions) as session:
+                jobs = JobStore(session, PolicyEnforcementPoint(pdp, "execution.durable.job_store"))
+                jobs.checkpoint(execution_id, result)
+                jobs.transition(execution_id, SUCCEEDED if result["outcome"] == "GOLDEN_ACCEPTANCE_PASS" else FAILED)
+                if result["outcome"] != "GOLDEN_ACCEPTANCE_PASS":
+                    jobs.transition(execution_id, DEAD_LETTER)
+            return result
+        finally:
+            lock.unlink()
+    finally:
+        engine.dispose()
 
 
 def _resolve_scenario(

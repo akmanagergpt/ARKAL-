@@ -40,6 +40,7 @@ import pathlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Mapping
+from arkali.engineering.candidate.content_identity import file_manifest
 
 from arkali.engineering.candidate.errors import (
     CandidateAcceptanceInProgressError,
@@ -164,9 +165,6 @@ _VERIFIABLE_STATES = ALL_STATES - {ALLOCATED, GENERATING, ACCEPTANCE_RUNNING}
 #: is recorded as its own honest classification, not asserted as a pass.
 LEGACY_UNVERIFIED = "LEGACY_UNVERIFIED"
 
-_SNAPSHOT_DIR_NAME = "snapshot"
-
-
 @dataclass(frozen=True)
 class GenerationProvenance:
     """Everything needed to answer "what, exactly, produced this candidate"
@@ -198,41 +196,6 @@ def hash_text(text: str) -> str:
     return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def file_manifest(root: pathlib.Path) -> dict[str, dict[str, object]]:
-    """Every real file under `root` (excluding the pre-populated stable
-    `snapshot/` subtree, which is baseline scaffolding the model never
-    wrote) as `{relative_posix_path: {"byte_length": int, "sha256": hex}}`.
-    Sorted-path iteration makes the result deterministic across platforms
-    and across repeated calls against the same content.
-
-    Walked with `os.walk(..., followlinks=False)` and an explicit
-    per-file `is_symlink()` check, deliberately not `Path.rglob` (which
-    follows symlinks): a model-generated candidate is untrusted content,
-    and a symlink inside it -- file or directory -- pointing outside
-    `root` must never be traversed into or hashed, the same containment
-    `WorkspaceAuthority.write` already enforces on the write side.
-    """
-    manifest: dict[str, dict[str, object]] = {}
-    if not root.is_dir():
-        return manifest
-    for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-        current = pathlib.Path(dirpath)
-        if current == root:
-            dirnames[:] = [d for d in dirnames if d != _SNAPSHOT_DIR_NAME]
-        dirnames[:] = [d for d in dirnames if not (current / d).is_symlink()]
-        for name in filenames:
-            path = current / name
-            if path.is_symlink():
-                continue
-            relative = path.relative_to(root)
-            data = path.read_bytes()
-            manifest[relative.as_posix()] = {
-                "byte_length": len(data),
-                "sha256": hashlib.sha256(data).hexdigest(),
-            }
-    return manifest
-
-
 def _manifest_diff(
     recorded: Mapping[str, Mapping[str, object]], live: Mapping[str, Mapping[str, object]],
 ) -> dict[str, list[str]]:
@@ -253,8 +216,9 @@ class CandidateLedger:
     correctly after a workspace directory is deleted.
     """
 
-    def __init__(self, ledger_root: pathlib.Path) -> None:
+    def __init__(self, ledger_root: pathlib.Path, *, execution_id: str | None = None) -> None:
         self._root = ledger_root
+        self._execution_id = execution_id
         self._root.mkdir(parents=True, exist_ok=True)
         self._log = self._root / "ledger.jsonl"
 
@@ -266,7 +230,7 @@ class CandidateLedger:
             if not line.strip():
                 continue
             entry = json.loads(line)
-            if entry["candidate_id"] == candidate_id:
+            if entry["candidate_id"] == candidate_id and entry.get("execution_id") == self._execution_id:
                 entries.append(entry)
         return tuple(entries)
 
@@ -322,6 +286,8 @@ class CandidateLedger:
         return None
 
     def _append(self, entry: dict[str, object]) -> None:
+        if self._execution_id is not None:
+            entry = {**entry, "execution_id": self._execution_id}
         with self._log.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry, sort_keys=True) + "\n")
 
@@ -329,6 +295,8 @@ class CandidateLedger:
         """Record `ALLOCATED`. Refuses outright if `candidate_id` has EVER
         appeared in this ledger, regardless of whether a workspace
         directory for it currently exists on disk."""
+        if self._execution_id is not None:
+            raise CandidateIdentityReuseError("acceptance executions cannot allocate candidates")
         if self.history(candidate_id):
             raise CandidateIdentityReuseError(
                 f"candidate_id {candidate_id!r} already has ledger history; identities "
@@ -378,7 +346,11 @@ class CandidateLedger:
             "state": state,
             "recorded_at": datetime.now(timezone.utc).isoformat(),
             "manifest": file_manifest(workspace_root),
-            "detail": dict(detail) if detail else {},
+            "detail": {
+                **(dict(latest["detail"]) if self._execution_id else {}),
+                **(dict(detail) if detail else {}),
+                **({"execution_id": self._execution_id} if self._execution_id else {}),
+            },
         })
 
     def verify_integrity(self, candidate_id: str, workspace_root: pathlib.Path) -> None:
@@ -409,6 +381,47 @@ class CandidateLedger:
                 f"recorded manifest -- added={diff['added']} removed={diff['removed']} "
                 f"changed={diff['changed']}"
             )
+
+    def recovery_input(self, candidate_id: str, workspace_root: pathlib.Path) -> dict[str, object]:
+        """Read-only, content-pinned input for a new acceptance execution."""
+        original = CandidateLedger(self._root)
+        entries = original.history(candidate_id)
+        if not entries or entries[-1]["state"] != INTERRUPTED:
+            raise CandidateIntegrityError("acceptance recovery requires an INTERRUPTED original")
+        passes = [e for e in entries if e["state"] in _ACCEPTANCE_ELIGIBLE_STATES]
+        if not passes or passes[-1]["manifest"] != entries[-1]["manifest"]:
+            raise CandidateIntegrityError("interrupted input does not match the verified generation")
+        original.verify_integrity(candidate_id, workspace_root)
+        terminal = entries[-1]
+        return {
+            "candidate_id": candidate_id,
+            "original_execution": terminal,
+            "original_identity": hash_text(json.dumps(terminal, sort_keys=True)),
+            "input_identity": hash_text(json.dumps(terminal["manifest"], sort_keys=True)),
+            "provenance": entries[0],
+        }
+
+    def begin_recovery(
+        self, candidate_id: str, workspace_root: pathlib.Path, *,
+        recovery_input: Mapping[str, object], authorization_ref: str, reason: str,
+    ) -> None:
+        """New execution in this same ledger; never transitions the original."""
+        if not self._execution_id or not authorization_ref.strip() or not reason.strip():
+            raise CandidateIntegrityError("recovery needs execution, authorization and reason")
+        if self.history(candidate_id):
+            raise CandidateAcceptanceInProgressError("recovery execution already exists")
+        verified = self.recovery_input(candidate_id, workspace_root)
+        if dict(recovery_input) != verified:
+            raise CandidateIntegrityError("recovery input changed after authorization")
+        self._append({
+            **verified["provenance"],
+            "candidate_id": candidate_id, "state": ACCEPTANCE_RUNNING,
+            "recorded_at": datetime.now(timezone.utc).isoformat(),
+            "manifest": file_manifest(workspace_root),
+            "detail": {"recovery_of": verified["original_identity"],
+                       "input_identity": verified["input_identity"],
+                       "authorization_ref": authorization_ref, "reason": reason},
+        })
 
     def begin_acceptance(self, candidate_id: str, workspace_root: pathlib.Path) -> None:
         """The strict, atomic gate for starting real acceptance
