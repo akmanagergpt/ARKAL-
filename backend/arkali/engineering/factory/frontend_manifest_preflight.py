@@ -65,7 +65,7 @@ import posixpath
 import re
 from collections.abc import Mapping
 
-from arkali.engineering.factory.frontend_js_semantics import _component_destructured_props
+from arkali.engineering.factory.frontend_js_semantics import _component_destructured_props, _redeclared_import_bindings, _relative_import_resolves
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 
 _REQUIRED_SCRIPTS = ("start", "build")
@@ -480,15 +480,6 @@ def _route_component_missing_props_findings(files: Mapping[str, str]) -> list[Se
 _RELATIVE_IMPORT = re.compile(r"""(?:from|require\()\s*['"](\.\.?/[^'"]+)['"]""")
 
 
-def _relative_import_resolves(importer_path: str, target: str, files: Mapping[str, str]) -> bool:
-    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(importer_path), target))
-    return any(
-        candidate in files
-        for candidate in (resolved, f"{resolved}.js", f"{resolved}.jsx",
-                          f"{resolved}/index.js", f"{resolved}/index.jsx")
-    )
-
-
 def _frontend_local_import_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """Every real relative import (`from './X'`/`require('../X')`) in a
     generated frontend file must resolve to a real file this candidate
@@ -501,6 +492,12 @@ def _frontend_local_import_findings(files: Mapping[str, str]) -> list[SemanticFi
     for path, source in files.items():
         if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
             continue
+        collisions = _redeclared_import_bindings(source)
+        if collisions:
+            findings.append(SemanticFinding(
+                code="frontend_import_binding_redeclared", path=path,
+                detail=f"Imported binding(s) {list(collisions)} also declared in the same module scope; the frontend cannot compile. Keep the import OR the inline definition, not both.",
+            ))
         for match in _RELATIVE_IMPORT.finditer(source):
             target = match.group(1)
             if not _relative_import_resolves(path, target, files):
@@ -513,5 +510,3 @@ def _frontend_local_import_findings(files: Mapping[str, str]) -> list[SemanticFi
                     ),
                 ))
     return findings
-
-

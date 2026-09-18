@@ -1,13 +1,61 @@
 from __future__ import annotations
 
 import json
+import pathlib
+import pytest
 
 from arkali.engineering.factory.frontend_manifest_preflight import (
+    _frontend_local_import_findings,
     _missing_frontend_entry_point_findings,
     _missing_frontend_scripts_findings,
     _react_router_version_mismatch_findings,
     _repair_react_router_version_mismatch,
 )
+
+
+@pytest.mark.parametrize("clause,declaration", [
+    ("Thing", "const Thing = () => <div />;"),
+    ("{ Original as Thing }", "function Thing() { return null; }"),
+    ("* as Thing", "class Thing {}"),
+    ("{ Thing }", "let Thing = 1;"),
+])
+def test_import_binding_redeclaration_is_rejected(clause, declaration):
+    files = {"frontend/src/App.js": f"import {clause} from './Thing';\n{declaration}",
+             "frontend/src/Thing.js": "export default function Thing() {}"}
+    findings = _frontend_local_import_findings(files)
+    assert len(findings) == 1
+    assert findings[0].code == "frontend_import_binding_redeclared"
+    assert "Thing" in findings[0].detail
+
+
+@pytest.mark.parametrize("source", [
+    "import Thing from './Thing';\nconst App = () => <Thing />;",
+    "const Thing = () => <div />;",
+    "import Thing from './Thing';\nfunction App() {\nconst Thing = () => null;\n}",
+    "import Thing from './Thing';\n// const Thing = 1;\nconst text = 'const Thing = 1';",
+    "import Thing from './Thing';\nconst template = `const Thing = 1`;",
+])
+def test_valid_import_or_inline_and_nested_shadowing_pass(source):
+    assert _frontend_local_import_findings({"frontend/src/App.js": source,
+                                            "frontend/src/Thing.js": "export default function Thing() {}"}) == []
+
+
+def test_frozen_rental_duplicate_forms_are_detected_without_patch():
+    root = pathlib.Path(__file__).resolve().parents[3] / "var/factory/candidates/factory-goal-mu4cwddo-itisx9"
+    if not root.exists():
+        pytest.skip("local frozen candidate not available")
+    files = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
+             for p in (root / "frontend/src").glob("*.js")}
+    findings = [f for f in _frontend_local_import_findings(files) if f.code == "frontend_import_binding_redeclared"]
+    assert len(findings) == 1
+    assert findings[0].path == "frontend/src/App.js"
+    assert "ToolForm" in findings[0].detail and "AgreementForm" in findings[0].detail
+
+
+def test_redeclaration_retry_hint_is_actionable():
+    from arkali.engineering.factory.stage_prompting import _SUPPORTED_HINT_INVARIANTS
+    hint = _SUPPORTED_HINT_INVARIANTS["frontend_import_binding_redeclared"]
+    assert "retain the real import" in hint and "retain the inline implementation" in hint
 
 
 def test_flags_react_scripts_declared_without_a_scripts_object() -> None:
@@ -186,5 +234,4 @@ def test_router_version_repair_is_a_noop_when_stage_did_not_write_package_json()
         "dependencies": {"react-router-dom": "^6.11.2"},
     })}
     assert _repair_react_router_version_mismatch(merged, {}) is None
-
 

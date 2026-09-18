@@ -1202,10 +1202,12 @@ class TestFrontendLocalImportFrozenReplay:
     def test_b_the_real_merged_state_produces_both_local_import_findings(self) -> None:
         findings = _frontend_local_import_findings(self._real_merged_files())
         codes = {f.code for f in findings}
-        assert codes == {"frontend_local_import_unresolved"}
+        assert codes == {"frontend_local_import_unresolved", "frontend_import_binding_redeclared"}
         assert any("./EquipmentForm" in f.detail for f in findings)
         assert any("./RentalForm" in f.detail for f in findings)
-        assert len(findings) == 2
+        assert len(findings) == 3
+        assert any("EquipmentForm" in f.detail and "RentalForm" in f.detail
+                   for f in findings if f.code == "frontend_import_binding_redeclared")
 
     def test_c_the_real_findings_map_to_the_new_actionable_hint(self) -> None:
         findings = _frontend_local_import_findings(self._real_merged_files())

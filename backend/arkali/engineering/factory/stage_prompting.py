@@ -283,6 +283,13 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "making this change, every other real local relative import in "
         "every emitted frontend file must still resolve"
     ),
+    "frontend_import_binding_redeclared": (
+        "a generated file imports a binding and also declares that same name in its module scope. "
+        "Keep exactly one implementation: retain the real import and remove the duplicate inline "
+        "declaration, or retain the inline implementation and remove its conflicting import. "
+        "Do not leave duplicate imports of the same local name. Preserve working references and "
+        "all other required imports; a nested scope may legally shadow an imported name"
+    ),
     #: FRONTEND_SUCCESS_FEEDBACK_RETRY_HINT_GAP (real evidence: `factory-
     #: goal-mu2h4fda-yyz4hh`, ARK-ERR-0116 exhausted, session evidence,
     #: frozen). The real checker fires correctly -- a real create/update/

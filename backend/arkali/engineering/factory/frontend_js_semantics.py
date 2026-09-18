@@ -35,7 +35,67 @@ JS shapes this pipeline's own generated frontends are evidenced to use.
 from __future__ import annotations
 
 import re
+import posixpath
+from collections import Counter
 from collections.abc import Mapping
+
+
+def _redeclared_import_bindings(source: str) -> tuple[str, ...]:
+    """Observed JS/JSX module bindings, not nested legal shadowing.
+
+    Conservative static check for imports plus simple top-level declarations;
+    the real frontend build remains the full syntax authority.
+    """
+    masked = re.sub(
+        r"//[^\n]*|/\*[\s\S]*?\*/|'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\"|`(?:\\.|[^`\\])*`",
+        lambda m: re.sub(r"[^\n]", " ", m.group()), source,
+    )
+    depths: list[int] = []
+    depth = 0
+    for char in masked:
+        depths.append(depth)
+        depth += (char == "{") - (char == "}")
+    imported = _module_import_bindings(masked, depths)
+    identifier = r"[A-Za-z_$][A-Za-z0-9_$]*"
+    collisions = {name for name, count in imported.items() if count > 1}
+    declarations = rf"(?m)^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|var|function|class)\s+({identifier})"
+    for match in re.finditer(declarations, masked):
+        if depths[match.start()] == 0 and match.group(1) in imported:
+            collisions.add(match.group(1))
+    return tuple(sorted(collisions))
+
+
+def _module_import_bindings(masked: str, depths: list[int]) -> Counter[str]:
+    """Local default, named/aliased and namespace ESM bindings at module scope."""
+    identifier = r"[A-Za-z_$][A-Za-z0-9_$]*"
+    imported: Counter[str] = Counter()
+    for match in re.finditer(r"\bimport\s+([A-Za-z0-9_$\s{},*]+?)\s+from\b", masked):
+        if depths[match.start()] != 0:
+            continue
+        clause = match.group(1).strip()
+        default = clause.split(",", 1)[0].strip()
+        if re.fullmatch(identifier, default):
+            imported[default] += 1
+        namespace = re.search(rf"\*\s+as\s+({identifier})", clause)
+        if namespace:
+            imported[namespace.group(1)] += 1
+        named = re.search(r"\{([^}]*)\}", clause)
+        if named:
+            for specifier in named.group(1).split(","):
+                local = re.split(r"\s+as\s+", specifier.strip())[-1]
+                if re.fullmatch(identifier, local):
+                    imported[local] += 1
+    return imported
+
+
+def _relative_import_resolves(importer_path: str, target: str, files: Mapping[str, str]) -> bool:
+    """Static local JS module identity; same extension/index rules as before."""
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(importer_path), target))
+    return any(
+        candidate in files
+        for candidate in (resolved, f"{resolved}.js", f"{resolved}.jsx",
+                          f"{resolved}/index.js", f"{resolved}/index.jsx")
+    )
 
 #: `(?:async\s+)?function name(...)` or `(?:export\s+)?(?:const|let|var)
 #: name = (?:async\s*)?(...) =>` -- the two real function-declaration
