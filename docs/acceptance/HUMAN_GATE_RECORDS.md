@@ -411,3 +411,25 @@ the digest of that entry's exact file manifest, computed by `recovery_input`.
 | ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
 |---|---|---|---|---|---|---|---|
 | HGR-009 | ACCEPTANCE_RECOVERY | ACCEPTANCE_RECOVERY | sha256:609207916e71188d4cce65f463b03f01081a58a81b6e7dca5450da1ebbb6eecf | sha256:75680bffb3054e011892898564368adaa63265c2b24cab215de0ee5e06b9a716 | human operator | GRANTED | Explicit human message: CANONICAL ACCEPTANCE RECOVERY PATH. Limited to new acceptance execution identity for factory-goal-mu2u58qo-5md7vc, original job goal-mu2u58qo-5md7vc. No terminal resurrection, candidate changes, generation, model call, or new Factory candidate. Results remain independent and durably linked. |
+
+## Recovery scope transcription correction and current application request — 2026-09-18
+
+HGR-009 incorrectly transcribed the auto-repair approval onto a venue/booking
+candidate. The real auto-repair job in the human-supplied campaign is
+`goal-mu2oiqw0-fhy6kz`, not `goal-mu2u58qo-5md7vc`. The row below voids that
+erroneous binding without deleting its historical record or changing either
+execution. It records a correction to the human instruction's actual scope,
+not a machine-issued expansion of human authority.
+
+The current human request is to obtain, show and inspect a genuinely working
+ARKALI-generated application, then repair ARKALI based on real defects. Reusing
+the already-generated equipment-rental application avoids unnecessary model
+generation; its generated backend tests passed, and its interrupted acceptance
+was blocked by the contract-input scope fault corrected at `410cb55`. This
+operation is limited to production acceptance on its existing exact manifest;
+no candidate mutation, generation or release/promotion grant is implied.
+
+| ID | GATE | OPERATION | TARGET | REVISION | ISSUER | STATUS | BASIS |
+|---|---|---|---|---|---|---|---|
+| HGR-009-VOID | ACCEPTANCE_RECOVERY | ACCEPTANCE_RECOVERY | sha256:609207916e71188d4cce65f463b03f01081a58a81b6e7dca5450da1ebbb6eecf | sha256:75680bffb3054e011892898564368adaa63265c2b24cab215de0ee5e06b9a716 | human operator | REVOKED | Supersedes erroneous scope transcription in HGR-009; the original human instruction named auto-repair, while this target was mechanically verified to be venue/booking. Never reuse this grant. Historical original and recovery records remain unchanged. |
+| HGR-010 | ACCEPTANCE_RECOVERY | ACCEPTANCE_RECOVERY | sha256:c7313c1d0c48febe555d796bdcb90a39c769bbf30116e7aeefc7f5b7a0ff8590 | sha256:c8eccdffe05dbd227333dfe2c8c0c9d2cc73cd7f6dd6960fe39c7a6034f7aaa0 | human operator | GRANTED | Current human request: obtain and show a genuinely working ARKALI-generated application; quota-efficient reuse of factory-goal-mu4cwddo-itisx9, equipment-rental tools and agreements. New immutable recovery execution on this exact verified input, same production acceptance engine. No candidate patch, original terminal resurrection or new generation. |

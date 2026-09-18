@@ -282,9 +282,11 @@ def _find_operation_gate_grant(
     """The scoped grant covering this exact operation, target and revision."""
     text, _ = read_document(repo_root, HUMAN_GATE_RECORDS)
     barred = forbidden_issuers(repo_root)
-    for grant in _operation_grants(text):
+    for grant in reversed(_operation_grants(text)):
         if grant.issuer.strip().lower() in barred:
             continue
-        if grant.covers(gate_id, operation_class, target_identity, revision_identity):
-            return grant
+        if (grant.gate_id, grant.operation_class, grant.target_identity, grant.revision_identity) == (
+            gate_id, operation_class, target_identity, revision_identity,
+        ):
+            return grant if grant.is_granted else None
     return None

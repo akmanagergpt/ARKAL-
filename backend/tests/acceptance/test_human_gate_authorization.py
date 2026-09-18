@@ -78,6 +78,21 @@ def barred_issuer() -> str:
     return next(iter(barred))
 
 
+@pytest.mark.parametrize("status", ["REVOKED", "MALFORMED"])
+def test_latest_matching_operation_record_supersedes_old_grant(tmp_path, real_issuer, status):
+    text = OPERATION_HEADER + operation_row("old", "G", "OP", "T", "R", real_issuer, "GRANTED")
+    text += operation_row("correction", "G", "OP", "T", "R", real_issuer, status)
+    repo = repo_with_records(tmp_path, text)
+    assert _find_operation_gate_grant(repo, "G", "OP", "T", "R") is None
+
+
+def test_operation_correction_does_not_revoke_another_scope(tmp_path, real_issuer):
+    text = OPERATION_HEADER + operation_row("old", "G", "OP", "T", "R", real_issuer, "GRANTED")
+    text += operation_row("other", "G", "OP", "different", "R", real_issuer, "REVOKED")
+    repo = repo_with_records(tmp_path, text)
+    assert _find_operation_gate_grant(repo, "G", "OP", "T", "R").identifier == "old"
+
+
 class TestPhaseScopeNegativeControls:
     """Controls 1, 2, 6, 7, 8, 9, 10, 11, 13 for `_find_phase_gate_grant`."""
 
