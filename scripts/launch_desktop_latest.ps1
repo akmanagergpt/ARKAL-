@@ -9,7 +9,7 @@ $buildLockFile = Join-Path $releaseDir '.arkali-build.lock'
 $tauriCli = Join-Path $repoRoot 'frontend\node_modules\.bin\tauri.cmd'
 
 function Read-CurrentHead {
-    $value = (& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1)
+    $value = & git -C $repoRoot rev-parse HEAD 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $value) { throw 'Git HEAD okunamadı; sürüm doğrulanamadı.' }
     return $value.Trim()
 }
