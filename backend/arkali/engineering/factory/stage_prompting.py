@@ -112,6 +112,13 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
 #: only codes this stage's own preflight suite already enforces belong here,
 #: never a new check invented to have something to hint about.
 _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    "frontend_ui_missing_destructive_confirmation": (
+        "for each module with a delete action, put a reachable delete control "
+        "on its rendered record/list surface and require a real user "
+        "confirmation before invoking the delete client function. If the "
+        "existing list component owns the delete button, modify that file; "
+        "an unrelated route or an unused confirmation helper is insufficient"
+    ),
     "test_hardcoded_created_id": (
         "after a test creates a row, capture the create response and use its "
         "returned id for every read, update or delete of that row in the "

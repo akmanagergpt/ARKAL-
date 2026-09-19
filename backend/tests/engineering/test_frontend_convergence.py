@@ -1021,6 +1021,15 @@ _LOCAL_IMPORT_FINDINGS: tuple[tuple[str, str, str], ...] = (
 )
 
 
+def test_destructive_confirmation_retry_hint_is_actionable() -> None:
+    code = "frontend_ui_missing_destructive_confirmation"
+    blocks = _prior_finding_hint_blocks(((code, "frontend/src/", "missing confirmation"),))
+    assert len(blocks) == 1
+    assert "delete control" in blocks[0]
+    assert "confirmation" in blocks[0]
+    assert "before" in blocks[0]
+
+
 class TestFrontendLocalImportHintCoverage:
     """`FRONTEND_FORMS_LOCAL_COMPONENT_COMPLETENESS_GAP`.
     `frontend_local_import_unresolved` did not have a structured hint
@@ -1034,6 +1043,7 @@ class TestFrontendLocalImportHintCoverage:
 
     def test_a_the_code_is_now_in_the_supported_map(self) -> None:
         assert "frontend_local_import_unresolved" in _SUPPORTED_HINT_INVARIANTS
+
 
     def test_b_the_hint_offers_the_emit_repair_action(self) -> None:
         invariant = _SUPPORTED_HINT_INVARIANTS["frontend_local_import_unresolved"]
