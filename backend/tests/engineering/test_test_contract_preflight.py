@@ -6,6 +6,10 @@ from arkali.engineering.factory.test_contract_preflight import (
     _lifecycle_findings,
     _undefined_call_findings,
 )
+from arkali.engineering.factory.stage_prompting import (
+    _prior_finding_hint_blocks,
+    _SUPPORTED_HINT_INVARIANTS,
+)
 
 
 def _findings(source: str, path: str = "tests/test_app.py") -> list:
@@ -95,6 +99,20 @@ def test_flags_mutating_sqlite_tests_that_share_persistent_rows() -> None:
     assert [finding.code for finding in findings] == [
         "test_database_state_leaks_between_cases"
     ]
+
+
+def test_database_isolation_finding_has_actionable_retry_hint() -> None:
+    code = "test_database_state_leaks_between_cases"
+    finding = (code, "tests/", "multiple tests mutate the same persistent SQLite database")
+    blocks = _prior_finding_hint_blocks((finding, finding))
+    assert len(blocks) == 1
+    assert code in blocks[0]
+    invariant = _SUPPORTED_HINT_INVARIANTS[code]
+    assert "per test" in invariant
+    assert "temporary" in invariant
+    assert "before" in invariant
+    assert "cleanup" in invariant
+    assert "schema initialization" in invariant
 
 
 def test_accepts_mutating_sqlite_tests_with_per_test_temporary_database() -> None:

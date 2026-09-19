@@ -112,6 +112,13 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
 #: only codes this stage's own preflight suite already enforces belong here,
 #: never a new check invented to have something to hint about.
 _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    "test_database_state_leaks_between_cases": (
+        "isolate the file-backed database independently per test: use a "
+        "temporary database path wired into the real application before "
+        "each test runs, or perform reliable cleanup/rollback between tests. "
+        "Make every mutating test independent of execution order; merely "
+        "repeating schema initialization does not remove prior rows"
+    ),
     "python_syntax": (
         "the emitted Python file is incomplete or syntactically invalid. Repair "
         "the exact parser-reported location in the previous attempt, completing "
