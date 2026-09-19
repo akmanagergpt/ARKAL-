@@ -91,6 +91,34 @@ describe('New Application intake', () => {
     expect(screen.getByText(/otomatik olarak doğrulanabilir bir kural çıkaramadı/)).toBeInTheDocument();
     expect(screen.queryByText('missing_acceptance_criteria')).not.toBeInTheDocument();
     expect(screen.queryByText(/goal_id/)).not.toBeInTheDocument();
+    expect(screen.getByText('Birlikte netleştirelim')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' })).toBeDisabled();
+  });
+
+  it('requires explicit scope approval before resubmitting a guided proposal', async () => {
+    const user = userEvent.setup();
+    const { calls } = mount({ [GOALS]: [
+      { status: 202, body: GOVERNED_STOP },
+      { status: 202, body: ESCALATED },
+    ] });
+    await typeAndSubmit(user, 'İşlerimi takip edip bana sorarak otomatik görev dağıtan bir uygulama istiyorum.');
+    await screen.findByText('Birlikte netleştirelim');
+    expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'))).toHaveLength(1);
+    await user.type(screen.getByLabelText('Hangi kayıtları tutalım?'), 'görevler');
+    await user.type(screen.getByLabelText('Her kayıt için hangi bilgiler gerekli?'), 'görev adı, sorumlu kişi ve durum');
+    expect(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: /yalnızca bu temel sürüm/i }));
+    expect(screen.getByText(/otomatik görev dağıtımı bu teklife dahil değildir/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' }));
+    expect(await screen.findByText('İsteğiniz insan onayı gerektiriyor')).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'));
+    expect(posts).toHaveLength(2);
+    const first = posts[0]?.body as { goal_text: string };
+    const second = posts[1]?.body as { goal_text: string };
+    expect(first.goal_text).toContain('bana sorarak otomatik görev dağıtan');
+    expect(second.goal_text).toContain('görevler');
+    expect(second.goal_text).toContain('at least 1 table');
+    expect(second.goal_text).not.toContain('bana sorarak otomatik görev dağıtan');
   });
 
   it('shows the real kind and detail in Uzman mode', async () => {

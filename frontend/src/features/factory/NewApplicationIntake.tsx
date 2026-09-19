@@ -256,8 +256,23 @@ export function NewApplicationIntake({
 }) {
   const intake = useFactoryIntake(client);
   const [goalText, setGoalText] = useState('');
+  const [recordName, setRecordName] = useState('');
+  const [recordFields, setRecordFields] = useState('');
+  const [screenCount, setScreenCount] = useState(2);
+  const [approvedScope, setApprovedScope] = useState(false);
 
   const trimmed = goalText.trim();
+  const needsGuidance = intake.result?.state === 'governed_stop'
+    && intake.result.unresolved.some((question) => question.kind === 'missing_acceptance_criteria');
+  const record = recordName.trim().replace(/[\r\n]+/g, ' ');
+  const fields = recordFields.trim().replace(/[\r\n]+/g, ' ');
+  const proposal = record && fields && screenCount >= 1 && screenCount <= 20
+    ? [
+      `1. The system must persist ${record} using SQLite with at least 1 table; each record contains ${fields}.`,
+      `2. The backend must expose at least 4 REST API endpoints supporting create, read, update and delete operations for ${record}.`,
+      `3. The frontend must let a user create, view, edit and delete ${record} within at most ${screenCount} screens, including an actionable empty list and visible feedback after saving.`,
+    ].join('\n')
+    : null;
 
   return (
     <Panel title={showTechnical ? 'Yeni Uygulama (Goal Intake)' : 'Yeni Uygulama'}>
@@ -279,7 +294,7 @@ export function NewApplicationIntake({
             id="new-application-goal"
             value={goalText}
             disabled={intake.submitting}
-            onChange={(event) => setGoalText(event.target.value)}
+            onChange={(event) => { setGoalText(event.target.value); setApprovedScope(false); }}
             rows={4}
             placeholder="Örneğin: Stoklarımı, giriş-çıkış işlemlerini ve kritik stok seviyelerini takip edebileceğim bir uygulama istiyorum."
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:bg-slate-100"
@@ -306,6 +321,49 @@ export function NewApplicationIntake({
         {intake.result === null ? null : (
           <ResultCallout result={intake.result} showTechnical={showTechnical} />
         )}
+
+        {needsGuidance && !intake.submitting ? (
+          <div className="space-y-3 rounded-lg border border-slate-300 bg-slate-50 p-4">
+            <h3 className="font-semibold text-slate-900">Birlikte netleştirelim</h3>
+            <p className="text-sm text-slate-700">
+              Fikrinizi teknik terimlerle yeniden yazmanız gerekmiyor. Aşağıdaki yanıtlarınızla
+              yalnızca temel bir kayıt uygulaması önereceğiz; son kapsamı siz onaylayacaksınız.
+            </p>
+            <label className="block text-sm" htmlFor="guided-record-name">Hangi kayıtları tutalım?</label>
+            <input id="guided-record-name" className="w-full rounded border p-2" value={recordName}
+              maxLength={80} placeholder="Örneğin: görevler" onChange={(event) => {
+                setRecordName(event.target.value); setApprovedScope(false);
+              }} />
+            <label className="block text-sm" htmlFor="guided-record-fields">Her kayıt için hangi bilgiler gerekli?</label>
+            <input id="guided-record-fields" className="w-full rounded border p-2" value={recordFields}
+              maxLength={160} placeholder="Örneğin: görev adı, sorumlu kişi ve durum"
+              onChange={(event) => { setRecordFields(event.target.value); setApprovedScope(false); }} />
+            <label className="block text-sm" htmlFor="guided-screen-count">İlk sürüm en çok kaç ekrandan oluşsun?</label>
+            <input id="guided-screen-count" className="w-24 rounded border p-2" type="number"
+              min={1} max={20} value={screenCount}
+              onChange={(event) => { setScreenCount(Number(event.target.value)); setApprovedScope(false); }} />
+            {proposal === null ? null : (
+              <div className="space-y-2 text-sm">
+                <p>Önerilen ilk sürüm: {record} kayıtlarını {fields} bilgileriyle ekleme, görme,
+                  düzenleme ve silme. En çok {screenCount} ekran kullanılacak.</p>
+                {/(yapay zek|öğren|otomatik|ai\b)/i.test(goalText) ? (
+                  <p className="font-medium text-amber-800">Yapay zekâ ile öğrenme veya otomatik görev dağıtımı bu teklife dahil değildir.</p>
+                ) : null}
+                <p className="text-slate-600">İlk açıklamanız bu ekranda kalır; ancak aşağıdaki onay yalnızca
+                  bu dar temel sürümü üretime gönderir. Diğer özellikler ayrıca tanımlanmalıdır.</p>
+                {showTechnical ? <pre className="whitespace-pre-wrap break-words rounded bg-white p-2 text-xs">{proposal}</pre> : null}
+                <label className="flex gap-2"><input type="checkbox" checked={approvedScope}
+                  onChange={(event) => setApprovedScope(event.target.checked)} />
+                  Yalnızca bu temel sürüm kapsamını onaylıyorum.
+                </label>
+              </div>
+            )}
+            <Button type="button" disabled={proposal === null || !approvedScope}
+              onClick={() => { if (proposal !== null && approvedScope) void intake.submit(proposal); }}>
+              Bu kapsamla üretime gönder
+            </Button>
+          </div>
+        ) : null}
 
         {intake.job === null ? null : (
           <ProgressCallout
