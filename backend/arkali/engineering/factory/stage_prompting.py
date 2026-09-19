@@ -112,6 +112,12 @@ def _worked_example_from_contracts(mutation_contracts: list[dict[str, object]]) 
 #: only codes this stage's own preflight suite already enforces belong here,
 #: never a new check invented to have something to hint about.
 _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
+    "test_hardcoded_created_id": (
+        "after a test creates a row, capture the create response and use its "
+        "returned id for every read, update or delete of that row in the "
+        "same test. Never assume a literal id such as 1: AUTOINCREMENT can "
+        "advance even if a setup fixture deletes all prior rows"
+    ),
     "test_database_state_leaks_between_cases": (
         "isolate the file-backed database independently per test: use a "
         "temporary database path wired into the real application before "

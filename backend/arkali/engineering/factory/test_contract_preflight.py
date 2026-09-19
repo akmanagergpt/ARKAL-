@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import re
 import sys
 from collections.abc import Mapping
 
@@ -113,6 +114,49 @@ def _database_state_finding(
     )
 
 
+def _literal_http_calls(test: ast.AST) -> list[ast.Call]:
+    return [node for node in ast.walk(test) if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute) and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)]
+
+
+def _literal_created_id_path(calls: list[ast.Call]) -> str | None:
+    created = {call.args[0].value.rstrip("/") for call in calls
+               if isinstance(call.func, ast.Attribute) and call.func.attr == "post"}
+    for call in calls:
+        if not isinstance(call.func, ast.Attribute) or call.func.attr not in {
+            "get", "put", "patch", "delete"
+        }:
+            continue
+        target = call.args[0].value
+        if any(re.fullmatch(re.escape(root) + r"/\d+/?", target) for root in created):
+            return target
+    return None
+
+
+def _hardcoded_created_id_findings(files: Mapping[str, str], backend: str) -> list[SemanticFinding]:
+    """Catch literal record IDs reused after a POST on AUTOINCREMENT tables."""
+    if "autoincrement" not in backend.lower():
+        return []
+    findings: list[SemanticFinding] = []
+    for path, source in files.items():
+        if not path.startswith("tests/") or not path.endswith(".py"):
+            continue
+        for test in ast.parse(source).body:
+            if not _is_test(test):
+                continue
+            target = _literal_created_id_path(_literal_http_calls(test))
+            if target is not None:
+                findings.append(SemanticFinding(
+                    code="test_hardcoded_created_id", path=path,
+                    detail=f"{test.name} uses literal record path {target!r} after "
+                           "creating a row on an AUTOINCREMENT table; use the id "
+                           "returned by that test's create response instead",
+                ))
+    return findings
+
+
 def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend = "\n".join(
         source
@@ -136,7 +180,7 @@ def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
             )
         ]
     database_finding = _database_state_finding(files, backend, tests)
-    return [database_finding] if database_finding else []
+    return ([database_finding] if database_finding else []) + _hardcoded_created_id_findings(files, backend)
 
 
 def _function_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) -> set[str]:

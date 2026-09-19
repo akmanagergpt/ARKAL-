@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import pathlib
 
 from arkali.engineering.factory.test_contract_preflight import (
     _lifecycle_findings,
@@ -10,6 +11,7 @@ from arkali.engineering.factory.stage_prompting import (
     _prior_finding_hint_blocks,
     _SUPPORTED_HINT_INVARIANTS,
 )
+from arkali.engineering.factory.backend_stage_preflight import _backend_tests_stage_findings
 
 
 def _findings(source: str, path: str = "tests/test_app.py") -> list:
@@ -139,3 +141,57 @@ def test_accepts_read_only_sqlite_tests_without_database_reset() -> None:
         ),
     }
     assert _lifecycle_findings(files) == []
+
+
+def test_rejects_literal_record_id_after_create_with_autoincrement() -> None:
+    files = {
+        "backend/db.py": "import sqlite3\nCREATE_SQL = 'id INTEGER PRIMARY KEY AUTOINCREMENT'\n",
+        "tests/test_app.py": (
+            "def test_read(client):\n"
+            "    client.post('/things', json={'name': 'x'})\n"
+            "    response = client.get('/things/1')\n"
+            "    assert response.status_code == 200\n"
+        ),
+    }
+    assert [f.code for f in _lifecycle_findings(files)] == ["test_hardcoded_created_id"]
+
+
+def test_accepts_response_derived_record_id_after_create() -> None:
+    files = {
+        "backend/db.py": "import sqlite3\nCREATE_SQL = 'id INTEGER PRIMARY KEY AUTOINCREMENT'\n",
+        "tests/test_app.py": (
+            "def test_read(client):\n"
+            "    created = client.post('/things', json={'name': 'x'})\n"
+            "    response = client.get(f\"/things/{created.json['id']}\")\n"
+            "    assert response.status_code == 200\n"
+        ),
+    }
+    assert _lifecycle_findings(files) == []
+
+
+def test_literal_id_check_does_not_apply_without_autoincrement_or_create() -> None:
+    source = (
+        "def test_read(client):\n"
+        "    client.post('/things', json={'name': 'x'})\n"
+        "    assert client.get('/things/1').status_code == 200\n"
+    )
+    assert _lifecycle_findings({"backend/db.py": "import sqlite3\n", "tests/test_app.py": source}) == []
+    assert _lifecycle_findings({
+        "backend/db.py": "import sqlite3\nCREATE_SQL = 'AUTOINCREMENT'\n",
+        "tests/test_app.py": source.replace("    client.post('/things', json={'name': 'x'})\n", ""),
+    }) == []
+
+
+def test_frozen_reading_candidate_exposes_literal_id_defect() -> None:
+    root = pathlib.Path(__file__).resolve().parents[3]
+    candidate = root / "var/factory/candidates/factory-goal-mu7ulkrc-ks31z9"
+    files = {
+        "backend/db.py": (candidate / "backend/db.py").read_text(encoding="utf-8"),
+        "tests/test_app.py": (candidate / "tests/test_app.py").read_text(encoding="utf-8"),
+    }
+    findings = _lifecycle_findings(files)
+    assert [f.code for f in findings] == ["test_hardcoded_created_id"] * 3
+    assert any("test_get_reading" in f.detail for f in findings)
+    assert [f.code for f in _backend_tests_stage_findings(files)] == [
+        "test_hardcoded_created_id"
+    ] * 3
