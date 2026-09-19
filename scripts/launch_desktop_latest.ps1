@@ -62,7 +62,7 @@ try {
         $lock = [System.IO.File]::Open($buildLockFile, 'OpenOrCreate', 'ReadWrite', 'None')
         try {
             Write-Host 'ARKALI güncelleniyor. İlk açılış birkaç dakika sürebilir...'
-            Push-Location (Join-Path $repoRoot 'frontend')
+            Push-Location $repoRoot
             try {
                 & $tauriCli build --no-bundle
                 if ($LASTEXITCODE -ne 0) { throw 'Masaüstü derlemesi başarısız oldu; eski sürüm açılmadı.' }
