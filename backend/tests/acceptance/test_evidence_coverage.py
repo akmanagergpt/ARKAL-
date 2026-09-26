@@ -8,6 +8,7 @@ import pytest
 
 from arkali.acceptance.evidence_coverage import evidence_coverage
 from arkali.acceptance.evidence_graph import evidence_graph
+from arkali.control.specification.register_parser import RequirementRegister
 from arkali.evidence.audit.chain import EvidenceInput
 from tests.evidence.plane_harness import critical_provenance
 
@@ -94,8 +95,13 @@ class TestGraphCoverage:
             coverage = evidence_coverage.compute(graph, REPO, {})
 
         rows = {row.requirement_id: row for row in coverage.requirements}
-        # 328 registered - 2 OPTIONAL (D-025/D-026 added Block 8, ARK-REQ-0381-0395).
-        assert coverage.requirement_denominator == 326
+        register = RequirementRegister.load(REPO)
+        expected_ids = {
+            requirement_id for requirement_id in register.all_ids()
+            if register.get(requirement_id).counts_toward_coverage
+        }
+        assert set(rows) == expected_ids
+        assert coverage.requirement_denominator == len(expected_ids)
         assert coverage.requirement_numerator == 1
         assert rows["ARK-REQ-0069"].required_evidence == ("integ", "prov")
         assert rows["ARK-REQ-0069"].present_evidence == ("integ", "prov")
@@ -121,5 +127,9 @@ class TestGraphCoverage:
             )
         ids = {row.requirement_id for row in coverage.requirements}
         assert "ARK-REQ-0060" not in ids
-        # 326 (see above) - 1 for the removed false CONDITIONAL entry.
-        assert coverage.requirement_denominator == 325
+        register = RequirementRegister.load(REPO)
+        expected_count = sum(
+            register.get(requirement_id).counts_toward_coverage
+            for requirement_id in register.all_ids()
+        )
+        assert coverage.requirement_denominator == expected_count - 1

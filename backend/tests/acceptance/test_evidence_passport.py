@@ -8,11 +8,20 @@ import pytest
 
 from arkali.acceptance.evidence_graph import evidence_graph
 from arkali.acceptance.evidence_passport import evidence_passport
+from arkali.control.specification.register_parser import RequirementRegister
 from arkali.evidence.audit.chain import EvidenceInput
 from tests.evidence.plane_harness import critical_provenance
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 pytest_plugins = ("tests.evidence.plane_harness",)
+
+
+def expected_requirement_count() -> int:
+    register = RequirementRegister.load(REPO)
+    return sum(
+        register.get(requirement_id).counts_toward_coverage
+        for requirement_id in register.all_ids()
+    )
 
 
 def append_evidence(plane: object, requirement_id: str, kind: str, result: str) -> None:
@@ -72,8 +81,7 @@ def test_passport_groups_register_obligations_by_capability(plane: object) -> No
     assert requirement.missing_evidence == ()
     assert {item.evidence_kind for item in requirement.bindings} == {"integ", "prov"}
     assert all(item.evidence_id and item.artifact_id for item in requirement.bindings)
-    # 328 registered - 2 OPTIONAL (D-025/D-026 added Block 8, ARK-REQ-0381-0395).
-    assert passport.requirement_denominator == 326
+    assert passport.requirement_denominator == expected_requirement_count()
 
 
 def test_missing_or_non_pass_evidence_remains_explicit(plane: object) -> None:
@@ -106,4 +114,4 @@ def test_capability_completion_counts_evidence_complete_requirements(plane: obje
         if item.capability == "acceptance.engine"
     )
     assert engine.requirement_numerator == 1
-    assert passport.completion_fraction == (1, 326)
+    assert passport.completion_fraction == (1, expected_requirement_count())
