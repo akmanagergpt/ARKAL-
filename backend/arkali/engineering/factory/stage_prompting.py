@@ -132,6 +132,12 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "Make every mutating test independent of execution order; merely "
         "repeating schema initialization does not remove prior rows"
     ),
+    "test_database_path_mismatch": (
+        "when a test verifies persisted rows with sqlite3.connect, connect to the exact "
+        "database path the application under test uses, or explicitly override the "
+        "application's database path before creating its client. Initializing and "
+        "inspecting a separate test database does not verify the application's writes"
+    ),
     "python_syntax": (
         "the emitted Python file is incomplete or syntactically invalid. Repair "
         "the exact parser-reported location in the previous attempt, completing "

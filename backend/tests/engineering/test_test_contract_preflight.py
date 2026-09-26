@@ -143,6 +143,56 @@ def test_accepts_read_only_sqlite_tests_without_database_reset() -> None:
     assert _lifecycle_findings(files) == []
 
 
+def test_rejects_direct_database_assertions_against_a_different_path() -> None:
+    files = {
+        "backend/app.py": "import sqlite3\nconn = sqlite3.connect('app.db')\n",
+        "tests/test_app.py": (
+            "import sqlite3\n"
+            "def test_create(client):\n"
+            "    client.post('/things', json={'name': 'x'})\n"
+            "    assert sqlite3.connect('test.db').execute('select 1').fetchone()\n"
+        ),
+    }
+    findings = _lifecycle_findings(files)
+    assert [finding.code for finding in findings] == ["test_database_path_mismatch"]
+    assert "app.db" in findings[0].detail
+    assert "test.db" in findings[0].detail
+
+
+def test_accepts_direct_database_assertions_against_the_application_path() -> None:
+    files = {
+        "backend/app.py": "import sqlite3\nconn = sqlite3.connect('app.db')\n",
+        "tests/test_app.py": (
+            "import sqlite3\n"
+            "def test_read():\n"
+            "    assert sqlite3.connect('app.db').execute('select 1').fetchone()\n"
+        ),
+    }
+    assert _lifecycle_findings(files) == []
+
+
+def test_database_path_mismatch_has_actionable_retry_hint() -> None:
+    code = "test_database_path_mismatch"
+    invariant = _SUPPORTED_HINT_INVARIANTS[code]
+    assert "exact database path" in invariant
+    assert "override" in invariant
+    assert code in _prior_finding_hint_blocks(((code, "tests/", "mismatched path"),))[0]
+
+
+def test_frozen_venue_candidate_exposes_database_path_mismatch() -> None:
+    root = pathlib.Path(__file__).resolve().parents[3]
+    candidate = root / "var/factory/candidates/factory-goal-mui7gnxa-ikpua0"
+    files = {
+        path.relative_to(candidate).as_posix(): path.read_text(encoding="utf-8")
+        for path in candidate.rglob("*.py")
+    }
+    findings = _lifecycle_findings(files)
+    assert "test_database_path_mismatch" in [finding.code for finding in findings]
+    mismatch = next(f for f in findings if f.code == "test_database_path_mismatch")
+    assert "venue.db" in mismatch.detail
+    assert "test_venue.db" in mismatch.detail
+
+
 def test_rejects_literal_record_id_after_create_with_autoincrement() -> None:
     files = {
         "backend/db.py": "import sqlite3\nCREATE_SQL = 'id INTEGER PRIMARY KEY AUTOINCREMENT'\n",

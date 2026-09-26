@@ -114,6 +114,44 @@ def _database_state_finding(
     )
 
 
+def _sqlite_connect_literal(node: ast.AST) -> str | None:
+    if not (isinstance(node, ast.Call) and node.args):
+        return None
+    function, value = node.func, node.args[0]
+    if not (isinstance(function, ast.Attribute) and function.attr == "connect"
+            and isinstance(function.value, ast.Name) and function.value.id == "sqlite3"):
+        return None
+    return value.value if isinstance(value, ast.Constant) and isinstance(value.value, str) else None
+
+
+def _literal_sqlite_paths(files: Mapping[str, str], prefix: str) -> set[str]:
+    paths: set[str] = set()
+    for path, source in files.items():
+        if not path.startswith(prefix) or not path.endswith(".py"):
+            continue
+        for node in ast.walk(ast.parse(source)):
+            literal = _sqlite_connect_literal(node)
+            if literal is not None:
+                paths.add(literal)
+    return paths
+
+
+def _database_path_mismatch_finding(files: Mapping[str, str], tests: str) -> SemanticFinding | None:
+    backend_paths = _literal_sqlite_paths(files, "backend/")
+    test_paths = _literal_sqlite_paths(files, "tests/")
+    mismatched = sorted(test_paths - backend_paths)
+    if not backend_paths or not mismatched or "monkeypatch" in tests.lower():
+        return None
+    return SemanticFinding(
+        code="test_database_path_mismatch", path="tests/",
+        detail=(
+            f"tests directly inspect SQLite path(s) {mismatched!r}, but the application "
+            f"connects to {sorted(backend_paths)!r}; direct database assertions must inspect "
+            "the exact database used by the application or explicitly override that path"
+        ),
+    )
+
+
 def _literal_http_calls(test: ast.AST) -> list[ast.Call]:
     return [node for node in ast.walk(test) if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute) and node.args
@@ -179,8 +217,11 @@ def _lifecycle_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
                 detail="TestClient must enter a context when schema bootstrap runs at startup",
             )
         ]
-    database_finding = _database_state_finding(files, backend, tests)
-    return ([database_finding] if database_finding else []) + _hardcoded_created_id_findings(files, backend)
+    database_findings = []
+    state_finding = _database_state_finding(files, backend, tests)
+    path_finding = _database_path_mismatch_finding(files, tests)
+    database_findings.extend(filter(None, (state_finding, path_finding)))
+    return database_findings + _hardcoded_created_id_findings(files, backend)
 
 
 def _function_parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) -> set[str]:
