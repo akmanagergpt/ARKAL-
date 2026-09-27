@@ -64,7 +64,9 @@ from arkali.surfaces.command.error_mapping import (
     message_of,
     status_for,
 )
-from arkali.surfaces.command.factory import _build_factory_router, _FactorySubmitter
+from arkali.surfaces.command.factory import (
+    _build_factory_router, _FactoryGuide, _FactorySubmitter,
+)
 from arkali.surfaces.command.factory_history import (
     _CampaignHistorySource,
     _CandidateHistorySource,
@@ -107,6 +109,7 @@ class _CommandExtensions:
     operations_wiring: OperationsWiring | None = None
     operations_repo_root: pathlib.Path | None = None
     factory_submitter: _FactorySubmitter | None = None
+    factory_guide: _FactoryGuide | None = None
     factory_candidate_history: _CandidateHistorySource | None = None
     factory_campaign_history: _CampaignHistorySource | None = None
     #: `(artifact_session_scope, artifact_blobs, ledger)` for the Product
@@ -399,7 +402,8 @@ def create_app(
     if extensions is not None and extensions.factory_submitter is not None:
         app.include_router(
             _build_factory_router(
-                session_scope, guard, WRITE, extensions.factory_submitter
+                session_scope, guard, WRITE, extensions.factory_submitter,
+                extensions.factory_guide,
             )
         )
     # Read-only production history (see `factory_history.py`'s own module

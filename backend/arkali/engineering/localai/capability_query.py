@@ -83,17 +83,19 @@ class RealCapabilityAuthority(BaseModel):
 
     query: Callable[[str], CapabilityQueryResult]
     default_capability_id: str | None
+    default_model_id: str | None
 
 
 def _probe_nodes(
     adapter: LocalRuntimeAdapter,
-) -> tuple[CapabilityNode, ...]:
+) -> tuple[tuple[CapabilityNode, str], ...]:
     probe = adapter.probe()
     if probe.state is not HonestState.PASS:
         return ()
     host = probe_host()
     return tuple(
-        build_capability_node(descriptor, probe, evaluate_suitability(descriptor, host))
+        (build_capability_node(descriptor, probe, evaluate_suitability(descriptor, host)),
+         descriptor.model_id)
         for descriptor in adapter.list_models()
     )
 
@@ -117,7 +119,8 @@ def compose_real_capability_authority(
     register = RequirementRegister.load(repo_root)
     activation_phase = register.get(_ACTIVATION_REQUIREMENT).owning_phase
 
-    nodes = _probe_nodes(adapter)
+    probed = _probe_nodes(adapter)
+    nodes = tuple(node for node, _model_id in probed)
     references = ReferenceResolvers(CapabilityReferenceAuthority.load(repo_root), {})
     graph = CapabilityGraph(
         nodes,
@@ -130,11 +133,19 @@ def compose_real_capability_authority(
     # pre-activation, and the default offered here must match what a real
     # query would actually answer, never a node fact the activation gate
     # would itself refuse.
-    configured = next(
-        (node.id for node in nodes if graph.can_perform(node.id).state is HonestState.PASS),
+    configured_node = next(
+        (node for node in nodes if graph.can_perform(node.id).state is HonestState.PASS),
         None,
     )
-    return RealCapabilityAuthority(query=graph.can_perform, default_capability_id=configured)
+    configured = configured_node.id if configured_node is not None else None
+    model_by_capability = {
+        node.id: model_id for node, model_id in probed
+    }
+    return RealCapabilityAuthority(
+        query=graph.can_perform,
+        default_capability_id=configured,
+        default_model_id=model_by_capability.get(configured),
+    )
 
 
 __all__ = ["RealCapabilityAuthority", "compose_real_capability_authority"]

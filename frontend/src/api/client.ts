@@ -21,6 +21,8 @@ import type {
   CreateRevisionRequest,
   _DiagnosticsSnapshotResponse,
   _FactoryGoalRequest,
+  _FactoryConversationRequest,
+  _FactoryConversationResponse,
   FactoryHistorySnapshot,
   _FactoryIntakeResponse,
   HealthResponse,
@@ -81,6 +83,7 @@ export const ENDPOINTS = {
   diagnosticsSnapshot: { method: 'GET', path: '/api/diagnostics/snapshot' },
   factoryHistory: { method: 'GET', path: '/api/factory/history' },
   submitFactoryGoal: { method: 'POST', path: '/api/factory/goals' },
+  continueFactoryConversation: { method: 'POST', path: '/api/factory/conversation' },
   startPreview: { method: 'POST', path: '/api/candidates/{candidate_id}/preview' },
   findPreview: { method: 'GET', path: '/api/candidates/{candidate_id}/preview' },
   startProjectPreview: { method: 'POST', path: '/api/projects/{project_id}/preview' },
@@ -423,6 +426,12 @@ export class ArkaliApiClient {
    */
   submitFactoryGoal(body: _FactoryGoalRequest): Promise<_FactoryIntakeResponse> {
     return this.request<_FactoryIntakeResponse>(ENDPOINTS.submitFactoryGoal, { body });
+  }
+
+  continueFactoryConversation(
+    body: _FactoryConversationRequest,
+  ): Promise<_FactoryConversationResponse> {
+    return this.request<_FactoryConversationResponse>(ENDPOINTS.continueFactoryConversation, { body });
   }
 
   /**

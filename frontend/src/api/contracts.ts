@@ -341,6 +341,22 @@ export interface _FactoryGoalRequest {
   capability_id: string | null;
 }
 
+export interface _FactoryConversationMessage {
+  role: string;
+  content: string;
+}
+
+export interface _FactoryConversationRequest {
+  messages: _FactoryConversationMessage[];
+}
+
+export interface _FactoryConversationResponse {
+  assistant_message: string;
+  questions: string[];
+  proposed_goal_text: string | null;
+  model_id: string;
+}
+
 /** One real, mechanically-derived reason a goal did not fully resolve. */
 export interface _UnresolvedQuestionShape {
   subject_index: number | null;

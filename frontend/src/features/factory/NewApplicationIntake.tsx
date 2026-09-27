@@ -24,6 +24,7 @@ import { useState } from 'react';
 
 import type { ArkaliApiClient } from '@/api/client';
 import type {
+  _FactoryConversationMessage,
   _FactoryIntakeResponse,
   _JobCheckpointResponse,
   _UnresolvedQuestionShape,
@@ -256,23 +257,32 @@ export function NewApplicationIntake({
 }) {
   const intake = useFactoryIntake(client);
   const [goalText, setGoalText] = useState('');
-  const [recordName, setRecordName] = useState('');
-  const [recordFields, setRecordFields] = useState('');
-  const [screenCount, setScreenCount] = useState(2);
+  const [messages, setMessages] = useState<readonly _FactoryConversationMessage[]>([]);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [guidancePending, setGuidancePending] = useState(false);
+  const [guidanceFailure, setGuidanceFailure] = useState<string | null>(null);
   const [approvedScope, setApprovedScope] = useState(false);
 
   const trimmed = goalText.trim();
-  const needsGuidance = intake.result?.state === 'governed_stop'
-    && intake.result.unresolved.some((question) => question.kind === 'missing_acceptance_criteria');
-  const record = recordName.trim().replace(/[\r\n]+/g, ' ');
-  const fields = recordFields.trim().replace(/[\r\n]+/g, ' ');
-  const proposal = record && fields && screenCount >= 1 && screenCount <= 20
-    ? [
-      `1. The system must persist ${record} using SQLite with at least 1 table; each record contains ${fields}.`,
-      `2. The backend must expose at least 4 REST API endpoints supporting create, read, update and delete operations for ${record}.`,
-      `3. The frontend must let a user create, view, edit and delete ${record} within at most ${screenCount} screens, including an actionable empty list and visible feedback after saving.`,
-    ].join('\n')
-    : null;
+  const askArkali = async () => {
+    if (trimmed === '' || guidancePending) return;
+    const next = [...messages, { role: 'user' as const, content: trimmed }];
+    setMessages(next);
+    setGoalText('');
+    setDraft(null);
+    setApprovedScope(false);
+    setGuidanceFailure(null);
+    setGuidancePending(true);
+    try {
+      const response = await client.continueFactoryConversation({ messages: next });
+      setMessages([...next, { role: 'assistant', content: response.assistant_message }]);
+      setDraft(response.proposed_goal_text);
+    } catch {
+      setGuidanceFailure('Yerel Qwen şu anda yanıt veremedi. Biraz sonra yeniden deneyebilirsiniz.');
+    } finally {
+      setGuidancePending(false);
+    }
+  };
 
   return (
     <Panel title={showTechnical ? 'Yeni Uygulama (Goal Intake)' : 'Yeni Uygulama'}>
@@ -280,10 +290,7 @@ export function NewApplicationIntake({
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault();
-          if (trimmed === '' || intake.submitting) {
-            return;
-          }
-          void intake.submit(trimmed);
+          void askArkali();
         }}
       >
         <div className="flex flex-col gap-1.5">
@@ -293,10 +300,10 @@ export function NewApplicationIntake({
           <textarea
             id="new-application-goal"
             value={goalText}
-            disabled={intake.submitting}
+            disabled={guidancePending || intake.submitting}
             onChange={(event) => { setGoalText(event.target.value); setApprovedScope(false); }}
             rows={4}
-            placeholder="Örneğin: Stoklarımı, giriş-çıkış işlemlerini ve kritik stok seviyelerini takip edebileceğim bir uygulama istiyorum."
+            placeholder="Örneğin: İş yerindeki görevleri çalışanlara dağıtan ve ilerlemeyi gösteren bir uygulama istiyorum."
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 disabled:bg-slate-100"
           />
           <p className="text-xs text-slate-500">
@@ -306,10 +313,42 @@ export function NewApplicationIntake({
         </div>
 
         <div>
-          <Button type="submit" variant="primary" busy={intake.submitting} disabled={trimmed === ''}>
-            {intake.submitting ? 'Gönderiliyor…' : 'Uygulamayı Oluştur'}
+          <Button type="submit" variant="primary" busy={guidancePending} disabled={trimmed === '' || intake.submitting}>
+            {guidancePending ? 'Qwen düşünüyor…' : messages.length === 0 ? 'ARKALI ile konuş' : 'Yanıtımı gönder'}
           </Button>
         </div>
+
+        {messages.length === 0 ? null : (
+          <div aria-label="ARKALI görüşmesi" className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            {messages.map((message, index) => (
+              <div key={index} className={message.role === 'assistant' ? 'text-slate-800' : 'text-blue-900'}>
+                <span className="font-semibold">{message.role === 'assistant' ? 'ARKALI' : 'Siz'}:</span>{' '}
+                <span className="whitespace-pre-wrap">{message.content}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {guidanceFailure === null ? null : (
+          <Callout tone="error" title="Görüşme sürdürülemedi"><p>{guidanceFailure}</p></Callout>
+        )}
+
+        {draft === null ? null : (
+          <div className="space-y-3 rounded-lg border border-emerald-300 bg-emerald-50 p-4">
+            <h3 className="font-semibold text-slate-900">Üretim için hazırlanan kapsam</h3>
+            <p className="text-sm text-slate-700">Aşağıdaki kapsamı onaylamadan üretim başlamaz. Değişiklik istiyorsanız yukarıya doğal dille yazabilirsiniz.</p>
+            <pre className="whitespace-pre-wrap rounded bg-white p-3 text-xs text-slate-700">{draft}</pre>
+            <label className="flex gap-2 text-sm"><input type="checkbox" checked={approvedScope}
+              onChange={(event) => setApprovedScope(event.target.checked)} />
+              Bu kapsamı okudum ve uygulamanın üretilmesini onaylıyorum.
+            </label>
+            <Button type="button" variant="primary" busy={intake.submitting}
+              disabled={!approvedScope || intake.submitting}
+              onClick={() => { void intake.submit(draft); }}>
+              Onayla ve üretimi başlat
+            </Button>
+          </div>
+        )}
 
         {intake.failure === null ? null : (
           <Callout tone="error" title="İstek gönderilemedi">
@@ -321,49 +360,6 @@ export function NewApplicationIntake({
         {intake.result === null ? null : (
           <ResultCallout result={intake.result} showTechnical={showTechnical} />
         )}
-
-        {needsGuidance && !intake.submitting ? (
-          <div className="space-y-3 rounded-lg border border-slate-300 bg-slate-50 p-4">
-            <h3 className="font-semibold text-slate-900">Birlikte netleştirelim</h3>
-            <p className="text-sm text-slate-700">
-              Fikrinizi teknik terimlerle yeniden yazmanız gerekmiyor. Aşağıdaki yanıtlarınızla
-              yalnızca temel bir kayıt uygulaması önereceğiz; son kapsamı siz onaylayacaksınız.
-            </p>
-            <label className="block text-sm" htmlFor="guided-record-name">Hangi kayıtları tutalım?</label>
-            <input id="guided-record-name" className="w-full rounded border p-2" value={recordName}
-              maxLength={80} placeholder="Örneğin: görevler" onChange={(event) => {
-                setRecordName(event.target.value); setApprovedScope(false);
-              }} />
-            <label className="block text-sm" htmlFor="guided-record-fields">Her kayıt için hangi bilgiler gerekli?</label>
-            <input id="guided-record-fields" className="w-full rounded border p-2" value={recordFields}
-              maxLength={160} placeholder="Örneğin: görev adı, sorumlu kişi ve durum"
-              onChange={(event) => { setRecordFields(event.target.value); setApprovedScope(false); }} />
-            <label className="block text-sm" htmlFor="guided-screen-count">İlk sürüm en çok kaç ekrandan oluşsun?</label>
-            <input id="guided-screen-count" className="w-24 rounded border p-2" type="number"
-              min={1} max={20} value={screenCount}
-              onChange={(event) => { setScreenCount(Number(event.target.value)); setApprovedScope(false); }} />
-            {proposal === null ? null : (
-              <div className="space-y-2 text-sm">
-                <p>Önerilen ilk sürüm: {record} kayıtlarını {fields} bilgileriyle ekleme, görme,
-                  düzenleme ve silme. En çok {screenCount} ekran kullanılacak.</p>
-                {/(yapay zek|öğren|otomatik|ai\b)/i.test(goalText) ? (
-                  <p className="font-medium text-amber-800">Yapay zekâ ile öğrenme veya otomatik görev dağıtımı bu teklife dahil değildir.</p>
-                ) : null}
-                <p className="text-slate-600">İlk açıklamanız bu ekranda kalır; ancak aşağıdaki onay yalnızca
-                  bu dar temel sürümü üretime gönderir. Diğer özellikler ayrıca tanımlanmalıdır.</p>
-                {showTechnical ? <pre className="whitespace-pre-wrap break-words rounded bg-white p-2 text-xs">{proposal}</pre> : null}
-                <label className="flex gap-2"><input type="checkbox" checked={approvedScope}
-                  onChange={(event) => setApprovedScope(event.target.checked)} />
-                  Yalnızca bu temel sürüm kapsamını onaylıyorum.
-                </label>
-              </div>
-            )}
-            <Button type="button" disabled={proposal === null || !approvedScope}
-              onClick={() => { if (proposal !== null && approvedScope) void intake.submit(proposal); }}>
-              Bu kapsamla üretime gönder
-            </Button>
-          </div>
-        ) : null}
 
         {intake.job === null ? null : (
           <ProgressCallout

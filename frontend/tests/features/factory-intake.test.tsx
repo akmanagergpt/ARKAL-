@@ -21,12 +21,22 @@ import { stubFetch, type Route } from '../fixtures';
 
 const BASE = 'http://127.0.0.1:8000';
 const GOALS = `POST ${BASE}/api/factory/goals`;
+const CONVERSATION = `POST ${BASE}/api/factory/conversation`;
 const HISTORY = `GET ${BASE}/api/factory/history`;
 const FACTORY_HISTORY_EMPTY = { candidates: [], campaigns: [] };
 
 function mount(routes: Record<string, Route | Route[]>) {
   const { fetchImpl, calls } = stubFetch({
     [HISTORY]: { status: 200, body: FACTORY_HISTORY_EMPTY },
+    [CONVERSATION]: {
+      status: 200,
+      body: {
+        assistant_message: 'İhtiyacınızı anladım; üretim kapsamı hazır.',
+        questions: [],
+        proposed_goal_text: '1. The system must persist records using SQLite with at least 1 table.\n2. The backend must expose at least 4 REST API endpoints.\n3. The frontend must support create, view, edit and delete within at most 2 screens.',
+        model_id: 'qwen2.5-coder:14b',
+      },
+    },
     ...routes,
   });
   const client = new ArkaliApiClient({ baseUrl: BASE, fetchImpl });
@@ -72,13 +82,16 @@ const QUEUED: _FactoryIntakeResponse = {
 
 async function typeAndSubmit(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.type(screen.getByLabelText(/nasıl bir uygulama yapmak istiyorsunuz/i), text);
-  await user.click(screen.getByRole('button', { name: 'Uygulamayı Oluştur' }));
+  await user.click(screen.getByRole('button', { name: 'ARKALI ile konuş' }));
+  await screen.findByText('Üretim için hazırlanan kapsam');
+  await user.click(screen.getByRole('checkbox', { name: /uygulamanın üretilmesini onaylıyorum/i }));
+  await user.click(screen.getByRole('button', { name: 'Onayla ve üretimi başlat' }));
 }
 
 describe('New Application intake', () => {
   it('keeps submit disabled until real text is entered', async () => {
     mount({});
-    expect(screen.getByRole('button', { name: 'Uygulamayı Oluştur' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'ARKALI ile konuş' })).toBeDisabled();
   });
 
   it('explains a governed_stop honestly, in Turkish, without technical jargon in beginner mode', async () => {
@@ -91,34 +104,24 @@ describe('New Application intake', () => {
     expect(screen.getByText(/otomatik olarak doğrulanabilir bir kural çıkaramadı/)).toBeInTheDocument();
     expect(screen.queryByText('missing_acceptance_criteria')).not.toBeInTheDocument();
     expect(screen.queryByText(/goal_id/)).not.toBeInTheDocument();
-    expect(screen.getByText('Birlikte netleştirelim')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' })).toBeDisabled();
+    expect(screen.getByLabelText('ARKALI görüşmesi')).toBeInTheDocument();
   });
 
-  it('requires explicit scope approval before resubmitting a guided proposal', async () => {
+  it('uses Qwen guidance and requires explicit scope approval before production', async () => {
     const user = userEvent.setup();
-    const { calls } = mount({ [GOALS]: [
-      { status: 202, body: GOVERNED_STOP },
-      { status: 202, body: ESCALATED },
-    ] });
-    await typeAndSubmit(user, 'İşlerimi takip edip bana sorarak otomatik görev dağıtan bir uygulama istiyorum.');
-    await screen.findByText('Birlikte netleştirelim');
-    expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'))).toHaveLength(1);
-    await user.type(screen.getByLabelText('Hangi kayıtları tutalım?'), 'görevler');
-    await user.type(screen.getByLabelText('Her kayıt için hangi bilgiler gerekli?'), 'görev adı, sorumlu kişi ve durum');
-    expect(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' })).toBeDisabled();
-    await user.click(screen.getByRole('checkbox', { name: /yalnızca bu temel sürüm/i }));
-    expect(screen.getByText(/otomatik görev dağıtımı bu teklife dahil değildir/)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Bu kapsamla üretime gönder' }));
+    const { calls } = mount({ [GOALS]: { status: 202, body: ESCALATED } });
+    await user.type(screen.getByLabelText(/nasıl bir uygulama/i), 'Görevleri dağıtan bir uygulama istiyorum.');
+    await user.click(screen.getByRole('button', { name: 'ARKALI ile konuş' }));
+    expect(await screen.findByText(/üretim kapsamı hazır/i)).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'))).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Onayla ve üretimi başlat' })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: /uygulamanın üretilmesini onaylıyorum/i }));
+    await user.click(screen.getByRole('button', { name: 'Onayla ve üretimi başlat' }));
     expect(await screen.findByText('İsteğiniz insan onayı gerektiriyor')).toBeInTheDocument();
     const posts = calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'));
-    expect(posts).toHaveLength(2);
-    const first = posts[0]?.body as { goal_text: string };
-    const second = posts[1]?.body as { goal_text: string };
-    expect(first.goal_text).toContain('bana sorarak otomatik görev dağıtan');
-    expect(second.goal_text).toContain('görevler');
-    expect(second.goal_text).toContain('at least 1 table');
-    expect(second.goal_text).not.toContain('bana sorarak otomatik görev dağıtan');
+    expect(posts).toHaveLength(1);
+    const submitted = posts[0]?.body as { goal_text: string };
+    expect(submitted.goal_text).toContain('at least 1 table');
   });
 
   it('shows the real kind and detail in Uzman mode', async () => {
@@ -303,7 +306,7 @@ describe('New Application intake', () => {
     expect(await screen.findByText('İstek gönderilemedi')).toBeInTheDocument();
   });
 
-  it('sends the real, unmodified goal text and a real request id', async () => {
+  it('sends the user words to guidance and only the approved draft to Factory', async () => {
     const user = userEvent.setup();
     const { calls } = mount({ [GOALS]: { status: 202, body: GOVERNED_STOP } });
 
@@ -312,8 +315,11 @@ describe('New Application intake', () => {
 
     const call = calls.find((c) => c.method === 'POST' && c.url.endsWith('/api/factory/goals'));
     const body = call?.body as { goal_text: string; request_id: string; capability_id: string | null };
-    expect(body.goal_text).toBe('Stok takibi yapabileceğim bir uygulama istiyorum.');
+    expect(body.goal_text).toContain('at least 1 table');
     expect(body.request_id.length).toBeGreaterThan(0);
     expect(body.capability_id).toBeNull();
+    const conversation = calls.find((c) => c.method === 'POST' && c.url.endsWith('/api/factory/conversation'));
+    expect((conversation?.body as { messages: Array<{ content: string }> }).messages[0]?.content)
+      .toBe('Stok takibi yapabileceğim bir uygulama istiyorum.');
   });
 });

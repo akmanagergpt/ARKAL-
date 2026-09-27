@@ -412,6 +412,30 @@ def _factory_submitter(
     return submit
 
 
+def _factory_guide(repo_root: pathlib.Path) -> Callable[..., Any]:
+    """One bounded local Qwen-backed discovery turn; never enqueues generation."""
+    from arkali.engineering.localai.intake_conversation import (
+        IntakeMessage, continue_intake_conversation,
+    )
+
+    adapter = OllamaAdapter(json_mode=True, max_output_tokens=1200)
+    authority = compose_real_capability_authority(
+        repo_root, adapter, _current_capability_phase(repo_root),
+    )
+    model_id = authority.default_model_id
+
+    def guide(body: Any) -> dict[str, Any]:
+        if model_id is None:
+            raise RuntimeError("no configured local model is available for guided intake")
+        guidance = continue_intake_conversation(
+            adapter, model_id,
+            tuple(IntakeMessage(**message.model_dump()) for message in body.messages),
+        )
+        return {**guidance.model_dump(mode="json"), "model_id": model_id}
+
+    return guide
+
+
 def _workflow_wiring(
     pdp: PolicyDecisionPoint, repo_root: pathlib.Path
 ) -> tuple[Callable[..., Any], Callable[..., Any], Callable[..., Any]]:
@@ -692,6 +716,7 @@ def main(argv: list[str]) -> int:
             operations_wiring=_operations_wiring(pdp, ROOT),
             operations_repo_root=ROOT,
             factory_submitter=_factory_submitter(pdp, ROOT, database),
+            factory_guide=_factory_guide(ROOT),
             factory_candidate_history=_factory_candidate_history(ROOT),
             factory_campaign_history=_factory_campaign_history(ROOT),
             preview_bridge=_preview_bridge_wiring(ROOT),

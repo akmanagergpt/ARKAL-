@@ -266,6 +266,16 @@ def _factory_submitter_wiring(pdp: PolicyDecisionPoint):
     return submit
 
 
+def _factory_guide_wiring(body):  # noqa: ANN001
+    """Contract-only projection of the real local guidance callable."""
+    return {
+        "assistant_message": "Bir sonraki soruyu yanıtlayın.",
+        "questions": ["Kaç kullanıcı olacak?"],
+        "proposed_goal_text": None,
+        "model_id": "qwen2.5-coder:14b",
+    }
+
+
 def _factory_history_wiring(var_root: pathlib.Path):
     """Mirrors `scripts/run_command_center.py`'s own `_factory_candidate_
     history`/`_factory_campaign_history` exactly, over an isolated root -
@@ -383,6 +393,7 @@ def app(tmp_path_factory: pytest.TempPathFactory) -> FastAPI:
             factory_candidate_history=candidate_history,
             factory_campaign_history=campaign_history,
             factory_submitter=_factory_submitter_wiring(pdp),
+            factory_guide=_factory_guide_wiring,
             preview_bridge=_preview_bridge_wiring(pdp, tmp_path_factory.mktemp("preview-bridge-var")),
             product_change=_product_change_wiring(),
             providers_wiring=_providers_wiring(REPO),

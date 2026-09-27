@@ -40,6 +40,28 @@ class _FactoryGoalRequest(BaseModel):
     capability_id: str | None = Field(default=None, min_length=1)
 
 
+class _FactoryConversationMessage(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
+
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class _FactoryConversationRequest(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    messages: tuple[_FactoryConversationMessage, ...] = Field(min_length=1, max_length=20)
+
+
+class _FactoryConversationResponse(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    assistant_message: str
+    questions: tuple[str, ...]
+    proposed_goal_text: str | None
+    model_id: str
+
+
 class _UnresolvedQuestionShape(BaseModel):
     """This surface's own projection of `control.specification`'s
     `UnresolvedQuestion` — field-for-field, the same projection discipline
@@ -71,12 +93,13 @@ class _FactoryIntakeResponse(BaseModel):
 
 SessionScope = Callable[[], Iterator[Session]]
 _FactorySubmitter = Callable[[Session, _FactoryGoalRequest], Any]
+_FactoryGuide = Callable[[_FactoryConversationRequest], Any]
 Guard = Callable[[str], None]
 
 
 def _build_factory_router(
     session_scope: SessionScope, guard: Guard, write_operation: str,
-    submitter: _FactorySubmitter,
+    submitter: _FactorySubmitter, guide: _FactoryGuide | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/factory", tags=[BROWSER_SLICE])
 
@@ -87,6 +110,14 @@ def _build_factory_router(
         guard(write_operation)
         result = submitter(session, body)
         return _FactoryIntakeResponse(**result.model_dump(mode="json"))
+
+    if guide is not None:
+        @router.post("/conversation", response_model=_FactoryConversationResponse)
+        def continue_conversation(
+            body: _FactoryConversationRequest,
+        ) -> _FactoryConversationResponse:
+            guard(write_operation)
+            return _FactoryConversationResponse(**guide(body))
 
     return router
 
