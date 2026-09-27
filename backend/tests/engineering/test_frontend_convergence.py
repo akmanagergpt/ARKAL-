@@ -74,6 +74,7 @@ _BACKEND_CONTRACT_FILES = {
     ),
 }
 _WORK_FORM_JS = (
+    "const WorkList = () => <button>Create Work</button>;\n"
     "function WorkForm({ onSubmit }) {\n"
     "  const [title, setTitle] = React.useState('');\n"
     "  const [success, setSuccess] = React.useState(false);\n"

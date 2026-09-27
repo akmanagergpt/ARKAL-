@@ -53,8 +53,8 @@ def _statement_end(text: str, start: int) -> int:
     return len(text)
 
 
-def _zero_state_branch(frontend: str, tokens: set[str]) -> str | None:
-    """The real body of the first zero-record early-return branch whose
+def _zero_state_scopes(frontend: str, tokens: set[str]) -> tuple[str, str] | None:
+    """The empty and populated scopes around the first zero-record return whose
     own checked collection variable normalizes to one of this module's
     own tokens -- `None` when no such branch can be confidently located,
     so the existing whole-file behavior below is preserved unchanged
@@ -68,13 +68,18 @@ def _zero_state_branch(frontend: str, tokens: set[str]) -> str | None:
         while index < len(frontend) and frontend[index].isspace():
             index += 1
         if index < len(frontend) and frontend[index] == "{":
-            return _balanced_brace_body(frontend, index)
-        return frontend[match.end():_statement_end(frontend, match.end())]
+            branch = _balanced_brace_body(frontend, index)
+            end = min(len(frontend), index + len(branch) + 2)
+        else:
+            end = _statement_end(frontend, match.end())
+            branch = frontend[match.end():end]
+        prefix = frontend[:match.start()]
+        return prefix + branch, prefix + frontend[end:]
     return None
 
 
 def _create_access_findings(spec: object, frontend: str, finding: Callable[..., object]) -> list[object]:
-    """Require a real exit from every create-capable empty state."""
+    """Require create to remain reachable with both zero and existing records."""
     controls = _CONTROL.findall(frontend)
     findings: list[object] = []
     for module in spec.modules:  # type: ignore[attr-defined]
@@ -84,20 +89,20 @@ def _create_access_findings(spec: object, frontend: str, finding: Callable[..., 
             _normalize(module.name), _normalize(module.navigation_label),
             _normalize(module.navigation_label.rstrip("s")),
         }
-        zero_state = _zero_state_branch(frontend, tokens)
-        scope = _CONTROL.findall(zero_state) if zero_state is not None else controls
-        found = any(
+        scopes = _zero_state_scopes(frontend, tokens)
+        scoped_controls = (controls,) if scopes is None else tuple(_CONTROL.findall(scope) for scope in scopes)
+        reachable = all(any(
             any(word in control.lower() for word in ("create", "add", "new"))
             and any(token and token in _normalize(control) for token in tokens)
             for control in scope
-        )
-        if not found:
+        ) for scope in scoped_controls)
+        if not reachable:
             findings.append(finding(
                 code="frontend_ui_create_unreachable_from_empty_state", path="frontend/src/",
                 detail=(
                     f"module {module.name!r} declares create, but no accessible interactive "
                     "create/add/new control associated with it remains reachable; the action "
-                    "must be usable even when the collection is empty"
+                    "must be usable whether the collection is empty or populated"
                 ),
             ))
     return findings

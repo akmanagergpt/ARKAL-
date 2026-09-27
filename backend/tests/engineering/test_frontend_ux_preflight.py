@@ -322,10 +322,27 @@ class TestEmptyStateCreateReachabilityControlFlow:
         codes = {f.code for f in self._findings(frontend)}
         assert "frontend_ui_create_unreachable_from_empty_state" in codes
 
-    def test_b_create_inside_the_zero_state_branch_passes(self) -> None:
+    def test_b_create_only_inside_the_zero_state_branch_is_flagged(self) -> None:
         frontend = (
             "if (clients.length === 0) return <div>No clients"
             "<Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        codes = {f.code for f in self._findings(frontend)}
+        assert "frontend_ui_create_unreachable_from_empty_state" in codes
+
+    def test_b2_create_in_both_zero_and_populated_states_passes(self) -> None:
+        frontend = (
+            "if (clients.length === 0) return <div>No clients"
+            "<Link to='/clients/create'>Create Client</Link></div>;"
+            "return <div><Link to='/clients/create'>Create Client</Link></div>;"
+        )
+        assert self._findings(frontend) == []
+
+    def test_b3_create_before_the_zero_state_branch_passes_both_states(self) -> None:
+        frontend = (
+            "const action = <Link to='/clients/create'>Create Client</Link>;"
+            "if (clients.length === 0) return <div>{action}No clients</div>;"
+            "return <div>{action}<ul /></div>;"
         )
         assert self._findings(frontend) == []
 
@@ -340,6 +357,7 @@ class TestEmptyStateCreateReachabilityControlFlow:
             "if (loading) return <div>Loading</div>; "
             "if (clients.length === 0) return <div>No clients"
             "<Link to='/clients/create'>Create Client</Link></div>;"
+            "return <div><Link to='/clients/create'>Create Client</Link></div>;"
         )
         assert self._findings(frontend) == []
 
@@ -372,8 +390,9 @@ class TestEmptyStateCreateReachabilityControlFlow:
 
     def test_h_brace_less_zero_state_form_is_extracted_correctly(self) -> None:
         frontend = (
+            "const action = <Link to='/clients/create'>Create Client</Link>;"
             "if (clients.length === 0) return <div>No clients"
-            "<Link to='/clients/create'>Create Client</Link></div>;"
+            "{action}</div>; return <div>{action}</div>;"
         )
         assert self._findings(frontend) == []
 
@@ -412,6 +431,20 @@ class TestEmptyStateCreateReachabilityControlFlow:
         codes = {f.code for f in findings}
         assert codes == {"frontend_ui_create_unreachable_from_empty_state"}
         assert len(findings) == 2
+
+    def test_m_frozen_venue_candidate_flags_create_hidden_when_populated(self) -> None:
+        candidate_app_js = (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "var" / "factory" / "candidates" / "factory-goal-muiacw4y-odpawm"
+            / "frontend" / "src" / "App.js"
+        )
+        findings = self._findings(
+            candidate_app_js.read_text(encoding="utf-8"), ("rooms", "reservations")
+        )
+        assert [f.code for f in findings] == [
+            "frontend_ui_create_unreachable_from_empty_state",
+            "frontend_ui_create_unreachable_from_empty_state",
+        ]
 
 
 class TestSuccessFeedbackCoverage:
