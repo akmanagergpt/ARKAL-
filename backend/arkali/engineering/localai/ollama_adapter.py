@@ -28,6 +28,7 @@ import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
+from typing import Any
 
 from arkali.engineering.localai.adapter import (
     CompletionMetadata,
@@ -90,6 +91,34 @@ def resolve_output_budget(
 
 def _is_loopback(endpoint: str) -> bool:
     return urlparse(endpoint).hostname in _LOOPBACK_HOSTS
+
+
+def _read_stream(
+    response: Any, started: float, timeout_seconds: float, text_parts: list[str],
+) -> tuple[str, CompletionMetadata | None, float]:
+    """Accumulate one Ollama NDJSON stream under the caller's deadline."""
+    completion: CompletionMetadata | None = None
+    while True:
+        elapsed = time.monotonic() - started
+        remaining = timeout_seconds - elapsed
+        if remaining <= 0:
+            raise TimeoutError("inference deadline exceeded")
+        socket = getattr(getattr(getattr(response, "fp", None), "raw", None),
+                         "_sock", None)
+        if socket is not None:
+            socket.settimeout(max(0.001, remaining))
+        line = response.readline()
+        if not line:
+            return "".join(text_parts), completion, time.monotonic() - started
+        event = json.loads(line.decode("utf-8"))
+        text_parts.append(str(event.get("response", "")))
+        if "done" in event:
+            completion = CompletionMetadata(
+                completed=bool(event.get("done")),
+                finish_reason=str(event.get("done_reason", "")),
+                output_token_count=int(event.get("eval_count", 0) or 0),
+                prompt_token_count=int(event.get("prompt_eval_count", 0) or 0),
+            )
 
 
 class OllamaAdapter:
@@ -214,28 +243,8 @@ class OllamaAdapter:
                         detail=f"unexpected status {response.status}",
                         elapsed_seconds=elapsed,
                     )
-                while True:
-                    elapsed = time.monotonic() - started
-                    remaining = timeout_seconds - elapsed
-                    if remaining <= 0:
-                        raise TimeoutError("inference deadline exceeded")
-                    socket = getattr(getattr(getattr(response, "fp", None), "raw", None),
-                                     "_sock", None)
-                    if socket is not None:
-                        socket.settimeout(max(0.001, remaining))
-                    line = response.readline()
-                    if not line:
-                        break
-                    event = json.loads(line.decode("utf-8"))
-                    text_parts.append(str(event.get("response", "")))
-                    if "done" in event:
-                        completion = CompletionMetadata(
-                            completed=bool(event.get("done")),
-                            finish_reason=str(event.get("done_reason", "")),
-                            output_token_count=int(event.get("eval_count", 0) or 0),
-                            prompt_token_count=int(event.get("prompt_eval_count", 0) or 0),
-                        )
-                elapsed = time.monotonic() - started
+                text, completion, elapsed = _read_stream(
+                    response, started, timeout_seconds, text_parts)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             partial = "".join(text_parts)
             return InferenceResult(
@@ -258,7 +267,6 @@ class OllamaAdapter:
                 output_excerpt=partial[:200],
                 output=partial,
             )
-        text = "".join(text_parts)
         return InferenceResult(
             runtime=RUNTIME,
             model_id=model_id,
