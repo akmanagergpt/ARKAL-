@@ -130,7 +130,9 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "temporary database path wired into the real application before "
         "each test runs, or perform reliable cleanup/rollback between tests. "
         "Make every mutating test independent of execution order; merely "
-        "repeating schema initialization does not remove prior rows"
+        "repeating schema initialization does not remove prior rows. Merely "
+        "importing tempfile/os is not isolation: the fixture must actually "
+        "create and use the temporary path or execute cleanup/rollback"
     ),
     "test_database_path_mismatch": (
         "when a test verifies persisted rows with sqlite3.connect, connect to the exact "

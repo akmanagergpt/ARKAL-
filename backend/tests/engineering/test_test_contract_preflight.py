@@ -115,6 +115,8 @@ def test_database_isolation_finding_has_actionable_retry_hint() -> None:
     assert "before" in invariant
     assert "cleanup" in invariant
     assert "schema initialization" in invariant
+    assert "importing tempfile/os is not isolation" in invariant
+    assert "actually" in invariant
 
 
 def test_accepts_mutating_sqlite_tests_with_per_test_temporary_database() -> None:
