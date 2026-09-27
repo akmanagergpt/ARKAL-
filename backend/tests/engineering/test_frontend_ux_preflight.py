@@ -942,6 +942,29 @@ def test_is_silent_when_a_real_link_targets_the_parameterized_route() -> None:
     assert _unreachable_parameterized_route_findings(files) == []
 
 
+def test_is_silent_when_a_generic_list_link_targets_the_parameterized_route() -> None:
+    """A reusable list may derive the resource segment from its module
+    descriptor while keeping the route action and record id explicit."""
+    files = {
+        "frontend/src/App.js": (
+            "const route = <Route path='/owners/edit/:id' component={EditOwner} />;\n"
+            "const row = <Link to={`/${module.name}/edit/${item.id}`}>Edit</Link>;\n"
+        ),
+    }
+    assert _unreachable_parameterized_route_findings(files) == []
+
+
+def test_generic_list_link_with_a_different_action_does_not_reach_route() -> None:
+    files = {
+        "frontend/src/App.js": (
+            "const route = <Route path='/owners/edit/:id' component={EditOwner} />;\n"
+            "const row = <Link to={`/${module.name}/delete/${item.id}`}>Delete</Link>;\n"
+        ),
+    }
+    findings = _unreachable_parameterized_route_findings(files)
+    assert [finding.code for finding in findings] == ["frontend_route_unreachable"]
+
+
 def test_is_silent_for_a_non_parameterized_route() -> None:
     files = {
         "frontend/src/index.js": (

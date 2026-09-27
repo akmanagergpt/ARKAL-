@@ -54,7 +54,7 @@ from arkali.engineering.factory.frontend_root_route_preflight import (
     _missing_root_route_findings,
     _orphaned_router_root_findings,
 )
-from arkali.engineering.factory.frontend_route_shadowing_preflight import _shadowed_route_findings
+from arkali.engineering.factory.frontend_route_shadowing_preflight import _has_generic_list_route_reference, _shadowed_route_findings
 from arkali.engineering.factory.semantic_finding import SemanticFinding
 from arkali.engineering.factory.product_ux_spec import _backend_declared_models, _parse_ux_spec
 
@@ -528,7 +528,7 @@ def _unreachable_parameterized_route_findings(files: Mapping[str, str]) -> list[
         for match in _PARAMETERIZED_ROUTE.finditer(source):
             route_path = match.group(1)
             prefix = _route_static_prefix(route_path)
-            if not prefix or all_source.count(prefix) > 1:
+            if not prefix or all_source.count(prefix) > 1 or _has_generic_list_route_reference(route_path, all_source):
                 continue
             findings.append(SemanticFinding(
                 code="frontend_route_unreachable", path=path,

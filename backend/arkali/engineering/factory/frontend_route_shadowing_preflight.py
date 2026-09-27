@@ -42,6 +42,18 @@ from arkali.engineering.factory.semantic_finding import SemanticFinding
 #: accepts.
 _ROUTE_TAG = re.compile(r"<Route\s[^>]*?path=[\"']([^\"']+)[\"'][^>]*>")
 _EXACT_ATTR = re.compile(r"(?<![\w-])exact(?![\w-])")
+_JS_TEMPLATE_EXPRESSION = r"\$\{[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\}"
+
+
+def _has_generic_list_route_reference(route_path: str, source: str) -> bool:
+    """Recognize `/${module.name}/edit/${item.id}` without treating a
+    different action segment as the declared route."""
+    parts = route_path.strip("/").split("/")
+    if len(parts) < 2 or not parts[-1].startswith(":"):
+        return False
+    resource = rf"(?:{re.escape(parts[0])}|{_JS_TEMPLATE_EXPRESSION})"
+    tail = "".join(rf"/{re.escape(part)}" for part in parts[1:-1])
+    return re.search(rf"/{resource}{tail}/{_JS_TEMPLATE_EXPRESSION}", source) is not None
 
 
 def _shadowed_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
