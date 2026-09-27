@@ -16,9 +16,9 @@ generic HTTP client.
 
 READ-ONLY DISCOVERY, BOUNDED INFERENCE. `probe()` and `list_models()` issue
 GET requests only and never change runtime state. `infer()` issues exactly one
-POST with `stream: false` and the caller's timeout; a network failure, a
-timeout or a non-200 response is an honest non-PASS outcome, never converted
-to success.
+streaming POST under the caller's total deadline. Streaming preserves genuine
+partial progress as diagnostic evidence; a network failure, timeout or non-200
+response remains an honest non-PASS outcome, never converted to success.
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ class OllamaAdapter:
         payload: dict[str, object] = {
             "model": model_id,
             "prompt": prompt,
-            "stream": False,
+            "stream": True,
         }
         if self._json_mode:
             payload["format"] = "json"
@@ -201,6 +201,8 @@ class OllamaAdapter:
             method="POST",
         )
         started = time.monotonic()
+        text_parts: list[str] = []
+        completion: CompletionMetadata | None = None
         try:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 elapsed = time.monotonic() - started
@@ -212,48 +214,51 @@ class OllamaAdapter:
                         detail=f"unexpected status {response.status}",
                         elapsed_seconds=elapsed,
                     )
-                payload = json.loads(response.read().decode("utf-8"))
+                while True:
+                    elapsed = time.monotonic() - started
+                    remaining = timeout_seconds - elapsed
+                    if remaining <= 0:
+                        raise TimeoutError("inference deadline exceeded")
+                    socket = getattr(getattr(getattr(response, "fp", None), "raw", None),
+                                     "_sock", None)
+                    if socket is not None:
+                        socket.settimeout(max(0.001, remaining))
+                    line = response.readline()
+                    if not line:
+                        break
+                    event = json.loads(line.decode("utf-8"))
+                    text_parts.append(str(event.get("response", "")))
+                    if "done" in event:
+                        completion = CompletionMetadata(
+                            completed=bool(event.get("done")),
+                            finish_reason=str(event.get("done_reason", "")),
+                            output_token_count=int(event.get("eval_count", 0) or 0),
+                            prompt_token_count=int(event.get("prompt_eval_count", 0) or 0),
+                        )
+                elapsed = time.monotonic() - started
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            partial = "".join(text_parts)
             return InferenceResult(
                 runtime=RUNTIME,
                 model_id=model_id,
                 state=HonestState.NOT_CONFIGURED,
                 detail=f"inference call failed: {exc}",
                 elapsed_seconds=time.monotonic() - started,
+                output_excerpt=partial[:200],
+                output=partial,
             )
         except (ValueError, json.JSONDecodeError) as exc:
+            partial = "".join(text_parts)
             return InferenceResult(
                 runtime=RUNTIME,
                 model_id=model_id,
                 state=HonestState.EXTERNAL_UNAVAILABLE,
                 detail=f"malformed response: {exc}",
                 elapsed_seconds=time.monotonic() - started,
+                output_excerpt=partial[:200],
+                output=partial,
             )
-        text = str(payload.get("response", ""))
-        # F-0100 (`BACKEND_SCHEMA_TRUNCATED_GENERATION_GAP`, observability
-        # phase). Ollama's own non-streaming response already carries `done`/
-        # `done_reason`/`eval_count`/`prompt_eval_count` in this exact
-        # `payload` -- previously read into this local variable and then
-        # discarded entirely, keeping only `response` text. A genuinely
-        # short, mid-construct-truncated real response (`goal-mtyeas61-
-        # 75cn2k`, `backend_schema`) left no way to tell whether Ollama
-        # itself reported the generation as finished, or ARKALI's own read
-        # path was the one that stopped early -- this call is non-streaming
-        # (`stream: false`) and reads the full HTTP body in one blocking
-        # `response.read()`, so that second possibility was already
-        # structurally ruled out, but nothing recorded it. Observation
-        # only: retaining this changes no request, no option, no retry, no
-        # budget -- the exact same bytes are sent and the exact same
-        # `text` becomes `output`/`output_excerpt` as before.
-        completion = (
-            CompletionMetadata(
-                completed=bool(payload.get("done")),
-                finish_reason=str(payload.get("done_reason", "")),
-                output_token_count=int(payload.get("eval_count", 0) or 0),
-                prompt_token_count=int(payload.get("prompt_eval_count", 0) or 0),
-            )
-            if "done" in payload else None
-        )
+        text = "".join(text_parts)
         return InferenceResult(
             runtime=RUNTIME,
             model_id=model_id,

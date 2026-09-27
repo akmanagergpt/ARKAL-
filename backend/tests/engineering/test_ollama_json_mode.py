@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import io
 import urllib.request
 
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter
@@ -15,9 +16,11 @@ class _Response:
     def __exit__(self, *_args: object) -> None:
         return None
 
-    @staticmethod
-    def read() -> bytes:
-        return b'{"response":"{}"}'
+    def __init__(self) -> None:
+        self._lines = io.BytesIO(b'{"response":"{}"}\n')
+
+    def readline(self) -> bytes:
+        return self._lines.readline()
 
 
 def test_json_mode_uses_ollama_native_structured_output(
@@ -38,7 +41,7 @@ def test_json_mode_uses_ollama_native_structured_output(
     assert captured["body"] == {
         "model": "coder",
         "prompt": "prompt",
-        "stream": False,
+        "stream": True,
         "format": "json",
         "options": {"num_ctx": 8192, "num_predict": 4096, "temperature": 0},
     }

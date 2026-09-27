@@ -2,19 +2,16 @@
 
 Real evidence (`goal-mtyeas61-75cn2k`, `backend_schema`): a genuinely
 short, mid-construct-truncated real response left no way to tell whether
-Ollama itself reported the generation as finished, or ARKALI's own read
-path stopped early. `OllamaAdapter.infer()` already parses Ollama's full
-non-streaming `/api/generate` response (`done`/`done_reason`/`eval_count`/
-`prompt_eval_count` all present in that same JSON object) but previously
-kept only `response` text, discarding the rest. This phase is
-observational only: it proves the previously-discarded fields now reach
-`InferenceResult.completion`, unbounded generation options and request
-behaviour remain byte-for-byte unchanged.
+Ollama itself reported the generation as finished. These tests prove that
+the terminal streaming event's `done`/`done_reason`/`eval_count`/
+`prompt_eval_count` fields reach `InferenceResult.completion` without being
+inferred from output shape.
 """
 
 from __future__ import annotations
 
 import json
+import io
 import urllib.request
 
 from arkali.engineering.localai.adapter import CompletionMetadata, InferenceResult
@@ -36,11 +33,16 @@ class _Response:
     def read(self) -> bytes:
         return self._body
 
+    def readline(self) -> bytes:
+        if not hasattr(self, "_lines"):
+            self._lines = io.BytesIO(self._body)
+        return self._lines.readline()
+
 
 def _ollama_reply(**fields: object) -> bytes:
     payload: dict[str, object] = {"response": "{}"}
     payload.update(fields)
-    return json.dumps(payload).encode()
+    return json.dumps(payload).encode() + b"\n"
 
 
 # -- A: a normal Ollama completion's own real fields are preserved ----------
@@ -109,10 +111,10 @@ def test_d_inference_result_constructs_without_completion() -> None:
     assert result.completion is None
 
 
-# -- E/F: request payload and stream mode are unchanged ----------------------
+# -- E/F: request payload and stream mode are explicit -----------------------
 
 
-def test_e_f_request_payload_and_stream_mode_are_unchanged(monkeypatch) -> None:  # noqa: ANN001
+def test_e_f_request_payload_uses_progress_preserving_streaming(monkeypatch) -> None:  # noqa: ANN001
     captured: dict[str, object] = {}
 
     def urlopen(request: urllib.request.Request, timeout: float) -> _Response:
@@ -123,7 +125,7 @@ def test_e_f_request_payload_and_stream_mode_are_unchanged(monkeypatch) -> None:
     OllamaAdapter(json_mode=True, max_output_tokens=4096).infer("coder", "prompt", timeout_seconds=9)
 
     assert captured["body"] == {
-        "model": "coder", "prompt": "prompt", "stream": False, "format": "json",
+        "model": "coder", "prompt": "prompt", "stream": True, "format": "json",
         "options": {"num_ctx": 8192, "num_predict": 4096, "temperature": 0},
     }
 
