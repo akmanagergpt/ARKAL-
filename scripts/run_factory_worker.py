@@ -65,6 +65,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from local_runtime import local_runtime_adapter, local_runtime_model_id  # noqa: E402
+
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from arkali.control.architecture.authority_map import AuthorityMap  # noqa: E402
@@ -99,7 +101,6 @@ from arkali.engineering.factory.product_preflight import (  # noqa: E402
     inspect_product_files,
 )
 from arkali.engineering.localai.adapter import CompletionMetadata  # noqa: E402
-from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.evidence.artifact.store import ArtifactStore, ProvenanceInput  # noqa: E402
 from arkali.execution.durable.job_state_machine import (  # noqa: E402
@@ -281,7 +282,19 @@ def main(argv: list[str]) -> int:
     goal_hash = hash_text(goal_text)
     already_accepted = ledger.accepted_candidate_for_goal(goal_hash)
     candidate_id = f"factory-{job_id}"
-    provider_model = "ollama/qwen2.5-coder:14b"
+    # FACTORY_RUNTIME_SELECTION_WIRING_GAP fix: resolved once, here, from
+    # the same real selection rule `run_command_center.py` already uses
+    # (`ARKALI_LOCAL_RUNTIME`/`ARKALI_LOCAL_RUNTIME_ENDPOINT`/
+    # `ARKALI_LOCAL_RUNTIME_REASONING_EFFORT`) -- this worker previously
+    # never consulted it at all, so a genuinely selected and genuinely
+    # CONFIGURED `openai_compatible` runtime was still silently attempted
+    # against Ollama. Resolved once per job, not per stage: neither
+    # adapter carries state across calls, and re-discovering the real
+    # model id from a live server on every one of ~11 real stage calls
+    # would be needless repeated network traffic for no behavior change.
+    adapter = local_runtime_adapter(json_mode=True, max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS)
+    model_id = local_runtime_model_id(adapter)
+    provider_model = f"{adapter.runtime}/{model_id}"
     started = time.monotonic()
 
     def _checkpoint(detail: dict[str, object]) -> None:
@@ -320,8 +333,8 @@ def main(argv: list[str]) -> int:
     vocabulary = StageVocabulary.load(ROOT)
 
     provenance = GenerationProvenance(
-        goal_hash=goal_hash, source_commit="", runtime="ollama",
-        endpoint="http://127.0.0.1:11434", model="qwen2.5-coder:14b",
+        goal_hash=goal_hash, source_commit="", runtime=adapter.runtime,
+        endpoint=adapter.endpoint, model=model_id,
         model_parameters={
             "max_output_tokens": DEFAULT_MAX_OUTPUT_TOKENS,
             "timeout_seconds": DEFAULT_TIMEOUT_SECONDS,
@@ -340,12 +353,11 @@ def main(argv: list[str]) -> int:
     _checkpoint({"phase": "generating", "candidate_id": candidate_id})
 
     def model_factory(_stage_name: str):  # noqa: ANN202
-        adapter = OllamaAdapter(json_mode=True, max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS)
         # F-0078: every real attempt's own diagnostic facts are frozen as
         # real, content-addressed evidence -- diagnostic provenance only,
         # never changing what this run reports or how it is classified.
         observed = _ObservedModel(adapter, candidate_id, provider_model)
-        return observed, "qwen2.5-coder:14b"
+        return observed, model_id
 
     try:
         result = generate_staged_model_product(

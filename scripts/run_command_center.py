@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import pathlib
 import subprocess
 import sys
@@ -34,6 +33,7 @@ from typing import Any
 
 ROOT = pathlib.Path(getattr(sys, "_MEIPASS", pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 import uvicorn  # noqa: E402
 from alembic import command  # noqa: E402
@@ -60,10 +60,7 @@ from arkali.engineering.localai import host_probe  # noqa: E402
 from arkali.engineering.localai.capability_query import (  # noqa: E402
     compose_real_capability_authority,
 )
-from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
-from arkali.engineering.localai.openai_compatible_adapter import (  # noqa: E402
-    OpenAICompatibleAdapter,
-)
+from local_runtime import local_runtime_adapter  # noqa: E402
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.durable.job_state_machine import QUEUED as _JOB_QUEUED  # noqa: E402
@@ -201,41 +198,13 @@ def _should_auto_spawn_worker(
 #: identical way.
 _CAPABILITY_ACTIVATION_PHASE = "9B"
 
-#: Bionic's own documented default (OpenAI-compatible, just-in-time model
-#: loading) - a loopback default, never a hard-coded business-logic URL:
-#: `ARKALI_LOCAL_RUNTIME_ENDPOINT` overrides it, exactly like every other
-#: `--host`/`--db` default above.
-_BIONIC_DEFAULT_ENDPOINT = "http://127.0.0.1:1234"
-
-
-def _local_runtime_adapter(
-    *, json_mode: bool = False, max_output_tokens: int | None = None,
-):
-    """The one `LocalRuntimeAdapter` every composition below wires in.
-
-    Defaults to `OllamaAdapter()`, byte-identical to every call site's own
-    prior behavior. `ARKALI_LOCAL_RUNTIME=openai_compatible` selects the
-    existing, unmodified `OpenAICompatibleAdapter` instead (e.g. Bionic's
-    own local server) - ARK-REQ-0016's adapter Protocol already made this a
-    same-shape swap; no second provider framework, no Ollama-specific
-    change. Real availability still comes from `compose_real_capability_
-    authority`'s own real probe below, never from this selection alone.
-    """
-    runtime = os.environ.get("ARKALI_LOCAL_RUNTIME", "ollama")
-    if runtime == "openai_compatible":
-        endpoint = os.environ.get("ARKALI_LOCAL_RUNTIME_ENDPOINT", _BIONIC_DEFAULT_ENDPOINT)
-        return OpenAICompatibleAdapter(
-            endpoint, json_mode=json_mode, max_output_tokens=max_output_tokens,
-            # Opt-in only: unset by default, so every existing caller's own
-            # request shape is byte-unchanged. Real, documented, provider-
-            # agnostic OpenAI field (`reasoning_effort`), never a
-            # Qwen-specific name -- verified live against Bionic this
-            # session to empty a reasoning model's own hidden
-            # `reasoning_content`, which can otherwise consume an entire
-            # small output-token budget before any visible content exists.
-            reasoning_effort=os.environ.get("ARKALI_LOCAL_RUNTIME_REASONING_EFFORT"),
-        )
-    return OllamaAdapter(json_mode=json_mode, max_output_tokens=max_output_tokens)
+#: FACTORY_RUNTIME_SELECTION_WIRING_GAP fix: the real selection rule now
+#: lives in one place, `local_runtime.py` (a sibling script module, not a
+#: package import - `run_factory_worker.py`, a separate subprocess, must
+#: resolve the identical runtime the identical way, and previously did
+#: not). Re-exported under this module's own prior name so every existing
+#: call site below is unchanged.
+_local_runtime_adapter = local_runtime_adapter
 
 
 def _current_capability_phase(repo_root: pathlib.Path) -> str:
