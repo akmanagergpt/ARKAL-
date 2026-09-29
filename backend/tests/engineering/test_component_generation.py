@@ -1122,6 +1122,187 @@ def test_backend_implementation_findings_does_not_require_cors() -> None:
     assert _backend_implementation_stage_findings(files) == []
 
 
+#: BACKEND_IMPLEMENTATION_LOCAL_FILE_COMPLETENESS_GAP (real evidence:
+#: `factory-ea9cba11-89be-4b41-895f-5ea0069b495b`, live QWEN3.5/Bionic
+#: run, session evidence, frozen). A real `qwen/qwen3.5-9b`'s own
+#: `backend/app.py` imported and registered `members_bp`/`classes_bp`
+#: from `backend.routes.members`/`backend.routes.classes`, but neither
+#: referenced module was ever emitted, on all 4 real attempts --
+#: `missing_api_routes` fired correctly, but had no structured retry hint
+#: and `STAGED_GENERATION_STAGES.md#3` stated no same-response local-file
+#: completeness invariant for backend Python imports (the exact invariant
+#: `STAGED_GENERATION_STAGES.md#9` already states for frontend_forms).
+_FROZEN_BACKEND_LOCAL_IMPORT_GAP_APP_PY = (
+    "from flask import Flask\n"
+    "from backend.routes.members import members_bp\n"
+    "from backend.routes.classes import classes_bp\n\n"
+    "app = Flask(__name__)\n\n"
+    "app.register_blueprint(members_bp)\n"
+    "app.register_blueprint(classes_bp)\n\n"
+    "if __name__ == '__main__':\n"
+    "    app.run(debug=True)\n"
+)
+_FROZEN_BACKEND_LOCAL_IMPORT_GAP_DB_PY = (
+    "from backend.schema.init import init_db\n\n"
+    "DB_PATH = \"data/gym.db\"\n\n"
+    "init_db()\n\n"
+    "import sqlite3\n\n"
+    "def get_db_connection():\n"
+    "    conn = sqlite3.connect(DB_PATH)\n"
+    "    conn.row_factory = sqlite3.Row\n"
+    "    return conn\n"
+)
+
+
+def test_a_frontend_forms_local_component_completeness_gap_also_exists_in_backend_implementation_frozen_replay() -> None:
+    """Matrix item G: the real frozen `factory-ea9cba11-89be-4b41-895f-
+    5ea0069b495b` attempt, replayed through the real, unmodified
+    production checker -- app.py/db.py only, both referenced Blueprint
+    modules absent -- still correctly produces `missing_api_routes`."""
+    files = {
+        "backend/app.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_APP_PY,
+        "backend/db.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_DB_PY,
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "missing_api_routes" for f in findings)
+
+
+def test_matrix_a_blueprint_import_with_module_absent_is_flagged() -> None:
+    """Matrix item A."""
+    files = {"backend/app.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_APP_PY}
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "missing_api_routes" for f in findings)
+
+
+def test_matrix_b_blueprint_import_with_module_emitted_is_not_flagged_for_routes() -> None:
+    """Matrix item B: once both referenced Blueprint files are genuinely
+    emitted with real route decorators, `missing_api_routes` must not
+    fire -- proving the route-detection fix (not only the prompt/hint
+    additions) actually closes the gap."""
+    files = {
+        "backend/app.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_APP_PY,
+        "backend/db.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_DB_PY,
+        "backend/routes/members.py": (
+            "from flask import Blueprint, jsonify\n"
+            "members_bp = Blueprint('members', __name__)\n\n"
+            "@members_bp.route('/members', methods=['GET'])\n"
+            "def list_members():\n    return jsonify([])\n"
+        ),
+        "backend/routes/classes.py": (
+            "from flask import Blueprint, jsonify\n"
+            "classes_bp = Blueprint('classes', __name__)\n\n"
+            "@classes_bp.route('/classes', methods=['GET'])\n"
+            "def list_classes():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert not any(f.code == "missing_api_routes" for f in findings)
+
+
+def test_matrix_d_routes_implemented_inline_on_app_has_no_dangling_import_problem() -> None:
+    """Matrix item D: the rule's own alternative repair choice (declare
+    routes directly on the application instance instead of a separate
+    module) must already pass cleanly, with no import to resolve at all."""
+    files = {
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "import sqlite3\n\n"
+            "app = Flask(__name__)\n"
+            "sqlite3.connect('data/gym.db').execute('CREATE TABLE IF NOT EXISTS members (id INTEGER)')\n\n"
+            "@app.route('/members', methods=['GET'])\n"
+            "def list_members():\n    return jsonify([])\n\n"
+            "if __name__ == '__main__':\n    app.run(debug=True)\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert findings == []
+
+
+def test_matrix_e_two_missing_route_modules_both_named_by_the_finding_path() -> None:
+    """Matrix item E: the existing `missing_api_routes` finding is a
+    single stage-level symptom (`path='backend/'`), not per-module -- both
+    missing modules are captured by the one finding, and the structured
+    hint (asserted separately below) names the general repair action
+    rather than a per-file location, since no more precise existing
+    finding exists for this (see DETECTION trace)."""
+    files = {"backend/app.py": _FROZEN_BACKEND_LOCAL_IMPORT_GAP_APP_PY}
+    findings = _backend_implementation_stage_findings(files)
+    matches = [f for f in findings if f.code == "missing_api_routes"]
+    assert len(matches) == 1
+    assert matches[0].path == "backend/"
+
+
+def test_matrix_f_unrelated_third_party_import_is_never_treated_as_a_missing_local_route_module() -> None:
+    """Matrix item F: a real, resolvable third-party import (flask_cors)
+    must never itself trigger `missing_api_routes` -- only the genuine
+    absence of any resolvable route decorator does."""
+    files = {
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "from flask_cors import CORS\n\n"
+            "app = Flask(__name__)\n"
+            "CORS(app)\n\n"
+            "@app.route('/members', methods=['GET'])\n"
+            "def list_members():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert not any(f.code == "missing_api_routes" for f in findings)
+
+
+def test_missing_api_routes_has_an_actionable_structured_retry_hint() -> None:
+    """RETRY_HINT_NONCONVERGENCE closes: `missing_api_routes` now has a
+    real entry in `_SUPPORTED_HINT_INVARIANTS`, so a retry receives an
+    explicit repair action (emit the referenced module, or inline the
+    routes) instead of only the raw finding text."""
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = (
+        ("missing_api_routes", "backend/", "backend source declares no HTTP API route"),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "missing_api_routes" in hint
+    assert "Blueprint" in hint or "local Python module" in hint
+    assert "same response" in hint
+
+
+def test_schema_bootstrap_reachability_recognizes_a_blueprint_file_as_route_declaring() -> None:
+    """Matrix item K (existing backend checker non-regression, extended):
+    `_schema_bootstrap_reachability_findings` must not wrongly demand an
+    explicit import of the schema module from a file that itself declares
+    real Blueprint routes -- the same route-decorator generalization
+    `missing_api_routes` needed, reused rather than duplicated with a
+    second, narrower fix."""
+    from arkali.engineering.factory.product_preflight import inspect_product_files
+
+    files = {
+        "backend/schema/init.py": (
+            "import sqlite3\n"
+            "def init_db():\n"
+            "    sqlite3.connect('data.db').execute('CREATE TABLE IF NOT EXISTS members (id INTEGER)')\n"
+        ),
+        "backend/routes/members.py": (
+            "from flask import Blueprint, Flask, jsonify\n"
+            "from backend.schema.init import init_db\n"
+            "app = Flask(__name__)\n"
+            "init_db()\n"
+            "members_bp = Blueprint('members', __name__)\n\n"
+            "@members_bp.route('/members', methods=['GET'])\n"
+            "def list_members():\n    return jsonify([])\n\n"
+            "app.register_blueprint(members_bp)\n"
+            "if __name__ == '__main__':\n    app.run(debug=True)\n"
+        ),
+        "tests/backend/test_members.py": "def test_placeholder():\n    assert True\n",
+        "frontend/src/App.js": "export default function App(){return null}\n",
+        "frontend/public/index.html": '<div id="root"></div>\n',
+        "frontend/package.json": '{"scripts":{"build":"echo ok"}}\n',
+        "config/README.md": "run\n",
+        "backend/requirements.txt": "flask\n",
+    }
+    report = inspect_product_files(files)
+    assert "schema_bootstrap_unreachable" not in {item.code for item in report.findings}
+
+
 def test_cors_boundary_findings_requires_cors() -> None:
     findings = _cors_boundary_stage_findings(HAPPY_PATH_FILES["backend_implementation"])
     assert any(f.code == "missing_browser_origin_boundary" for f in findings)

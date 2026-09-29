@@ -199,10 +199,17 @@ def _raw_row_jsonify_findings(files: Mapping[str, str]) -> list[SemanticFinding]
 
 _IMPORT_LINE = re.compile(r"^\s*(?:import|from)\s")
 _SCHEMA_MARKERS = ("create table", "create_all(")
-_ROUTE_MARKERS = (
-    "@app.route", "@app.get", "@app.post", "@app.put", "@app.delete",
-    "@router.", "add_url_rule",
-)
+#: Same generalization as `product_preflight._ROUTE_DECORATOR` (real
+#: evidence: `factory-ea9cba11-89be-4b41-895f-5ea0069b495b`) -- a literal
+#: `"@app."`/`"@router."` marker list never matched a real Flask
+#: Blueprint's own route decorator (`@members_bp.route(...)`), which would
+#: have made this function wrongly treat a real, correctly-emitted route
+#: module as exempt-only-via-import rather than itself route-declaring,
+#: the moment `STAGED_GENERATION_STAGES.md#3`'s own local-file-completeness
+#: invariant leads a future attempt to actually emit one. Duplicated here
+#: rather than imported: this module's own small local detail, the same
+#: reason `_CORS_MARKERS` stays local to `backend_stage_preflight.py`.
+_ROUTE_DECORATOR = re.compile(r"@\w+\.(?:route|get|post|put|delete|patch)\(")
 
 
 def _schema_creating_paths(lowered: Mapping[str, str]) -> set[str]:
@@ -210,7 +217,10 @@ def _schema_creating_paths(lowered: Mapping[str, str]) -> set[str]:
 
 
 def _route_declaring_paths(lowered: Mapping[str, str]) -> set[str]:
-    return {path for path, source in lowered.items() if any(m in source for m in _ROUTE_MARKERS)}
+    return {
+        path for path, source in lowered.items()
+        if _ROUTE_DECORATOR.search(source) or "add_url_rule" in source
+    }
 
 
 def _module_referenced_on_an_import_line(

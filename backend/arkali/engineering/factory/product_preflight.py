@@ -376,6 +376,22 @@ def _framework_api_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     return []
 
 
+#: BACKEND_IMPLEMENTATION_LOCAL_FILE_COMPLETENESS_GAP (real evidence:
+#: `factory-ea9cba11-89be-4b41-895f-5ea0069b495b`). The prior literal
+#: marker list (`"@app.route"`, `"@app.get"`, ..., `"@router."`) never
+#: matched a real Flask Blueprint's own route decorator
+#: (`@members_bp.route(...)`) -- verified by mechanically replaying a
+#: synthetic but genuinely correct, fully-emitted Blueprint pair through
+#: this exact real checker function, which still raised
+#: `missing_api_routes` against real, working route-decorated code. Any
+#: bound Python identifier (an app instance, an APIRouter, or a
+#: Blueprint) can own `.route(`/`.get(`/`.post(`/`.put(`/`.delete(`/
+#: `.patch(`; matching the method name generically, not only against a
+#: literal `app`/`router` receiver, recognizes all three without any
+#: per-name list.
+_ROUTE_DECORATOR = re.compile(r"@\w+\.(?:route|get|post|put|delete|patch)\(")
+
+
 def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     backend_text = "\n".join(
         source.lower()
@@ -403,16 +419,7 @@ def _persistence_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         )
     findings.extend(_schema_context_findings(backend_text))
     findings.extend(_schema_bootstrap_reachability_findings(files))
-    route_markers = (
-        "@app.route",
-        "@app.get",
-        "@app.post",
-        "@app.put",
-        "@app.delete",
-        "@router.",
-        "add_url_rule",
-    )
-    if not any(marker in backend_text for marker in route_markers):
+    if not _ROUTE_DECORATOR.search(backend_text) and "add_url_rule" not in backend_text:
         findings.append(
             SemanticFinding(
                 code="missing_api_routes",

@@ -146,6 +146,35 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "every opened string, bracket, call, and statement, then return the whole "
         "valid file rather than repeating or continuing the broken fragment"
     ),
+    #: BACKEND_IMPLEMENTATION_LOCAL_FILE_COMPLETENESS_GAP (real evidence:
+    #: `factory-ea9cba11-89be-4b41-895f-5ea0069b495b`, `missing_api_routes`,
+    #: ARK-ERR-0116 exhausted, session evidence, frozen). The real checker
+    #: fires correctly -- the emitted backend source contains no resolvable
+    #: route declaration -- but had no entry here, so a retry received only
+    #: the raw finding text and the generic "make the minimal edit"
+    #: convergence rule, never an explicit repair action; the same two
+    #: dangling Blueprint imports (`backend/routes/members.py`,
+    #: `backend/routes/classes.py`, both referenced by `app.py`, neither
+    #: ever emitted) survived all 4 real attempts. This is the identical
+    #: structural gap `frontend_local_import_unresolved` already names for
+    #: frontend local imports, restated here for backend Python local
+    #: imports; `STAGED_GENERATION_STAGES.md#3`'s own rule now states this
+    #: same invariant at generation time, this hint restates it only for a
+    #: retry that already violated it.
+    "missing_api_routes": (
+        "the emitted backend source declares no HTTP route the real checker "
+        "can resolve. This can happen because no route exists yet, or "
+        "because real routes exist only in a separate local Python module "
+        "(for example a Flask Blueprint file) that the application file "
+        "imports but this response never emitted. Repair by doing exactly "
+        "one of: emit every such locally-imported route module, with real, "
+        "working route-decorated implementation content, in this same "
+        "response; or remove that import and instead declare those routes "
+        "directly on the application instance in the same file. Never leave "
+        "the import in place while assuming a later stage or a future "
+        "attempt will create the missing module -- no later stage re-emits "
+        "backend_implementation's own files"
+    ),
     #: F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
     #: `frontend_route_unreachable` x4, ARK-ERR-0116 exhausted). This hint
     #: already existed and was already delivered; the recurrence traced to

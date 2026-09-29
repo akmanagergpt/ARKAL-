@@ -112,7 +112,23 @@ own JSON files are schema documents, never Python modules, and must
 never be `import`ed (golden-work-067, session evidence, frozen: the
 identical real defect as backend_schema's own rule cites, independently
 repeated in `backend/app.py`) — the backend exposes an
-executable server entrypoint. A route that inserts a new row and returns
+executable server entrypoint. Any local Python module this stage's own
+generated code imports (for example a Flask Blueprint split into its own
+file, such as `from backend.routes.members import members_bp`) must
+resolve inside this same response's own file set: either emit that
+referenced module, with real, working route implementation content, in
+this same response, or do not introduce the import at all and instead
+declare those routes directly on the application instance in the same
+file — never assume a later stage or a future attempt will create the
+missing module, since no later stage in this pipeline re-emits
+backend_implementation's own files (real evidence, factory-ea9cba11-89be-
+4b41-895f-5ea0069b495b: a real qwen/qwen3.5-9b's own `backend/app.py`
+imported and registered `members_bp`/`classes_bp` from
+`backend.routes.members`/`backend.routes.classes`, but neither referenced
+module was ever emitted, on all 4 real attempts — the same structural
+gap `STAGED_GENERATION_STAGES.md#9` already names and fixes for
+frontend_forms's own local component imports, now stated here for this
+stage's own local Python module imports). A route that inserts a new row and returns
 JSON must include that row's own database-generated id (e.g.
 cursor.lastrowid) in the response, not only the submitted request body
 (golden-work-052/053, session evidence, frozen: a real model's own
