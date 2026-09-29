@@ -226,6 +226,14 @@ def _local_runtime_adapter(
         endpoint = os.environ.get("ARKALI_LOCAL_RUNTIME_ENDPOINT", _BIONIC_DEFAULT_ENDPOINT)
         return OpenAICompatibleAdapter(
             endpoint, json_mode=json_mode, max_output_tokens=max_output_tokens,
+            # Opt-in only: unset by default, so every existing caller's own
+            # request shape is byte-unchanged. Real, documented, provider-
+            # agnostic OpenAI field (`reasoning_effort`), never a
+            # Qwen-specific name -- verified live against Bionic this
+            # session to empty a reasoning model's own hidden
+            # `reasoning_content`, which can otherwise consume an entire
+            # small output-token budget before any visible content exists.
+            reasoning_effort=os.environ.get("ARKALI_LOCAL_RUNTIME_REASONING_EFFORT"),
         )
     return OllamaAdapter(json_mode=json_mode, max_output_tokens=max_output_tokens)
 

@@ -138,3 +138,127 @@ class TestBoundedAndReadOnlyByConstruction:
             },
             "timeout": 91,
         }
+
+    def test_reasoning_effort_is_forwarded_only_when_explicitly_set(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """BIONIC_QWEN35_ARKALI_INTEGRATION: real, documented, provider-
+        agnostic OpenAI field (never a Qwen-specific name), verified live
+        against Bionic this session to empty a reasoning model's own
+        hidden `reasoning_content`. `None` (default) must send no such
+        field -- byte-identical prior request shape for every existing
+        caller that never set it."""
+        captured: list[dict[str, object]] = []
+
+        class Response:
+            status = 200
+
+            def __enter__(self):  # noqa: ANN204
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+
+        def fake_urlopen(request, timeout):  # noqa: ANN001, ANN202
+            captured.append(json.loads(request.data.decode()))
+            return Response()
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        OpenAICompatibleAdapter().infer("m", "p")
+        OpenAICompatibleAdapter(reasoning_effort="none").infer("m", "p")
+
+        assert "reasoning_effort" not in captured[0]
+        assert captured[1]["reasoning_effort"] == "none"
+
+
+class TestListModelsRealMetadata:
+    """BIONIC_QWEN35_ARKALI_INTEGRATION: `evaluate_suitability` (`suitability.
+    py`, unmodified) needs a real `parameter_size` and a real `quantization`
+    to ever resolve anything but `NOT_TESTED` -- plain OpenAI `/v1/models`
+    carries neither. Real evidence, this session: Bionic's own real
+    `/api/v0/models` (LM Studio's native, richer surface) DOES carry real
+    `quantization`/`max_context_length`; `parameter_size` is recovered
+    generically from the model id's own real, near-universal `<n>b` suffix
+    -- never a hard-coded constant for one model."""
+
+    @staticmethod
+    def _plain_response(model_ids: list[str]):  # noqa: ANN205
+        class Response:
+            status = 200
+
+            def __enter__(self):  # noqa: ANN204
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({"data": [{"id": i} for i in model_ids]}).encode()
+
+        return Response()
+
+    @staticmethod
+    def _native_response(entries: list[dict[str, object]]):  # noqa: ANN205
+        class Response:
+            status = 200
+
+            def __enter__(self):  # noqa: ANN204
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({"data": entries}).encode()
+
+        return Response()
+
+    def test_native_metadata_populates_quantization_and_context_length(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fake_urlopen(url, timeout):  # noqa: ANN001, ANN202
+            if "/api/v0/models" in url:
+                return self._native_response([{
+                    "id": "qwen/qwen3.5-9b", "quantization": "Q4_K_M",
+                    "max_context_length": 262144,
+                }])
+            return self._plain_response(["qwen/qwen3.5-9b"])
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        models = OpenAICompatibleAdapter().list_models()
+        assert len(models) == 1
+        assert models[0].parameter_size == "9B"
+        assert models[0].quantization == "Q4_K_M"
+        assert models[0].context_length == 262144
+
+    def test_no_native_endpoint_falls_back_honestly(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fake_urlopen(url, timeout):  # noqa: ANN001, ANN202
+            if "/api/v0/models" in url:
+                raise urllib.error.URLError("connection refused")
+            return self._plain_response(["qwen/qwen3.5-9b"])
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        models = OpenAICompatibleAdapter().list_models()
+        assert len(models) == 1
+        # The generic id-suffix parse still recovers a real parameter size
+        # even with no native endpoint at all.
+        assert models[0].parameter_size == "9B"
+        assert models[0].quantization == ""
+        assert models[0].context_length == 0
+
+    def test_an_id_with_no_size_suffix_is_never_guessed(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def fake_urlopen(url, timeout):  # noqa: ANN001, ANN202
+            if "/api/v0/models" in url:
+                raise urllib.error.URLError("connection refused")
+            return self._plain_response(["essentialai/rnj-1"])
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        models = OpenAICompatibleAdapter().list_models()
+        assert models[0].parameter_size == ""
