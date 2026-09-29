@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import pathlib
 import subprocess
 import sys
@@ -60,6 +61,9 @@ from arkali.engineering.localai.capability_query import (  # noqa: E402
     compose_real_capability_authority,
 )
 from arkali.engineering.localai.ollama_adapter import OllamaAdapter  # noqa: E402
+from arkali.engineering.localai.openai_compatible_adapter import (  # noqa: E402
+    OpenAICompatibleAdapter,
+)
 from arkali.evidence.artifact.blob_store import ArtifactBlobStore  # noqa: E402
 from arkali.execution.durable.recovery import JobRecovery  # noqa: E402
 from arkali.execution.durable.job_state_machine import QUEUED as _JOB_QUEUED  # noqa: E402
@@ -197,6 +201,34 @@ def _should_auto_spawn_worker(
 #: identical way.
 _CAPABILITY_ACTIVATION_PHASE = "9B"
 
+#: Bionic's own documented default (OpenAI-compatible, just-in-time model
+#: loading) - a loopback default, never a hard-coded business-logic URL:
+#: `ARKALI_LOCAL_RUNTIME_ENDPOINT` overrides it, exactly like every other
+#: `--host`/`--db` default above.
+_BIONIC_DEFAULT_ENDPOINT = "http://127.0.0.1:1234"
+
+
+def _local_runtime_adapter(
+    *, json_mode: bool = False, max_output_tokens: int | None = None,
+):
+    """The one `LocalRuntimeAdapter` every composition below wires in.
+
+    Defaults to `OllamaAdapter()`, byte-identical to every call site's own
+    prior behavior. `ARKALI_LOCAL_RUNTIME=openai_compatible` selects the
+    existing, unmodified `OpenAICompatibleAdapter` instead (e.g. Bionic's
+    own local server) - ARK-REQ-0016's adapter Protocol already made this a
+    same-shape swap; no second provider framework, no Ollama-specific
+    change. Real availability still comes from `compose_real_capability_
+    authority`'s own real probe below, never from this selection alone.
+    """
+    runtime = os.environ.get("ARKALI_LOCAL_RUNTIME", "ollama")
+    if runtime == "openai_compatible":
+        endpoint = os.environ.get("ARKALI_LOCAL_RUNTIME_ENDPOINT", _BIONIC_DEFAULT_ENDPOINT)
+        return OpenAICompatibleAdapter(
+            endpoint, json_mode=json_mode, max_output_tokens=max_output_tokens,
+        )
+    return OllamaAdapter(json_mode=json_mode, max_output_tokens=max_output_tokens)
+
 
 def _current_capability_phase(repo_root: pathlib.Path) -> str:
     """`GovernanceState` (`acceptance.engine`) is asked here, not inside
@@ -228,7 +260,7 @@ def _providers_wiring(repo_root: pathlib.Path) -> ProvidersSnapshotSource:
     `host_probe.probe_host`.
     """
     authority = compose_real_capability_authority(
-        repo_root, OllamaAdapter(), _current_capability_phase(repo_root),
+        repo_root, _local_runtime_adapter(), _current_capability_phase(repo_root),
     )
 
     def snapshot() -> _ProvidersSnapshotResponse:
@@ -382,7 +414,7 @@ def _factory_submitter(
     if none is, the default stays `None` and routing honestly escalates.
     """
     authority = compose_real_capability_authority(
-        repo_root, OllamaAdapter(), _current_capability_phase(repo_root),
+        repo_root, _local_runtime_adapter(), _current_capability_phase(repo_root),
     )
     factory = ProductionFactory(AuthorityMap.load(repo_root), authority.query)
     # `run_factory_worker.py` opens its own fixed `var/command_center.db` by
@@ -418,7 +450,7 @@ def _factory_guide(repo_root: pathlib.Path) -> Callable[..., Any]:
         IntakeMessage, continue_intake_conversation,
     )
 
-    adapter = OllamaAdapter(json_mode=True, max_output_tokens=1200)
+    adapter = _local_runtime_adapter(json_mode=True, max_output_tokens=1200)
     authority = compose_real_capability_authority(
         repo_root, adapter, _current_capability_phase(repo_root),
     )

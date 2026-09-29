@@ -30,6 +30,7 @@ import urllib.request
 from urllib.parse import urlparse
 
 from arkali.engineering.localai.adapter import (
+    CompletionMetadata,
     HonestState,
     InferenceResult,
     LocalModelDescriptor,
@@ -162,12 +163,21 @@ class OpenAICompatibleAdapter:
             )
         choices = payload.get("choices", [])
         text = ""
+        finish_reason = ""
         if choices:
             text = str(choices[0].get("message", {}).get("content", ""))
+            finish_reason = str(choices[0].get("finish_reason", ""))
+        usage = payload.get("usage", {})
+        completion = CompletionMetadata(
+            completed=finish_reason != "",
+            finish_reason=finish_reason,
+            output_token_count=int(usage.get("completion_tokens", 0) or 0),
+            prompt_token_count=int(usage.get("prompt_tokens", 0) or 0),
+        )
         return InferenceResult(
             runtime=RUNTIME, model_id=model_id, state=HonestState.PASS,
             detail="genuine local inference completed", elapsed_seconds=elapsed,
-            output_excerpt=text[:200], output=text,
+            output_excerpt=text[:200], output=text, completion=completion,
         )
 
 
