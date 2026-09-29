@@ -50,6 +50,28 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 #: `essentialai/rnj-1`).
 _TRAILING_PARAMETER_COUNT = re.compile(r"(\d+(?:\.\d+)?)b(?:[-_]|$)", re.IGNORECASE)
 
+#: OPENAI_COMPATIBLE_JSON_REASONING_CONTRACT (real evidence, this session,
+#: reproduced against the real, live Bionic server -- never guessed):
+#: `{"type": "json_object"}` is REJECTED outright, HTTP 400, real body
+#: `{"error":"'response_format.type' must be 'json_schema' or 'text'"}`
+#: -- identically whether `reasoning_effort` is set or not, proving this
+#: was never a `json_mode` + `reasoning_effort` interaction (the earlier
+#: hypothesis) but `json_object` alone being unsupported here. `json_object`
+#: is itself OpenAI's own older, now-secondary structured-output mode;
+#: `json_schema` is the newer, more broadly-implemented one across the
+#: OpenAI-compatible ecosystem (llama.cpp server, LM Studio/Bionic, vLLM)
+#: and is what this real server requires. This schema is deliberately the
+#: most permissive legal one ("any JSON object") -- it carries no stage,
+#: candidate or model name, and requests exactly the same "valid JSON,
+#: unconstrained shape" contract `json_object` was already asking for;
+#: verified live to return genuine, parseable JSON content (`{"status":
+#: "READY"}`) with a real, adequate token budget, and to be silently
+#: accepted (never a 400) independent of `reasoning_effort`.
+_JSON_MODE_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {"name": "response", "schema": {"type": "object"}},
+}
+
 
 def _is_loopback(endpoint: str) -> bool:
     return urlparse(endpoint).hostname in _LOOPBACK_HOSTS
@@ -176,7 +198,7 @@ class OpenAICompatibleAdapter:
         if self._max_output_tokens is not None:
             payload["max_tokens"] = self._max_output_tokens
         if self._json_mode:
-            payload["response_format"] = {"type": "json_object"}
+            payload["response_format"] = _JSON_MODE_RESPONSE_FORMAT
         if self._reasoning_effort is not None:
             payload["reasoning_effort"] = self._reasoning_effort
         body = json.dumps(payload).encode("utf-8")

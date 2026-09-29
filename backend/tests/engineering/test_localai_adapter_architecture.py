@@ -134,7 +134,10 @@ class TestBoundedAndReadOnlyByConstruction:
                 "model": "local-model",
                 "messages": [{"role": "user", "content": "generate"}],
                 "max_tokens": 4096,
-                "response_format": {"type": "json_object"},
+                "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {"name": "response", "schema": {"type": "object"}},
+                },
             },
             "timeout": 91,
         }
@@ -172,6 +175,89 @@ class TestBoundedAndReadOnlyByConstruction:
 
         assert "reasoning_effort" not in captured[0]
         assert captured[1]["reasoning_effort"] == "none"
+
+
+class TestJsonModeResponseFormatContract:
+    """OPENAI_COMPATIBLE_JSON_REASONING_CONTRACT. Real evidence, this
+    session, reproduced against the real, live Bionic server (never
+    guessed): `{"type": "json_object"}` -- this adapter's own original
+    `json_mode` shape -- was rejected outright, HTTP 400, real body
+    `{"error":"'response_format.type' must be 'json_schema' or 'text'"}`,
+    identically whether `reasoning_effort` was set or not. This was never
+    a `json_mode` + `reasoning_effort` interaction (the earlier
+    hypothesis, mechanically disproven this session): `json_object` alone
+    is what this real server does not implement. `json_schema` -- the
+    newer, more broadly-implemented OpenAI structured-output mode -- is
+    what it requires, and a minimal, maximally-permissive schema
+    (`{"type": "object"}`, no stage/candidate/model name anywhere in it)
+    was verified live to be silently accepted and to produce genuine,
+    parseable JSON content, independent of `reasoning_effort`."""
+
+    @staticmethod
+    def _capture_payload(monkeypatch: pytest.MonkeyPatch, **adapter_kwargs: object) -> dict[str, object]:
+        captured: dict[str, object] = {}
+
+        class Response:
+            status = 200
+
+            def __enter__(self):  # noqa: ANN204
+                return self
+
+            def __exit__(self, *args: object) -> None:
+                return None
+
+            def read(self) -> bytes:
+                return json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode()
+
+        def fake_urlopen(request, timeout):  # noqa: ANN001, ANN202
+            captured["payload"] = json.loads(request.data.decode())
+            return Response()
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        OpenAICompatibleAdapter(**adapter_kwargs).infer("m", "p")
+        return captured["payload"]
+
+    def test_a_non_json_mode_inference_carries_no_response_format_at_all(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        payload = self._capture_payload(monkeypatch, json_mode=False)
+        assert "response_format" not in payload
+
+    def test_c_json_mode_requests_the_new_json_schema_shape(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        payload = self._capture_payload(monkeypatch, json_mode=True)
+        assert payload["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {"name": "response", "schema": {"type": "object"}},
+        }
+        assert "json_object" not in json.dumps(payload)
+
+    def test_d_the_previously_failing_combination_now_uses_the_fixed_shape(
+        self, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """The exact real, live-reproduced failing configuration
+        (`json_mode=True`, `reasoning_effort="none"`): both fields must
+        still be forwarded, and `response_format` must be the corrected
+        shape, never the rejected `json_object` one."""
+        payload = self._capture_payload(monkeypatch, json_mode=True, reasoning_effort="none")
+        assert payload["response_format"]["type"] == "json_schema"
+        assert payload["reasoning_effort"] == "none"
+
+    def test_g_the_fixed_schema_names_no_candidate_stage_or_model(self) -> None:
+        """No new subsystem, no per-call schema construction, no Bionic/
+        model/stage/candidate literal anywhere in the fixed shape -- the
+        exact same single, generic, maximally-permissive schema for
+        every real caller, every real stage, every real model."""
+        source = pathlib.Path(__file__).resolve().parents[2] / (
+            "arkali/engineering/localai/openai_compatible_adapter.py"
+        )
+        text = source.read_text(encoding="utf-8").lower()
+        start = text.index("_json_mode_response_format = {")
+        end = text.index("}\n", start) + 2
+        constant_source = text[start:end]
+        for banned in ("bionic", "qwen", "factory", "files", "backend_contract", "frontend_forms"):
+            assert banned not in constant_source, banned
 
 
 class TestListModelsRealMetadata:
