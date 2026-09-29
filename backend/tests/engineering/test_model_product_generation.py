@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
 
@@ -14,6 +15,7 @@ from arkali.engineering.factory.model_product_generation import (
     generate_model_product_bounded,
 )
 from arkali.engineering.factory.product_preflight import _framework_api_findings
+from arkali.engineering.factory.test_contract_preflight import _fixture_findings, _is_fixture
 from arkali.engineering.localai.adapter import HonestState, InferenceResult
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
@@ -491,6 +493,125 @@ def test_undefined_generated_test_fixture_is_rejected(tmp_path: pathlib.Path) ->
             "model-1",
             _workspace(tmp_path),
         )
+
+
+#: PYTEST_CALLED_FIXTURE_CHECKER_FALSE_POSITIVE (real evidence:
+#: factory-drycleaning-1790684507, `undefined_test_fixture` x10, session
+#: evidence, frozen). The real generated `tests/test_app.py` declared
+#: `@pytest.fixture(scope='function')\ndef test_app(): ...` -- a genuine,
+#: idiomatic, correctly-declared fixture -- but `_is_fixture` only ever
+#: recognized the bare, uncalled `@pytest.fixture` decorator shape.
+def _decorator_node(source: str) -> ast.expr:
+    tree = ast.parse(source)
+    func = tree.body[0]
+    assert isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef))
+    return func.decorator_list[0]
+
+
+def test_matrix_a_bare_pytest_fixture_is_recognized() -> None:
+    assert _is_fixture(_decorator_node("@pytest.fixture\ndef test_app(): ...\n"))
+
+
+def test_matrix_b_called_pytest_fixture_with_no_arguments_is_recognized() -> None:
+    assert _is_fixture(_decorator_node("@pytest.fixture()\ndef test_app(): ...\n"))
+
+
+def test_matrix_c_called_pytest_fixture_with_scope_keyword_is_recognized() -> None:
+    assert _is_fixture(_decorator_node("@pytest.fixture(scope='function')\ndef test_app(): ...\n"))
+
+
+def test_matrix_d_called_pytest_fixture_with_scope_and_autouse_is_recognized() -> None:
+    assert _is_fixture(
+        _decorator_node("@pytest.fixture(scope='module', autouse=True)\ndef setup_db(): ...\n")
+    )
+
+
+def test_matrix_e_pytest_mark_parametrize_is_never_a_fixture() -> None:
+    assert not _is_fixture(
+        _decorator_node("@pytest.mark.parametrize('x', [1, 2])\ndef test_something(x): ...\n")
+    )
+
+
+def test_matrix_f_an_unrelated_call_named_fixture_like_is_never_a_fixture() -> None:
+    """Exact-name identity only -- normalizing a `Call` to its own `.func`
+    must never loosen WHICH attribute name counts as a fixture, only
+    whether that attribute may legally be called."""
+    assert not _is_fixture(_decorator_node("@something.fixture_like()\ndef test_app(): ...\n"))
+
+
+def test_matrix_f2_a_bare_imported_fixture_symbol_is_not_supported_and_stays_that_way() -> None:
+    """The existing checker never recognized the bare imported `fixture`
+    symbol (an `ast.Name`, not an `ast.Attribute`) even before this fix --
+    the task is to normalize Call-vs-bare for the SAME identity check, not
+    invent new identity semantics. Both the bare and the called imported
+    form remain unrecognized, unchanged."""
+    assert not _is_fixture(_decorator_node("@fixture\ndef test_app(): ...\n"))
+    assert not _is_fixture(_decorator_node("@fixture()\ndef test_app(): ...\n"))
+
+
+def test_matrix_g_a_genuinely_undeclared_fixture_still_fires() -> None:
+    tree = ast.parse(
+        "import pytest\n\n"
+        "@pytest.fixture(scope='function')\n"
+        "def real_fixture(): ...\n\n"
+        "def test_uses_undeclared(real_fixture, ghost_fixture): ...\n"
+    )
+    findings = _fixture_findings("tests/test_app.py", tree)
+    assert len(findings) == 1
+    assert findings[0].code == "undefined_test_fixture"
+    assert "ghost_fixture" in findings[0].detail
+
+
+def test_matrix_h_a_test_referencing_the_parameterized_fixture_is_not_flagged() -> None:
+    tree = ast.parse(
+        "import pytest\n\n"
+        "@pytest.fixture(scope='function')\n"
+        "def test_app(): ...\n\n"
+        "def test_uses_it(test_app): ...\n"
+    )
+    assert _fixture_findings("tests/test_app.py", tree) == []
+
+
+def test_matrix_i_multiple_tests_sharing_the_same_parameterized_fixture_produce_no_findings() -> None:
+    tree = ast.parse(
+        "import pytest\n\n"
+        "@pytest.fixture(scope='function')\n"
+        "def test_app(): ...\n\n"
+        "@pytest.fixture\n"
+        "def init_test_db(test_app): ...\n\n"
+        "def test_one(test_app, init_test_db): ...\n"
+        "def test_two(test_app): ...\n"
+        "def test_three(test_app, init_test_db): ...\n"
+    )
+    assert _fixture_findings("tests/test_app.py", tree) == []
+
+
+def test_matrix_j_frozen_dry_cleaning_candidate_replay_no_longer_flags_test_app() -> None:
+    """Real, unmodified frozen evidence: factory-drycleaning-1790684507,
+    sha256:bc7c8fb5e99a21024abb82651bf4eeef3acbb780a5d7279b6ec959f449354cef.
+    Before this fix, this exact content produced 10 real
+    `undefined_test_fixture` findings naming `test_app`, live-observed and
+    replayed unmodified. After this fix, none of them may remain -- and no
+    other, independent finding is invented here to force the replay green."""
+    blob_path = (
+        REPO / "var" / "factory" / "evidence" / "blobs" / "sha256" / "bc"
+        / "bc7c8fb5e99a21024abb82651bf4eeef3acbb780a5d7279b6ec959f449354cef"
+    )
+    if not blob_path.exists():
+        pytest.skip("local frozen evidence not available")
+    blob = json.loads(blob_path.read_text(encoding="utf-8"))
+    raw_output = json.loads(blob["last_raw_output"])
+    content = next(
+        item["content"] for item in raw_output["files"] if item["path"] == "tests/test_app.py"
+    )
+    tree = ast.parse(content)
+    findings = _fixture_findings("tests/test_app.py", tree)
+    test_app_findings = [f for f in findings if "test_app" in f.detail]
+    assert test_app_findings == [], (
+        f"false-positive test_app findings must be gone after the fix, got: {test_app_findings}"
+    )
+    if findings:
+        pytest.fail(f"an independent, non-test_app finding remains in the frozen replay: {findings}")
 
 
 def test_backend_mutation_route_requires_frontend_mutation_call(

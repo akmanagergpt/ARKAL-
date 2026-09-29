@@ -310,6 +310,21 @@ def _undefined_call_findings(path: str, tree: ast.AST) -> list[SemanticFinding]:
 
 
 def _is_fixture(node: ast.expr) -> bool:
+    # PYTEST_CALLED_FIXTURE_CHECKER_FALSE_POSITIVE (real evidence:
+    # factory-drycleaning-1790684507, `undefined_test_fixture` x10,
+    # session evidence, frozen). `@pytest.fixture` decorates as a bare
+    # `ast.Attribute`, but the equally idiomatic, equally common called
+    # forms -- `@pytest.fixture()` and `@pytest.fixture(scope=...)` --
+    # decorate as an `ast.Call` whose own `.func` is that identical
+    # `ast.Attribute`; `isinstance(node, ast.Attribute)` never matched the
+    # call wrapper, so a real, correctly-declared parameterized fixture
+    # (`@pytest.fixture(scope='function')\ndef test_app(): ...`) was never
+    # added to the recognized `fixtures` set, and every real test
+    # consuming it was wrongly flagged. A pytest fixture decorator names
+    # the identical fixture whether bare or called; unwrap a call to its
+    # own callee first, then apply the unchanged identity check.
+    if isinstance(node, ast.Call):
+        node = node.func
     return isinstance(node, ast.Attribute) and node.attr == "fixture"
 
 
