@@ -146,6 +146,32 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "every opened string, bracket, call, and statement, then return the whole "
         "valid file rather than repeating or continuing the broken fragment"
     ),
+    #: BACKEND_SCHEMA_EXECUTABLE_PERSISTENCE_CONTRACT (real evidence:
+    #: `factory-tutoring-1790697700`, `missing_persistence_code`,
+    #: ARK-ERR-0116 exhausted after 2 identical attempts, session evidence,
+    #: frozen). The real checker fires correctly -- the only file this
+    #: attempt wrote was `backend/db/schema.sql`, a genuinely valid, real
+    #: SQLite DDL script, but never a Python module -- and had no entry
+    #: here, so a retry received only the raw finding text and the generic
+    #: "make the minimal edit" convergence rule; the identical `.sql`-only
+    #: shape survived a second real attempt unchanged, and the anti-loop
+    #: stopped before exhausting the remaining bounded attempts.
+    #: `STAGED_GENERATION_STAGES.md#2`'s own rule now states this same
+    #: invariant at generation time; this hint restates it only for a
+    #: retry that already violated it.
+    "missing_persistence_code": (
+        "the emitted backend source contains no real, executable SQLite "
+        "persistence code. A standalone `.sql` file, migration script, or "
+        "other DDL-only artifact never satisfies this, no matter how "
+        "correct its own SQL is -- nothing in this pipeline ever executes "
+        "a bare `.sql` file. Repair by writing real Python source under "
+        "`backend/` that itself opens a SQLite connection (for example "
+        "`sqlite3.connect(...)`) and creates the declared schema, using "
+        "the same real table and field names already available in your "
+        "own visible context -- an accompanying `.sql` file may still "
+        "exist alongside it, but the actual schema-creating code must be "
+        "real, executable Python, not text in a file nothing runs"
+    ),
     #: BACKEND_IMPLEMENTATION_LOCAL_FILE_COMPLETENESS_GAP (real evidence:
     #: `factory-ea9cba11-89be-4b41-895f-5ea0069b495b`, `missing_api_routes`,
     #: ARK-ERR-0116 exhausted, session evidence, frozen). The real checker

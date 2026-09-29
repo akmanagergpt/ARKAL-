@@ -62,7 +62,17 @@ Inputs: backend_contract
 Rule: a real, executable SQLite schema or migration exists, generated from
 backend_contract's data-model JSON, and is wired into the application's
 real startup lifecycle, not a bare `CREATE TABLE` left outside any
-lifecycle hook. This stage does not yet declare routes or an app
+lifecycle hook. The file you write for this must itself be real, executable
+Python source under `backend/` that actually opens/creates the declared
+SQLite database when run — a standalone `.sql` file, migration script, or
+other DDL-only artifact never satisfies this rule by itself, no matter how
+complete or valid its own SQL is, since nothing in this pipeline's own
+startup path ever executes a bare `.sql` file (real evidence,
+factory-tutoring-1790697700: a real qwen/qwen3.5-9b's only output for this
+stage was `backend/db/schema.sql`, a genuinely correct, well-formed SQLite
+schema — two real `CREATE TABLE` statements with a real foreign key — that
+nonetheless never actually ran, on both real attempts before the anti-loop
+stopped it). This stage does not yet declare routes or an app
 instance — that is backend_implementation's job, not this one's. Every
 import in the file you write must resolve to a real Python module —
 backend_contract's own JSON files (e.g. `backend/data_model.json`) are

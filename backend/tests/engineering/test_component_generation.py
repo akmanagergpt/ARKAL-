@@ -2449,6 +2449,212 @@ class TestF0100BackendSchemaPreventiveRule:
             assert token not in lowered, token
 
 
+#: BACKEND_SCHEMA_EXECUTABLE_PERSISTENCE_CONTRACT (real evidence:
+#: `factory-tutoring-1790697700`, `missing_persistence_code` x2,
+#: ARK-ERR-0116 exhausted, session evidence, frozen). The real, only
+#: output this attempt wrote for `backend_schema`.
+_FROZEN_TUTORING_SCHEMA_SQL_ONLY = {
+    "backend/db/schema.sql": (
+        "-- SQLite Schema for Tutoring Service\n"
+        "CREATE TABLE IF NOT EXISTS tutors (\n"
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "    name TEXT NOT NULL\n"
+        ");\n\n"
+        "CREATE TABLE IF NOT EXISTS sessions (\n"
+        "    id INTEGER PRIMARY KEY AUTOINCREMENT,\n"
+        "    tutor_id INTEGER NOT NULL,\n"
+        "    FOREIGN KEY (tutor_id) REFERENCES tutors(id)\n"
+        ");\n"
+    ),
+}
+
+
+class TestBackendSchemaExecutablePersistenceContract:
+    """A-N: `backend_schema` must emit real, executable Python persistence
+    -- a standalone `.sql`/migration/DDL-only artifact never satisfies
+    this rule by itself, no matter how valid its own SQL is."""
+
+    @staticmethod
+    def _rule() -> str:
+        return StageVocabulary.load(REPO).stage("backend_schema").rule
+
+    def test_a_schema_sql_only_output_is_rejected(self) -> None:
+        findings = _schema_only_findings(_FROZEN_TUTORING_SCHEMA_SQL_ONLY)
+        assert any(f.code == "missing_persistence_code" for f in findings)
+
+    def test_b_migration_sql_only_output_is_rejected(self) -> None:
+        files = {"backend/migrations/0001_initial.sql": "CREATE TABLE tutors (id INTEGER);\n"}
+        findings = _schema_only_findings(files)
+        assert any(f.code == "missing_persistence_code" for f in findings)
+
+    def test_c_executable_python_sqlite_persistence_passes(self) -> None:
+        files = {
+            "backend/db.py": (
+                "import sqlite3\n"
+                "def init_db():\n"
+                "    conn = sqlite3.connect('app.db')\n"
+                "    conn.execute('CREATE TABLE IF NOT EXISTS tutors (id INTEGER)')\n"
+                "    conn.commit()\n"
+            ),
+        }
+        assert _schema_only_findings(files) == []
+
+    def test_d_python_file_with_only_inert_sql_text_and_no_sqlite_usage_still_fails(self) -> None:
+        """A `.py` file that merely holds SQL as a string constant, with no
+        real `sqlite3`/`sqlite://` usage anywhere, must not be mistaken for
+        executable persistence -- the checker's own existing `uses_sqlite`
+        gate already requires a real connection marker, unchanged by this
+        fix."""
+        files = {
+            "backend/schema_text.py": (
+                "SCHEMA = \"CREATE TABLE tutors (id INTEGER)\"\n"
+            ),
+        }
+        findings = _schema_only_findings(files)
+        assert any(f.code == "missing_persistence_code" for f in findings)
+
+    def test_e_python_persistence_with_an_optional_accompanying_sql_artifact_passes(self) -> None:
+        files = {
+            **_FROZEN_TUTORING_SCHEMA_SQL_ONLY,
+            "backend/db.py": (
+                "import sqlite3\n"
+                "def init_db():\n"
+                "    conn = sqlite3.connect('app.db')\n"
+                "    conn.execute('CREATE TABLE IF NOT EXISTS tutors (id INTEGER)')\n"
+                "    conn.commit()\n"
+            ),
+        }
+        assert _schema_only_findings(files) == []
+
+    def test_f_valid_python_persistence_using_create_table_passes(self) -> None:
+        assert _schema_only_findings(HAPPY_PATH_FILES["backend_schema"]) == []
+
+    def test_g_frozen_tutoring_evidence_still_fails_before_and_after_the_fix(self) -> None:
+        """The frozen INVALID output must still fail -- this fix changes
+        retry guidance only, never detection."""
+        findings = _schema_only_findings(_FROZEN_TUTORING_SCHEMA_SQL_ONLY)
+        assert [f.code for f in findings] == ["missing_persistence_code"]
+
+    def test_h_frozen_finding_maps_to_the_new_structured_hint(self) -> None:
+        from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+        prior_findings = (
+            (
+                "missing_persistence_code", "backend/",
+                "backend Python source contains no executable SQLite persistence",
+            ),
+        )
+        hint = _structured_hint_text([], prior_findings)
+        assert "missing_persistence_code" in hint
+        assert "real, executable Python" in hint
+        assert "nothing in this pipeline ever executes a bare `.sql` file" in hint
+
+    def test_i_canonical_retry_prompt_contains_the_new_actionable_hint(self) -> None:
+        """Item H/I/J: the real production `_stage_prompt` composition, not
+        a reimplementation, for this exact frozen candidate's own failure,
+        now carries the structured hint alongside the previous failed
+        output and the Stage-2 rule."""
+        from arkali.control.architecture.authority_map import AuthorityMap
+        from arkali.control.specification.blueprint_engine import derive_blueprint
+        from arkali.engineering.factory.stage_prompting import _stage_prompt
+
+        goal = (
+            "1. The system must persist tutors and sessions for a small home "
+            "tutoring service using SQLite with at least 2 tables.\n"
+            "2. The backend must expose at least 8 REST API endpoints supporting "
+            "full create, read, update and delete operations for both tutors "
+            "and sessions.\n"
+            "3. The frontend must allow creating, viewing, editing and deleting "
+            "both tutors and sessions within 2 screens.\n"
+            "4. The backend must respond within 500 ms for a single record "
+            "request under normal load."
+        )
+        blueprint = derive_blueprint(goal, AuthorityMap.load(REPO))
+        declaration = StageVocabulary.load(REPO).stage("backend_schema")
+        visible_files = {
+            "backend/models/tutors.json": '{"table_name": "tutors", "fields": {"id": "integer"}}',
+            "backend/models/sessions.json": '{"table_name": "sessions", "fields": {"id": "integer"}}',
+        }
+        finding_detail = "backend Python source contains no executable SQLite persistence"
+        prior_findings = (("missing_persistence_code", "backend/", finding_detail),)
+        prior_failure = f"missing_persistence_code:backend/:{finding_detail}"
+
+        prompt = _stage_prompt(
+            declaration, blueprint, visible_files, prior_failure, None,
+            repair_strategy="structured_hint", prior_findings=prior_findings,
+            previous_attempt_files=_FROZEN_TUTORING_SCHEMA_SQL_ONLY,
+        )
+        payload = json.loads(prompt)
+        assert payload["prior_attempt_failure"] == prior_failure
+        assert "backend/db/schema.sql" in payload["previous_attempt_output"]
+        assert "a real, executable SQLite schema" in payload["task"]
+        assert payload.get("repair_hint") is not None
+        assert "missing_persistence_code" in payload["repair_hint"]
+
+    def test_j_schema_bootstrap_unreachable_hint_is_unaffected(self) -> None:
+        from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+        prior_findings = (
+            (
+                "schema_bootstrap_unreachable", "backend/db.py",
+                "'backend/db.py' creates real schema but no other real backend "
+                "file ever imports it",
+            ),
+        )
+        hint = _structured_hint_text([], prior_findings)
+        assert "schema_bootstrap_unreachable" in hint
+        assert "missing_persistence_code" not in hint
+
+    def test_k_missing_api_routes_hint_is_unaffected(self) -> None:
+        from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+        prior_findings = (
+            ("missing_api_routes", "backend/", "backend source declares no HTTP API route"),
+        )
+        hint = _structured_hint_text([], prior_findings)
+        assert "missing_api_routes" in hint
+        assert "missing_persistence_code" not in hint
+
+    def test_l_frontend_local_import_hint_is_unaffected(self) -> None:
+        from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+        prior_findings = (
+            ("frontend_local_import_unresolved", "frontend/src/App.js", "imports './Thing' but no such file exists"),
+        )
+        hint = _structured_hint_text([], prior_findings)
+        assert "frontend_local_import_unresolved" in hint
+        assert "missing_persistence_code" not in hint
+
+    def test_m_missing_schema_bootstrap_does_not_receive_the_new_hint(self) -> None:
+        """A different, distinct finding code -- persistence exists but
+        never creates the schema -- must not accidentally inherit the
+        `missing_persistence_code` invariant merely because both names
+        mention schema/persistence. `missing_schema_bootstrap` itself has
+        no hint entry either way; this only proves the new entry is not
+        wrongly keyed to it."""
+        from arkali.engineering.factory.stage_prompting import _SUPPORTED_HINT_INVARIANTS
+
+        assert "missing_schema_bootstrap" not in _SUPPORTED_HINT_INVARIANTS
+
+    def test_n_no_candidate_or_domain_literal_in_the_new_production_logic(self) -> None:
+        """The rule cites its own real evidence candidate id, exactly like
+        every other citation in this file (e.g. `factory-goal-mtw5byq6-
+        irjabg`, `factory-ea9cba11-...`) -- that provenance string is
+        expected and required. What must never leak is this specific
+        candidate's own generated content: its real field/column names, or
+        the hint text repeating them, which would make the fix look
+        candidate-specific rather than generic."""
+        from arkali.engineering.factory.stage_prompting import _SUPPORTED_HINT_INVARIANTS
+
+        rule = self._rule()
+        hint = _SUPPORTED_HINT_INVARIANTS["missing_persistence_code"]
+        assert "factory-tutoring-1790697700" in rule  # real evidence citation, expected
+        banned_fields = ("hourly_rate", "scheduled_time", "is_available", "duration_minutes")
+        for token in banned_fields:
+            assert token not in rule.lower()
+            assert token not in hint.lower()
+
+
 class TestAsyncEsmExportCheckerFix:
     """goal-mtzww02l-48k6h3 (session evidence, frozen). The real, terminal
     `frontend_forms` attempt 3 (recovered, unmodified, from the real
