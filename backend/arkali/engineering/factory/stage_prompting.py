@@ -175,6 +175,36 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "attempt will create the missing module -- no later stage re-emits "
         "backend_implementation's own files"
     ),
+    #: SCHEMA_BOOTSTRAP_RETRY_HINT_GAP (real evidence:
+    #: `factory-catering-1790691970`, `schema_bootstrap_unreachable`,
+    #: ARK-ERR-0116 exhausted, session evidence, frozen). The real checker
+    #: fires correctly -- `backend_schema`'s own real `backend/db.py`
+    #: creates real schema, but the real `backend/app.py` this attempt
+    #: wrote never imports it, instead redeclaring its own separate
+    #: `init_db`/connection logic from scratch -- but had no entry here, so
+    #: a retry received only the raw finding text, `backend/db.py` itself
+    #: (as a declared-input visible file), and the generic "make the
+    #: minimal edit" convergence rule, never an explicit repair action; the
+    #: real, mechanically-reconstructed retry prompt (this exact candidate,
+    #: this exact failure) confirmed `repair_hint` was absent entirely.
+    #: `STAGED_GENERATION_STAGES.md#3`'s own rule already states this same
+    #: invariant at generation time ("If schema creation ... lives in a
+    #: file separate from the one declaring the real HTTP routes, the
+    #: routes file must actually import that file"); this hint restates it
+    #: only for a retry that already violated it.
+    "schema_bootstrap_unreachable": (
+        "a real schema/bootstrap module this stage's own earlier input "
+        "already declares creates real schema, but no real file this "
+        "response wrote ever imports or otherwise reuses it -- that "
+        "schema-creation code can never run when the real application "
+        "starts. Repair by doing exactly one of: import and reuse that "
+        "existing schema/bootstrap module from the real application/routes "
+        "file, through its real startup path; or, if the active "
+        "application does not use that separate module, remove or replace "
+        "it so only one real, reachable schema/bootstrap implementation "
+        "remains -- never leave a second, real-but-unreachable schema "
+        "implementation duplicated alongside the one actually wired in"
+    ),
     #: F-0099 recurrence (real evidence: `factory-goal-mtzkvowr-998jly`,
     #: `frontend_route_unreachable` x4, ARK-ERR-0116 exhausted). This hint
     #: already existed and was already delivered; the recurrence traced to

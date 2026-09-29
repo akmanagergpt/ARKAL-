@@ -1303,6 +1303,286 @@ def test_schema_bootstrap_reachability_recognizes_a_blueprint_file_as_route_decl
     assert "schema_bootstrap_unreachable" not in {item.code for item in report.findings}
 
 
+#: SCHEMA_BOOTSTRAP_RETRY_HINT_GAP (real evidence: `factory-
+#: catering-1790691970`, `schema_bootstrap_unreachable`, ARK-ERR-0116
+#: exhausted, session evidence, frozen). `backend_schema`'s own real
+#: `backend/db.py` created real schema; the real `backend/app.py` this
+#: attempt wrote never imported it, instead redeclaring its own separate
+#: `init_db`/connection logic from scratch -- the checker fired correctly,
+#: but had no structured retry hint, confirmed by mechanically
+#: reconstructing the real retry prompt this exact candidate would have
+#: received (`repair_hint` was `None`).
+_SCHEMA_BOOTSTRAP_GAP_DB_PY = (
+    "import sqlite3\n"
+    "def init_db():\n"
+    "    conn = sqlite3.connect('app.db')\n"
+    "    conn.execute('CREATE TABLE IF NOT EXISTS clients (id INTEGER)')\n"
+    "    conn.commit()\n"
+)
+
+
+def test_matrix_a_separate_schema_module_imported_by_the_active_app_is_reachable() -> None:
+    files = {
+        "backend/db.py": _SCHEMA_BOOTSTRAP_GAP_DB_PY,
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "from backend.db import init_db\n\n"
+            "app = Flask(__name__)\n"
+            "init_db()\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert not any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_b_separate_schema_module_never_imported_is_unreachable() -> None:
+    files = {
+        "backend/db.py": _SCHEMA_BOOTSTRAP_GAP_DB_PY,
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n\n"
+            "app = Flask(__name__)\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_c_inline_schema_with_no_abandoned_second_implementation_passes() -> None:
+    """A single, self-contained file that both creates schema and declares
+    routes is trivially exempt -- its own schema creation always runs when
+    it does (the checker's own documented rationale)."""
+    files = {
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "import sqlite3\n\n"
+            "app = Flask(__name__)\n"
+            "sqlite3.connect('app.db').execute('CREATE TABLE IF NOT EXISTS clients (id INTEGER)')\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert not any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_d_app_duplicates_bootstrap_logic_while_the_real_module_stays_unreachable() -> None:
+    """The exact real frozen shape: app.py redeclares its own separate
+    init_db/connection logic from scratch rather than importing the real,
+    separate backend_schema-produced module -- the duplicate does not
+    rescue the original module's own unreachable schema creation."""
+    files = {
+        "backend/db.py": _SCHEMA_BOOTSTRAP_GAP_DB_PY,
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "import sqlite3\n\n"
+            "app = Flask(__name__)\n\n"
+            "def get_connection():\n    return sqlite3.connect('app.db')\n\n"
+            "def init_db():\n"
+            "    conn = get_connection()\n"
+            "    conn.execute('CREATE TABLE IF NOT EXISTS clients (id INTEGER)')\n"
+            "    conn.commit()\n\n"
+            "init_db()\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_e_an_unrelated_import_does_not_satisfy_reachability() -> None:
+    """Importing a different module that merely shares no real reference to
+    the schema module's own name must not be mistaken for reachability."""
+    files = {
+        "backend/db.py": _SCHEMA_BOOTSTRAP_GAP_DB_PY,
+        "backend/utils.py": "def helper():\n    return 1\n",
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n"
+            "from backend.utils import helper\n\n"
+            "app = Flask(__name__)\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([helper()])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_f_a_comment_or_string_literal_mentioning_the_module_does_not_satisfy_reachability() -> None:
+    """`_module_referenced_on_an_import_line` only ever matches a real
+    import/from line -- a comment or string literal naming the module was
+    already, correctly, never enough before this fix, and stays that way;
+    this change touches only the hint registry, never this detection."""
+    files = {
+        "backend/db.py": _SCHEMA_BOOTSTRAP_GAP_DB_PY,
+        "backend/app.py": (
+            "from flask import Flask, jsonify\n\n"
+            "# TODO: wire up backend.db for schema bootstrap\n"
+            "NOTE = 'see backend.db for schema'\n\n"
+            "app = Flask(__name__)\n\n"
+            "@app.route('/clients', methods=['GET'])\n"
+            "def list_clients():\n    return jsonify([])\n"
+        ),
+    }
+    findings = _backend_implementation_stage_findings(files)
+    assert any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_g_schema_bootstrap_unreachable_has_an_actionable_structured_retry_hint() -> None:
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = (
+        (
+            "schema_bootstrap_unreachable", "backend/db.py",
+            "'backend/db.py' creates real schema (CREATE TABLE / create_all) but no "
+            "other real backend file ever imports it -- this schema-creation code can "
+            "never actually run when the real application starts",
+        ),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "schema_bootstrap_unreachable" in hint
+    assert "import and reuse" in hint
+    assert "reachable" in hint
+
+
+def test_matrix_h_an_unrelated_finding_code_never_receives_the_schema_bootstrap_invariant() -> None:
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = (
+        ("missing_api_routes", "backend/", "backend source declares no HTTP API route"),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "schema_bootstrap_unreachable" not in hint
+    assert "import and reuse" not in hint
+
+
+def _frozen_catering_blob():  # noqa: ANN202
+    path = (
+        REPO / "var" / "factory" / "evidence" / "blobs" / "sha256" / "cc"
+        / "cc9ae4fbae8f4677b9a93a5aeb8e9dfc69822e221bbb35e84659af6e946e0aa5"
+    )
+    if not path.exists():
+        pytest.skip("local frozen evidence not available")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_matrix_j_frozen_catering_replay_still_fails_the_checker() -> None:
+    """Do NOT fix the model output -- the frozen invalid candidate must
+    still fail exactly as it did live. If this ever passes, the hint
+    registry change wrongly touched detection."""
+    blob = _frozen_catering_blob()
+    envelope, parse_failure = _parse_stage_envelope("backend_implementation", blob["last_raw_output"])
+    assert parse_failure is None
+    stage_files = {item.path: item.content for item in envelope.files}
+    ws = REPO / "var/factory/candidates/factory-catering-1790691970"
+    if not ws.exists():
+        pytest.skip("local frozen candidate not available")
+    visible_files = {
+        p.relative_to(ws).as_posix(): p.read_text(encoding="utf-8")
+        for p in ws.rglob("*") if p.is_file()
+    }
+    merged = {**visible_files, **stage_files}
+    findings = _backend_implementation_stage_findings(merged)
+    assert any(f.code == "schema_bootstrap_unreachable" for f in findings)
+
+
+def test_matrix_k_frozen_catering_finding_now_maps_to_the_new_structured_hint() -> None:
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    blob = _frozen_catering_blob()
+    prior_findings = (
+        (
+            "schema_bootstrap_unreachable", "backend/db.py",
+            "'backend/db.py' creates real schema (CREATE TABLE / create_all) but no "
+            "other real backend file ever imports it -- this schema-creation code can "
+            "never actually run when the real application starts",
+        ),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "schema_bootstrap_unreachable" in hint
+    assert blob["last_completion_metadata"]["finish_reason"] == "stop"
+
+
+def test_matrix_i_the_real_reconstructed_retry_prompt_carries_the_new_hint() -> None:
+    """Item I: use the real production `_stage_prompt` composition, not a
+    reimplementation, to prove the actual retry this candidate would next
+    receive now carries the structured invariant alongside the raw
+    finding and the previous attempt's own real files."""
+    from arkali.control.architecture.authority_map import AuthorityMap
+    from arkali.control.specification.blueprint_engine import derive_blueprint
+    from arkali.engineering.factory.generation_stages import StageVocabulary
+    from arkali.engineering.factory.stage_prompting import _stage_prompt
+
+    blob = _frozen_catering_blob()
+    ws = REPO / "var/factory/candidates/factory-catering-1790691970"
+    if not ws.exists():
+        pytest.skip("local frozen candidate not available")
+    visible_files = {
+        p.relative_to(ws).as_posix(): p.read_text(encoding="utf-8")
+        for p in ws.rglob("*") if p.is_file()
+    }
+    envelope, _ = _parse_stage_envelope("backend_implementation", blob["last_raw_output"])
+    previous_attempt_files = {item.path: item.content for item in envelope.files}
+
+    goal = (
+        "1. The system must persist clients and events for a small event catering "
+        "business using SQLite with at least 2 tables.\n"
+        "2. The backend must expose at least 8 REST API endpoints supporting full "
+        "create, read, update and delete operations for both clients and events.\n"
+        "3. The frontend must allow creating, viewing, editing and deleting both "
+        "clients and events within 2 screens.\n"
+        "4. The backend must respond within 500 ms for a single record request "
+        "under normal load."
+    )
+    blueprint = derive_blueprint(goal, AuthorityMap.load(REPO))
+    declaration = StageVocabulary.load(REPO).stage("backend_implementation")
+    finding_detail = (
+        "'backend/db.py' creates real schema (CREATE TABLE / create_all) but no "
+        "other real backend file ever imports it -- this schema-creation code can "
+        "never actually run when the real application starts"
+    )
+    prior_findings = (("schema_bootstrap_unreachable", "backend/db.py", finding_detail),)
+    prior_failure = f"schema_bootstrap_unreachable:backend/db.py:{finding_detail}"
+
+    prompt = _stage_prompt(
+        declaration, blueprint, visible_files, prior_failure, None,
+        repair_strategy="structured_hint", prior_findings=prior_findings,
+        previous_attempt_files=previous_attempt_files,
+    )
+    payload = json.loads(prompt)
+    assert payload["prior_attempt_failure"] == prior_failure
+    assert "backend/app.py" in payload["previous_attempt_output"]
+    assert "backend/db.py" in payload["visible_prior_files"]
+    assert payload.get("repair_hint") is not None
+    assert "schema_bootstrap_unreachable" in payload["repair_hint"]
+
+
+def test_matrix_l_missing_api_routes_hint_is_unaffected() -> None:
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = (
+        ("missing_api_routes", "backend/", "backend source declares no HTTP API route"),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "missing_api_routes" in hint
+    assert "Blueprint" in hint or "local Python module" in hint
+
+
+def test_matrix_m_frontend_hint_registry_is_unaffected() -> None:
+    from arkali.engineering.factory.stage_prompting import _structured_hint_text
+
+    prior_findings = (
+        ("frontend_local_import_unresolved", "frontend/src/App.js", "imports './Thing' but no such file exists"),
+    )
+    hint = _structured_hint_text([], prior_findings)
+    assert "frontend_local_import_unresolved" in hint
+    assert "schema_bootstrap_unreachable" not in hint
+
+
 def test_cors_boundary_findings_requires_cors() -> None:
     findings = _cors_boundary_stage_findings(HAPPY_PATH_FILES["backend_implementation"])
     assert any(f.code == "missing_browser_origin_boundary" for f in findings)
