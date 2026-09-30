@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 
 import pytest
 
@@ -26,6 +27,11 @@ from arkali.engineering.factory.component_generation import (
     generate_staged_model_product,
 )
 from arkali.engineering.factory.errors import ModelGenerationError
+from arkali.engineering.factory.frontend_forms_stage import (
+    _frontend_forms_units,
+    _generate_frontend_forms_stage,
+    _narrowed_visible_files,
+)
 from arkali.engineering.factory.generation_stages import StageVocabulary
 from arkali.engineering.factory.stage_prompting import _stage_prompt
 from arkali.engineering.localai.adapter import HonestState, InferenceResult
@@ -3783,3 +3789,339 @@ if __name__ == '__main__':
     assert ui_timeout == DEFAULT_TIMEOUT_SECONDS
     assert forms_timeout > DEFAULT_TIMEOUT_SECONDS
     assert forms_timeout == pytest.approx(1311.87, abs=0.1)
+
+
+#: FRONTEND_FORMS_OUTPUT_BOUNDARY (real evidence: `factory-garden-
+#: 1790744835`, `finish_reason: "length"` at exactly the shared 4096-token
+#: output ceiling, mid-way through a second module's own create form,
+#: after backend_contract through frontend_ui all genuinely passed).
+_BOUNDED_FORMS_UX_SPEC_DICT = {
+    "product_title": "Test Product",
+    "primary_roles": ["user"],
+    "modules": [
+        {
+            "name": "widgets", "navigation_label": "Widgets", "presentation": "table",
+            "actions": ["create", "edit"], "forms": [{"name": "widget_form", "fields": ["name"]}],
+            "search_filter": False,
+            "states": {"loading": True, "empty": True, "error": True, "success": True},
+        },
+        {
+            "name": "gadgets", "navigation_label": "Gadgets", "presentation": "table",
+            "actions": ["create", "edit"], "forms": [{"name": "gadget_form", "fields": ["label"]}],
+            "search_filter": False,
+            "states": {"loading": True, "empty": True, "error": True, "success": True},
+        },
+    ],
+    "navigation_destinations": ["Widgets", "Gadgets"],
+    "design_system": {
+        "typography_scale": ["base"], "spacing_scale": ["sm"], "component_conventions": ["cards"],
+    },
+}
+_BOUNDED_FORMS_UX_SPEC = json.dumps(_BOUNDED_FORMS_UX_SPEC_DICT)
+
+_BOUNDED_FORMS_API_CLIENT_JS = (
+    "export async function createWidget(name) {\n"
+    "  const r = await fetch('/api/widgets', {method: 'POST', body: JSON.stringify({name})});\n"
+    "  return r.json();\n"
+    "}\n"
+    "export async function updateWidget(id, name) {\n"
+    "  const r = await fetch(`/api/widgets/${id}`, {method: 'PUT', body: JSON.stringify({name})});\n"
+    "  return r.json();\n"
+    "}\n"
+    "export async function createGadget(label) {\n"
+    "  const r = await fetch('/api/gadgets', {method: 'POST', body: JSON.stringify({label})});\n"
+    "  return r.json();\n"
+    "}\n"
+    "export async function updateGadget(id, label) {\n"
+    "  const r = await fetch(`/api/gadgets/${id}`, {method: 'PUT', body: JSON.stringify({label})});\n"
+    "  return r.json();\n"
+    "}\n"
+)
+
+_BOUNDED_FORMS_APP_JSX = (
+    "import React from 'react';\n"
+    "export default function App() {\n"
+    "  return <div>Test App</div>;\n"
+    "}\n"
+)
+
+_WIDGET_FORM_JSX = (
+    "import React, { useState } from 'react';\n"
+    "import { createWidget, updateWidget } from './apiClient';\n\n"
+    "function WidgetForm({ editing, onDone }) {\n"
+    "  const [name, setName] = useState(editing ? editing.name : '');\n"
+    "  const [success, setSuccess] = useState(false);\n"
+    "  const handleSubmit = async (e) => {\n"
+    "    e.preventDefault();\n"
+    "    if (editing) { await updateWidget(editing.id, name); } else { await createWidget(name); }\n"
+    "    setSuccess(true);\n"
+    "    onDone();\n"
+    "  };\n"
+    "  return (\n"
+    "    <form onSubmit={handleSubmit}>\n"
+    "      <label htmlFor=\"widget-name\">Name</label>\n"
+    "      <input id=\"widget-name\" required value={name} onChange={(e) => setName(e.target.value)} />\n"
+    "      <button type=\"submit\">Add Widget</button>\n"
+    "      {success && <p>Saved successfully</p>}\n"
+    "    </form>\n"
+    "  );\n"
+    "}\n\n"
+    "export default WidgetForm;\n"
+)
+
+_GADGET_FORM_JSX = (
+    "import React, { useState } from 'react';\n"
+    "import { createGadget, updateGadget } from './apiClient';\n\n"
+    "function GadgetForm({ editing, onDone }) {\n"
+    "  const [label, setLabel] = useState(editing ? editing.label : '');\n"
+    "  const [success, setSuccess] = useState(false);\n"
+    "  const handleSubmit = async (e) => {\n"
+    "    e.preventDefault();\n"
+    "    if (editing) { await updateGadget(editing.id, label); } else { await createGadget(label); }\n"
+    "    setSuccess(true);\n"
+    "    onDone();\n"
+    "  };\n"
+    "  return (\n"
+    "    <form onSubmit={handleSubmit}>\n"
+    "      <label htmlFor=\"gadget-label\">Label</label>\n"
+    "      <input id=\"gadget-label\" required value={label} onChange={(e) => setLabel(e.target.value)} />\n"
+    "      <button type=\"submit\">Add Gadget</button>\n"
+    "      {success && <p>Saved successfully</p>}\n"
+    "    </form>\n"
+    "  );\n"
+    "}\n\n"
+    "export default GadgetForm;\n"
+)
+
+
+def _bounded_forms_declaration():  # noqa: ANN202
+    return StageVocabulary.load(REPO).stage("frontend_forms")
+
+
+class TestFrontendFormsBoundedGeneration:
+    """Matrix A-O: bounded, per-module frontend_forms generation."""
+
+    @staticmethod
+    def _two_module_visible_files() -> dict[str, str]:
+        return {
+            "product/ux_spec.json": _BOUNDED_FORMS_UX_SPEC,
+            "frontend/src/apiClient.js": _BOUNDED_FORMS_API_CLIENT_JS,
+            "frontend/src/App.jsx": _BOUNDED_FORMS_APP_JSX,
+        }
+
+    @staticmethod
+    def _one_module_visible_files() -> dict[str, str]:
+        spec = {**_BOUNDED_FORMS_UX_SPEC_DICT, "modules": [_BOUNDED_FORMS_UX_SPEC_DICT["modules"][0]],
+                "navigation_destinations": ["Widgets"]}
+        return {
+            "product/ux_spec.json": json.dumps(spec),
+            "frontend/src/apiClient.js": _BOUNDED_FORMS_API_CLIENT_JS,
+            "frontend/src/App.jsx": _BOUNDED_FORMS_APP_JSX,
+        }
+
+    # -- B/C/D: partition primitives, no model call -----------------------
+
+    def test_b_two_create_edit_modules_produce_two_units(self) -> None:
+        assert _frontend_forms_units(self._two_module_visible_files()) == ("widgets", "gadgets")
+
+    def test_c_five_modules_produce_five_units_not_one_monolithic_call(self) -> None:
+        modules = [
+            {
+                "name": f"entity{i}", "navigation_label": f"Entity {i}", "presentation": "table",
+                "actions": ["create", "edit"], "forms": [{"name": f"entity{i}_form", "fields": ["name"]}],
+                "search_filter": False,
+                "states": {"loading": True, "empty": True, "error": True, "success": True},
+            }
+            for i in range(5)
+        ]
+        spec = json.dumps({
+            **_BOUNDED_FORMS_UX_SPEC_DICT, "modules": modules,
+            "navigation_destinations": [f"Entity {i}" for i in range(5)],
+        })
+        units = _frontend_forms_units({"product/ux_spec.json": spec})
+        assert units == tuple(f"entity{i}" for i in range(5))
+
+    def test_d_unit_2_narrowing_includes_unit_1s_own_accepted_files(self) -> None:
+        visible = self._two_module_visible_files()
+        accepted_after_unit_1 = {"frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX}
+        narrowed = _narrowed_visible_files({**visible, **accepted_after_unit_1}, frozenset(["widgets", "gadgets"]))
+        assert narrowed["frontend/src/WidgetForm.jsx"] == _WIDGET_FORM_JSX
+        spec = json.loads(narrowed["product/ux_spec.json"])
+        assert {m["name"] for m in spec["modules"]} == {"widgets", "gadgets"}
+
+    def test_d2_unit_1_alone_narrows_to_only_its_own_module(self) -> None:
+        narrowed = _narrowed_visible_files(self._two_module_visible_files(), frozenset(["widgets"]))
+        spec = json.loads(narrowed["product/ux_spec.json"])
+        assert [m["name"] for m in spec["modules"]] == ["widgets"]
+
+    # -- A/E: orchestration dispatch, model calls mocked out ---------------
+
+    def test_a_one_entity_product_falls_back_to_the_unchanged_single_call_path(self, monkeypatch) -> None:
+        calls: list[str | None] = []
+
+        def fake_generate_one_stage(decl, bp, model, model_id, visible, *, timeout_seconds,
+                                     max_attempts, target_runtime=None, unit_scope=None):
+            calls.append(unit_scope)
+            return {"frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX}
+
+        monkeypatch.setattr(
+            "arkali.engineering.factory.component_generation._generate_one_stage",
+            fake_generate_one_stage,
+        )
+        result = _generate_frontend_forms_stage(
+            _bounded_forms_declaration(), _blueprint(), object(), "model-1",
+            self._one_module_visible_files(), timeout_seconds=10.0, max_attempts=4,
+        )
+        assert calls == [None]
+        assert result == {"frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX}
+
+    def test_e_a_failure_in_unit_2_does_not_regenerate_unit_1(self, monkeypatch) -> None:
+        calls: list[str | None] = []
+
+        def fake_generate_one_stage(decl, bp, model, model_id, visible, *, timeout_seconds,
+                                     max_attempts, target_runtime=None, unit_scope=None):
+            calls.append(unit_scope)
+            if unit_scope == "gadgets":
+                raise ModelGenerationError("stage 'frontend_forms' exhausted 4 attempts: boom")
+            return {"frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX}
+
+        monkeypatch.setattr(
+            "arkali.engineering.factory.component_generation._generate_one_stage",
+            fake_generate_one_stage,
+        )
+        with pytest.raises(ModelGenerationError):
+            _generate_frontend_forms_stage(
+                _bounded_forms_declaration(), _blueprint(), object(), "model-1",
+                self._two_module_visible_files(), timeout_seconds=10.0, max_attempts=4,
+            )
+        assert calls == ["widgets", "gadgets"]
+
+    def test_l_a_failing_final_merge_check_is_still_enforced(self, monkeypatch) -> None:
+        """Item L: even when every unit's own call succeeds, the final,
+        unmodified stage checker still runs once over the complete merged
+        result and can still reject it."""
+        def fake_generate_one_stage(decl, bp, model, model_id, visible, *, timeout_seconds,
+                                     max_attempts, target_runtime=None, unit_scope=None):
+            return {f"frontend/src/{unit_scope}.jsx": "not real form content"}
+
+        monkeypatch.setattr(
+            "arkali.engineering.factory.component_generation._generate_one_stage",
+            fake_generate_one_stage,
+        )
+        with pytest.raises(ModelGenerationError, match="merged units still violate"):
+            _generate_frontend_forms_stage(
+                _bounded_forms_declaration(), _blueprint(), object(), "model-1",
+                self._two_module_visible_files(), timeout_seconds=10.0, max_attempts=4,
+            )
+
+    # -- F/M: real end-to-end generation through the real checker ----------
+
+    def test_f_and_m_two_real_bounded_units_pass_the_real_checker_end_to_end(self) -> None:
+        """Items F (each unit's own real _generate_one_stage attempt loop,
+        never sharing state with the other) and M (the real garden-shaped
+        two-module workload partitions into two bounded calls, neither
+        needing to fit both modules' forms in one response)."""
+        model = _QueueModel([
+            (HonestState.PASS, _output({"frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX})),
+            (HonestState.PASS, _output({"frontend/src/GadgetForm.jsx": _GADGET_FORM_JSX})),
+        ])
+        result = _generate_frontend_forms_stage(
+            _bounded_forms_declaration(), _blueprint(), model, "model-1",
+            self._two_module_visible_files(), timeout_seconds=10.0, max_attempts=4,
+        )
+        assert result == {
+            "frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX,
+            "frontend/src/GadgetForm.jsx": _GADGET_FORM_JSX,
+        }
+        assert len(model.prompts) == 2
+        unit_1_payload = json.loads(model.prompts[0])
+        unit_2_payload = json.loads(model.prompts[1])
+        assert unit_1_payload["generation_scope"].count("'widgets'") == 1
+        assert unit_2_payload["generation_scope"].count("'gadgets'") == 1
+        # Unit 2 sees unit 1's own accepted file (item D, end-to-end).
+        assert "frontend/src/WidgetForm.jsx" in unit_2_payload["visible_prior_files"]
+        assert "frontend/src/GadgetForm.jsx" not in unit_1_payload["visible_prior_files"]
+        merged = {**self._two_module_visible_files(), **result}
+        assert _frontend_forms_findings(merged) == []
+
+    # -- G-K: the relocated checker still enforces every real invariant ----
+
+    def test_g_unresolved_local_imports_still_fail(self) -> None:
+        files = {
+            **self._one_module_visible_files(),
+            "frontend/src/WidgetForm.jsx": _WIDGET_FORM_JSX.replace("./apiClient", "./MissingHelper"),
+        }
+        codes = {f.code for f in _frontend_forms_findings(files)}
+        assert "frontend_local_import_unresolved" in codes
+
+    def test_h_missing_success_feedback_still_fails(self) -> None:
+        broken = (
+            _WIDGET_FORM_JSX
+            .replace("  const [success, setSuccess] = useState(false);\n", "")
+            .replace("    setSuccess(true);\n", "")
+            .replace("      {success && <p>Saved successfully</p>}\n", "")
+        )
+        assert "success" not in broken.lower()
+        files = {**self._one_module_visible_files(), "frontend/src/WidgetForm.jsx": broken}
+        codes = {f.code for f in _frontend_forms_findings(files)}
+        assert "frontend_ui_missing_success_feedback" in codes
+
+    def test_i_unlabelled_form_control_still_fails(self) -> None:
+        broken = _WIDGET_FORM_JSX.replace('<label htmlFor="widget-name">Name</label>', "")
+        files = {**self._one_module_visible_files(), "frontend/src/WidgetForm.jsx": broken}
+        codes = {f.code for f in _frontend_forms_findings(files)}
+        assert "frontend_ui_form_control_unlabelled" in codes
+
+    def test_j_missing_edit_ui_reachability_still_fails(self) -> None:
+        broken = _WIDGET_FORM_JSX.replace("updateWidget", "createWidget")
+        files = {**self._one_module_visible_files(), "frontend/src/WidgetForm.jsx": broken}
+        codes = {f.code for f in _frontend_forms_findings(files)}
+        assert "frontend_ui_missing_edit_ui" in codes
+
+    def test_k_client_call_missing_import_still_fails(self) -> None:
+        broken = _WIDGET_FORM_JSX.replace(
+            "import { createWidget, updateWidget } from './apiClient';", "",
+        )
+        files = {**self._one_module_visible_files(), "frontend/src/WidgetForm.jsx": broken}
+        codes = {f.code for f in _frontend_forms_findings(files)}
+        assert "frontend_client_call_missing_import" in codes
+
+    # -- N/O: no provider or domain literals in production logic ----------
+
+    def test_frozen_garden_workload_partitions_into_two_bounded_units(self) -> None:
+        """Frozen garden replay (Step 12): the real, persisted
+        `factory-garden-1790744835` candidate's own real `product/ux_spec.
+        json` -- two modules, both declaring create and edit -- partitions
+        into exactly two bounded units, eliminating the original
+        4096-token monolithic shape without any model call."""
+        ws = REPO / "var/factory/candidates/factory-garden-1790744835"
+        spec_path = ws / "product/ux_spec.json"
+        if not spec_path.exists():
+            pytest.skip("local frozen candidate not available")
+        visible_files = {"product/ux_spec.json": spec_path.read_text(encoding="utf-8")}
+        units = _frontend_forms_units(visible_files)
+        assert units == ("members", "plots")
+        narrowed_unit_1 = _narrowed_visible_files(visible_files, frozenset(["members"]))
+        narrowed_unit_2 = _narrowed_visible_files(visible_files, frozenset(["members", "plots"]))
+        assert [m["name"] for m in json.loads(narrowed_unit_1["product/ux_spec.json"])["modules"]] == ["members"]
+        assert {m["name"] for m in json.loads(narrowed_unit_2["product/ux_spec.json"])["modules"]} == {"members", "plots"}
+
+    def test_n_and_o_no_provider_or_domain_literal_in_partitioning_logic(self) -> None:
+        """The module's own docstring legitimately cites its real evidence
+        (`factory-garden-1790744835`, `qwen/qwen3.5-9b`) -- the same
+        established citation convention every other checker/rule in this
+        codebase already uses. What must never appear is a domain or
+        provider name inside the actual EXECUTABLE code -- a docstring or
+        `#`-comment line is never itself a code path."""
+        source = pathlib.Path(
+            REPO / "backend/arkali/engineering/factory/frontend_forms_stage.py"
+        ).read_text(encoding="utf-8")
+        code_only = re.sub(r'""".*?"""', "", source, flags=re.DOTALL)
+        code_only = "\n".join(
+            line for line in code_only.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        )
+        banned = ("qwen", "bionic", "ollama", "garden", "member", "plot")
+        lowered = code_only.lower()
+        for token in banned:
+            assert token not in lowered, token

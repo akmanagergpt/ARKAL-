@@ -507,6 +507,7 @@ def _stage_prompt(
     target_runtime: str | None = None, repair_strategy: str = _DEFAULT_REPAIR_STRATEGY,
     prior_findings: tuple[tuple[str, str, str], ...] = (),
     previous_attempt_files: Mapping[str, str] | None = None,
+    unit_scope: str | None = None,
 ) -> str:
     payload: dict[str, object] = {
         "role": "You are one bounded stage of a multi-stage software factory.",
@@ -547,6 +548,19 @@ def _stage_prompt(
             "names, and retain everything else already correct -- do not "
             "regenerate unrelated content from scratch, and do not repeat "
             "the same wrong value again."
+        )
+    if unit_scope is not None:
+        # FRONTEND_FORMS_OUTPUT_BOUNDARY (real evidence: `factory-garden-
+        # 1790744835`, `finish_reason: "length"` at exactly the shared
+        # output-token ceiling). One bounded call now covers one
+        # product_ux_spec-declared module at a time; this additive field
+        # is the only real difference from an unscoped call to this same
+        # stage -- 'task' below still states every other requirement.
+        payload["generation_scope"] = (
+            f"Generate real, complete mutation UI ONLY for the {unit_scope!r} module "
+            "named in product_ux_spec; other modules' own forms are generated "
+            "separately and must not be touched here -- every other requirement in "
+            "'task' still applies fully to this module's own forms."
         )
     if target_runtime is not None:
         # golden-work-047 (session evidence, frozen): the model was never

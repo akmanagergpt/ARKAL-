@@ -55,12 +55,13 @@ from arkali.engineering.factory.backend_stage_preflight import (
 from arkali.engineering.factory.dependency_resolution import _apply_missing_compatibility_cap_repair
 from arkali.engineering.factory.errors import ModelGenerationError, _model_generation_error
 from arkali.engineering.factory.frontend_client_call_preflight import (
-    _client_call_missing_import_findings,
-    _phantom_client_import_findings,
     _repair_missing_client_call_imports,
 )
+from arkali.engineering.factory.frontend_forms_stage import (
+    _frontend_forms_findings,
+    _generate_frontend_forms_stage,
+)
 from arkali.engineering.factory.frontend_invented_mutation_preflight import (
-    _invented_mutation_ui_findings,
     _repair_invented_mutation_ui,
 )
 from arkali.engineering.factory.frontend_manifest_preflight import (
@@ -75,20 +76,12 @@ from arkali.engineering.factory.frontend_root_route_preflight import (
     _orphaned_router_root_findings,
     _repair_orphaned_router_root,
 )
-from arkali.engineering.factory.frontend_callback_arity_preflight import (
-    _callback_prop_arity_mismatch_findings,
-)
-from arkali.engineering.factory.frontend_form_initial_state_preflight import (
-    _form_initial_data_ignored_findings,
-)
-from arkali.engineering.factory.frontend_route_param_preflight import _unread_route_param_findings
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
     _missing_ui_state_findings,
     _split_client_and_ui,
     _unreachable_module_findings,
     _unused_client_export_findings,
-    _ux_spec_mutation_findings,
     _ux_spec_shell_findings,
 )
 from arkali.engineering.factory.generation_stages import StageDeclaration, StageVocabulary
@@ -206,23 +199,6 @@ def _frontend_ui_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
         + _missing_root_route_findings(files)
         + _orphaned_router_root_findings(files)
         + _ux_spec_shell_findings(files)
-    )
-
-
-def _frontend_forms_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
-    """`frontend_forms`'s own narrow rule: real, labelled, validated
-    mutation UI for every product_ux_spec-declared create/edit action, a
-    confirmation step before delete, and success feedback after a
-    mutation. Split out from `frontend_ui` (golden-work-065, session
-    evidence, frozen) — see `STAGED_GENERATION_STAGES.md#9`."""
-    return (
-        _ux_spec_mutation_findings(files)
-        + _client_call_missing_import_findings(files)
-        + _phantom_client_import_findings(files)
-        + _invented_mutation_ui_findings(files)
-        + _unread_route_param_findings(files)
-        + _callback_prop_arity_mismatch_findings(files)
-        + _form_initial_data_ignored_findings(files)
     )
 
 
@@ -405,6 +381,7 @@ def _generate_one_stage(
     timeout_seconds: float,
     max_attempts: int,
     target_runtime: str | None = None,
+    unit_scope: str | None = None,
 ) -> dict[str, str]:
     from arkali.kernel.contracts.honest_state import HonestState
 
@@ -447,7 +424,7 @@ def _generate_one_stage(
         prompt = _stage_prompt(
             declaration, blueprint, visible_files, failure, target_runtime,
             repair_strategy=strategy, prior_findings=last_findings,
-            previous_attempt_files=previous_attempt_files,
+            previous_attempt_files=previous_attempt_files, unit_scope=unit_scope,
         )
         effective_timeout = timeout_seconds * min(
             max(1.0, len(prompt) / _REF_PROMPT_CHARS), _MAX_TIMEOUT_SCALE)
@@ -586,7 +563,8 @@ def generate_staged_model_product(
             # (session evidence) showed the model was never told it.
             target_runtime = platform.python_version()
         model, model_id = model_factory(declaration.name)
-        stage_files = _generate_one_stage(
+        generate = _generate_frontend_forms_stage if declaration.name == "frontend_forms" else _generate_one_stage
+        stage_files = generate(
             declaration, blueprint, model, model_id, visible,
             timeout_seconds=timeout_seconds, max_attempts=per_stage_max_attempts,
             target_runtime=target_runtime,
