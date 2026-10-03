@@ -510,6 +510,40 @@ def _route_static_prefix(route_path: str) -> str | None:
     return route_path[:slash + 1] if slash >= 0 else None
 
 
+def _repair_unreachable_parameterized_routes(
+    files: Mapping[str, str],
+) -> dict[str, str]:
+    """Remove only provably dead, self-closing parameterized route declarations."""
+    repaired = dict(files)
+    route_decl = re.compile(
+        r"""[ \t]*<Route\s[^>]*?path=["']([^"']*/:[^/"']+)["'][^>]*/>\r?\n?""",
+    )
+    all_source = "\n".join(
+        source for path, source in repaired.items()
+        if path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))
+    )
+    for path, source in tuple(repaired.items()):
+        if not (path.startswith("frontend/src/") and path.endswith((".js", ".jsx"))):
+            continue
+        def remove(match: re.Match[str]) -> str:
+            route_path = match.group(1)
+            prefix = _route_static_prefix(route_path)
+            if (
+                not prefix
+                or all_source.count(prefix) > 1
+                or _has_generic_list_route_reference(route_path, all_source)
+            ):
+                return match.group(0)
+            return ""
+        repaired[path] = route_decl.sub(remove, source)
+        all_source = "\n".join(
+            value for candidate_path, value in repaired.items()
+            if candidate_path.startswith("frontend/src/")
+            and candidate_path.endswith((".js", ".jsx"))
+        )
+    return repaired
+
+
 def _unreachable_parameterized_route_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """A parameterized route's own static prefix must appear somewhere in
     the real frontend beyond its own declaration -- a real templated Link

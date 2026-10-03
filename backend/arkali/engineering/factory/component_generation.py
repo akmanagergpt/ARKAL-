@@ -79,6 +79,7 @@ from arkali.engineering.factory.frontend_root_route_preflight import (
 from arkali.engineering.factory.frontend_route_shadowing_preflight import _repair_shadowed_routes
 from arkali.engineering.factory.frontend_ux_preflight import (
     _missing_ui_state_findings,
+    _repair_unreachable_parameterized_routes,
     _split_client_and_ui,
     _unreachable_module_findings,
     _unused_client_export_findings,
@@ -251,6 +252,7 @@ def _apply_deterministic_repairs(
         lambda sf: _repair_missing_react_router_imports(sf),
         lambda sf: _repair_missing_client_call_imports({**visible_files, **sf}, sf),
         lambda sf: _repair_shadowed_routes(sf),
+        lambda sf: _repair_unreachable_parameterized_routes({**visible_files, **sf}),
         lambda sf: _repair_orphaned_router_root(visible_files, sf),
         lambda sf: _repair_invented_mutation_ui({**visible_files, **sf}, sf),
     )
