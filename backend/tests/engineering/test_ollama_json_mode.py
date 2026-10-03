@@ -44,7 +44,7 @@ def test_json_mode_uses_ollama_native_structured_output(
         "stream": True,
         "format": "json",
         "think": False,
-        "options": {"num_ctx": 12288, "num_predict": 4096, "temperature": 0},
+        "options": {"num_ctx": 8192, "num_predict": 4096, "temperature": 0},
     }
     assert captured["timeout"] == 9
     assert result.output == "{}"
@@ -86,7 +86,7 @@ def test_default_adapter_does_not_force_runtime_specific_format(monkeypatch) -> 
     # let the real Ollama server on this host silently fall back to its
     # own OLLAMA_CONTEXT_LENGTH=4096 default instead of the model's real,
     # much larger capability, starving a dense real prompt of headroom.
-    assert captured["options"] == {"num_ctx": 12288, "temperature": 0}
+    assert captured["options"] == {"num_ctx": 8192, "temperature": 0}
 
 
 def test_num_ctx_leaves_real_headroom_for_a_dense_real_frontend_forms_prompt(
