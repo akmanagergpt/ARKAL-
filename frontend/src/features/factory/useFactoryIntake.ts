@@ -113,6 +113,25 @@ export function useFactoryIntake(client: ArkaliApiClient): FactoryIntakeState & 
     [client, stopPolling],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    void client.findCurrentFactoryJob().then((current) => {
+      if (cancelled || current === null) return;
+      setJob(current);
+      void pollOnce(current.job_id);
+      stopPolling();
+      pollRef.current = setInterval(() => {
+        void pollOnce(current.job_id);
+      }, POLL_INTERVAL_MS);
+    }).catch(() => {
+      // Recovery is best-effort presentation only. Backend truth is untouched.
+    });
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
+  }, [client, pollOnce, stopPolling]);
+
   const submit = useCallback(
     async (goalText: string): Promise<void> => {
       stopPolling();

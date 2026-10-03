@@ -88,6 +88,7 @@ export const ENDPOINTS = {
   findPreview: { method: 'GET', path: '/api/candidates/{candidate_id}/preview' },
   startProjectPreview: { method: 'POST', path: '/api/projects/{project_id}/preview' },
   findProjectPreview: { method: 'GET', path: '/api/projects/{project_id}/preview' },
+  findCurrentFactoryJob: { method: 'GET', path: '/api/jobs/current-factory' },
   getJob: { method: 'GET', path: '/api/jobs/{job_id}' },
   listJobCheckpoints: { method: 'GET', path: '/api/jobs/{job_id}/checkpoints' },
   cancelJob: { method: 'POST', path: '/api/jobs/{job_id}/cancel' },
@@ -493,6 +494,10 @@ export class ArkaliApiClient {
    * never a mutation. Used to poll a real `software_factory.production`
    * job after a `queued` intake result.
    */
+  findCurrentFactoryJob(): Promise<JobReferenceResponse | null> {
+    return this.request<JobReferenceResponse | null>(ENDPOINTS.findCurrentFactoryJob, {});
+  }
+
   getJob(jobId: string): Promise<JobReferenceResponse> {
     return this.request<JobReferenceResponse>(ENDPOINTS.getJob, {
       params: { job_id: jobId },

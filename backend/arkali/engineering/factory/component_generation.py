@@ -105,6 +105,7 @@ from arkali.engineering.factory.model_product_generation import (
 from arkali.engineering.factory.product_preflight import (
     SemanticFinding, _manifest_findings, _manifests_stage_findings,
 )
+from arkali.engineering.factory.schema_bootstrap_repair import _repair_unreachable_schema_bootstrap
 from arkali.engineering.factory.stage_prompting import _stage_prompt, _repair_strategy_for_attempt
 
 MAX_STAGE_ATTEMPTS = 4
@@ -247,6 +248,7 @@ def _apply_deterministic_repairs(
     silently discard a working repair, so every repair here runs
     unconditionally regardless of what the others found."""
     repair_fns = (
+        lambda sf: _repair_unreachable_schema_bootstrap(visible_files, sf),
         lambda sf: _apply_missing_compatibility_cap_repair(sf),
         lambda sf: _repair_react_router_version_mismatch({**visible_files, **sf}, sf),
         lambda sf: _repair_missing_react_router_imports(sf),

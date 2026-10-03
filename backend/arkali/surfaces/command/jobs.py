@@ -79,6 +79,7 @@ from arkali.control.policy.pep import PolicyEnforcementPoint
 from arkali.control.registry.project.registry import ProjectRegistry
 from arkali.execution.durable.job_state_machine import DEFINITION as _JOB_MACHINE
 from arkali.execution.durable.job_store import READ, WRITE, JobStore, JobSubmission
+from arkali.surfaces.command.factory_job_query import _find_current_factory_job
 from arkali.execution.durable.records import (
     DurableJobRecord,
     JobCheckpointRecord,
@@ -386,6 +387,18 @@ def build_jobs_router(
                 raise refuse(error) from error
             record = _find_current_preview(store(session), subject.subject_id)
             return None if record is None else _reference(record)
+
+    @router.get(
+        "/jobs/current-factory", response_model=JobReferenceResponse | None,
+        tags=[BROWSER_SLICE],
+    )
+    def find_current_factory_job(
+        session: Session = Depends(session_scope),
+    ) -> JobReferenceResponse | None:
+        """Rediscover the newest active production-Factory job after refresh."""
+        guard(READ)
+        current = _find_current_factory_job(store(session))
+        return None if current is None else _reference(current)
 
     @router.get(
         "/jobs/{job_id}", response_model=JobReferenceResponse, tags=[BROWSER_SLICE],
