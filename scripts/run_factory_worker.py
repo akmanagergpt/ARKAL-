@@ -292,7 +292,22 @@ def main(argv: list[str]) -> int:
     # adapter carries state across calls, and re-discovering the real
     # model id from a live server on every one of ~11 real stage calls
     # would be needless repeated network traffic for no behavior change.
-    adapter = local_runtime_adapter(json_mode=True, max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS)
+    generation_schema = {
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "items": GeneratedFile.model_json_schema(),
+            },
+        },
+        "required": ["files"],
+        "additionalProperties": False,
+    }
+    adapter = local_runtime_adapter(
+        json_mode=True,
+        max_output_tokens=DEFAULT_MAX_OUTPUT_TOKENS,
+        json_schema=generation_schema,
+    )
     model_id = local_runtime_model_id(adapter)
     provider_model = f"{adapter.runtime}/{model_id}"
     started = time.monotonic()

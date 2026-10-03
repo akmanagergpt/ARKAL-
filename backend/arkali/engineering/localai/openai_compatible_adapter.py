@@ -90,6 +90,7 @@ class OpenAICompatibleAdapter:
         self, endpoint: str = DEFAULT_ENDPOINT, *,
         max_output_tokens: int | None = None, json_mode: bool = False,
         reasoning_effort: str | None = None,
+        json_schema: dict[str, object] | None = None,
     ) -> None:
         if not _is_loopback(endpoint):
             raise LocalRuntimeTargetNotLoopbackError(
@@ -99,6 +100,7 @@ class OpenAICompatibleAdapter:
         self._endpoint = endpoint
         self._max_output_tokens = max_output_tokens
         self._json_mode = json_mode
+        self._json_schema = json_schema
         #: The standard OpenAI `reasoning_effort` field (real, documented,
         #: provider-agnostic -- never a Qwen-specific name), forwarded
         #: unchanged when set. Real evidence, this session: a reasoning
@@ -198,7 +200,10 @@ class OpenAICompatibleAdapter:
         if self._max_output_tokens is not None:
             payload["max_tokens"] = self._max_output_tokens
         if self._json_mode:
-            payload["response_format"] = _JSON_MODE_RESPONSE_FORMAT
+            payload["response_format"] = (
+                {"type": "json_schema", "json_schema": {"name": "response", "schema": self._json_schema}}
+                if self._json_schema is not None else _JSON_MODE_RESPONSE_FORMAT
+            )
         if self._reasoning_effort is not None:
             payload["reasoning_effort"] = self._reasoning_effort
         body = json.dumps(payload).encode("utf-8")

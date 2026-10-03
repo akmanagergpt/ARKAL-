@@ -99,14 +99,41 @@ class TestSharedModuleSelection:
         adapter = local_runtime.local_runtime_adapter()
         assert isinstance(adapter, OllamaAdapter)
 
-    def test_6_ollama_model_id_is_the_existing_unchanged_literal(
+    def test_6_ollama_model_id_is_discovered_from_the_live_runtime(
         self, local_runtime, monkeypatch,
     ) -> None:  # noqa: ANN001
-        monkeypatch.delenv("ARKALI_LOCAL_RUNTIME", raising=False)
-        adapter = local_runtime.local_runtime_adapter()
-        assert local_runtime.local_runtime_model_id(adapter) == "qwen2.5-coder:14b"
+        class _FakeOllama:
+            runtime = "ollama"
 
-    def test_7_openai_compatible_model_id_is_discovered_never_hard_coded(
+            def list_models(self):  # noqa: ANN201
+                class _Descriptor:
+                    model_id = "qwen3:8b"
+
+                return (_Descriptor(),)
+
+        monkeypatch.delenv("ARKALI_LOCAL_RUNTIME_MODEL_ID", raising=False)
+        assert local_runtime.local_runtime_model_id(_FakeOllama()) == "qwen3:8b"
+
+    def test_7_explicit_model_id_is_honored_only_when_available(
+        self, local_runtime, monkeypatch,
+    ) -> None:  # noqa: ANN001
+        class _FakeOllama:
+            runtime = "ollama"
+
+            def list_models(self):  # noqa: ANN201
+                class _Descriptor:
+                    model_id = "qwen3:8b"
+
+                return (_Descriptor(),)
+
+        monkeypatch.setenv("ARKALI_LOCAL_RUNTIME_MODEL_ID", "qwen3:8b")
+        assert local_runtime.local_runtime_model_id(_FakeOllama()) == "qwen3:8b"
+
+        monkeypatch.setenv("ARKALI_LOCAL_RUNTIME_MODEL_ID", "missing:model")
+        with pytest.raises(RuntimeError):
+            local_runtime.local_runtime_model_id(_FakeOllama())
+
+    def test_8_openai_compatible_model_id_is_discovered_never_hard_coded(
         self, local_runtime, monkeypatch,
     ) -> None:  # noqa: ANN001
         class _FakeAdapter:
@@ -120,7 +147,7 @@ class TestSharedModuleSelection:
 
         assert local_runtime.local_runtime_model_id(_FakeAdapter()) == "some/discovered-model"
 
-    def test_8_openai_compatible_model_id_raises_honestly_when_none_discovered(
+    def test_9_openai_compatible_model_id_raises_honestly_when_none_discovered(
         self, local_runtime,
     ) -> None:
         class _EmptyAdapter:
@@ -132,7 +159,7 @@ class TestSharedModuleSelection:
         with pytest.raises(RuntimeError):
             local_runtime.local_runtime_model_id(_EmptyAdapter())
 
-    def test_9_no_bionic_specific_model_id_literal_in_the_shared_module(
+    def test_10_no_provider_specific_model_id_literal_in_the_shared_module(
         self,
     ) -> None:
         source = (SCRIPTS / "local_runtime.py").read_text(encoding="utf-8")

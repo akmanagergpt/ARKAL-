@@ -121,7 +121,7 @@ MAX_STAGE_ATTEMPTS = 4
 #: floor. Never lower `_MEASURED_MIN_TOKENS_PER_SECOND` without a new real
 #: measurement on this same host.
 _MEASURED_MIN_TOKENS_PER_SECOND = 7.0
-DEFAULT_MAX_OUTPUT_TOKENS = 4096
+DEFAULT_MAX_OUTPUT_TOKENS = 5000
 #: One full generation at the measured floor, plus a 50% margin for
 #: prompt evaluation and real host variance (thermal, background load).
 DEFAULT_TIMEOUT_SECONDS = (DEFAULT_MAX_OUTPUT_TOKENS / _MEASURED_MIN_TOKENS_PER_SECOND) * 1.5

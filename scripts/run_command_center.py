@@ -424,10 +424,14 @@ def _factory_submitter(
 def _factory_guide(repo_root: pathlib.Path) -> Callable[..., Any]:
     """One bounded local Qwen-backed discovery turn; never enqueues generation."""
     from arkali.engineering.localai.intake_conversation import (
-        IntakeMessage, continue_intake_conversation,
+        IntakeGuidance, IntakeMessage, continue_intake_conversation,
     )
 
-    adapter = _local_runtime_adapter(json_mode=True, max_output_tokens=1200)
+    adapter = _local_runtime_adapter(
+        json_mode=True,
+        max_output_tokens=1200,
+        json_schema=IntakeGuidance.model_json_schema(),
+    )
     authority = compose_real_capability_authority(
         repo_root, adapter, _current_capability_phase(repo_root),
     )

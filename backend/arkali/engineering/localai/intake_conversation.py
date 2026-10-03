@@ -8,24 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from arkali.engineering.localai.adapter import HonestState, LocalRuntimeAdapter
 
 
-class IntakeMessage(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
-
-    role: str = Field(pattern="^(user|assistant)$")
-    content: str = Field(min_length=1, max_length=4000)
-
-
-class IntakeGuidance(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
-
-    assistant_message: str = Field(min_length=1, max_length=4000)
-    questions: tuple[str, ...] = Field(default=(), max_length=3)
-    proposed_goal_text: str | None = Field(default=None, max_length=12000)
-
-
-def _prompt(messages: Sequence[IntakeMessage]) -> str:
-    history = [{"role": item.role, "content": item.content} for item in messages]
-    return """Bounded local-model guidance for natural-language product intake.
+_PROMPT_GUIDANCE = """Bounded local-model guidance for natural-language product intake.
 
 The model is ARKALI's conversational discovery layer. It may ask a small number
 of BUSINESS questions and propose a production goal, but it never enqueues work,
@@ -44,8 +27,16 @@ USER EXPERIENCE RULES:
 - Do not ask a question merely because a technical choice is possible.
 - If the user's request already specifies enough business behavior, stop asking
   questions and propose the goal immediately.
+- Treat a CRUD-style MVP as complete when the user has specified the core
+  resource and its essential actions (for example add/list/complete/delete)
+  plus persistence when requested. Do NOT ask about optional fields such as
+  priority, timestamps, categories, due dates, extra statuses, themes, or
+  filters unless the user explicitly asks for them.
 - A request such as "görev ekle, tamamla, sil, kalıcı olsun" is sufficiently
-  concrete for a first production attempt.
+  concrete for a first production attempt and MUST produce proposed_goal_text
+  on the first response.
+- Do not invent optional business features just to create another question.
+  Choose the smallest coherent MVP and let ARKALI make the technical decisions.
 - At most two short questions in one turn.
 - If the user says "tamam", "üret", "başla", "yap", or otherwise approves the
   proposed scope, keep proposed_goal_text populated and do not ask another
@@ -71,7 +62,70 @@ Use null for proposed_goal_text only while genuinely missing business
 information. When enough is known, proposed_goal_text MUST be non-null.
 
 Conversation:
-""" + json.dumps(history, ensure_ascii=False)
+"""
+
+
+class IntakeMessage(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
+
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class IntakeGuidance(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", str_strip_whitespace=True)
+
+    assistant_message: str = Field(min_length=1, max_length=4000)
+    questions: tuple[str, ...] = Field(default=(), max_length=3)
+    proposed_goal_text: str | None = Field(default=None, max_length=12000)
+
+
+def _prompt(messages: Sequence[IntakeMessage]) -> str:
+    history = [{"role": item.role, "content": item.content} for item in messages]
+    return _PROMPT_GUIDANCE + json.dumps(history, ensure_ascii=False)
+
+
+def _is_crud_mvp_ready(messages: Sequence[IntakeMessage]) -> bool:
+    if not messages or messages[-1].role != "user":
+        return False
+    text = messages[-1].content.lower()
+    action_groups = (
+        ("ekle", "oluştur", "oluşturayım", "kayd"),
+        ("tamam", "bitir", "işaretle"),
+        ("sil", "kaldır"),
+        ("liste", "göster", "görüntüle"),
+    )
+    action_hits = sum(any(term in text for term in group) for group in action_groups)
+    persistence = any(
+        term in text
+        for term in (
+            "kalıcı",
+            "kaybolmasın",
+            "kapatıp aç",
+            "yeniden aç",
+            "saklan",
+            "verilerim kalsın",
+        )
+    )
+    return "uygulama" in text and action_hits >= 2 and persistence
+
+
+def _crud_mvp_fallback(messages: Sequence[IntakeMessage]) -> IntakeGuidance | None:
+    if not _is_crud_mvp_ready(messages):
+        return None
+    return IntakeGuidance(
+        assistant_message=(
+            "İsteğiniz ilk sürüm için yeterince açık. Teknik kararları ARKALI verecek; "
+            "önce küçük ve çalışan sürümü üretiyorum."
+        ),
+        questions=(),
+        proposed_goal_text=(
+            "1. The system must persist task records using SQLite with at least 1 table.\n"
+            "2. The backend must expose at least 4 REST API endpoints for task management.\n"
+            "3. The frontend must display a task list within 1 screen.\n"
+            "4. The backend must respond within 500 ms for a single task request under normal load."
+        ),
+    )
 
 
 def continue_intake_conversation(
@@ -87,9 +141,14 @@ def continue_intake_conversation(
     if result.state is not HonestState.PASS or not result.output.strip():
         raise RuntimeError(result.detail or "local guidance did not return output")
     try:
-        return IntakeGuidance.model_validate(json.loads(result.output))
+        guidance = IntakeGuidance.model_validate(json.loads(result.output))
     except (json.JSONDecodeError, ValidationError) as exc:
         raise RuntimeError("local guidance returned an invalid structured response") from exc
+
+    fallback = _crud_mvp_fallback(messages)
+    if fallback is not None and guidance.proposed_goal_text is None:
+        return fallback
+    return guidance
 
 
 __all__ = ["IntakeGuidance", "IntakeMessage", "continue_intake_conversation"]

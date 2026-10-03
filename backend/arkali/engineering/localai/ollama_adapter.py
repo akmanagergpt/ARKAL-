@@ -56,7 +56,7 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 #: real files (App.js + StudentForm.js) were being requested. A generous,
 #: explicit default closes this regardless of what a given host's own
 #: Ollama environment happens to default to.
-DEFAULT_NUM_CTX = 8192
+DEFAULT_NUM_CTX = 12288
 
 
 def estimate_tokens(text: str) -> int:
@@ -131,6 +131,7 @@ class OllamaAdapter:
         json_mode: bool = False,
         max_output_tokens: int | None = None,
         num_ctx: int = DEFAULT_NUM_CTX,
+        json_schema: dict[str, object] | None = None,
     ) -> None:
         if not _is_loopback(endpoint):
             raise LocalRuntimeTargetNotLoopbackError(
@@ -142,6 +143,7 @@ class OllamaAdapter:
         if max_output_tokens is not None and not 1 <= max_output_tokens <= 32768:
             raise ValueError("max_output_tokens must be between 1 and 32768")
         self._max_output_tokens = max_output_tokens
+        self._json_schema = json_schema
         if not 1 <= num_ctx <= 131072:
             raise ValueError("num_ctx must be between 1 and 131072")
         self._num_ctx = num_ctx
@@ -217,7 +219,12 @@ class OllamaAdapter:
             "stream": True,
         }
         if self._json_mode:
-            payload["format"] = "json"
+            payload["format"] = self._json_schema if self._json_schema is not None else "json"
+            # Qwen3's thinking channel can otherwise consume the structured
+            # generation budget and return a reasoning-shaped object instead
+            # of the requested contract. JSON-mode is a contract-producing
+            # call, so disable provider-specific thinking output explicitly.
+            payload["think"] = False
         options: dict[str, object] = {"num_ctx": self._num_ctx, "temperature": 0}
         if self._max_output_tokens is not None:
             options["num_predict"] = self._max_output_tokens
