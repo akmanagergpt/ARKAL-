@@ -40,7 +40,9 @@ def test_guidance_is_turkish_structured_and_bounded() -> None:
     assert guidance.proposed_goal_text is None
     assert adapter.calls[0][0] == "qwen2.5-coder:14b"
     assert adapter.calls[0][2] == 180.0
-    assert "non-technical user" in adapter.calls[0][1]
+    assert "NEVER ask the user to choose a programming language" in adapter.calls[0][1]
+    assert "SQLite persistence" in adapter.calls[0][1]
+    assert "proposed_goal_text MUST be non-null" in adapter.calls[0][1]
 
 
 def test_ready_draft_is_only_returned_for_user_approval() -> None:
