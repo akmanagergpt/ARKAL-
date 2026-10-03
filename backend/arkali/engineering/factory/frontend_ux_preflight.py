@@ -8,7 +8,7 @@ out of this repository's own generated-candidate store
 `backend/course_model.json` and `backend/payment_model.json` each declare a
 real, distinct "fields" data model, but the entire generated frontend
 (`frontend/src/StudentList.js`) is one component rendering one bare `<ul>` of
-student names — no navigation element, no route, no form, no control of any
+student names Ã¢â‚¬â€ no navigation element, no route, no form, no control of any
 kind reaching the other two backend-declared models. It needs nothing but
 `backend_contract`'s own JSON, so it runs on every candidate regardless of
 which generation path produced it (staged or one-shot).
@@ -16,22 +16,22 @@ which generation path produced it (staged or one-shot).
 `_ux_spec_shell_findings` and `_ux_spec_mutation_findings` are the deeper,
 real `product_ux_spec` reconciliation, split along the same seam
 `frontend_ui`/`frontend_forms` are split along (golden-work-065, session
-evidence, frozen — see `STAGED_GENERATION_STAGES.md#9`): the shell slice
+evidence, frozen Ã¢â‚¬â€ see `STAGED_GENERATION_STAGES.md#9`): the shell slice
 checks every declared navigation destination is reachable and no raw JSON
 is dumped as primary content; the mutation slice checks every declared
 create/edit action has real, labelled, validated form UI, a declared
 delete action is confirmed before it fires, and a mutation leaves visible
 success feedback. Both are silent (no findings, never a `ux_spec_missing`
-failure) when no `product/ux_spec.json` exists — the one-shot generation
+failure) when no `product/ux_spec.json` exists Ã¢â‚¬â€ the one-shot generation
 path (`model_product_generation.py`) has no such stage and must not be
 penalized for a stage it never runs; `product_ux_spec`'s own stage
 validator, not this whole-product-gate layer, is what refuses a missing
 or invalid spec on the staged path.
 
 DELIBERATELY NARROW, NOT A DESIGN-QUALITY GATE. Both layers check
-reachability and structural completeness — whether a real control exists to
+reachability and structural completeness Ã¢â‚¬â€ whether a real control exists to
 reach each declared destination, whether a declared action has real UI,
-whether a state is present — never visual polish, color, spacing or
+whether a state is present Ã¢â‚¬â€ never visual polish, color, spacing or
 "professional" appearance; those are subjective and not machine-verifiable
 without a canonical authority this repository has not granted (VDC "Real
 user journeys" names navigation and dead controls as browser-automation
@@ -44,7 +44,14 @@ import re
 from collections.abc import Mapping
 
 from arkali.engineering.factory.frontend_actionability_preflight import _create_access_findings, _error_recovery_findings
-from arkali.engineering.factory.frontend_js_semantics import _commonjs_alias_export_names
+from arkali.engineering.factory.frontend_ux_source_helpers import (
+    _MUTATION_EXPORT_NAME,
+    _exported_js_names,
+    _frontend_source_text,
+    _frontend_ui_only_text,
+    _split_client_and_ui,
+    _update_like_client_exports,
+)
 from arkali.engineering.factory.frontend_manifest_preflight import (
     _frontend_local_import_findings,
     _react_router_missing_import_findings,
@@ -82,7 +89,6 @@ _CONFIRM_MARKERS = ("confirm(", "are you sure", "window.confirm")
 #: UI -- the same false-positive shape golden-work-101/124 already fixed
 #: for two different CommonJS export shapes, now extended to this
 #: distinct, plain-ESM one.
-_INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|(?:async\s+)?function)\s+(\w+)")
 #: golden-work-081 (session evidence, frozen): every real candidate this
 #: session's own `frontend_client` output has actually used -- declare
 #: every function as a plain top-level `async function name(...)`, then
@@ -94,7 +100,6 @@ _INLINE_EXPORT_PATTERN = re.compile(r"export\s+(?:const|(?:async\s+)?function)\s
 #: both this module's own `_update_like_client_exports` and
 #: `component_generation._unused_client_export_findings` (same pattern,
 #: reproduced there too) -- neither ever exercised on real output before.
-_GROUPED_EXPORT_BLOCK = re.compile(r"export\s*\{([^}]*)\}")
 #: golden-work-101 (session evidence, frozen): a real qwen2.5-coder:14b
 #: wrote a real, complete, correctly-wired `apiClient.js` using CommonJS
 #: (`module.exports = { getTasks, createTask, ... };`), a real pattern a
@@ -102,8 +107,6 @@ _GROUPED_EXPORT_BLOCK = re.compile(r"export\s*\{([^}]*)\}")
 #: export regex above recognizes it, so this extractor -- and every
 #: check built on it -- silently saw zero exports for any real candidate
 #: using this shape.
-_COMMONJS_EXPORTS_BLOCK = re.compile(r"module\.exports\s*=\s*\{([^}]*)\}")
-_UPDATE_OR_EDIT_NAME = re.compile(r"^(?:update|edit)", re.IGNORECASE)
 #: golden-work-082 (session evidence, frozen): STAGED_GENERATION_STAGES.md#8
 #: ("the UI calls every function frontend_client exports") and #9
 #: ("mutating forms...are not this stage's concern -- that is
@@ -117,32 +120,8 @@ _UPDATE_OR_EDIT_NAME = re.compile(r"^(?:update|edit)", re.IGNORECASE)
 #: this; a mutation-named export is real evidence's own naming
 #: convention (createX/updateX/editX/deleteX), the same evidence
 #: `_UPDATE_OR_EDIT_NAME` above already relies on.
-_MUTATION_EXPORT_NAME = re.compile(r"^(?:create|update|edit|delete)", re.IGNORECASE)
 
 
-def _exported_js_names(client_text: str) -> frozenset[str]:
-    """Real names a JS/TS file exports, covering every real shape this
-    pipeline's own generated `frontend_client` output has used: inline
-    (`export function name(...)`/`export const name = ...`), grouped
-    (`export { name, other as alias };` -- the local declared name, the
-    one actually called or referenced elsewhere in the same file, not
-    any renamed alias) and CommonJS (`module.exports = { name, ... };`
-    -- golden-work-101, session evidence, frozen)."""
-    names = set(_INLINE_EXPORT_PATTERN.findall(client_text))
-    for block in _GROUPED_EXPORT_BLOCK.findall(client_text):
-        for part in block.split(","):
-            local_name = part.strip().split(" as ")[0].strip()
-            if local_name:
-                names.add(local_name)
-    for block in _COMMONJS_EXPORTS_BLOCK.findall(client_text):
-        for part in block.split(","):
-            name = part.strip().split(":")[0].strip()
-            if name:
-                names.add(name)
-    # F-0101 (real evidence: `factory-goal-mtz6bst2-myhr15`'s own
-    # `apiClient.js`): `const api = {...}; module.exports = api;` -- see
-    # `frontend_js_semantics._commonjs_alias_export_names`'s own docstring.
-    return frozenset(names) | _commonjs_alias_export_names(client_text)
 
 
 #: Deliberately excludes "error" -- an async-fetch error state (already
@@ -155,7 +134,7 @@ _VALIDATION_MARKERS = ("required", "invalid")
 #: implemented a genuine empty-state branch three times over
 #: (`students.length === 0 ? <p>No students found</p> : ...`) and every
 #: one was a real false positive against a bare `"empty" in text`
-#: check — the literal word never appears, only real, more specific
+#: check Ã¢â‚¬â€ the literal word never appears, only real, more specific
 #: phrasing. Loading/error stay single-marker: real output overwhelmingly
 #: uses those exact words, and no real evidence yet shows otherwise.
 _EMPTY_STATE_MARKERS = ("empty", "no results", "nothing found", ".length === 0", ".length==0")
@@ -169,7 +148,7 @@ def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
     UI-state-completeness check this file already owns. "empty" was
     named in `frontend_ui`'s own rule text (STAGED_GENERATION_STAGES.md#8:
     "renders loading, empty and error states") but never actually
-    checked here — a real gap in this check, not the rule, fixed
+    checked here Ã¢â‚¬â€ a real gap in this check, not the rule, fixed
     alongside this session's wider UX-reconciliation work rather than
     left to drift further from its own rule."""
     lowered = ui.lower()
@@ -187,23 +166,6 @@ def _missing_ui_state_findings(ui: str) -> list[SemanticFinding]:
     ]
 
 
-def _split_client_and_ui(files: Mapping[str, str]) -> tuple[str, str]:
-    """A `*client*`-named file versus every other real `frontend/src/*`
-    file -- moved here from `component_generation.py` (ADR-0008
-    decomposition, not a GATE 8 exception: that module reached its
-    400-logical-line ceiling, measured live by the real architecture
-    gate, not assumed) to sit alongside every other real check that
-    already needs this exact same split (`_frontend_ui_only_text`,
-    `_update_like_client_exports`)."""
-    client_paths = [
-        path for path in files if path.startswith("frontend/src/") and "client" in path.lower()
-    ]
-    ui_paths = [
-        path for path in files if path.startswith("frontend/src/") and "client" not in path.lower()
-    ]
-    client = "\n".join(files[path] for path in client_paths)
-    ui = "\n".join(files[path] for path in ui_paths)
-    return client, ui
 
 
 def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding]:
@@ -282,42 +244,10 @@ def _unused_client_export_findings(client: str, ui: str) -> list[SemanticFinding
                              detail=f"frontend_ui never calls client export(s) {uncalled!r}")]
 
 
-def _frontend_ui_only_text(files: Mapping[str, str]) -> str:
-    """Lowercased UI-only source (client files excluded) -- needed because
-    a `*client*` file's own function DEFINITION (e.g. `async function
-    updateStudent(...)`) would otherwise satisfy a regex looking for a
-    real UI-side reference to it."""
-    return _split_client_and_ui(files)[1].lower()
 
 
-def _update_like_client_exports(files: Mapping[str, str]) -> frozenset[str]:
-    """Real update/edit-named functions `frontend_client` actually exports
-    -- golden-work-081 (session evidence, frozen): a real model reused one
-    form component for both create and edit, passing the real exported
-    `updateStudent` BY REFERENCE (`<StudentForm onSubmit={updateStudent}
-    />`, invoked generically inside `StudentForm` as `onSubmit(...)`)
-    rather than calling it directly by name (`updateStudent(...)`) -- a
-    real, idiomatic React pattern this check's own first version (a regex
-    requiring a literal `(` right after the name) rejected as a false
-    positive on the very next real candidate. Matching the real declared
-    name itself, the same mechanism `_unused_client_export_findings`
-    already uses successfully, is robust to a call, a prop reference, or
-    any other real way of using it."""
-    client = "\n".join(
-        source for path, source in files.items()
-        if path.startswith("frontend/src/") and "client" in path.lower()
-    )
-    return frozenset(
-        name for name in _exported_js_names(client)
-        if _UPDATE_OR_EDIT_NAME.match(name)
-    )
 
 
-def _frontend_source_text(files: Mapping[str, str]) -> str:
-    return "\n".join(
-        source.lower() for path, source in files.items()
-        if path.startswith("frontend/src/")
-    )
 
 
 def _unreachable_module_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
@@ -325,7 +255,7 @@ def _unreachable_module_findings(files: Mapping[str, str]) -> list[SemanticFindi
 
     Fires only when backend_contract declares two or more distinct models
     AND the frontend shows no navigation marker AND the frontend contains no
-    interactive control (form/input/button/select) — the exact shape of
+    interactive control (form/input/button/select) Ã¢â‚¬â€ the exact shape of
     `dershane-demo-003`'s real single-`<ul>` output. Runs unconditionally,
     with or without a `product_ux_spec` artifact, since it needs nothing but
     `backend_contract`'s own JSON.
@@ -347,7 +277,7 @@ def _unreachable_module_findings(files: Mapping[str, str]) -> list[SemanticFindi
             f"({sorted(models)!r}) but the frontend has no navigation "
             "element (react-router, <Link>/<NavLink>, <nav>) and no "
             "interactive control (form/input/button/select) reaching any "
-            "of them beyond a single rendered list — a multi-module "
+            "of them beyond a single rendered list Ã¢â‚¬â€ a multi-module "
             "product may not ship as one bare list with the rest of the "
             "backend's declared models unreachable"
         ),
@@ -601,7 +531,7 @@ def _parsed_spec_and_frontend(files: Mapping[str, str]) -> tuple[object, str] | 
 def _ux_spec_shell_findings(files: Mapping[str, str]) -> list[SemanticFinding]:
     """`frontend_ui`'s own reconciliation slice: navigation reachability and
     no-raw-JSON, never the mutation-UI concerns `frontend_forms` owns.
-    Silent when no spec exists — this is not the layer that refuses a
+    Silent when no spec exists Ã¢â‚¬â€ this is not the layer that refuses a
     missing/invalid spec (`product_ux_spec._ux_spec_stage_findings` is), so
     a candidate from a pipeline with no such stage is never penalized
     here."""
@@ -618,7 +548,7 @@ def _ux_spec_mutation_findings(files: Mapping[str, str]) -> list[SemanticFinding
     and (unconditionally, with or without a spec) no added route silently
     shadowed by a broader existing one. Split out from the shell checks
     above (golden-work-065, session evidence, frozen) alongside the stage
-    split itself — see `STAGED_GENERATION_STAGES.md#9`'s own rule text
+    split itself Ã¢â‚¬â€ see `STAGED_GENERATION_STAGES.md#9`'s own rule text
     for the real evidence. The spec-dependent checks are silent when no
     spec exists, for the same reason the shell slice is."""
     findings = (
