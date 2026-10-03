@@ -11,6 +11,8 @@ def test_unreachable_parameterized_route_repair_removes_only_dead_self_closing_r
     }
     repaired = _repair_unreachable_parameterized_routes(files)
     assert "<Route path='/tasks/delete/:id'" not in repaired["frontend/src/App.js"]
+    assert "element={<DeleteTask />}" not in repaired["frontend/src/App.js"]
+    assert repaired["frontend/src/App.js"] == ""
     assert _unreachable_parameterized_route_findings(repaired) == []
 
 

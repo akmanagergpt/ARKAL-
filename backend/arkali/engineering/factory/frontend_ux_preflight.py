@@ -516,7 +516,11 @@ def _repair_unreachable_parameterized_routes(
     """Remove only provably dead, self-closing parameterized route declarations."""
     repaired = dict(files)
     route_decl = re.compile(
-        r"""[ \t]*<Route\s[^>]*?path=["']([^"']*/:[^/"']+)["'][^>]*/>\r?\n?""",
+        # Generated Route declarations are emitted as one physical line,
+        # but the element prop may itself contain JSX. A generic [^>]* match
+        # would stop at the nested component's first > and leave a dangling
+        # } />. Match the complete line instead.
+        r"""(?m)^[ \t]*<Route\s[^\r\n]*?path=["']([^"']*/:[^/"']+)["'][^\r\n]*?/>[ \t]*(?:\r?\n|\\n|$)""",
     )
     all_source = "\n".join(
         source for path, source in repaired.items()
