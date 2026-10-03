@@ -65,6 +65,17 @@ def test_model_factory_wraps_the_real_adapter_in_observed_model() -> None:
     assert "return observed, " in model_factory
 
 
+def test_model_factory_checkpoints_the_real_stage_before_inference() -> None:
+    source = _source()
+    model_factory = source[
+        source.index("def model_factory("): source.index("try:\n        result = generate_staged_model_product")
+    ]
+    checkpoint = model_factory.index('"phase": "stage_started"')
+    observed = model_factory.index("_ObservedModel(adapter, candidate_id, provider_model)")
+    assert checkpoint < observed
+    assert '"stage": stage_name' in model_factory
+
+
 def test_terminal_stage_failed_payload_preserves_last_raw_output() -> None:
     source = _source()
     stage_failed_block = source[

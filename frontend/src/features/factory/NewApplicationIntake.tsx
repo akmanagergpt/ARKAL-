@@ -10,6 +10,7 @@ import type {
 } from '@/api/contracts';
 import { Button, Callout, Panel } from '@/components/ui';
 
+import { FactoryProgressTimeline } from './FactoryProgressTimeline';
 import { PreviewActionButton, PreviewStatusPanel, previewIsReady } from './PreviewControls';
 import { usePreview } from './usePreview';
 import { useFactoryIntake } from './useFactoryIntake';
@@ -324,7 +325,10 @@ export function NewApplicationIntake({
         {intake.result !== null ? <ResultCallout result={intake.result} showTechnical={showTechnical} /> : null}
 
         {intake.job !== null ? (
-          <ProgressCallout job={intake.job} checkpoints={intake.checkpoints} showTechnical={showTechnical} />
+          <>
+            <ProgressCallout job={intake.job} checkpoints={intake.checkpoints} showTechnical={showTechnical} />
+            <FactoryProgressTimeline checkpoints={intake.checkpoints} showTechnical={showTechnical} />
+          </>
         ) : null}
 
         {projectId !== null && intake.job !== null && isProductionApproved(intake.checkpoints.at(-1) ?? null) ? (

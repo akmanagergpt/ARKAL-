@@ -367,7 +367,15 @@ def main(argv: list[str]) -> int:
     ledger.record_state(candidate_id, GENERATING, workspace.root)
     _checkpoint({"phase": "generating", "candidate_id": candidate_id})
 
-    def model_factory(_stage_name: str):  # noqa: ANN202
+    def model_factory(stage_name: str):  # noqa: ANN202
+        # This is the canonical staged generator's real stage-entry seam.
+        # Persist it in the existing durable JobStore so the Command Center
+        # can show actual progress without inventing a second progress store.
+        _checkpoint({
+            "phase": "stage_started",
+            "candidate_id": candidate_id,
+            "stage": stage_name,
+        })
         # F-0078: every real attempt's own diagnostic facts are frozen as
         # real, content-addressed evidence -- diagnostic provenance only,
         # never changing what this run reports or how it is classified.
