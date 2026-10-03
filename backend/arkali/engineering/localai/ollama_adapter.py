@@ -56,7 +56,7 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 #: real files (App.js + StudentForm.js) were being requested. A generous,
 #: explicit default closes this regardless of what a given host's own
 #: Ollama environment happens to default to.
-DEFAULT_NUM_CTX = 8192
+DEFAULT_NUM_CTX = 12288
 
 
 def estimate_tokens(text: str) -> int:

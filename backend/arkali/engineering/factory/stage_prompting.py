@@ -261,7 +261,13 @@ _SUPPORTED_HINT_INVARIANTS: dict[str, str] = {
         "component; adding the action anywhere else does not fix it. No exact "
         "button text, route string, DOM shape, or styling is required -- what "
         "matters is that a real, accessible path from the rendered list to "
-        "that route exists"
+        "that route exists. IMPORTANT: never declare a parameterized delete "
+        "route such as /tasks/delete/:id unless the same response also emits "
+        "a real rendered control that navigates to or invokes that exact route "
+        "for a real task id. If no such control is being emitted, omit the "
+        "delete route entirely and implement deletion through the reachable "
+        "list/item control instead; an unreachable delete route is itself a "
+        "contract violation."
     ),
     "frontend_root_path_unreachable": (
         "the application's own root path (\"/\") must resolve to a real render "
